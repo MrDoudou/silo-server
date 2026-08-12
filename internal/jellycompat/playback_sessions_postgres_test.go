@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,15 @@ import (
 	"github.com/Silo-Server/silo-server/internal/watchsync"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func TestCompatNegotiationLockSQLDoesNotBindNULDelimiter(t *testing.T) {
+	if strings.Contains(compatNegotiationLockSQL, "\x00") {
+		t.Fatal("advisory lock SQL must not embed a NUL delimiter")
+	}
+	if !strings.Contains(compatNegotiationLockSQL, "chr(31)") {
+		t.Fatal("advisory lock SQL should join key parts with chr(31) inside PostgreSQL")
+	}
+}
 
 func TestMarshalPlaybackSessionStripsNestedNUL(t *testing.T) {
 	wantLiteral := `literal\u0000text`

@@ -42,6 +42,13 @@ var (
 
 var jsonNULCodePoint = []byte(`\u0000`)
 
+// compatNegotiationLockSQL takes token, device ID, and route item ID as
+// separate text parameters and joins them with chr(31) inside PostgreSQL.
+const compatNegotiationLockSQL = `
+		SELECT pg_advisory_xact_lock(
+			hashtextextended($1 || chr(31) || $2 || chr(31) || $3, 0)
+		)`
+
 // marshalPlaybackSession removes NUL code points from every nested string in
 // the JSON document. PostgreSQL JSONB rejects U+0000 even when Go's encoder
 // represents it as \u0000. Escaped literal text (\\u0000) remains unchanged.
@@ -218,8 +225,14 @@ func (d *DurableCompatPlaybackStore) replaceUnstartedNegotiation(
 
 	var removed []string
 	if session.CompatToken != "" && session.ClientDeviceID != "" && session.RouteItemID != "" {
-		scope := session.CompatToken + "\x00" + session.ClientDeviceID + "\x00" + session.RouteItemID
-		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, scope); err != nil {
+		// Join the lock key inside PostgreSQL. A Go-side NUL delimiter cannot
+		// be bound as text: PostgreSQL rejects U+0000 (SQLSTATE 22021), the
+		// transaction aborts, and the negotiated session stays cache-only.
+		if _, err := tx.Exec(ctx, compatNegotiationLockSQL,
+			stripCompatNUL(session.CompatToken),
+			stripCompatNUL(session.ClientDeviceID),
+			stripCompatNUL(session.RouteItemID),
+		); err != nil {
 			return nil, err
 		}
 		rows, err := tx.Query(ctx, `
