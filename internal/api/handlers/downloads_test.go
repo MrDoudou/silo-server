@@ -417,6 +417,7 @@ func TestHandleCreateDownloadErrorMapping(t *testing.T) {
 		{"profile required", downloads.ErrProfileRequired, http.StatusBadRequest},
 		{"concurrent limit", downloads.ErrConcurrentLimitReached, http.StatusTooManyRequests},
 		{"period limit", downloads.ErrPeriodLimitReached, http.StatusTooManyRequests},
+		{"artifact evicted", downloads.ErrArtifactEvicted, http.StatusConflict},
 		{"item not found", catalog.ErrItemNotFound, http.StatusNotFound},
 	}
 	for _, tc := range cases {

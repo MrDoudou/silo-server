@@ -834,6 +834,8 @@ func (h *DownloadHandler) writeDownloadError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusTooManyRequests, "download_quota_exceeded", "Download quota exceeded for this period")
 	case errors.Is(err, downloads.ErrNoDownloadableEpisodes):
 		writeError(w, http.StatusNotFound, "no_downloadable_episodes", "No downloadable episodes found")
+	case errors.Is(err, downloads.ErrArtifactEvicted):
+		writeError(w, http.StatusConflict, "artifact_evicted", "The prepared download was reclaimed; retry the request")
 	case errors.Is(err, catalog.ErrItemNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "Media item not found")
 	default:
