@@ -5,9 +5,18 @@ UPDATE public.downloads
 SET artifact_id = NULL
 WHERE artifact_id IS NOT NULL AND status IN ('cancelled', 'failed', 'revoked');
 
--- Heal legacy dangling references left by the pre-fence check-then-delete race.
+-- Heal legacy dangling references left by the pre-fence check-then-delete
+-- race. The remaining dangling rows are non-terminal (terminal links were
+-- cleared above) and can never serve their prepared bytes again: a ready row
+-- with a nulled artifact_id would silently fall back to serving the source
+-- file, and a preparing row would hang forever (reconciliation only visits
+-- artifact-linked rows). Fail them; eviction is a retryable failure, so
+-- clients simply re-request and get a fresh artifact.
 UPDATE public.downloads
-SET artifact_id = NULL
+SET status = 'failed',
+    error_message = 'prepared artifact was evicted',
+    artifact_id = NULL,
+    updated_at = now()
 WHERE artifact_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM public.download_artifacts a WHERE a.id = public.downloads.artifact_id);
 

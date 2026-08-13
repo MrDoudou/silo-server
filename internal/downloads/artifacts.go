@@ -1043,11 +1043,11 @@ func (m *ArtifactManager) removeArtifact(ctx context.Context, a *Artifact, reaso
 		deleted, err = m.repo.DeleteIfEvictable(ctx, a.ID)
 	}
 	if err != nil {
-		msg := "deleting swept artifact row failed"
 		if ready {
-			msg = "evicting swept ready artifact row failed"
+			slog.WarnContext(ctx, "evicting swept ready artifact row failed", "component", "downloads", "artifact_id", a.ID, "error", err)
+		} else {
+			slog.WarnContext(ctx, "deleting swept artifact row failed", "component", "downloads", "artifact_id", a.ID, "error", err)
 		}
-		slog.WarnContext(ctx, msg, "component", "downloads", "artifact_id", a.ID, "error", err)
 		return
 	}
 	if !deleted {

@@ -18,7 +18,7 @@ const artifactColumns = `id, media_file_id, format, params_hash, container, code
 
 // activeArtifactLinkSQL is the EXISTS predicate that protects an artifact from
 // eviction. Completed/ready/preparing/queued/downloading rows remain servable
-// handles; cancelled/failed/revoked do not.
+// handles; canceled/failed/revoked do not.
 const activeArtifactLinkSQL = `EXISTS(SELECT 1 FROM downloads
 		 WHERE artifact_id = $1
 		   AND status NOT IN ('cancelled','failed','revoked'))`

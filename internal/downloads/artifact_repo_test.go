@@ -1036,7 +1036,7 @@ func TestCreateAgainstMissingArtifactIsEvicted(t *testing.T) {
 }
 
 // TestTerminalTransitionsUnpinArtifact pins the ON DELETE RESTRICT contract:
-// cancelling or failing a download must drop its artifact link, otherwise the
+// canceling or failing a download must drop its artifact link, otherwise the
 // artifact stays pinned against eviction forever.
 func TestTerminalTransitionsUnpinArtifact(t *testing.T) {
 	repo, pool, fileID := newArtifactTestRepo(t)
@@ -1062,12 +1062,12 @@ func TestTerminalTransitionsUnpinArtifact(t *testing.T) {
 	if err := dlRepo.CancelByID(ctx, cancelID, userID); err != nil {
 		t.Fatalf("CancelByID: %v", err)
 	}
-	cancelled, err := dlRepo.GetByID(ctx, cancelID)
+	canceled, err := dlRepo.GetByID(ctx, cancelID)
 	if err != nil {
-		t.Fatalf("get cancelled download: %v", err)
+		t.Fatalf("get canceled download: %v", err)
 	}
-	if cancelled.ArtifactID != "" {
-		t.Fatalf("cancelled download artifact_id = %q, want empty", cancelled.ArtifactID)
+	if canceled.ArtifactID != "" {
+		t.Fatalf("canceled download artifact_id = %q, want empty", canceled.ArtifactID)
 	}
 	deleted, err := repo.DeleteReadyIfEvictable(ctx, cancelArt.ID)
 	if err != nil {
