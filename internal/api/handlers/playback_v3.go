@@ -2360,15 +2360,29 @@ func shouldTryAlternateFileV3(qualityPreference string) bool {
 }
 
 const (
-	terminalNoAlternateVersionV3      = "no_alternate_version"
-	terminalHDRTranscodeUnsupportedV3 = "hdr_transcode_unsupported"
+	terminalNoAlternateVersionV3            = "no_alternate_version"
+	terminalHDRTranscodeUnsupportedV3       = "hdr_transcode_unsupported"
+	terminalSubtitleConversionUnsupportedV3 = "subtitle_conversion_unsupported"
 )
 
+// terminalAllowsAlternateFileV3 reports whether a planner terminal should
+// trigger another media-file attempt before the response is finalized.
+//
+// subtitle_conversion_unsupported is included because a burn-in-only
+// adaptation can rename an HDR or 4K blocker to that reason (see
+// planVideoTranscodeV3's subtitleForcedAdaptation path). The underlying
+// incompatibility is still version-shaped: an SDR / lower-resolution
+// alternate may burn the same subtitle successfully.
 func terminalAllowsAlternateFileV3(terminal *playback.TerminalV3) bool {
 	if terminal == nil {
 		return false
 	}
-	return terminal.Reason == terminalNoAlternateVersionV3 || terminal.Reason == terminalHDRTranscodeUnsupportedV3
+	switch terminal.Reason {
+	case terminalNoAlternateVersionV3, terminalHDRTranscodeUnsupportedV3, terminalSubtitleConversionUnsupportedV3:
+		return true
+	default:
+		return false
+	}
 }
 
 func replanAllowsAlternateFileV3(operation playback.ReplanOperationV3, qualityPreference string) bool {
