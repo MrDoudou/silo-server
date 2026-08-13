@@ -779,10 +779,11 @@ func TestEvictionFenceCoversEphemeralRows(t *testing.T) {
 	}
 }
 
-// TestDeleteIfEvictableFencesRequeuedArtifact covers the failed-artifact sweep:
-// a row Ensure requeued (so it is no longer 'ready') and a download then linked
-// must survive the sweep, and become removable once the link goes terminal.
-func TestDeleteIfEvictableFencesRequeuedArtifact(t *testing.T) {
+// TestDeleteFailedIfEvictableFencesRequeuedArtifact covers the failed-artifact
+// sweep: a linked row must survive the sweep, an unlinked row Ensure requeued
+// (status back to 'queued'/'running') must survive it too, and the row becomes
+// removable only once it is failed and unlinked.
+func TestDeleteFailedIfEvictableFencesRequeuedArtifact(t *testing.T) {
 	repo, pool, fileID := newArtifactTestRepo(t)
 	ctx := context.Background()
 
@@ -803,12 +804,12 @@ func TestDeleteIfEvictableFencesRequeuedArtifact(t *testing.T) {
 		t.Fatalf("create preparing download: %v", err)
 	}
 
-	deleted, err := repo.DeleteIfEvictable(ctx, art.ID)
+	deleted, err := repo.DeleteFailedIfEvictable(ctx, art.ID)
 	if err != nil {
-		t.Fatalf("DeleteIfEvictable linked: %v", err)
+		t.Fatalf("DeleteFailedIfEvictable linked: %v", err)
 	}
 	if deleted {
-		t.Fatal("a linked non-ready artifact must not be swept")
+		t.Fatal("a linked non-failed artifact must not be swept")
 	}
 	if _, err := repo.GetByID(ctx, art.ID); err != nil {
 		t.Fatalf("linked artifact missing after sweep attempt: %v", err)
@@ -817,12 +818,25 @@ func TestDeleteIfEvictableFencesRequeuedArtifact(t *testing.T) {
 	if _, err := pool.Exec(ctx, `UPDATE downloads SET status = 'failed', artifact_id = NULL WHERE id = $1`, dlID); err != nil {
 		t.Fatalf("fail download: %v", err)
 	}
-	deleted, err = repo.DeleteIfEvictable(ctx, art.ID)
+	// Unlinked but still queued: a requeued job the drain may already own must
+	// survive a status-unrestricted sweep would have removed it.
+	deleted, err = repo.DeleteFailedIfEvictable(ctx, art.ID)
 	if err != nil {
-		t.Fatalf("DeleteIfEvictable after fail: %v", err)
+		t.Fatalf("DeleteFailedIfEvictable requeued: %v", err)
+	}
+	if deleted {
+		t.Fatal("an unlinked requeued artifact must not be swept")
+	}
+
+	if _, err := pool.Exec(ctx, `UPDATE download_artifacts SET status = 'failed' WHERE id = $1`, art.ID); err != nil {
+		t.Fatalf("fail artifact: %v", err)
+	}
+	deleted, err = repo.DeleteFailedIfEvictable(ctx, art.ID)
+	if err != nil {
+		t.Fatalf("DeleteFailedIfEvictable after fail: %v", err)
 	}
 	if !deleted {
-		t.Fatal("an unlinked non-ready artifact must be swept")
+		t.Fatal("an unlinked failed artifact must be swept")
 	}
 }
 
@@ -1057,7 +1071,7 @@ func TestTerminalTransitionsUnpinArtifact(t *testing.T) {
 		Kind:      KindQueued, Status: StatusQueued, Format: FormatTranscode,
 		ArtifactID: cancelArt.ID, FileSize: 1024, CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
-		t.Fatalf("create cancellable download: %v", err)
+		t.Fatalf("create cancelable download: %v", err)
 	}
 	if err := dlRepo.CancelByID(ctx, cancelID, userID); err != nil {
 		t.Fatalf("CancelByID: %v", err)
@@ -1074,7 +1088,7 @@ func TestTerminalTransitionsUnpinArtifact(t *testing.T) {
 		t.Fatalf("DeleteReadyIfEvictable after cancel: %v", err)
 	}
 	if !deleted {
-		t.Fatal("a cancelled download must not pin its artifact")
+		t.Fatal("a canceled download must not pin its artifact")
 	}
 
 	failArt := newArtifact(t, fileID, fmt.Sprintf("hash-fail-%d", now.UnixNano()))
@@ -1100,9 +1114,12 @@ func TestTerminalTransitionsUnpinArtifact(t *testing.T) {
 	if flipped[0].ArtifactID != "" {
 		t.Fatalf("failed download artifact_id = %q, want empty", flipped[0].ArtifactID)
 	}
-	deleted, err = repo.DeleteIfEvictable(ctx, failArt.ID)
+	if _, err := pool.Exec(ctx, `UPDATE download_artifacts SET status = 'failed' WHERE id = $1`, failArt.ID); err != nil {
+		t.Fatalf("fail artifact: %v", err)
+	}
+	deleted, err = repo.DeleteFailedIfEvictable(ctx, failArt.ID)
 	if err != nil {
-		t.Fatalf("DeleteIfEvictable after fail: %v", err)
+		t.Fatalf("DeleteFailedIfEvictable after fail: %v", err)
 	}
 	if !deleted {
 		t.Fatal("a failed download must not pin its artifact")

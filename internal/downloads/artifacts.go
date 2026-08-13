@@ -1031,16 +1031,18 @@ func (m *ArtifactManager) removeArtifact(ctx context.Context, a *Artifact, reaso
 	if !m.enqueueEvictionCleanup(ctx, a) {
 		return
 	}
-	// A non-ready row is not necessarily dead: Ensure requeues a failed row and
-	// a download may have linked it since this candidate list was built, so both
-	// branches go through the active-link fence (plus the FK).
+	// A non-ready candidate came from ListFailedBefore, but it is not
+	// necessarily still dead: Ensure requeues a failed row and the drain can
+	// claim it as running before any download links it. Both branches therefore
+	// pin the row's status in the delete predicate and go through the
+	// active-link fence (plus the FK).
 	ready := a.Status == ArtifactReady
 	var deleted bool
 	var err error
 	if ready {
 		deleted, err = m.repo.DeleteReadyIfEvictable(ctx, a.ID)
 	} else {
-		deleted, err = m.repo.DeleteIfEvictable(ctx, a.ID)
+		deleted, err = m.repo.DeleteFailedIfEvictable(ctx, a.ID)
 	}
 	if err != nil {
 		if ready {

@@ -444,23 +444,23 @@ func (r *ArtifactRepository) ListUnlinkedReadyBefore(ctx context.Context, cutoff
 // a concurrent link that commits after this statement's snapshot makes the RI
 // trigger raise 23503, which reads as "not evictable".
 func (r *ArtifactRepository) DeleteReadyIfEvictable(ctx context.Context, id string) (bool, error) {
-	return r.deleteIfEvictable(ctx, id, true)
+	return r.deleteIfEvictable(ctx, id, ArtifactReady)
 }
 
-// DeleteIfEvictable is DeleteReadyIfEvictable without the ready-status
-// predicate: the failed-artifact sweep uses it so a row Ensure requeued (and a
-// download then linked) is never removed out from under that link.
-func (r *ArtifactRepository) DeleteIfEvictable(ctx context.Context, id string) (bool, error) {
-	return r.deleteIfEvictable(ctx, id, false)
+// DeleteFailedIfEvictable is the hygiene-sweep twin of DeleteReadyIfEvictable.
+// The status pin matters even without a link: Ensure requeues a failed row and
+// the drain can claim it as running before any download links it — a
+// status-unrestricted delete would remove that live job out from under its
+// worker.
+func (r *ArtifactRepository) DeleteFailedIfEvictable(ctx context.Context, id string) (bool, error) {
+	return r.deleteIfEvictable(ctx, id, ArtifactFailed)
 }
 
-func (r *ArtifactRepository) deleteIfEvictable(ctx context.Context, id string, requireReady bool) (bool, error) {
-	query := `DELETE FROM download_artifacts WHERE id = $1`
-	if requireReady {
-		query += ` AND status = 'ready'`
-	}
-	query += ` AND NOT ` + activeArtifactLinkSQL
-	tag, err := r.pool.Exec(ctx, query, id)
+func (r *ArtifactRepository) deleteIfEvictable(ctx context.Context, id string, requireStatus string) (bool, error) {
+	query := `DELETE FROM download_artifacts WHERE id = $1
+		 AND status = $2
+		 AND NOT ` + activeArtifactLinkSQL
+	tag, err := r.pool.Exec(ctx, query, id, requireStatus)
 	if err != nil {
 		// A download row linked the artifact concurrently: not evictable.
 		if isForeignKeyViolation(err, downloadsArtifactFKConstraint) {
