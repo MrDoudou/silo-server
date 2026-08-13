@@ -276,6 +276,10 @@ func TestReconcileLinkedDownloads(t *testing.T) {
 	}
 	arepo := NewArtifactRepository(f.pool)
 	t.Cleanup(func() {
+		// Cleanups run LIFO, so this fires before the fixture's downloads
+		// delete; unpin the links first or downloads_artifact_id_fkey
+		// (ON DELETE RESTRICT) refuses the artifact delete.
+		_, _ = f.pool.Exec(ctx, `UPDATE downloads SET artifact_id = NULL WHERE media_file_id = $1`, f.fileID)
 		_, _ = f.pool.Exec(ctx, `DELETE FROM download_artifacts WHERE media_file_id = $1`, f.fileID)
 	})
 
@@ -499,5 +503,82 @@ func TestRegisterManagedItemsBatchAndCount(t *testing.T) {
 	}
 	if len(grown) != 2 {
 		t.Fatalf("grown register = %d rows, want 2", len(grown))
+	}
+}
+
+// TestReplaceManagedEntryRevisionConflictReturnsWinner pins the simplified
+// outcome contract: with the artifact foreign key doing the enforcement, a
+// zero-row UPDATE can only mean the identity/revision fence rejected the write,
+// so the caller gets the winning row rather than an eviction error.
+func TestReplaceManagedEntryRevisionConflictReturnsWinner(t *testing.T) {
+	f := seedManagedFixture(t)
+	ctx := context.Background()
+	id := f.createManagedEntry(t)
+
+	existing, err := f.repo.GetByID(ctx, id)
+	if err != nil {
+		t.Fatalf("get managed entry: %v", err)
+	}
+
+	// A concurrent writer bumps the revision out from under the snapshot.
+	if _, err := f.pool.Exec(ctx, `UPDATE downloads SET revision = revision + 1 WHERE id = $1`, id); err != nil {
+		t.Fatalf("bump revision: %v", err)
+	}
+
+	replacement := &Download{
+		UserID: f.userID, ProfileID: f.profileA, DeviceID: f.deviceA,
+		MediaFileID: f.fileID, ContentID: f.contentID, Kind: KindQueued,
+		Status: StatusReady, Format: FormatOriginal, Quality: QualityOriginal,
+		EffectiveQuality: QualityOriginal, FileSize: 2048,
+	}
+	row, err := f.repo.ReplaceManagedEntry(ctx, existing, replacement)
+	if err != nil {
+		t.Fatalf("ReplaceManagedEntry on revision conflict: %v", err)
+	}
+	if row == nil || row.ID != id {
+		t.Fatalf("ReplaceManagedEntry returned %+v, want the winning row %q", row, id)
+	}
+	if row.Revision != existing.Revision+1 {
+		t.Fatalf("winning revision = %d, want %d (the concurrent writer's)", row.Revision, existing.Revision+1)
+	}
+}
+
+// TestReplaceManagedEntryEvictedArtifact pins the other half: an artifact
+// evicted between Ensure and the replace surfaces as ErrArtifactEvicted (via
+// downloads_artifact_id_fkey), never as a silent no-op.
+func TestReplaceManagedEntryEvictedArtifact(t *testing.T) {
+	f := seedManagedFixture(t)
+	ctx := context.Background()
+	var present *string
+	if err := f.pool.QueryRow(ctx, `SELECT to_regclass('public.download_artifacts')::text`).Scan(&present); err != nil {
+		t.Fatalf("check download_artifacts: %v", err)
+	}
+	if present == nil {
+		t.Skip("download_artifacts migration has not been applied")
+	}
+	var fkPresent bool
+	if err := f.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM pg_constraint WHERE conname = 'downloads_artifact_id_fkey')`,
+	).Scan(&fkPresent); err != nil {
+		t.Fatalf("check artifact fk: %v", err)
+	}
+	if !fkPresent {
+		t.Skip("downloads artifact foreign key migration has not been applied")
+	}
+
+	id := f.createManagedEntry(t)
+	existing, err := f.repo.GetByID(ctx, id)
+	if err != nil {
+		t.Fatalf("get managed entry: %v", err)
+	}
+	missingArtifactID := fmt.Sprintf("gone-artifact-%d", time.Now().UnixNano())
+	replacement := &Download{
+		UserID: f.userID, ProfileID: f.profileA, DeviceID: f.deviceA,
+		MediaFileID: f.fileID, ContentID: f.contentID, Kind: KindQueued,
+		Status: StatusReady, Format: FormatTranscode, Quality: QualityOriginal,
+		EffectiveQuality: QualityOriginal, ArtifactID: missingArtifactID, FileSize: 2048,
+	}
+	if _, err := f.repo.ReplaceManagedEntry(ctx, existing, replacement); !errors.Is(err, ErrArtifactEvicted) {
+		t.Fatalf("ReplaceManagedEntry with missing artifact = %v, want ErrArtifactEvicted", err)
 	}
 }

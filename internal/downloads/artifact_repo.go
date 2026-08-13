@@ -408,21 +408,6 @@ func (r *ArtifactRepository) TotalReadyBytes(ctx context.Context) (int64, error)
 	return total, nil
 }
 
-// HasActiveLink reports whether any valid download row — managed or ephemeral
-// (device-less web) — still references the artifact. Completed rows are
-// retained because they remain re-downloadable handles; evicting an artifact a
-// live row references would 404 a download the API advertises as servable.
-func (r *ArtifactRepository) HasActiveLink(ctx context.Context, artifactID string) (bool, error) {
-	var exists bool
-	if err := r.pool.QueryRow(ctx,
-		`SELECT `+activeArtifactLinkSQL,
-		artifactID,
-	).Scan(&exists); err != nil {
-		return false, fmt.Errorf("checking artifact links: %w", err)
-	}
-	return exists, nil
-}
-
 // ListFailedBefore returns terminally-failed artifacts cold since cutoff
 // (last_used_at). Their linked downloads were already flipped to 'failed' by
 // reconciliation, so the rows serve nothing and only block re-attempts.
@@ -452,46 +437,124 @@ func (r *ArtifactRepository) ListUnlinkedReadyBefore(ctx context.Context, cutoff
 	return scanArtifacts(rows)
 }
 
-// DeleteArtifact removes an artifact row.
-func (r *ArtifactRepository) DeleteArtifact(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM download_artifacts WHERE id = $1`, id)
-	if err != nil {
-		return fmt.Errorf("deleting artifact: %w", err)
-	}
-	return nil
-}
-
 // DeleteReadyIfEvictable atomically deletes a ready artifact only when no
 // active download row references it. Check-then-delete eviction races a new
-// download linking the same id; this fence makes that outcome impossible.
+// download linking the same id; the NOT-EXISTS predicate is the fast path and
+// downloads_artifact_id_fkey (ON DELETE RESTRICT) is the enforcement backstop —
+// a concurrent link that commits after this statement's snapshot makes the RI
+// trigger raise 23503, which reads as "not evictable".
 func (r *ArtifactRepository) DeleteReadyIfEvictable(ctx context.Context, id string) (bool, error) {
-	tag, err := r.pool.Exec(ctx,
-		`DELETE FROM download_artifacts
-		 WHERE id = $1 AND status = 'ready'
-		   AND NOT `+activeArtifactLinkSQL,
-		id,
-	)
+	return r.deleteIfEvictable(ctx, id, true)
+}
+
+// DeleteIfEvictable is DeleteReadyIfEvictable without the ready-status
+// predicate: the failed-artifact sweep uses it so a row Ensure requeued (and a
+// download then linked) is never removed out from under that link.
+func (r *ArtifactRepository) DeleteIfEvictable(ctx context.Context, id string) (bool, error) {
+	return r.deleteIfEvictable(ctx, id, false)
+}
+
+func (r *ArtifactRepository) deleteIfEvictable(ctx context.Context, id string, requireReady bool) (bool, error) {
+	query := `DELETE FROM download_artifacts WHERE id = $1`
+	if requireReady {
+		query += ` AND status = 'ready'`
+	}
+	query += ` AND NOT ` + activeArtifactLinkSQL
+	tag, err := r.pool.Exec(ctx, query, id)
 	if err != nil {
+		// A download row linked the artifact concurrently: not evictable.
+		if isForeignKeyViolation(err, downloadsArtifactFKConstraint) {
+			return false, nil
+		}
 		return false, fmt.Errorf("evicting unlinked artifact: %w", err)
 	}
 	return tag.RowsAffected() == 1, nil
 }
 
-// OutputPathInUse reports whether any remaining artifact row still claims path.
-// Eviction deletes the DB row before bytes; a concurrent EnsureQueued may have
-// already reused the deterministic local path for a replacement job.
-func (r *ArtifactRepository) OutputPathInUse(ctx context.Context, path string) (bool, error) {
-	if path == "" {
-		return false, nil
+// LocalArtifactOrphan is a filesystem cleanup candidate recorded before its
+// artifact row is deleted, so a crash or unlink failure between the row delete
+// and the byte delete can never leak the file.
+type LocalArtifactOrphan struct {
+	ID                 int64
+	DownloadArtifactID string
+	OutputPath         string
+	Attempts           int
+}
+
+// EnqueueLocalOrphan durably records a local artifact path for deletion. Paths
+// are unique per artifact id, so a conflicting row already covers the same file.
+func (r *ArtifactRepository) EnqueueLocalOrphan(ctx context.Context, artifactID, outputPath string) error {
+	if artifactID == "" || outputPath == "" {
+		return nil
 	}
-	var exists bool
-	if err := r.pool.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM download_artifacts WHERE output_path = $1)`,
-		path,
-	).Scan(&exists); err != nil {
-		return false, fmt.Errorf("checking artifact output path: %w", err)
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO download_artifact_local_orphans (download_artifact_id, output_path)
+		 VALUES ($1, $2)
+		 ON CONFLICT (output_path) DO NOTHING`,
+		artifactID, outputPath,
+	)
+	if err != nil {
+		return fmt.Errorf("enqueueing local artifact cleanup: %w", err)
 	}
-	return exists, nil
+	return nil
+}
+
+// ListLocalOrphansDue returns due local cleanup candidates, oldest first.
+func (r *ArtifactRepository) ListLocalOrphansDue(ctx context.Context, limit int) ([]LocalArtifactOrphan, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, download_artifact_id, output_path, attempts
+		 FROM download_artifact_local_orphans
+		 WHERE next_retry_at IS NULL OR next_retry_at <= now()
+		 ORDER BY attempts, created_at, id
+		 LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("listing local artifact cleanup queue: %w", err)
+	}
+	defer rows.Close()
+	out := make([]LocalArtifactOrphan, 0, limit)
+	for rows.Next() {
+		var orphan LocalArtifactOrphan
+		if err := rows.Scan(&orphan.ID, &orphan.DownloadArtifactID, &orphan.OutputPath, &orphan.Attempts); err != nil {
+			return nil, fmt.Errorf("scanning local artifact cleanup row: %w", err)
+		}
+		out = append(out, orphan)
+	}
+	return out, rows.Err()
+}
+
+// DeleteLocalOrphan clears a local cleanup row by id.
+func (r *ArtifactRepository) DeleteLocalOrphan(ctx context.Context, id int64) error {
+	if _, err := r.pool.Exec(ctx, `DELETE FROM download_artifact_local_orphans WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("deleting local artifact cleanup row: %w", err)
+	}
+	return nil
+}
+
+// DeleteLocalOrphanByPath clears a local cleanup row after the inline unlink
+// that followed its enqueue succeeded.
+func (r *ArtifactRepository) DeleteLocalOrphanByPath(ctx context.Context, outputPath string) error {
+	if outputPath == "" {
+		return nil
+	}
+	if _, err := r.pool.Exec(ctx, `DELETE FROM download_artifact_local_orphans WHERE output_path = $1`, outputPath); err != nil {
+		return fmt.Errorf("deleting local artifact cleanup row by path: %w", err)
+	}
+	return nil
+}
+
+// BumpLocalOrphanRetry defers a failed unlink behind the same 2-minute backoff
+// the remote queue uses.
+func (r *ArtifactRepository) BumpLocalOrphanRetry(ctx context.Context, id int64) error {
+	if _, err := r.pool.Exec(ctx,
+		`UPDATE download_artifact_local_orphans
+		 SET attempts = attempts + 1, next_retry_at = now() + interval '2 minutes'
+		 WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("deferring local artifact cleanup row: %w", err)
+	}
+	return nil
 }
 
 // EnqueueRemoteOrphan durably records an abandoned attempt before its owning
@@ -593,6 +656,21 @@ func (r *ArtifactRepository) PrepareRemoteOrphanCleanup(ctx context.Context, orp
 		return false, false, fmt.Errorf("committing remote artifact cleanup claim: %w", err)
 	}
 	return owned, true, nil
+}
+
+// DeleteRemoteOrphanByLocator clears a cleanup intent whose remote delete
+// already succeeded inline.
+func (r *ArtifactRepository) DeleteRemoteOrphanByLocator(ctx context.Context, nodeID int, artifactID string) error {
+	if nodeID <= 0 || artifactID == "" {
+		return nil
+	}
+	if _, err := r.pool.Exec(ctx,
+		`DELETE FROM download_artifact_orphans WHERE origin_node_id = $1 AND origin_artifact_id = $2`,
+		nodeID, artifactID,
+	); err != nil {
+		return fmt.Errorf("deleting remote artifact cleanup row by locator: %w", err)
+	}
+	return nil
 }
 
 func (r *ArtifactRepository) DeleteRemoteOrphan(ctx context.Context, id int64) error {

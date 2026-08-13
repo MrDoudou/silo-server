@@ -39,8 +39,8 @@ func TestParamsHashStableAndDistinct(t *testing.T) {
 }
 
 func TestArtifactOutputPathDeterministic(t *testing.T) {
-	p1 := artifactOutputPath("/var/artifacts", 42, "transcode", "abcdef0123456789deadbeef")
-	p2 := artifactOutputPath("/var/artifacts", 42, "transcode", "abcdef0123456789deadbeef")
+	p1 := artifactOutputPath("/var/artifacts", 42, "transcode", "abcdef0123456789deadbeef", "art-1")
+	p2 := artifactOutputPath("/var/artifacts", 42, "transcode", "abcdef0123456789deadbeef", "art-1")
 	if p1 != p2 {
 		t.Fatalf("output path not deterministic: %q != %q", p1, p2)
 	}
@@ -49,6 +49,15 @@ func TestArtifactOutputPathDeterministic(t *testing.T) {
 	}
 	if !strings.Contains(p1, "42_transcode_") {
 		t.Fatalf("output path missing identity components: %q", p1)
+	}
+	// A replacement row for the same dedup key must NOT reuse the evicted row's
+	// path, or its bytes could be unlinked by the predecessor's cleanup.
+	p3 := artifactOutputPath("/var/artifacts", 42, "transcode", "abcdef0123456789deadbeef", "art-2")
+	if p3 == p1 {
+		t.Fatalf("distinct artifact ids share an output path: %q", p3)
+	}
+	if !strings.Contains(p3, "art-2") {
+		t.Fatalf("output path missing artifact id: %q", p3)
 	}
 }
 

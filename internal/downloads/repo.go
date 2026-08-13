@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -16,18 +17,66 @@ const downloadColumns = `id, user_id, profile_id, device_id, media_file_id, cont
 	kind, status, format, quality, effective_quality, target_bitrate_kbps, revision, artifact_id, file_size, bytes_sent, error_message,
 	created_at, updated_at, completed_at`
 
-const insertDownloadSQL = `INSERT INTO downloads (id, user_id, profile_id, device_id, media_file_id, content_id,
-		episode_id, batch_id, kind, status, format, quality, effective_quality, target_bitrate_kbps, revision, artifact_id, file_size, bytes_sent, error_message,
-		created_at, updated_at, completed_at)
+// downloadInsertColumns is the number of columns in downloadColumns; the insert
+// placeholder lists and the batch builder both derive their arity from it.
+const downloadInsertColumns = 22
+
+const insertDownloadSQL = `INSERT INTO downloads (` + downloadColumns + `)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`
 
-// insertDownloadRequiringArtifactSQL refuses to create a row that would point
-// at an artifact LRU/hygiene already deleted. $16 is artifact_id.
-const insertDownloadRequiringArtifactSQL = `INSERT INTO downloads (id, user_id, profile_id, device_id, media_file_id, content_id,
-		episode_id, batch_id, kind, status, format, quality, effective_quality, target_bitrate_kbps, revision, artifact_id, file_size, bytes_sent, error_message,
-		created_at, updated_at, completed_at)
+// insertDownloadRequiringArtifactSQL is a fast-path filter: it skips the insert
+// when the artifact row is already gone, so the common eviction case surfaces as
+// a clean zero-row result instead of a constraint error. It is NOT the
+// enforcement mechanism — under READ COMMITTED its subquery reads an independent
+// snapshot and takes no conflicting lock, so a concurrent eviction can still
+// commit alongside it. downloads_artifact_id_fkey is what makes a dangling
+// artifact_id impossible; a 23503 from it maps to ErrArtifactEvicted below.
+// $16 is artifact_id.
+const insertDownloadRequiringArtifactSQL = `INSERT INTO downloads (` + downloadColumns + `)
 	SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
 	WHERE EXISTS (SELECT 1 FROM download_artifacts WHERE id = $16)`
+
+// downloadsArtifactFKConstraint is the foreign key from downloads.artifact_id to
+// download_artifacts.id. Violating it in either direction means the artifact was
+// evicted concurrently.
+const downloadsArtifactFKConstraint = "downloads_artifact_id_fkey"
+
+// isForeignKeyViolation reports whether err is a Postgres foreign-key violation
+// (SQLSTATE 23503) raised by the named constraint.
+func isForeignKeyViolation(err error, constraint string) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	return pgErr.Code == "23503" && pgErr.ConstraintName == constraint
+}
+
+// execer is satisfied by both *pgxpool.Pool and pgx.Tx, so the insert helper
+// works inside and outside a transaction.
+type execer interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
+// execInsertDownload runs the right insert for d (fenced when it links an
+// artifact) and maps both the zero-row fast path and the FK violation to
+// ErrArtifactEvicted.
+func (r *Repository) execInsertDownload(ctx context.Context, q execer, d *Download) error {
+	query := insertDownloadSQL
+	if d.ArtifactID != "" {
+		query = insertDownloadRequiringArtifactSQL
+	}
+	tag, err := q.Exec(ctx, query, r.insertArgs(d)...)
+	if err != nil {
+		if isForeignKeyViolation(err, downloadsArtifactFKConstraint) {
+			return ErrArtifactEvicted
+		}
+		return err
+	}
+	if d.ArtifactID != "" && tag.RowsAffected() == 0 {
+		return ErrArtifactEvicted
+	}
+	return nil
+}
 
 // Repository provides CRUD operations for the downloads table.
 type Repository struct {
@@ -134,16 +183,11 @@ func (r *Repository) insertArgs(d *Download) []any {
 // while the artifact row still exists, so LRU eviction cannot leave a ready
 // download pointing at a deleted id.
 func (r *Repository) Create(ctx context.Context, d *Download) error {
-	query := insertDownloadSQL
-	if d.ArtifactID != "" {
-		query = insertDownloadRequiringArtifactSQL
-	}
-	tag, err := r.pool.Exec(ctx, query, r.insertArgs(d)...)
-	if err != nil {
+	if err := r.execInsertDownload(ctx, r.pool, d); err != nil {
+		if errors.Is(err, ErrArtifactEvicted) {
+			return err
+		}
 		return fmt.Errorf("inserting download: %w", err)
-	}
-	if d.ArtifactID != "" && tag.RowsAffected() == 0 {
-		return ErrArtifactEvicted
 	}
 	return nil
 }
@@ -157,16 +201,11 @@ func (r *Repository) CreateBatch(ctx context.Context, downloads []*Download) err
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	for _, d := range downloads {
-		query := insertDownloadSQL
-		if d.ArtifactID != "" {
-			query = insertDownloadRequiringArtifactSQL
-		}
-		tag, err := tx.Exec(ctx, query, r.insertArgs(d)...)
-		if err != nil {
+		if err := r.execInsertDownload(ctx, tx, d); err != nil {
+			if errors.Is(err, ErrArtifactEvicted) {
+				return err
+			}
 			return fmt.Errorf("inserting batch download: %w", err)
-		}
-		if d.ArtifactID != "" && tag.RowsAffected() == 0 {
-			return ErrArtifactEvicted
 		}
 	}
 
@@ -274,9 +313,11 @@ func (r *Repository) Delete(ctx context.Context, id string, userID int) error {
 }
 
 // CancelByID sets a download to canceled if it is still queued or downloading.
+// The artifact link is dropped with the transition: a terminal row must not pin
+// an artifact against eviction (downloads_artifact_id_fkey is ON DELETE RESTRICT).
 func (r *Repository) CancelByID(ctx context.Context, id string, userID int) error {
 	tag, err := r.pool.Exec(ctx,
-		`UPDATE downloads SET status = 'cancelled', updated_at = now()
+		`UPDATE downloads SET status = 'cancelled', artifact_id = NULL, updated_at = now()
 		WHERE id = $1 AND user_id = $2 AND status IN ('queued', 'downloading')`,
 		id, userID,
 	)
@@ -346,6 +387,11 @@ func (r *Repository) GetManagedEntry(ctx context.Context, userID int, profileID,
 // Callers have already classified the item as new.
 func (r *Repository) CreateManagedEntry(ctx context.Context, d *Download) (*Download, error) {
 	if err := r.Create(ctx, d); err != nil {
+		// An evicted artifact is retryable by the caller (re-Ensure, then
+		// re-insert); returning some unrelated existing row would hide it.
+		if errors.Is(err, ErrArtifactEvicted) {
+			return nil, err
+		}
 		if existing, gerr := r.GetManagedEntry(ctx, d.UserID, d.ProfileID, d.DeviceID, d.ContentID, d.EpisodeID); gerr == nil {
 			return existing, nil
 		}
@@ -411,11 +457,9 @@ func (r *Repository) CreateManagedEntriesBatch(ctx context.Context, ds []*Downlo
 	if len(ds) == 0 {
 		return nil, nil
 	}
-	const insertCols = 22
+	const insertCols = downloadInsertColumns
 	var sb strings.Builder
-	sb.WriteString(`INSERT INTO downloads (id, user_id, profile_id, device_id, media_file_id, content_id,
-		episode_id, batch_id, kind, status, format, quality, effective_quality, target_bitrate_kbps, revision, artifact_id, file_size, bytes_sent, error_message,
-		created_at, updated_at, completed_at) VALUES `)
+	sb.WriteString(`INSERT INTO downloads (` + downloadColumns + `) VALUES `)
 	args := make([]any, 0, len(ds)*insertCols)
 	for i, d := range ds {
 		if i > 0 {
@@ -435,14 +479,31 @@ func (r *Repository) CreateManagedEntriesBatch(ctx context.Context, ds []*Downlo
 	sb.WriteString(` ON CONFLICT (user_id, profile_id, device_id, content_id, (COALESCE(episode_id, ''))) WHERE device_id IS NOT NULL DO NOTHING RETURNING ` + downloadColumns)
 	rows, err := r.pool.Query(ctx, sb.String(), args...)
 	if err != nil {
+		// Managed originals carry no artifact today, so this is future-proofing:
+		// any artifact-backed row in the batch gets the same retryable error the
+		// single-row path returns.
+		if isForeignKeyViolation(err, downloadsArtifactFKConstraint) {
+			return nil, ErrArtifactEvicted
+		}
 		return nil, fmt.Errorf("batch inserting managed entries: %w", err)
 	}
 	defer rows.Close()
-	return scanDownloads(rows)
+	inserted, err := scanDownloads(rows)
+	if err != nil {
+		if isForeignKeyViolation(err, downloadsArtifactFKConstraint) {
+			return nil, ErrArtifactEvicted
+		}
+		return nil, err
+	}
+	return inserted, nil
 }
 
 // ReplaceManagedEntry updates an existing managed row to a new file/quality
 // target, incrementing its revision so clients can replace stale local bytes.
+// An artifact evicted concurrently surfaces as downloads_artifact_id_fkey
+// (23503) and maps to ErrArtifactEvicted, so a zero-row result means only that
+// the identity/revision fence rejected the write — another writer won the row,
+// and the caller gets that winner back.
 func (r *Repository) ReplaceManagedEntry(ctx context.Context, existing *Download, replacement *Download) (*Download, error) {
 	query := `UPDATE downloads SET
 			media_file_id = $6,
@@ -461,7 +522,6 @@ func (r *Repository) ReplaceManagedEntry(ctx context.Context, existing *Download
 			revision = revision + 1,
 			updated_at = now()
 		WHERE id = $1 AND user_id = $2 AND profile_id = $3 AND device_id = $4 AND revision = $5
-		  AND ($14::text IS NULL OR EXISTS (SELECT 1 FROM download_artifacts WHERE id = $14))
 		RETURNING ` + downloadColumns
 	row := r.pool.QueryRow(ctx, query,
 		existing.ID, existing.UserID, existing.ProfileID, existing.DeviceID, existing.Revision,
@@ -472,19 +532,10 @@ func (r *Repository) ReplaceManagedEntry(ctx context.Context, existing *Download
 	d, err := scanDownload(row)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			if replacement.ArtifactID != "" {
-				var artifactExists bool
-				if aerr := r.pool.QueryRow(ctx,
-					`SELECT EXISTS(SELECT 1 FROM download_artifacts WHERE id = $1)`,
-					replacement.ArtifactID,
-				).Scan(&artifactExists); aerr != nil {
-					return nil, fmt.Errorf("replacing managed download: %w", aerr)
-				}
-				if !artifactExists {
-					return nil, ErrArtifactEvicted
-				}
-			}
 			return r.GetManagedEntry(ctx, existing.UserID, existing.ProfileID, existing.DeviceID, existing.ContentID, existing.EpisodeID)
+		}
+		if isForeignKeyViolation(err, downloadsArtifactFKConstraint) {
+			return nil, ErrArtifactEvicted
 		}
 		return nil, fmt.Errorf("replacing managed download: %w", err)
 	}
@@ -649,10 +700,12 @@ func (r *Repository) MarkLinkedDownloadsReady(ctx context.Context, artifactID st
 }
 
 // MarkLinkedDownloadsFailed flips every preparing download linked to a failed
-// artifact to failed, returning the affected rows for client notification.
+// artifact to failed, returning the affected rows for client notification. The
+// artifact link is dropped with the transition so the now-terminal row does not
+// pin the artifact against eviction (the FK is ON DELETE RESTRICT).
 func (r *Repository) MarkLinkedDownloadsFailed(ctx context.Context, artifactID, errMsg string) ([]*Download, error) {
 	rows, err := r.pool.Query(ctx,
-		`UPDATE downloads SET status = 'failed', error_message = $2, updated_at = now()
+		`UPDATE downloads SET status = 'failed', artifact_id = NULL, error_message = $2, updated_at = now()
 		 WHERE artifact_id = $1 AND status = 'preparing'
 		 RETURNING `+downloadColumns,
 		artifactID, errMsg,
@@ -692,8 +745,11 @@ func (r *Repository) ReconcileLinkedDownloads(ctx context.Context) (ready []*Dow
 	}
 
 	failedRows, err := r.pool.Query(ctx,
+		// Every SET expression reads the OLD row, so error_message still resolves
+		// against the pre-update artifact_id while the same statement clears it.
 		`UPDATE downloads SET status = 'failed',
 		     error_message = COALESCE((SELECT NULLIF(a.error_message, '') FROM download_artifacts a WHERE a.id = downloads.artifact_id), 'artifact encode failed'),
+		     artifact_id = NULL,
 		     updated_at = now()
 		 WHERE status = 'preparing' AND artifact_id IS NOT NULL
 		   AND artifact_id IN (SELECT id FROM download_artifacts WHERE status = 'failed')

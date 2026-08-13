@@ -52,6 +52,10 @@ func TestArtifactQuotaCheckedBeforeEnqueue(t *testing.T) {
 		t.Fatalf("seed second media file: %v", err)
 	}
 	t.Cleanup(func() {
+		// Cleanups run LIFO, so this fires before the fixture's downloads
+		// delete; unpin the links first or downloads_artifact_id_fkey
+		// (ON DELETE RESTRICT) refuses the artifact delete.
+		_, _ = f.pool.Exec(ctx, `UPDATE downloads SET artifact_id = NULL WHERE media_file_id IN ($1, $2)`, f.fileID, fileID2)
 		_, _ = f.pool.Exec(ctx, `DELETE FROM download_artifacts WHERE media_file_id IN ($1, $2)`, f.fileID, fileID2)
 		_, _ = f.pool.Exec(ctx, `DELETE FROM media_files WHERE id = $1`, fileID2)
 	})
@@ -136,6 +140,7 @@ func TestConcurrentArtifactCreatesCannotBypassQuotaDB(t *testing.T) {
 		}
 	}
 	t.Cleanup(func() {
+		_, _ = f.pool.Exec(ctx, `UPDATE downloads SET artifact_id = NULL WHERE media_file_id = ANY($1)`, fileIDs)
 		_, _ = f.pool.Exec(ctx, `DELETE FROM download_artifacts WHERE media_file_id = ANY($1)`, fileIDs)
 		_, _ = f.pool.Exec(ctx, `DELETE FROM media_files WHERE id = ANY($1)`, fileIDs)
 	})

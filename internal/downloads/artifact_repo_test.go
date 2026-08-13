@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,6 +49,9 @@ func newArtifactTestRepo(t *testing.T) (*ArtifactRepository, *pgxpool.Pool, int)
 		t.Fatalf("seed media file: %v", err)
 	}
 	t.Cleanup(func() {
+		// downloads_artifact_id_fkey is ON DELETE RESTRICT: unpin any surviving
+		// links before removing the artifact rows they reference.
+		_, _ = pool.Exec(ctx, `UPDATE downloads SET artifact_id = NULL WHERE media_file_id = $1`, fileID)
 		_, _ = pool.Exec(ctx, `DELETE FROM download_artifacts WHERE media_file_id = $1`, fileID)
 		_, _ = pool.Exec(ctx, `DELETE FROM media_files WHERE id = $1`, fileID)
 		_, _ = pool.Exec(ctx, `DELETE FROM media_folders WHERE id = $1`, folderID)
@@ -718,10 +722,10 @@ func TestListRemoteOrphansDueIsFairAcrossOrigins(t *testing.T) {
 	}
 }
 
-// TestHasActiveLinkCoversEphemeralRows pins the eviction guard: an ephemeral
+// TestEvictionFenceCoversEphemeralRows pins the eviction guard: an ephemeral
 // (device-less web) download row must protect its artifact from LRU cleanup
 // exactly like a managed row does, and terminal rows must not.
-func TestHasActiveLinkCoversEphemeralRows(t *testing.T) {
+func TestEvictionFenceCoversEphemeralRows(t *testing.T) {
 	repo, pool, fileID := newArtifactTestRepo(t)
 	ctx := context.Background()
 
@@ -729,6 +733,7 @@ func TestHasActiveLinkCoversEphemeralRows(t *testing.T) {
 	if _, _, err := repo.EnsureQueued(ctx, art); err != nil {
 		t.Fatalf("ensure artifact: %v", err)
 	}
+	markArtifactReady(t, pool, art.ID)
 
 	var userID int
 	if err := pool.QueryRow(ctx,
@@ -754,24 +759,144 @@ func TestHasActiveLinkCoversEphemeralRows(t *testing.T) {
 		t.Fatalf("create ephemeral download: %v", err)
 	}
 
-	active, err := repo.HasActiveLink(ctx, art.ID)
+	deleted, err := repo.DeleteReadyIfEvictable(ctx, art.ID)
 	if err != nil {
-		t.Fatalf("HasActiveLink: %v", err)
+		t.Fatalf("DeleteReadyIfEvictable with ephemeral link: %v", err)
 	}
-	if !active {
+	if deleted {
 		t.Fatal("ephemeral ready row must protect its artifact from eviction")
 	}
 
-	if _, err := pool.Exec(ctx, `UPDATE downloads SET status = 'cancelled' WHERE id = $1`, dlID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE downloads SET status = 'cancelled', artifact_id = NULL WHERE id = $1`, dlID); err != nil {
 		t.Fatalf("cancel download: %v", err)
 	}
-	active, err = repo.HasActiveLink(ctx, art.ID)
+	deleted, err = repo.DeleteReadyIfEvictable(ctx, art.ID)
 	if err != nil {
-		t.Fatalf("HasActiveLink after cancel: %v", err)
+		t.Fatalf("DeleteReadyIfEvictable after cancel: %v", err)
 	}
-	if active {
+	if !deleted {
 		t.Fatal("terminal-only links must not protect an artifact")
 	}
+}
+
+// TestDeleteIfEvictableFencesRequeuedArtifact covers the failed-artifact sweep:
+// a row Ensure requeued (so it is no longer 'ready') and a download then linked
+// must survive the sweep, and become removable once the link goes terminal.
+func TestDeleteIfEvictableFencesRequeuedArtifact(t *testing.T) {
+	repo, pool, fileID := newArtifactTestRepo(t)
+	ctx := context.Background()
+
+	art := newArtifact(t, fileID, fmt.Sprintf("hash-requeued-%d", time.Now().UnixNano()))
+	if _, _, err := repo.EnsureQueued(ctx, art); err != nil {
+		t.Fatalf("ensure artifact: %v", err)
+	}
+	userID := seedDownloadUser(t, pool)
+	dlRepo := NewRepository(pool)
+	now := time.Now()
+	dlID := fmt.Sprintf("dl-requeued-%d", now.UnixNano())
+	if err := dlRepo.Create(ctx, &Download{
+		ID: dlID, UserID: userID, MediaFileID: fileID,
+		ContentID: fmt.Sprintf("requeued-content-%d", now.UnixNano()),
+		Kind:      KindQueued, Status: StatusPreparing, Format: FormatTranscode,
+		ArtifactID: art.ID, FileSize: 1024, CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create preparing download: %v", err)
+	}
+
+	deleted, err := repo.DeleteIfEvictable(ctx, art.ID)
+	if err != nil {
+		t.Fatalf("DeleteIfEvictable linked: %v", err)
+	}
+	if deleted {
+		t.Fatal("a linked non-ready artifact must not be swept")
+	}
+	if _, err := repo.GetByID(ctx, art.ID); err != nil {
+		t.Fatalf("linked artifact missing after sweep attempt: %v", err)
+	}
+
+	if _, err := pool.Exec(ctx, `UPDATE downloads SET status = 'failed', artifact_id = NULL WHERE id = $1`, dlID); err != nil {
+		t.Fatalf("fail download: %v", err)
+	}
+	deleted, err = repo.DeleteIfEvictable(ctx, art.ID)
+	if err != nil {
+		t.Fatalf("DeleteIfEvictable after fail: %v", err)
+	}
+	if !deleted {
+		t.Fatal("an unlinked non-ready artifact must be swept")
+	}
+}
+
+// TestLocalOrphanQueueRoundTrip covers the durable local cleanup intent: an
+// enqueue is idempotent per path, becomes due immediately, defers on a bumped
+// retry, and clears by id and by path.
+func TestLocalOrphanQueueRoundTrip(t *testing.T) {
+	repo, pool, fileID := newArtifactTestRepo(t)
+	ctx := context.Background()
+	var present *string
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.download_artifact_local_orphans')::text`).Scan(&present); err != nil {
+		t.Fatalf("check download_artifact_local_orphans: %v", err)
+	}
+	if present == nil {
+		t.Skip("download_artifact_local_orphans migration has not been applied")
+	}
+
+	art := newArtifact(t, fileID, fmt.Sprintf("hash-local-orphan-%d", time.Now().UnixNano()))
+	path := art.OutputPath
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM download_artifact_local_orphans WHERE output_path = $1`, path)
+	})
+
+	if err := repo.EnqueueLocalOrphan(ctx, art.ID, path); err != nil {
+		t.Fatalf("EnqueueLocalOrphan: %v", err)
+	}
+	if err := repo.EnqueueLocalOrphan(ctx, art.ID, path); err != nil {
+		t.Fatalf("EnqueueLocalOrphan (repeat): %v", err)
+	}
+	due, err := repo.ListLocalOrphansDue(ctx, 500)
+	if err != nil {
+		t.Fatalf("ListLocalOrphansDue: %v", err)
+	}
+	mine := localOrphansForPath(due, path)
+	if len(mine) != 1 {
+		t.Fatalf("due local orphans for path = %d, want exactly 1 (enqueue must dedupe)", len(mine))
+	}
+	if mine[0].DownloadArtifactID != art.ID {
+		t.Fatalf("orphan artifact id = %q, want %q", mine[0].DownloadArtifactID, art.ID)
+	}
+
+	if err := repo.BumpLocalOrphanRetry(ctx, mine[0].ID); err != nil {
+		t.Fatalf("BumpLocalOrphanRetry: %v", err)
+	}
+	due, err = repo.ListLocalOrphansDue(ctx, 500)
+	if err != nil {
+		t.Fatalf("ListLocalOrphansDue after bump: %v", err)
+	}
+	if len(localOrphansForPath(due, path)) != 0 {
+		t.Fatal("a bumped local orphan must not be due again immediately")
+	}
+
+	if err := repo.DeleteLocalOrphanByPath(ctx, path); err != nil {
+		t.Fatalf("DeleteLocalOrphanByPath: %v", err)
+	}
+	var remaining int
+	if err := pool.QueryRow(ctx,
+		`SELECT count(*) FROM download_artifact_local_orphans WHERE output_path = $1`, path,
+	).Scan(&remaining); err != nil {
+		t.Fatalf("count local orphans: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("local orphan rows after delete = %d, want 0", remaining)
+	}
+}
+
+func localOrphansForPath(orphans []LocalArtifactOrphan, path string) []LocalArtifactOrphan {
+	filtered := make([]LocalArtifactOrphan, 0, 1)
+	for _, orphan := range orphans {
+		if orphan.OutputPath == path {
+			filtered = append(filtered, orphan)
+		}
+	}
+	return filtered
 }
 
 func markArtifactReady(t *testing.T, pool *pgxpool.Pool, id string) {
@@ -856,7 +981,8 @@ func TestDeleteReadyIfEvictableFencesConcurrentLink(t *testing.T) {
 		t.Fatalf("linked artifact missing after eviction attempt: %v", err)
 	}
 
-	if _, err := pool.Exec(ctx, `UPDATE downloads SET status = 'cancelled' WHERE artifact_id = $1`, art2.ID); err != nil {
+	// Terminal transitions drop the link, as CancelByID and the fail paths do.
+	if _, err := pool.Exec(ctx, `UPDATE downloads SET status = 'cancelled', artifact_id = NULL WHERE artifact_id = $1`, art2.ID); err != nil {
 		t.Fatalf("cancel download: %v", err)
 	}
 	deleted, err = repo.DeleteReadyIfEvictable(ctx, art2.ID)
@@ -880,5 +1006,236 @@ func TestCreateOriginalDownloadDoesNotRequireArtifact(t *testing.T) {
 		FileSize: 1024, CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatalf("Create original download: %v", err)
+	}
+}
+
+// TestCreateAgainstMissingArtifactIsEvicted pins the enforcement layer itself:
+// a download that names an artifact id with no row must be rejected as evicted,
+// whichever mechanism catches it (the EXISTS fast path or the foreign key).
+func TestCreateAgainstMissingArtifactIsEvicted(t *testing.T) {
+	_, pool, fileID := newArtifactTestRepo(t)
+	ctx := context.Background()
+	userID := seedDownloadUser(t, pool)
+	now := time.Now()
+	missingID, err := idgen.NextID()
+	if err != nil {
+		t.Fatalf("id: %v", err)
+	}
+	d := &Download{
+		ID: fmt.Sprintf("dl-missing-%d", now.UnixNano()), UserID: userID, MediaFileID: fileID,
+		ContentID: fmt.Sprintf("missing-content-%d", now.UnixNano()),
+		Kind:      KindQueued, Status: StatusReady, Format: FormatTranscode,
+		ArtifactID: missingID, FileSize: 1024, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := NewRepository(pool).Create(ctx, d); !errors.Is(err, ErrArtifactEvicted) {
+		t.Fatalf("Create against missing artifact = %v, want ErrArtifactEvicted", err)
+	}
+	if err := NewRepository(pool).CreateBatch(ctx, []*Download{d}); !errors.Is(err, ErrArtifactEvicted) {
+		t.Fatalf("CreateBatch against missing artifact = %v, want ErrArtifactEvicted", err)
+	}
+}
+
+// TestTerminalTransitionsUnpinArtifact pins the ON DELETE RESTRICT contract:
+// cancelling or failing a download must drop its artifact link, otherwise the
+// artifact stays pinned against eviction forever.
+func TestTerminalTransitionsUnpinArtifact(t *testing.T) {
+	repo, pool, fileID := newArtifactTestRepo(t)
+	ctx := context.Background()
+	dlRepo := NewRepository(pool)
+	userID := seedDownloadUser(t, pool)
+	now := time.Now()
+
+	cancelArt := newArtifact(t, fileID, fmt.Sprintf("hash-cancel-%d", now.UnixNano()))
+	if _, _, err := repo.EnsureQueued(ctx, cancelArt); err != nil {
+		t.Fatalf("ensure cancel artifact: %v", err)
+	}
+	markArtifactReady(t, pool, cancelArt.ID)
+	cancelID := fmt.Sprintf("dl-cancel-%d", now.UnixNano())
+	if err := dlRepo.Create(ctx, &Download{
+		ID: cancelID, UserID: userID, MediaFileID: fileID,
+		ContentID: fmt.Sprintf("cancel-content-%d", now.UnixNano()),
+		Kind:      KindQueued, Status: StatusQueued, Format: FormatTranscode,
+		ArtifactID: cancelArt.ID, FileSize: 1024, CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create cancellable download: %v", err)
+	}
+	if err := dlRepo.CancelByID(ctx, cancelID, userID); err != nil {
+		t.Fatalf("CancelByID: %v", err)
+	}
+	cancelled, err := dlRepo.GetByID(ctx, cancelID)
+	if err != nil {
+		t.Fatalf("get cancelled download: %v", err)
+	}
+	if cancelled.ArtifactID != "" {
+		t.Fatalf("cancelled download artifact_id = %q, want empty", cancelled.ArtifactID)
+	}
+	deleted, err := repo.DeleteReadyIfEvictable(ctx, cancelArt.ID)
+	if err != nil {
+		t.Fatalf("DeleteReadyIfEvictable after cancel: %v", err)
+	}
+	if !deleted {
+		t.Fatal("a cancelled download must not pin its artifact")
+	}
+
+	failArt := newArtifact(t, fileID, fmt.Sprintf("hash-fail-%d", now.UnixNano()))
+	if _, _, err := repo.EnsureQueued(ctx, failArt); err != nil {
+		t.Fatalf("ensure fail artifact: %v", err)
+	}
+	failID := fmt.Sprintf("dl-fail-%d", now.UnixNano())
+	if err := dlRepo.Create(ctx, &Download{
+		ID: failID, UserID: userID, MediaFileID: fileID,
+		ContentID: fmt.Sprintf("fail-content-%d", now.UnixNano()),
+		Kind:      KindQueued, Status: StatusPreparing, Format: FormatTranscode,
+		ArtifactID: failArt.ID, FileSize: 1024, CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create preparing download: %v", err)
+	}
+	flipped, err := dlRepo.MarkLinkedDownloadsFailed(ctx, failArt.ID, "encode failed")
+	if err != nil {
+		t.Fatalf("MarkLinkedDownloadsFailed: %v", err)
+	}
+	if len(flipped) != 1 {
+		t.Fatalf("flipped rows = %d, want 1", len(flipped))
+	}
+	if flipped[0].ArtifactID != "" {
+		t.Fatalf("failed download artifact_id = %q, want empty", flipped[0].ArtifactID)
+	}
+	deleted, err = repo.DeleteIfEvictable(ctx, failArt.ID)
+	if err != nil {
+		t.Fatalf("DeleteIfEvictable after fail: %v", err)
+	}
+	if !deleted {
+		t.Fatal("a failed download must not pin its artifact")
+	}
+}
+
+// TestReconcileFailedDownloadsUnpinArtifact covers the reconcile-to-failed
+// update: it must both preserve the artifact's error message (read from the OLD
+// row) and clear the link in the same statement.
+func TestReconcileFailedDownloadsUnpinArtifact(t *testing.T) {
+	repo, pool, fileID := newArtifactTestRepo(t)
+	ctx := context.Background()
+	dlRepo := NewRepository(pool)
+	userID := seedDownloadUser(t, pool)
+	now := time.Now()
+
+	art := newArtifact(t, fileID, fmt.Sprintf("hash-reconcile-%d", now.UnixNano()))
+	if _, _, err := repo.EnsureQueued(ctx, art); err != nil {
+		t.Fatalf("ensure artifact: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`UPDATE download_artifacts SET status = 'failed', error_message = 'ffmpeg exploded' WHERE id = $1`, art.ID,
+	); err != nil {
+		t.Fatalf("mark artifact failed: %v", err)
+	}
+	dlID := fmt.Sprintf("dl-reconcile-%d", now.UnixNano())
+	if err := dlRepo.Create(ctx, &Download{
+		ID: dlID, UserID: userID, MediaFileID: fileID,
+		ContentID: fmt.Sprintf("reconcile-content-%d", now.UnixNano()),
+		Kind:      KindQueued, Status: StatusPreparing, Format: FormatTranscode,
+		ArtifactID: art.ID, FileSize: 1024, CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create preparing download: %v", err)
+	}
+
+	if _, _, err := dlRepo.ReconcileLinkedDownloads(ctx); err != nil {
+		t.Fatalf("ReconcileLinkedDownloads: %v", err)
+	}
+	row, err := dlRepo.GetByID(ctx, dlID)
+	if err != nil {
+		t.Fatalf("get reconciled download: %v", err)
+	}
+	if row.Status != StatusFailed {
+		t.Fatalf("reconciled status = %q, want failed", row.Status)
+	}
+	if row.ErrorMessage != "ffmpeg exploded" {
+		t.Fatalf("reconciled error_message = %q, want the artifact's message", row.ErrorMessage)
+	}
+	if row.ArtifactID != "" {
+		t.Fatalf("reconciled artifact_id = %q, want empty", row.ArtifactID)
+	}
+}
+
+// TestEvictionVersusLinkRace is the invariant test the fence alone could not
+// satisfy: many rounds of a genuine two-goroutine race between linking an
+// artifact and evicting it, asserting after every round that no download row
+// points at a missing artifact and that exactly one side lost.
+func TestEvictionVersusLinkRace(t *testing.T) {
+	repo, pool, fileID := newArtifactTestRepo(t)
+	ctx := context.Background()
+	dlRepo := NewRepository(pool)
+	userID := seedDownloadUser(t, pool)
+
+	const rounds = 100
+	for i := 0; i < rounds; i++ {
+		art := newArtifact(t, fileID, fmt.Sprintf("hash-race-%d-%d", time.Now().UnixNano(), i))
+		if _, _, err := repo.EnsureQueued(ctx, art); err != nil {
+			t.Fatalf("round %d: ensure artifact: %v", i, err)
+		}
+		markArtifactReady(t, pool, art.ID)
+
+		now := time.Now()
+		d := &Download{
+			ID: fmt.Sprintf("dl-race-%d-%d", now.UnixNano(), i), UserID: userID, MediaFileID: fileID,
+			ContentID: fmt.Sprintf("race-content-%d-%d", now.UnixNano(), i),
+			Kind:      KindQueued, Status: StatusReady, Format: FormatTranscode,
+			ArtifactID: art.ID, FileSize: 1024, CreatedAt: now, UpdatedAt: now,
+		}
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var createErr, deleteErr error
+		var evicted bool
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			createErr = dlRepo.Create(ctx, d)
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			evicted, deleteErr = repo.DeleteReadyIfEvictable(ctx, art.ID)
+		}()
+		close(start)
+		wg.Wait()
+
+		if deleteErr != nil {
+			t.Fatalf("round %d: DeleteReadyIfEvictable: %v", i, deleteErr)
+		}
+		if createErr != nil && !errors.Is(createErr, ErrArtifactEvicted) {
+			t.Fatalf("round %d: Create: %v", i, createErr)
+		}
+
+		// The invariant: never a download row whose artifact row is gone.
+		var dangling int
+		if err := pool.QueryRow(ctx,
+			`SELECT count(*) FROM downloads d
+			 WHERE d.artifact_id IS NOT NULL
+			   AND NOT EXISTS (SELECT 1 FROM download_artifacts a WHERE a.id = d.artifact_id)`,
+		).Scan(&dangling); err != nil {
+			t.Fatalf("round %d: dangling check: %v", i, err)
+		}
+		if dangling != 0 {
+			t.Fatalf("round %d: %d download rows point at a deleted artifact", i, dangling)
+		}
+
+		// And the eviction direction: exactly one side may win.
+		linked := createErr == nil
+		if linked && evicted {
+			t.Fatalf("round %d: both the link and the eviction succeeded", i)
+		}
+		if linked {
+			if _, err := repo.GetByID(ctx, art.ID); err != nil {
+				t.Fatalf("round %d: linked artifact missing: %v", i, err)
+			}
+		}
+
+		if _, err := pool.Exec(ctx, `DELETE FROM downloads WHERE id = $1`, d.ID); err != nil {
+			t.Fatalf("round %d: cleanup download: %v", i, err)
+		}
+		if _, err := pool.Exec(ctx, `DELETE FROM download_artifacts WHERE id = $1`, art.ID); err != nil {
+			t.Fatalf("round %d: cleanup artifact: %v", i, err)
+		}
 	}
 }

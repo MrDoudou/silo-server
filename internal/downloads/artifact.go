@@ -74,12 +74,16 @@ func effectiveArtifactDir(artifactDir, transcodeDir string) string {
 	return config.EffectiveDownloadArtifactDir(artifactDir, transcodeDir)
 }
 
-// artifactOutputPath derives a deterministic output path from
-// (media_file_id, format, params_hash) so a reclaimed job targets the same file.
-func artifactOutputPath(dir string, mediaFileID int, format, hash string) string {
+// artifactOutputPath derives an output path from
+// (media_file_id, format, params_hash, artifact_id). It is deterministic for a
+// given artifact row — a reclaimed job targets the same file — while the
+// artifact id keeps a REPLACEMENT row's path distinct from its predecessor's.
+// Without that, an evicted row's bytes could be unlinked after a successor with
+// the same dedup key had already claimed the identical path.
+func artifactOutputPath(dir string, mediaFileID int, format, hash, artifactID string) string {
 	short := hash
 	if len(short) > 16 {
 		short = short[:16]
 	}
-	return filepath.Join(dir, fmt.Sprintf("%d_%s_%s.mp4", mediaFileID, format, short))
+	return filepath.Join(dir, fmt.Sprintf("%d_%s_%s_%s.mp4", mediaFileID, format, short, artifactID))
 }

@@ -455,18 +455,27 @@ func (s *Service) createArtifactDownload(ctx context.Context, userID int, req Cr
 
 const artifactLinkAttempts = 2
 
-func (s *Service) replaceManagedArtifactDownload(ctx context.Context, existing *Download, userID int, req CreateRequest, file *models.MediaFile, decision QualityDecision) (*Download, error) {
+// withEnsuredArtifact runs attempt against a freshly ensured artifact, retrying
+// once when the artifact is evicted between Ensure and the linking write. Ensure
+// must stay inside the loop: an evicted artifact has to be recreated before the
+// next attempt can link anything.
+func (s *Service) withEnsuredArtifact(
+	ctx context.Context,
+	file *models.MediaFile,
+	decision QualityDecision,
+	attempt func(artifact *Artifact, status string, size int64) (*Download, error),
+) (*Download, error) {
 	var last error
-	for attempt := 0; attempt < artifactLinkAttempts; attempt++ {
+	for i := 0; i < artifactLinkAttempts; i++ {
 		artifact, err := s.artifacts.Ensure(ctx, file, decision.DeliveryFormat, decision.PrepareTarget)
 		if err != nil {
 			return nil, err
 		}
 		status, size := artifactRowStatus(artifact, file)
-		replacement := buildManagedDownload(userID, req.ProfileID, req.DeviceID, managedItem{file: file, contentID: file.ContentID, episodeID: file.EpisodeID}, decision, "", status, size, artifact.ID)
-		row, err := s.reuseOrReplaceManaged(ctx, existing, replacement)
+		row, err := attempt(artifact, status, size)
 		if errors.Is(err, ErrArtifactEvicted) {
 			last = err
+			slog.DebugContext(ctx, "retrying download after artifact eviction", "component", "downloads", "artifact_id", artifact.ID, "attempt", i+1)
 			continue
 		}
 		return row, err
@@ -474,21 +483,36 @@ func (s *Service) replaceManagedArtifactDownload(ctx context.Context, existing *
 	return nil, last
 }
 
+func (s *Service) replaceManagedArtifactDownload(ctx context.Context, existing *Download, userID int, req CreateRequest, file *models.MediaFile, decision QualityDecision) (*Download, error) {
+	return s.withEnsuredArtifact(ctx, file, decision, func(artifact *Artifact, status string, size int64) (*Download, error) {
+		row, err := s.replaceManagedWithArtifact(ctx, &existing, userID, req, file, decision, artifact, status, size)
+		return row, err
+	})
+}
+
+// replaceManagedWithArtifact points an existing managed entry at artifact. On
+// eviction it refreshes the caller's *existing snapshot so the next attempt's
+// revision fence can succeed against whatever the row looks like now.
+func (s *Service) replaceManagedWithArtifact(ctx context.Context, existing **Download, userID int, req CreateRequest, file *models.MediaFile, decision QualityDecision, artifact *Artifact, status string, size int64) (*Download, error) {
+	replacement := buildManagedDownload(userID, req.ProfileID, req.DeviceID, managedItem{file: file, contentID: file.ContentID, episodeID: file.EpisodeID}, decision, "", status, size, artifact.ID)
+	row, err := s.reuseOrReplaceManaged(ctx, *existing, replacement)
+	if errors.Is(err, ErrArtifactEvicted) {
+		if fresh, gerr := s.repo.GetManagedEntry(ctx, userID, req.ProfileID, req.DeviceID, file.ContentID, file.EpisodeID); gerr == nil {
+			*existing = fresh
+		}
+	}
+	return row, err
+}
+
 func (s *Service) insertArtifactDownload(ctx context.Context, userID int, req CreateRequest, file *models.MediaFile, decision QualityDecision, managed bool) (*Download, error) {
-	var last error
-	for attempt := 0; attempt < artifactLinkAttempts; attempt++ {
-		artifact, err := s.artifacts.Ensure(ctx, file, decision.DeliveryFormat, decision.PrepareTarget)
-		if err != nil {
+	// The device upsert is idempotent and independent of the artifact, so it
+	// runs once rather than on every retry.
+	if managed {
+		if err := s.repo.EnsureDevice(ctx, userID, req.ProfileID, req.DeviceID, req.DeviceName, req.DevicePlatform); err != nil {
 			return nil, err
 		}
-		status, size := artifactRowStatus(artifact, file)
-
-		if managed {
-			if err := s.repo.EnsureDevice(ctx, userID, req.ProfileID, req.DeviceID, req.DeviceName, req.DevicePlatform); err != nil {
-				return nil, err
-			}
-		}
-
+	}
+	return s.withEnsuredArtifact(ctx, file, decision, func(artifact *Artifact, status string, size int64) (*Download, error) {
 		id, err := idgen.NextID()
 		if err != nil {
 			return nil, fmt.Errorf("generating download ID: %w", err)
@@ -516,30 +540,22 @@ func (s *Service) insertArtifactDownload(ctx context.Context, userID int, req Cr
 			d.ProfileID = req.ProfileID
 			d.DeviceID = req.DeviceID
 		}
-		if err := s.repo.Create(ctx, d); err != nil {
-			if errors.Is(err, ErrArtifactEvicted) {
-				last = err
-				continue
-			}
-			if managed {
-				if existing, gerr := s.repo.GetManagedEntry(ctx, userID, req.ProfileID, req.DeviceID, file.ContentID, file.EpisodeID); gerr == nil {
-					replacement := buildManagedDownload(userID, req.ProfileID, req.DeviceID, managedItem{file: file, contentID: file.ContentID, episodeID: file.EpisodeID}, decision, "", status, size, artifact.ID)
-					row, rerr := s.reuseOrReplaceManaged(ctx, existing, replacement)
-					if errors.Is(rerr, ErrArtifactEvicted) {
-						last = rerr
-						continue
-					}
-					if rerr != nil {
-						return nil, rerr
-					}
-					return row, nil
-				}
-			}
+		err = s.repo.Create(ctx, d)
+		if err == nil {
+			return d, nil
+		}
+		if errors.Is(err, ErrArtifactEvicted) {
 			return nil, err
 		}
-		return d, nil
-	}
-	return nil, last
+		// A concurrent create won this managed identity: fall back to replacing
+		// the winning row, reusing the artifact already ensured this attempt.
+		if managed {
+			if existing, gerr := s.repo.GetManagedEntry(ctx, userID, req.ProfileID, req.DeviceID, file.ContentID, file.EpisodeID); gerr == nil {
+				return s.replaceManagedWithArtifact(ctx, &existing, userID, req, file, decision, artifact, status, size)
+			}
+		}
+		return nil, err
+	})
 }
 
 // artifactRowStatus maps an ensured artifact to the download row status and
