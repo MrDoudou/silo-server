@@ -16,6 +16,13 @@ const artifactColumns = `id, media_file_id, format, params_hash, container, code
 	attempts, max_attempts, lease_owner, lease_expires_at, next_retry_at,
 	created_at, completed_at, last_used_at`
 
+// activeArtifactLinkSQL is the EXISTS predicate that protects an artifact from
+// eviction. Completed/ready/preparing/queued/downloading rows remain servable
+// handles; cancelled/failed/revoked do not.
+const activeArtifactLinkSQL = `EXISTS(SELECT 1 FROM downloads
+		 WHERE artifact_id = $1
+		   AND status NOT IN ('cancelled','failed','revoked'))`
+
 // ArtifactRepository provides CRUD + durable-queue operations for
 // download_artifacts.
 type ArtifactRepository struct {
@@ -408,9 +415,7 @@ func (r *ArtifactRepository) TotalReadyBytes(ctx context.Context) (int64, error)
 func (r *ArtifactRepository) HasActiveLink(ctx context.Context, artifactID string) (bool, error) {
 	var exists bool
 	if err := r.pool.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM downloads
-		 WHERE artifact_id = $1
-		   AND status NOT IN ('cancelled','failed','revoked'))`,
+		`SELECT `+activeArtifactLinkSQL,
 		artifactID,
 	).Scan(&exists); err != nil {
 		return false, fmt.Errorf("checking artifact links: %w", err)
@@ -454,6 +459,39 @@ func (r *ArtifactRepository) DeleteArtifact(ctx context.Context, id string) erro
 		return fmt.Errorf("deleting artifact: %w", err)
 	}
 	return nil
+}
+
+// DeleteReadyIfEvictable atomically deletes a ready artifact only when no
+// active download row references it. Check-then-delete eviction races a new
+// download linking the same id; this fence makes that outcome impossible.
+func (r *ArtifactRepository) DeleteReadyIfEvictable(ctx context.Context, id string) (bool, error) {
+	tag, err := r.pool.Exec(ctx,
+		`DELETE FROM download_artifacts
+		 WHERE id = $1 AND status = 'ready'
+		   AND NOT `+activeArtifactLinkSQL,
+		id,
+	)
+	if err != nil {
+		return false, fmt.Errorf("evicting unlinked artifact: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// OutputPathInUse reports whether any remaining artifact row still claims path.
+// Eviction deletes the DB row before bytes; a concurrent EnsureQueued may have
+// already reused the deterministic local path for a replacement job.
+func (r *ArtifactRepository) OutputPathInUse(ctx context.Context, path string) (bool, error) {
+	if path == "" {
+		return false, nil
+	}
+	var exists bool
+	if err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM download_artifacts WHERE output_path = $1)`,
+		path,
+	).Scan(&exists); err != nil {
+		return false, fmt.Errorf("checking artifact output path: %w", err)
+	}
+	return exists, nil
 }
 
 // EnqueueRemoteOrphan durably records an abandoned attempt before its owning

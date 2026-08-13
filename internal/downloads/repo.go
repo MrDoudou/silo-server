@@ -21,6 +21,14 @@ const insertDownloadSQL = `INSERT INTO downloads (id, user_id, profile_id, devic
 		created_at, updated_at, completed_at)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`
 
+// insertDownloadRequiringArtifactSQL refuses to create a row that would point
+// at an artifact LRU/hygiene already deleted. $16 is artifact_id.
+const insertDownloadRequiringArtifactSQL = `INSERT INTO downloads (id, user_id, profile_id, device_id, media_file_id, content_id,
+		episode_id, batch_id, kind, status, format, quality, effective_quality, target_bitrate_kbps, revision, artifact_id, file_size, bytes_sent, error_message,
+		created_at, updated_at, completed_at)
+	SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+	WHERE EXISTS (SELECT 1 FROM download_artifacts WHERE id = $16)`
+
 // Repository provides CRUD operations for the downloads table.
 type Repository struct {
 	pool *pgxpool.Pool
@@ -122,10 +130,20 @@ func (r *Repository) insertArgs(d *Download) []any {
 	}
 }
 
-// Create inserts a new download record.
+// Create inserts a new download record. Artifact-backed rows are inserted only
+// while the artifact row still exists, so LRU eviction cannot leave a ready
+// download pointing at a deleted id.
 func (r *Repository) Create(ctx context.Context, d *Download) error {
-	if _, err := r.pool.Exec(ctx, insertDownloadSQL, r.insertArgs(d)...); err != nil {
+	query := insertDownloadSQL
+	if d.ArtifactID != "" {
+		query = insertDownloadRequiringArtifactSQL
+	}
+	tag, err := r.pool.Exec(ctx, query, r.insertArgs(d)...)
+	if err != nil {
 		return fmt.Errorf("inserting download: %w", err)
+	}
+	if d.ArtifactID != "" && tag.RowsAffected() == 0 {
+		return ErrArtifactEvicted
 	}
 	return nil
 }
@@ -139,8 +157,16 @@ func (r *Repository) CreateBatch(ctx context.Context, downloads []*Download) err
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	for _, d := range downloads {
-		if _, err := tx.Exec(ctx, insertDownloadSQL, r.insertArgs(d)...); err != nil {
+		query := insertDownloadSQL
+		if d.ArtifactID != "" {
+			query = insertDownloadRequiringArtifactSQL
+		}
+		tag, err := tx.Exec(ctx, query, r.insertArgs(d)...)
+		if err != nil {
 			return fmt.Errorf("inserting batch download: %w", err)
+		}
+		if d.ArtifactID != "" && tag.RowsAffected() == 0 {
+			return ErrArtifactEvicted
 		}
 	}
 
@@ -435,6 +461,7 @@ func (r *Repository) ReplaceManagedEntry(ctx context.Context, existing *Download
 			revision = revision + 1,
 			updated_at = now()
 		WHERE id = $1 AND user_id = $2 AND profile_id = $3 AND device_id = $4 AND revision = $5
+		  AND ($14::text IS NULL OR EXISTS (SELECT 1 FROM download_artifacts WHERE id = $14))
 		RETURNING ` + downloadColumns
 	row := r.pool.QueryRow(ctx, query,
 		existing.ID, existing.UserID, existing.ProfileID, existing.DeviceID, existing.Revision,
@@ -445,6 +472,18 @@ func (r *Repository) ReplaceManagedEntry(ctx context.Context, existing *Download
 	d, err := scanDownload(row)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
+			if replacement.ArtifactID != "" {
+				var artifactExists bool
+				if aerr := r.pool.QueryRow(ctx,
+					`SELECT EXISTS(SELECT 1 FROM download_artifacts WHERE id = $1)`,
+					replacement.ArtifactID,
+				).Scan(&artifactExists); aerr != nil {
+					return nil, fmt.Errorf("replacing managed download: %w", aerr)
+				}
+				if !artifactExists {
+					return nil, ErrArtifactEvicted
+				}
+			}
 			return r.GetManagedEntry(ctx, existing.UserID, existing.ProfileID, existing.DeviceID, existing.ContentID, existing.EpisodeID)
 		}
 		return nil, fmt.Errorf("replacing managed download: %w", err)

@@ -813,19 +813,21 @@ func (m *ArtifactManager) Cleanup(ctx context.Context) error {
 		if total <= budget {
 			break
 		}
-		active, err := m.repo.HasActiveLink(ctx, a.ID)
+		// Delete the row first, gated on the same active-link predicate
+		// HasActiveLink uses. Checking then deleting bytes then deleting the
+		// row lets a concurrent Ensure+Create land a ready download on an id
+		// that this pass then removes — the download stays advertised and
+		// never heals. The atomic delete closes that window; Create refuses
+		// to link a row that no longer exists.
+		deleted, err := m.repo.DeleteReadyIfEvictable(ctx, a.ID)
 		if err != nil {
-			slog.WarnContext(ctx, "artifact link check failed", "component", "downloads", "artifact_id", a.ID, "error", err)
+			slog.WarnContext(ctx, "artifact eviction fence failed", "component", "downloads", "artifact_id", a.ID, "error", err)
 			continue
 		}
-		if active {
+		if !deleted {
 			continue
 		}
-		if !m.deleteArtifactBytes(ctx, a) {
-			continue
-		}
-		if err := m.repo.DeleteArtifact(ctx, a.ID); err != nil {
-			slog.WarnContext(ctx, "deleting evicted artifact row failed", "component", "downloads", "artifact_id", a.ID, "error", err)
+		if !m.deleteEvictedArtifactBytes(ctx, a) {
 			continue
 		}
 		slog.InfoContext(ctx, "evicted download artifact (LRU)", "component", "downloads", "artifact_id", a.ID, "bytes", a.FileSize)
@@ -931,12 +933,24 @@ func (m *ArtifactManager) sweepStale(ctx context.Context) {
 // removeArtifact deletes an artifact's output file, its .part leftover, and
 // its row. Used by the hygiene sweep for rows nothing can serve again.
 func (m *ArtifactManager) removeArtifact(ctx context.Context, a *Artifact, reason string) {
-	if !m.deleteArtifactBytes(ctx, a) {
-		return
-	}
-	if err := m.repo.DeleteArtifact(ctx, a.ID); err != nil {
-		slog.WarnContext(ctx, "deleting swept artifact row failed", "component", "downloads", "artifact_id", a.ID, "error", err)
-		return
+	if a.Status == ArtifactReady {
+		deleted, err := m.repo.DeleteReadyIfEvictable(ctx, a.ID)
+		if err != nil {
+			slog.WarnContext(ctx, "deleting swept artifact row failed", "component", "downloads", "artifact_id", a.ID, "error", err)
+			return
+		}
+		if !deleted {
+			return
+		}
+		_ = m.deleteEvictedArtifactBytes(ctx, a)
+	} else {
+		if !m.deleteArtifactBytes(ctx, a) {
+			return
+		}
+		if err := m.repo.DeleteArtifact(ctx, a.ID); err != nil {
+			slog.WarnContext(ctx, "deleting swept artifact row failed", "component", "downloads", "artifact_id", a.ID, "error", err)
+			return
+		}
 	}
 	slog.InfoContext(ctx, "swept stale download artifact", "component", "downloads", "artifact_id", a.ID, "reason", reason, "bytes", a.FileSize)
 }
@@ -966,6 +980,33 @@ func (m *ArtifactManager) deleteArtifactBytes(ctx context.Context, a *Artifact) 
 		return false
 	}
 	return true
+}
+
+// deleteEvictedArtifactBytes removes bytes after the artifact row is already
+// gone. Remote locators are unique per attempt, so they are always deleted
+// (and re-queued for orphan cleanup on failure). Local output paths are
+// deterministic: skip the unlink if a replacement job already claimed the path.
+func (m *ArtifactManager) deleteEvictedArtifactBytes(ctx context.Context, a *Artifact) bool {
+	if a.OriginArtifactID != "" {
+		if m.deleteArtifactBytes(ctx, a) {
+			return true
+		}
+		m.enqueueRemoteCleanup(ctx, a.ID, PreparedArtifact{
+			OriginNodeID: a.OriginNodeID, OriginNodeURL: a.OriginNodeURL, OriginArtifactID: a.OriginArtifactID,
+		}, false)
+		return false
+	}
+	if a.OutputPath != "" {
+		inUse, err := m.repo.OutputPathInUse(ctx, a.OutputPath)
+		if err != nil {
+			slog.WarnContext(ctx, "artifact output path reuse check failed", "component", "downloads", "artifact_id", a.ID, "error", err)
+			return false
+		}
+		if inUse {
+			return true
+		}
+	}
+	return m.deleteArtifactBytes(ctx, a)
 }
 
 // backoffFor returns the retry delay for the next attempt after a failure.

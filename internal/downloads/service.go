@@ -427,13 +427,7 @@ func (s *Service) createArtifactDownload(ctx context.Context, userID int, req Cr
 		}
 	}
 	if existing != nil {
-		artifact, err := s.artifacts.Ensure(ctx, file, decision.DeliveryFormat, decision.PrepareTarget)
-		if err != nil {
-			return nil, err
-		}
-		status, size := artifactRowStatus(artifact, file)
-		replacement := buildManagedDownload(userID, req.ProfileID, req.DeviceID, managedItem{file: file, contentID: file.ContentID, episodeID: file.EpisodeID}, decision, "", status, size, artifact.ID)
-		return s.reuseOrReplaceManaged(ctx, existing, replacement)
+		return s.replaceManagedArtifactDownload(ctx, existing, userID, req, file, decision)
 	}
 
 	// New row: the quota lock serializes check + insert across concurrent
@@ -446,24 +440,61 @@ func (s *Service) createArtifactDownload(ctx context.Context, userID int, req Cr
 		if err := s.limiter.Check(ctx, userID, 1); err != nil {
 			return err
 		}
-		artifact, err := s.artifacts.Ensure(ctx, file, decision.DeliveryFormat, decision.PrepareTarget)
+		row, err := s.insertArtifactDownload(ctx, userID, req, file, decision, managed)
 		if err != nil {
 			return err
+		}
+		d = row
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+const artifactLinkAttempts = 2
+
+func (s *Service) replaceManagedArtifactDownload(ctx context.Context, existing *Download, userID int, req CreateRequest, file *models.MediaFile, decision QualityDecision) (*Download, error) {
+	var last error
+	for attempt := 0; attempt < artifactLinkAttempts; attempt++ {
+		artifact, err := s.artifacts.Ensure(ctx, file, decision.DeliveryFormat, decision.PrepareTarget)
+		if err != nil {
+			return nil, err
+		}
+		status, size := artifactRowStatus(artifact, file)
+		replacement := buildManagedDownload(userID, req.ProfileID, req.DeviceID, managedItem{file: file, contentID: file.ContentID, episodeID: file.EpisodeID}, decision, "", status, size, artifact.ID)
+		row, err := s.reuseOrReplaceManaged(ctx, existing, replacement)
+		if errors.Is(err, ErrArtifactEvicted) {
+			last = err
+			continue
+		}
+		return row, err
+	}
+	return nil, last
+}
+
+func (s *Service) insertArtifactDownload(ctx context.Context, userID int, req CreateRequest, file *models.MediaFile, decision QualityDecision, managed bool) (*Download, error) {
+	var last error
+	for attempt := 0; attempt < artifactLinkAttempts; attempt++ {
+		artifact, err := s.artifacts.Ensure(ctx, file, decision.DeliveryFormat, decision.PrepareTarget)
+		if err != nil {
+			return nil, err
 		}
 		status, size := artifactRowStatus(artifact, file)
 
 		if managed {
 			if err := s.repo.EnsureDevice(ctx, userID, req.ProfileID, req.DeviceID, req.DeviceName, req.DevicePlatform); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
 		id, err := idgen.NextID()
 		if err != nil {
-			return fmt.Errorf("generating download ID: %w", err)
+			return nil, fmt.Errorf("generating download ID: %w", err)
 		}
 		now := time.Now()
-		d = &Download{
+		d := &Download{
 			ID:                id,
 			UserID:            userID,
 			MediaFileID:       file.ID,
@@ -486,25 +517,29 @@ func (s *Service) createArtifactDownload(ctx context.Context, userID int, req Cr
 			d.DeviceID = req.DeviceID
 		}
 		if err := s.repo.Create(ctx, d); err != nil {
+			if errors.Is(err, ErrArtifactEvicted) {
+				last = err
+				continue
+			}
 			if managed {
 				if existing, gerr := s.repo.GetManagedEntry(ctx, userID, req.ProfileID, req.DeviceID, file.ContentID, file.EpisodeID); gerr == nil {
 					replacement := buildManagedDownload(userID, req.ProfileID, req.DeviceID, managedItem{file: file, contentID: file.ContentID, episodeID: file.EpisodeID}, decision, "", status, size, artifact.ID)
 					row, rerr := s.reuseOrReplaceManaged(ctx, existing, replacement)
-					if rerr != nil {
-						return rerr
+					if errors.Is(rerr, ErrArtifactEvicted) {
+						last = rerr
+						continue
 					}
-					d = row
-					return nil
+					if rerr != nil {
+						return nil, rerr
+					}
+					return row, nil
 				}
 			}
-			return err
+			return nil, err
 		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
+		return d, nil
 	}
-	return d, nil
+	return nil, last
 }
 
 // artifactRowStatus maps an ensured artifact to the download row status and

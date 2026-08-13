@@ -773,3 +773,112 @@ func TestHasActiveLinkCoversEphemeralRows(t *testing.T) {
 		t.Fatal("terminal-only links must not protect an artifact")
 	}
 }
+
+func markArtifactReady(t *testing.T, pool *pgxpool.Pool, id string) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(),
+		`UPDATE download_artifacts SET status = 'ready', file_size = 1024, completed_at = now() WHERE id = $1`,
+		id,
+	); err != nil {
+		t.Fatalf("mark artifact ready: %v", err)
+	}
+}
+
+func seedDownloadUser(t *testing.T, pool *pgxpool.Pool) int {
+	t.Helper()
+	var userID int
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO users (username, role, download_allowed) VALUES ($1, 'user', true) RETURNING id`,
+		fmt.Sprintf("evictuser-%d", time.Now().UnixNano()),
+	).Scan(&userID); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM downloads WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
+	})
+	return userID
+}
+
+// TestDeleteReadyIfEvictableFencesConcurrentLink pins the LRU eviction
+// invariant: a ready download that lands after the unlinked check must keep
+// the artifact row, and a download insert against a deleted id must fail
+// rather than advertise a 404-forever handle.
+func TestDeleteReadyIfEvictableFencesConcurrentLink(t *testing.T) {
+	repo, pool, fileID := newArtifactTestRepo(t)
+	ctx := context.Background()
+
+	art := newArtifact(t, fileID, fmt.Sprintf("hash-evict-%d", time.Now().UnixNano()))
+	if _, _, err := repo.EnsureQueued(ctx, art); err != nil {
+		t.Fatalf("ensure artifact: %v", err)
+	}
+	markArtifactReady(t, pool, art.ID)
+	userID := seedDownloadUser(t, pool)
+	dlRepo := NewRepository(pool)
+	now := time.Now()
+	contentID := fmt.Sprintf("evict-content-%d", now.UnixNano())
+
+	deleted, err := repo.DeleteReadyIfEvictable(ctx, art.ID)
+	if err != nil {
+		t.Fatalf("DeleteReadyIfEvictable unlinked: %v", err)
+	}
+	if !deleted {
+		t.Fatal("unlinked ready artifact must be evictable")
+	}
+	if err := dlRepo.Create(ctx, &Download{
+		ID: fmt.Sprintf("dl-evict-miss-%d", now.UnixNano()), UserID: userID, MediaFileID: fileID, ContentID: contentID,
+		Kind: KindQueued, Status: StatusReady, Format: FormatTranscode,
+		ArtifactID: art.ID, FileSize: 1024, CreatedAt: now, UpdatedAt: now,
+	}); !errors.Is(err, ErrArtifactEvicted) {
+		t.Fatalf("Create after eviction = %v, want ErrArtifactEvicted", err)
+	}
+
+	art2 := newArtifact(t, fileID, fmt.Sprintf("hash-evict-live-%d", time.Now().UnixNano()))
+	if _, _, err := repo.EnsureQueued(ctx, art2); err != nil {
+		t.Fatalf("ensure second artifact: %v", err)
+	}
+	markArtifactReady(t, pool, art2.ID)
+	if err := dlRepo.Create(ctx, &Download{
+		ID: fmt.Sprintf("dl-evict-live-%d", now.UnixNano()), UserID: userID, MediaFileID: fileID, ContentID: contentID + "-live",
+		Kind: KindQueued, Status: StatusReady, Format: FormatTranscode,
+		ArtifactID: art2.ID, FileSize: 1024, CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("Create live download: %v", err)
+	}
+	deleted, err = repo.DeleteReadyIfEvictable(ctx, art2.ID)
+	if err != nil {
+		t.Fatalf("DeleteReadyIfEvictable linked: %v", err)
+	}
+	if deleted {
+		t.Fatal("ready download must fence LRU eviction")
+	}
+	if _, err := repo.GetByID(ctx, art2.ID); err != nil {
+		t.Fatalf("linked artifact missing after eviction attempt: %v", err)
+	}
+
+	if _, err := pool.Exec(ctx, `UPDATE downloads SET status = 'cancelled' WHERE artifact_id = $1`, art2.ID); err != nil {
+		t.Fatalf("cancel download: %v", err)
+	}
+	deleted, err = repo.DeleteReadyIfEvictable(ctx, art2.ID)
+	if err != nil {
+		t.Fatalf("DeleteReadyIfEvictable after cancel: %v", err)
+	}
+	if !deleted {
+		t.Fatal("terminal-only links must not fence eviction")
+	}
+}
+
+func TestCreateOriginalDownloadDoesNotRequireArtifact(t *testing.T) {
+	_, pool, fileID := newArtifactTestRepo(t)
+	ctx := context.Background()
+	userID := seedDownloadUser(t, pool)
+	now := time.Now()
+	if err := NewRepository(pool).Create(ctx, &Download{
+		ID: fmt.Sprintf("dl-original-%d", now.UnixNano()), UserID: userID, MediaFileID: fileID,
+		ContentID: fmt.Sprintf("original-content-%d", now.UnixNano()),
+		Kind:      KindQueued, Status: StatusQueued, Format: FormatOriginal,
+		FileSize: 1024, CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("Create original download: %v", err)
+	}
+}

@@ -86,6 +86,9 @@ var (
 	// ErrArtifactOriginRemoved means a durable remote locator points at a node
 	// no longer present in the enabled transcode pool.
 	ErrArtifactOriginRemoved = errors.New("download artifact origin node was removed")
+	// ErrArtifactEvicted means a download tried to link to an artifact that LRU
+	// or hygiene eviction removed between Ensure and the row write.
+	ErrArtifactEvicted = errors.New("download artifact was evicted")
 	// ErrQualityUnavailable means the requested quality is valid and permitted in
 	// principle but cannot be fulfilled by the current server wiring.
 	ErrQualityUnavailable = errors.New("requested download quality is not available")
