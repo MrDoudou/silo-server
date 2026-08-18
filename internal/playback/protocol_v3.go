@@ -27,6 +27,13 @@ const (
 	ClientDV7ToHDR10V3            = "client_dv7_to_hdr10"
 	ClientDVTransformVersionV3    = "1"
 	ClientDV8HDR10PlusSanitizerV3 = "client_dv8_hdr10plus_sanitizer_v1"
+	// ClientAudioTrackSelectionV3 is advertised in a delivery's features when
+	// that delivery's executor selects the plan's audio track itself from the
+	// container it is handed. It is the only evidence that lets a
+	// source-preserving delivery carry a non-default audio selection: the
+	// bytes are untouched, so a client without it plays the container default
+	// no matter what selected_tracks says.
+	ClientAudioTrackSelectionV3   = "client_audio_track_selection_v1"
 	ClientPostResumeRecoveryV3    = "client_post_resume_video_recovery_v1"
 	ClientSurfaceRecoveryV3       = "client_surface_recovery_v1"
 	DeviceQuirkRegistryRevisionV3 = "2026-07-13.1"

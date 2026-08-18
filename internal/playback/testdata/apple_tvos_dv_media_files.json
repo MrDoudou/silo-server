@@ -1,0 +1,658 @@
+[
+ {
+  "id": 741,
+  "content_id": "movie-tmdb-513347",
+  "container": "mkv",
+  "codec_video": "hevc",
+  "codec_audio": "eac3",
+  "resolution": "1080p",
+  "hdr": true,
+  "bitrate": 2943,
+  "duration": 4451,
+  "video_tracks": [
+   {
+    "codec": "hevc",
+    "level": 120,
+    "title": "H.265 / HEVC (High Efficiency Video Coding)",
+    "width": 1920,
+    "height": 1080,
+    "profile": "Main 10",
+    "dv_level": 3,
+    "bit_depth": 10,
+    "dv_profile": 5,
+    "frame_rate": "24.000",
+    "interlaced": false,
+    "color_range": "pc",
+    "video_range": "DolbyVision",
+    "aspect_ratio": "16:9",
+    "dolby_vision": "Profile 5",
+    "pixel_format": "yuv420p10le",
+    "reference_frames": 1,
+    "video_range_type": "DOVI",
+    "dv_enhancement_layer": "none"
+   }
+  ],
+  "audio_tracks": [
+   {
+    "codec": "eac3",
+    "title": "ATSC A/52B (AC-3, E-AC-3)",
+    "layout": "stereo",
+    "bitrate": 128,
+    "default": true,
+    "channels": 2,
+    "language": "zh",
+    "sample_rate": 48000
+   },
+   {
+    "codec": "eac3",
+    "title": "ATSC A/52B (AC-3, E-AC-3)",
+    "layout": "stereo",
+    "bitrate": 128,
+    "default": false,
+    "channels": 2,
+    "language": "en",
+    "sample_rate": 48000
+   }
+  ],
+  "subtitle_tracks": [
+   {
+    "codec": "subrip",
+    "index": 3,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "en",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 4,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "ar",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 5,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "da",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 6,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "de",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 7,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "el",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 8,
+    "title": "Latin American",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "es",
+    "embedded_title": "Latin American",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 9,
+    "title": "European",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "es",
+    "embedded_title": "European",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 10,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "fi",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 11,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "fr",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 12,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "he",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 13,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "it",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 14,
+    "title": "SDH",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "ja",
+    "embedded_title": "SDH",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 15,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "ko",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 16,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "nb",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 17,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "nl",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 18,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "pl",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 19,
+    "title": "Brazilian",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "pt",
+    "embedded_title": "Brazilian",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 20,
+    "title": "European",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "pt",
+    "embedded_title": "European",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 21,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "ro",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 22,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "sv",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 23,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "th",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 24,
+    "title": "SUBRIP",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "tr",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 25,
+    "title": "Simplified",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "zh",
+    "embedded_title": "Simplified",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 26,
+    "title": "Traditional",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "zh",
+    "embedded_title": "Traditional",
+    "hearing_impaired": false
+   }
+  ],
+  "external_subtitles": [
+   {
+    "path": "/media/movies/file-741/subtitles.ar.srt",
+    "title": "subtitles.ar.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "ar",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-741/subtitles.da.srt",
+    "title": "subtitles.da.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "da",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-741/subtitles.de.srt",
+    "title": "subtitles.de.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "de",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-741/subtitles.es.srt",
+    "title": "subtitles.es.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "es",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-741/subtitles.fr.srt",
+    "title": "subtitles.fr.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "fr",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-741/subtitles.ja.srt",
+    "title": "subtitles.ja.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "ja",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-741/subtitles.nl.srt",
+    "title": "subtitles.nl.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "nl",
+    "hearing_impaired": false
+   }
+  ]
+ },
+ {
+  "id": 223792,
+  "content_id": "movie-tmdb-1117126",
+  "container": "mkv",
+  "codec_video": "hevc",
+  "codec_audio": "eac3",
+  "resolution": "2160p",
+  "hdr": true,
+  "bitrate": 17151,
+  "duration": 6035,
+  "video_tracks": [
+   {
+    "codec": "hevc",
+    "level": 150,
+    "title": "H.265 / HEVC (High Efficiency Video Coding)",
+    "width": 3840,
+    "height": 1600,
+    "profile": "Main 10",
+    "bit_depth": 10,
+    "dv_profile": 8,
+    "frame_rate": "23.976",
+    "interlaced": false,
+    "color_range": "tv",
+    "color_space": "bt2020nc",
+    "video_range": "DolbyVision",
+    "aspect_ratio": "12:5",
+    "dolby_vision": "Profile 8",
+    "pixel_format": "yuv420p10le",
+    "color_transfer": "smpte2084",
+    "color_primaries": "bt2020",
+    "dv_bl_compat_id": 1,
+    "reference_frames": 1,
+    "video_range_type": "DOVIWithHDR10",
+    "dv_enhancement_layer": "none"
+   }
+  ],
+  "audio_tracks": [
+   {
+    "codec": "eac3",
+    "title": "German",
+    "layout": "5.1(side)",
+    "bitrate": 640,
+    "default": true,
+    "channels": 6,
+    "language": "de",
+    "sample_rate": 48000,
+    "embedded_title": "German"
+   },
+   {
+    "codec": "eac3",
+    "title": "English",
+    "layout": "5.1(side)",
+    "bitrate": 640,
+    "default": false,
+    "channels": 6,
+    "language": "en",
+    "sample_rate": 48000,
+    "embedded_title": "English"
+   }
+  ],
+  "subtitle_tracks": [
+   {
+    "codec": "subrip",
+    "index": 3,
+    "title": "German (Forced)",
+    "forced": true,
+    "default": true,
+    "external": false,
+    "language": "de",
+    "embedded_title": "German (Forced)",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 4,
+    "title": "German",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "de",
+    "embedded_title": "German",
+    "hearing_impaired": false
+   }
+  ],
+  "external_subtitles": []
+ },
+ {
+  "id": 223805,
+  "content_id": "movie-tmdb-852590",
+  "container": "mkv",
+  "codec_video": "hevc",
+  "codec_audio": "eac3",
+  "resolution": "2160p",
+  "hdr": true,
+  "bitrate": 20358,
+  "duration": 6152,
+  "video_tracks": [
+   {
+    "codec": "hevc",
+    "level": 150,
+    "title": "H.265 / HEVC (High Efficiency Video Coding)",
+    "width": 3840,
+    "height": 2160,
+    "profile": "Main 10",
+    "bit_depth": 10,
+    "frame_rate": "24.000",
+    "interlaced": false,
+    "color_range": "tv",
+    "color_space": "bt2020nc",
+    "video_range": "HDR",
+    "aspect_ratio": "16:9",
+    "pixel_format": "yuv420p10le",
+    "color_transfer": "smpte2084",
+    "color_primaries": "bt2020",
+    "reference_frames": 1,
+    "video_range_type": "HDR10",
+    "dv_enhancement_layer": "none"
+   }
+  ],
+  "audio_tracks": [
+   {
+    "codec": "eac3",
+    "title": "Polish E-AC3 640 kbps",
+    "layout": "5.1(side)",
+    "bitrate": 640,
+    "default": true,
+    "channels": 6,
+    "language": "pl",
+    "sample_rate": 48000,
+    "embedded_title": "Polish E-AC3 640 kbps"
+   },
+   {
+    "codec": "eac3",
+    "title": "Spanish E-AC3 640 kbps",
+    "layout": "5.1(side)",
+    "bitrate": 640,
+    "default": false,
+    "channels": 6,
+    "language": "es",
+    "sample_rate": 48000,
+    "embedded_title": "Spanish E-AC3 640 kbps"
+   }
+  ],
+  "subtitle_tracks": [
+   {
+    "codec": "subrip",
+    "index": 3,
+    "title": "Polish (Forced)",
+    "forced": true,
+    "default": true,
+    "external": false,
+    "language": "pl",
+    "embedded_title": "Polish (Forced)",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 4,
+    "title": "Polish",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "pl",
+    "embedded_title": "Polish",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 5,
+    "title": "English",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "en",
+    "embedded_title": "English",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 6,
+    "title": "English",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "en",
+    "embedded_title": "English",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 7,
+    "title": "English (SDH)",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "en",
+    "embedded_title": "English (SDH)",
+    "hearing_impaired": false
+   },
+   {
+    "codec": "subrip",
+    "index": 8,
+    "title": "Spanish (SDH)",
+    "forced": false,
+    "default": false,
+    "external": false,
+    "language": "es",
+    "embedded_title": "Spanish (SDH)",
+    "hearing_impaired": false
+   }
+  ],
+  "external_subtitles": [
+   {
+    "path": "/media/movies/file-223805/subtitles.ar.srt",
+    "title": "subtitles.ar.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "ar",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-223805/subtitles.da.srt",
+    "title": "subtitles.da.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "da",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-223805/subtitles.de.srt",
+    "title": "subtitles.de.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "de",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-223805/subtitles.en.srt",
+    "title": "subtitles.en.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "en",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-223805/subtitles.es.sdh.srt",
+    "title": "subtitles.es.sdh.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "es",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-223805/subtitles.fr.srt",
+    "title": "subtitles.fr.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "fr",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-223805/subtitles.ja.srt",
+    "title": "subtitles.ja.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "ja",
+    "hearing_impaired": false
+   },
+   {
+    "path": "/media/movies/file-223805/subtitles.nl.srt",
+    "title": "subtitles.nl.srt",
+    "forced": false,
+    "format": "srt",
+    "default": false,
+    "language": "nl",
+    "hearing_impaired": false
+   }
+  ]
+ }
+]

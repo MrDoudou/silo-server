@@ -338,7 +338,7 @@ func PlanPlaybackV3(input PlannerInputV3) PlannerResultV3 {
 	}
 
 	if source.DVProfile != 7 && deliveryAvailableV3(input.Request, DeliveryClassOriginalHTTPV3) && containerOK && videoOK && rangeOK && audioOK && quality.PreservesSource &&
-		audioSelectionUsesContainerDefaultV3(file, input.AudioTrackIndex) && !subtitle.RequiresBurn {
+		originalAudioSelectionRealizableV3(input.Request, file, input.AudioTrackIndex) && !subtitle.RequiresBurn {
 		plan := base
 		plan.Delivery = DeliveryOriginalHTTPV3
 		plan.Stream = StreamV3{Protocol: StreamHTTPProgressiveV3, Container: source.Container, MIMEType: MimeFromExtension(file.FilePath), Headers: map[string]string{}, HeaderRefresh: HeaderRefreshNoneV3}
@@ -1033,6 +1033,21 @@ func audioSelectionUsesContainerDefaultV3(file *models.MediaFile, audioIndex int
 		audioIndex = defaultIndex
 	}
 	return audioIndex == defaultIndex
+}
+
+// originalAudioSelectionRealizableV3 reports whether the original_http delivery
+// can actually realize the selected audio track. The container default always
+// can. Anything else needs the delivery's executor to select the track itself:
+// the plan names it in selected_tracks, but the bytes are untouched, so a
+// client that ignores that selection would silently play the container default
+// instead — usually the wrong language, which is exactly what the remux route
+// exists to prevent. Clients that do perform the selection (AVPlayer media
+// selection, ExoPlayer track selection) say so per delivery, and forcing them
+// through a remux costs the source's own container, its Dolby Vision, and — on
+// deliveries the device cannot execute — playback itself.
+func originalAudioSelectionRealizableV3(request StartRequestV3, file *models.MediaFile, audioIndex int) bool {
+	return audioSelectionUsesContainerDefaultV3(file, audioIndex) ||
+		deliverySupportsFeatureV3(request, DeliveryClassOriginalHTTPV3, ClientAudioTrackSelectionV3)
 }
 
 func finalizePlanIdentityV3(plan *PlanV3, attemptID string, outputContextID string) {

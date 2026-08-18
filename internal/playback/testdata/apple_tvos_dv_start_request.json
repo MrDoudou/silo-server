@@ -1,0 +1,259 @@
+{
+ "protocol_version": 3,
+ "client_features": [
+  "playback_plan_v3",
+  "client_video_transforms"
+ ],
+ "file_id": 223805,
+ "playback_attempt_id": "apple:probe2-223805",
+ "quality_preference": "auto",
+ "subtitle_fidelity_preference": "compatible",
+ "start_position": 0,
+ "progress_persistence": "client",
+ "metered": false,
+ "client_capabilities": {
+  "video_evidence": "platform_attested",
+  "audio_evidence": "declared",
+  "codecs_video": [
+   "h264",
+   "hevc"
+  ],
+  "codecs_video_hardware": [
+   "h264",
+   "hevc"
+  ],
+  "codecs_audio": [
+   "aac",
+   "ac3",
+   "eac3",
+   "dts",
+   "truehd",
+   "flac",
+   "alac",
+   "mp3",
+   "opus",
+   "vorbis",
+   "pcm",
+   "pcm_s16le",
+   "pcm_s24le"
+  ],
+  "containers": [
+   "mp4",
+   "mov",
+   "m4v",
+   "mkv",
+   "matroska",
+   "webm",
+   "avi",
+   "ts",
+   "m2ts",
+   "mpegts",
+   "mp3",
+   "m4a",
+   "m4b",
+   "aac",
+   "flac",
+   "wav"
+  ],
+  "max_resolution": "2160p",
+  "hdr": true,
+  "hdr_details": {
+   "hdr10": true,
+   "hdr10_plus": false,
+   "hlg": false,
+   "dolby_vision_profiles": [
+    5,
+    8
+   ]
+  },
+  "video_decode": [
+   {
+    "codec": "h264",
+    "bit_depths": [
+     8
+    ],
+    "max_width": 3840,
+    "max_height": 2160,
+    "max_frame_rate": 60,
+    "max_bitrate_kbps": 120000,
+    "hardware": true
+   },
+   {
+    "codec": "hevc",
+    "bit_depths": [
+     8,
+     10
+    ],
+    "max_width": 3840,
+    "max_height": 2160,
+    "max_frame_rate": 60,
+    "max_bitrate_kbps": 120000,
+    "hardware": true
+   }
+  ]
+ },
+ "client_playback_context": {
+  "protocol_version": 3,
+  "form_factor": "tv",
+  "app_version": "probe",
+  "device": {
+   "platform": "tvos",
+   "os_version": "26",
+   "manufacturer": "Apple",
+   "model": "AppleTV14,1"
+  },
+  "output": {
+   "output_context_id": "apple:probe",
+   "sink_type": "HDMIOutput",
+   "hdr_details": {
+    "hdr10": true,
+    "hdr10_plus": false,
+    "hlg": false,
+    "dolby_vision_profiles": [
+     5,
+     8
+    ]
+   }
+  },
+  "deliveries": {
+   "original_http": {
+    "enabled": true,
+    "supported_on_device": true,
+    "containers": [
+     "mp4",
+     "mov",
+     "m4v",
+     "mkv",
+     "matroska",
+     "ts",
+     "m2ts",
+     "mpegts",
+     "mp3",
+     "m4a",
+     "m4b",
+     "aac",
+     "flac",
+     "wav"
+    ],
+    "video_codecs": [
+     "h264",
+     "hevc"
+    ],
+    "audio_decode_codecs": [
+     "aac",
+     "ac3",
+     "eac3",
+     "dts",
+     "truehd",
+     "flac",
+     "alac",
+     "mp3",
+     "opus",
+     "vorbis",
+     "pcm",
+     "pcm_s16le",
+     "pcm_s24le"
+    ],
+    "audio_passthrough_codecs": [],
+    "subtitles": {
+     "embedded_text": true,
+     "sidecar_text": true,
+     "ass_styling": true,
+     "embedded_bitmap": true,
+     "sidecar_bitmap": false,
+     "font_attachments": true
+    },
+    "features": [],
+    "auth_header_refresh": true,
+    "validated_claims": [],
+    "transformations": [],
+    "hdr_details": {
+     "hdr10": true,
+     "hdr10_plus": false,
+     "hlg": false,
+     "dolby_vision_profiles": [
+      5,
+      8
+     ]
+    }
+   },
+   "progressive": {
+    "enabled": true,
+    "supported_on_device": true,
+    "containers": [
+     "mp4"
+    ],
+    "video_codecs": [
+     "h264",
+     "hevc"
+    ],
+    "audio_decode_codecs": [
+     "aac",
+     "ac3",
+     "eac3"
+    ],
+    "audio_passthrough_codecs": [],
+    "subtitles": {
+     "embedded_text": false,
+     "sidecar_text": true,
+     "ass_styling": true,
+     "embedded_bitmap": false,
+     "sidecar_bitmap": false,
+     "font_attachments": false
+    },
+    "features": [],
+    "auth_header_refresh": true,
+    "validated_claims": [],
+    "transformations": [],
+    "hdr_details": {
+     "hdr10": true,
+     "hdr10_plus": false,
+     "hlg": false,
+     "dolby_vision_profiles": [
+      5,
+      8
+     ]
+    }
+   },
+   "hls": {
+    "enabled": true,
+    "supported_on_device": true,
+    "containers": [
+     "hls"
+    ],
+    "video_codecs": [
+     "h264",
+     "hevc"
+    ],
+    "audio_decode_codecs": [
+     "aac",
+     "ac3",
+     "eac3"
+    ],
+    "audio_passthrough_codecs": [],
+    "subtitles": {
+     "embedded_text": false,
+     "sidecar_text": true,
+     "ass_styling": true,
+     "embedded_bitmap": false,
+     "sidecar_bitmap": false,
+     "font_attachments": false
+    },
+    "features": [],
+    "auth_header_refresh": true,
+    "validated_claims": [],
+    "transformations": [],
+    "hdr_details": {
+     "hdr10": true,
+     "hdr10_plus": false,
+     "hlg": false,
+     "dolby_vision_profiles": [
+      5,
+      8
+     ]
+    }
+   }
+  }
+ },
+ "profile_id": "00000000-0000-4000-8000-000000000001"
+}

@@ -442,6 +442,16 @@ because "the user turned HLS off" and "this device has no HLS player" call for
 different degradation warnings and different diagnostics. A class the client
 omits entirely is unavailable — the server will not guess.
 
+One `features` string is load-bearing on `original_http`:
+`client_audio_track_selection_v1` declares that this delivery's executor selects
+`selected_tracks.audio` itself out of the container it is handed. Without it, a
+source-preserving route is only planned when the selection *is* the container's
+default track — the bytes are untouched, so a client that ignores the selection
+would silently play the default, usually in the wrong language, and the server
+routes it through a remux that maps the chosen stream explicitly instead. A
+client advertising the string must honour the selection on every original
+delivery, including after a `track_change` replan.
+
 `stream.header_refresh` tells the client what to do when the stream URL's auth
 expires: `none` means the URL is stable for the session, `session` means
 re-request headers from `header_refresh_url` rather than restarting playback.
