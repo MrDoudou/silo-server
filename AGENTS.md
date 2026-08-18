@@ -43,7 +43,12 @@ Renaming a row in SQL makes its value undecryptable.
 profiles on one account share a `user_id`. A profile's `is_primary` marks the household parent,
 which is *not* the server-wide `admin` role on the account.
 
-**Docs hygiene.** Files under `docs/superpowers/{specs,plans}/` must not contain local absolute
+**Docs hygiene.** Implementation plans and specs are ephemeral working artifacts, not
+documentation. `docs/superpowers/` is gitignored: write plans there (or in any scratch dir)
+while working, but never commit them — put the plan in the PR description instead. Before a
+branch merges, distill anything durable (invariants, protocols, security rules) into
+`docs/architecture/` and let the plan die. The code is the source of truth; a doc that
+disagrees with the code is wrong. Any committed doc must not contain local absolute
 filesystem paths or transient worktree IDs — use repository-relative paths and wording like
 "Commands assume the repository root is the cwd." `make verify-local-paths` enforces this.
 
