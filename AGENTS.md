@@ -16,9 +16,9 @@ libraries, whether it's one node serving a household or a deployment streaming t
 users. Weigh every design against that full spectrum; treat a node dying mid-stream as a normal
 event, not an edge case.
 
-It is an open platform, not a walled garden: third-party clients are encouraged, which is why
-the additive-only v1 API rules and capability endpoints below are binding — other people's
-clients will depend on them. Jellyfin-protocol compatibility is a long-term commitment as an
+It is an open platform, not a walled garden: third-party clients are encouraged, and other
+people's clients will depend on the v1 API once it locks — see "v1 API rules" below for the
+current pre-1.0 posture. Jellyfin-protocol compatibility is a long-term commitment as an
 on-ramp for the existing ecosystem.
 
 The core/plugin line is about implementation multiplicity: library types (movies, TV,
@@ -122,7 +122,8 @@ catalog, or in a specific plugin repo.
 A client-visible change (API, auth, playback, session, library, or metadata behavior) is not
 done until each of these has been handled or ruled out:
 
-- v1 API rules hold (additive only; new features expose a capability endpoint).
+- The API change fits the current v1 posture (see "v1 API rules" below); new features still
+  expose a capability endpoint.
 - Follow-up work is done or filed for both `silo-apple` and `silo-android` — prefer
   coordinated multi-repo changes over leaving a platform behind.
 - jellycompat parity was considered (does the Jellyfin surface need the same behavior?).
@@ -173,7 +174,15 @@ checks it end to end.
 
 ## v1 API rules
 
-Additive-only within `/api/v1`:
+Silo is alpha and `/api/v1` is not locked yet. Until it locks, restructuring the API is in
+scope — if a shape is wrong, fix it now rather than carry it into 1.0. Prefer larger
+coordinated sweeps over a drip of small breaks, and don't build backwards-compatibility shims
+for pre-lock clients. A breaking change still needs coordination with `silo-apple` and
+`silo-android`, and removals get recorded in the pre-lock removals table in
+[docs/architecture/v1-scope.md](docs/architecture/v1-scope.md) so client authors can track
+them.
+
+At v1 lock (1.0), the contract becomes additive-only and binding:
 
 - Never rename or remove a response field, change a field's type, or repurpose a status code on
   an existing endpoint.
@@ -182,10 +191,7 @@ Additive-only within `/api/v1`:
 - New features expose capability endpoints for feature detection rather than relying on version
   sniffing. Contract strategy and tooling: issue #135.
 
-Treat this as binding. The one exception: `/api/v1` is not locked yet, so a removal taken before
-lock is in scope — but only when it is recorded in the pre-lock removals table in
-[docs/architecture/v1-scope.md](docs/architecture/v1-scope.md) and ships before the lock. Assume
-any removal not listed there is a mistake.
+Design new endpoints today so they can live under that regime tomorrow.
 
 ## Pull requests
 
