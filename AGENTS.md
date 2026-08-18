@@ -31,6 +31,32 @@ the single-node and the multi-node deployment. Current posture: the 1.0 feature 
 essentially complete; the present era is QA, UX polish, and verifying everything does what it
 says. Prefer correctness and polish over new feature sprawl.
 
+## How it fits together
+
+Media enters through the scanner (`internal/scanner`, fed by `scanqueue`/`autoscan`), is
+classified by library kind (`librarykind`), ingested (`libraryingest`), and enriched by
+metadata plugins into the catalog: `media_items` keyed by deterministic content IDs
+(`contentid`), with `media_files` for the actual on-disk files. The catalog serves the v1 API
+and the home-screen sections (`sections`); `jellycompat` is a separate Jellyfin-protocol view
+over the same catalog. Playback resolves a play method (`internal/playback`) — direct play,
+direct stream, or transcode on a node from `nodepool` — and stream URLs are authorized by
+short-lived `streamtoken` JWTs. Per-user state (watch progress, settings) is stored
+server-side (`watchstate`, `userdb`, `settingsresolve`).
+
+## Glossary
+
+- **Account vs profile** — an account is a `users` row (login); a profile is a household
+  member on an account. Several profiles share one `user_id`. See the gotcha below.
+- **Library** — a media folder with a kind (movies, TV, audiobooks, ebooks, podcasts).
+- **Item vs file** — a `MediaItem` is a catalog entry (movie/series, `content_id` PK); a
+  `MediaFile` is one real file. One item can own many files (versions, extras, episodes).
+- **Section** — a home-screen row (Continue Watching, Recently Added…), not a library.
+- **Node** — a remote transcode/streaming worker in `nodepool`, not the API server.
+- **Session** — ambiguous; always say which: playback session (`internal/playback`) or login
+  session (`internal/auth`).
+- **jellycompat vs v1** — jellycompat is the Jellyfin-protocol surface for ecosystem clients;
+  "the API" or "v1" means Silo's native `/api/v1`.
+
 ## Priorities
 
 Performance and reliability first. Keep behavior predictable under load and during failures —
@@ -53,6 +79,8 @@ client suite at risk. This is settled product direction, not a design problem to
 write code for it, and say so plainly if asked.
 
 ## Gotchas
+
+The first two are irreversible — data loss, not inconvenience. Treat them as absolute.
 
 **Migrations.** New DB changes are Goose SQL migrations in `migrations/sql/`, created with
 `make migrate-create NAME=add_thing` so they get timestamped filenames. Never run `goose fix`,
@@ -88,16 +116,28 @@ Sibling repos are usually checked out side-by-side in the same parent directory.
 - First-party plugins (`silo-plugin-metadata-tmdb`, `silo-plugin-metadata-tvdb`, …) each have
   their own repo.
 
-Client-visible changes to API, auth, playback, session, library, or metadata behavior usually
-need follow-up in both client repos — prefer coordinated multi-repo changes over leaving a
-platform behind. When a task mentions plugins, work out first whether it belongs here, in the
-SDK, in the catalog, or in a specific plugin repo.
+When a task mentions plugins, work out first whether it belongs here, in the SDK, in the
+catalog, or in a specific plugin repo.
+
+A client-visible change (API, auth, playback, session, library, or metadata behavior) is not
+done until each of these has been handled or ruled out:
+
+- v1 API rules hold (additive only; new features expose a capability endpoint).
+- Follow-up work is done or filed for both `silo-apple` and `silo-android` — prefer
+  coordinated multi-repo changes over leaving a platform behind.
+- jellycompat parity was considered (does the Jellyfin surface need the same behavior?).
+- The relevant `docs/*-api.md` is updated, and `docs/feature-changelog.md` gets an entry if
+  the change is user-facing.
 
 ## Building and verifying
 
 `make build`, `make dev-backend`, `make dev-frontend`, `make lint`, `make test`, `make migrate-status`
 / `make migrate-up` — read the `Makefile` for the rest. Local services:
 `docker compose up -d postgres redis`.
+
+While iterating, run the focused tests for the packages you touched (`go test ./internal/<pkg>/...`)
+rather than the whole suite; the full gate below is for pre-PR. In tests, wait on observable
+state — job status, health endpoints, channel receipts — not fixed sleeps.
 
 `make test-go` runs the whole Go suite. A Go test that cannot pass yet carries a `t.Skip` and the
 reason in its own source, not an entry in a Makefile variable. `make test-web` still skips the
