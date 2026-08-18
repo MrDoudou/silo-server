@@ -120,9 +120,9 @@ Discord webhooks receive a native embed (no `content` line), with
 continue-watching, next-up precedence order). The builder enforces Discord's
 embed limits — 256-char title, 4096-char description, 1024-char field
 values, 2048-char footer, 6000 chars total — truncating description first
-and never the title. `allowed_mentions` always serializes an empty `parse`
-list so content assembled from user-derived text can never ping roles or
-`@everyone`.
+and never the title. Embeds cannot ping: Discord only parses mentions from
+the top-level `content` field, which this payload never sets (the
+`allowed_mentions` field is omitted rather than sent).
 
 ### Generic payload and HMAC signing
 

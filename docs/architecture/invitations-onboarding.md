@@ -104,9 +104,11 @@ this surface, this profile**:
   (`profile_field`, `setting`, or `device_setting`) so the tour writes through
   the existing profile/settings APIs rather than a parallel persistence path.
 
-Completion state is per-profile and server-side: the `profile_onboarding`
-table in the per-user SQLite store (`internal/userdb`), keyed
-`(profile_id, tour_id)` with `last_step`, `completed_at`, `skipped_at`.
+Completion state is per-profile and server-side, stored through the
+`userstore.UserStore` interface, keyed `(profile_id, tour_id)` with
+`last_step`, `completed_at`, `skipped_at`. Both backends implement it:
+Postgres (the default, `user_profile_onboarding`) and the per-user SQLite
+store (`internal/userdb`, `profile_onboarding`).
 Completion and skips are monotonic (upserts `COALESCE`-keep existing
 timestamps) and sync across devices: finishing the tour on the web means the
 phone does not ask again. The tour is not invite-only — any profile without a
