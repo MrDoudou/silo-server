@@ -7,6 +7,30 @@ entrypoint, backend code is under `internal/` by domain, the React frontend is `
 This repository is a VERY EARLY WIP. Proposing sweeping changes that improve long-term
 maintainability is encouraged.
 
+## What Silo is
+
+A modern, open-source media server built from the ground up on current infrastructure —
+Postgres, S3, Redis — rather than SQLite and local disk. The foundational bet is horizontal
+scale: Silo deploys as a cluster (Kubernetes, remote transcode nodes) and stays fast on large
+libraries, whether it's one node serving a household or a deployment streaming to thousands of
+users. Weigh every design against that full spectrum; treat a node dying mid-stream as a normal
+event, not an edge case.
+
+It is an open platform, not a walled garden: third-party clients are encouraged, which is why
+the additive-only v1 API rules and capability endpoints below are binding — other people's
+clients will depend on them. Jellyfin-protocol compatibility is a long-term commitment as an
+on-ramp for the existing ecosystem.
+
+The core/plugin line is about implementation multiplicity: library types (movies, TV,
+audiobooks, ebooks, podcasts) are core; plugins are for interfaces where many implementations
+will plausibly exist (metadata, subtitle, and watch providers). Plugins are never a loophole
+for the non-goals below.
+
+Taste: KISS and YAGNI win — the simple design beats the clever one, provided it survives both
+the single-node and the multi-node deployment. Current posture: the 1.0 feature set is
+essentially complete; the present era is QA, UX polish, and verifying everything does what it
+says. Prefer correctness and polish over new feature sprawl.
+
 ## Priorities
 
 Performance and reliability first. Keep behavior predictable under load and during failures —
