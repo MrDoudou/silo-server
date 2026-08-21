@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import PlaybackSettings from "./PlaybackSettings";
 
+const mocks = vi.hoisted(() => ({
+  useHWAccelDetection: vi.fn((_enabled?: boolean) => ({ data: undefined, isLoading: false })),
+}));
+
 const useSettingsFormMock = vi.fn();
 
 vi.mock("@/hooks/useSettingsForm", () => ({
@@ -10,7 +14,7 @@ vi.mock("@/hooks/useSettingsForm", () => ({
 }));
 
 vi.mock("@/hooks/queries/admin/system", () => ({
-  useHWAccelDetection: () => ({ data: undefined, isLoading: false }),
+  useHWAccelDetection: (enabled: boolean) => mocks.useHWAccelDetection(enabled),
 }));
 
 function makeForm(values: Record<string, string>) {
@@ -68,5 +72,20 @@ describe("PlaybackSettings CPU tone mapping", () => {
 
     expect(toggle).toHaveAttribute("aria-checked", "true");
     expect(toggle).toHaveAttribute("disabled");
+  });
+
+  it("does not probe hardware while transcoding is off", () => {
+    mocks.useHWAccelDetection.mockClear();
+    useSettingsFormMock.mockReturnValue(
+      makeForm({
+        "playback.transcode_enabled": "false",
+        "playback.hw_accel": "auto",
+        "playback.chapter_thumbnail_hdr_policy": "best_effort",
+      }),
+    );
+
+    renderToStaticMarkup(<PlaybackSettings />);
+
+    expect(mocks.useHWAccelDetection).toHaveBeenCalledWith(false);
   });
 });

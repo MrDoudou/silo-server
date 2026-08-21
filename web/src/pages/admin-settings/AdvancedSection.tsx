@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -13,6 +13,8 @@ interface AdvancedSectionProps {
   /** panel matches FieldGroup; flush sits in a page that already provides the surface. */
   variant?: "panel" | "flush";
   contentClassName?: string;
+  /** Keep the section expanded so a nested invalid or save-blocking field stays visible. */
+  forceOpen?: boolean;
 }
 
 export function AdvancedSection({
@@ -21,12 +23,19 @@ export function AdvancedSection({
   children,
   variant = "panel",
   contentClassName,
+  forceOpen = false,
 }: AdvancedSectionProps) {
   const labelId = useId();
   const contentId = useId();
+  const [open, setOpen] = useState(forceOpen);
+
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
 
   return (
     <details
+      open={open}
       className={cn(
         "group",
         variant === "panel" && "surface-panel rounded-2xl border-0 p-4 sm:p-5",
@@ -34,6 +43,11 @@ export function AdvancedSection({
     >
       <summary
         aria-controls={contentId}
+        onClick={(event) => {
+          event.preventDefault();
+          if (forceOpen) return;
+          setOpen((current) => !current);
+        }}
         className="focus-visible:ring-ring flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg focus-visible:ring-2 focus-visible:outline-none [&::-webkit-details-marker]:hidden"
       >
         <div className="min-w-0">

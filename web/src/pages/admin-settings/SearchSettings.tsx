@@ -129,6 +129,7 @@ export default function SearchSettings() {
                 onClick={handleCheckConnection}
                 result={connectionResult}
                 isPending={checkConnection.isPending}
+                disabled={form.isSaving}
               />
             </div>
           </FieldGroup>

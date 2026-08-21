@@ -230,5 +230,6 @@ describe("AIServicesSettings", () => {
 
     expect(mocks.toastError).toHaveBeenCalledWith(message);
     expect(mocks.save).not.toHaveBeenCalled();
+    expect(screen.getByText("Max concurrent AI jobs").closest("details")).toHaveAttribute("open");
   });
 });

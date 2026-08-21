@@ -33,4 +33,27 @@ describe("AdvancedSection", () => {
 
     expect(screen.getByText("Matcher Batch Size").closest("details")).toHaveAttribute("open");
   });
+
+  it("stays open while forceOpen is set so a nested invalid field remains visible", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <AdvancedSection forceOpen>
+        <p>Fetch Priority</p>
+      </AdvancedSection>,
+    );
+
+    expect(screen.getByText("Fetch Priority").closest("details")).toHaveAttribute("open");
+
+    await user.click(screen.getByText("Advanced"));
+    expect(screen.getByText("Fetch Priority").closest("details")).toHaveAttribute("open");
+
+    rerender(
+      <AdvancedSection>
+        <p>Fetch Priority</p>
+      </AdvancedSection>,
+    );
+
+    await user.click(screen.getByText("Advanced"));
+    expect(screen.getByText("Fetch Priority").closest("details")).not.toHaveAttribute("open");
+  });
 });

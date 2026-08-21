@@ -207,6 +207,25 @@ export default function AIServicesSettings() {
   const speechCompatible = !isChatOnlyGateway(speechUsesTextEndpoint ? textBaseURL : asrBaseURL);
   const speechReady = speechCheckable && speechCompatible;
   const descriptionEnabled = value("metadata_ai.enabled", "false") === "true";
+  const maxConcurrent = parseStrictInteger(
+    effectiveValue("ai.max_concurrent_jobs", "subtitle_ai.max_concurrent_jobs", "2"),
+  );
+  const batchSize = parseStrictInteger(value("subtitle_ai.batch_size", "40"));
+  const contextLines = parseStrictInteger(value("subtitle_ai.context_neighbors", "2"));
+  const chunkSeconds = parseStrictInteger(value("subtitle_ai.asr_chunk_seconds", "600"));
+  const quotaJobs = Number.parseInt(value("subtitle_ai.transcribe_quota_jobs", "0"), 10);
+  const advancedInvalid =
+    maxConcurrent === null ||
+    maxConcurrent < 1 ||
+    batchSize === null ||
+    batchSize < 1 ||
+    contextLines === null ||
+    contextLines < 0 ||
+    chunkSeconds === null ||
+    chunkSeconds < 60 ||
+    chunkSeconds > 600 ||
+    !Number.isInteger(quotaJobs) ||
+    quotaJobs < 0;
 
   function setValue(key: string, nextValue: string) {
     form.setValue(key, nextValue);
@@ -251,14 +270,6 @@ export default function AIServicesSettings() {
   }
 
   async function save() {
-    const batchSize = parseStrictInteger(value("subtitle_ai.batch_size", "40"));
-    const contextLines = parseStrictInteger(value("subtitle_ai.context_neighbors", "2"));
-    const chunkSeconds = parseStrictInteger(value("subtitle_ai.asr_chunk_seconds", "600"));
-    const quotaJobs = Number.parseInt(value("subtitle_ai.transcribe_quota_jobs", "0"), 10);
-    const maxConcurrent = parseStrictInteger(
-      effectiveValue("ai.max_concurrent_jobs", "subtitle_ai.max_concurrent_jobs", "2"),
-    );
-
     if (!textReady) {
       toast.error("Text AI base URL and chat model are required.");
       return;
@@ -513,6 +524,7 @@ export default function AIServicesSettings() {
             variant="flush"
             description="Job concurrency, translation batching, transcription chunks, and account quotas."
             contentClassName="mt-5 max-w-3xl space-y-1 divide-y-0"
+            forceOpen={advancedInvalid}
           >
             <SettingField
               label="Max concurrent AI jobs"

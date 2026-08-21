@@ -180,6 +180,7 @@ function ProviderSettingsForm({ provider }: { provider: MarkerProviderConfig }) 
           variant="flush"
           title="Provider tuning"
           description="Fetch order when providers overlap, and the confidence floor for auto-submitted markers."
+          forceOpen={!priorityValid || !confidenceValid}
         >
           <div className="space-y-1 py-2">
             <Label htmlFor={priorityID}>Fetch Priority</Label>

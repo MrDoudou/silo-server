@@ -65,4 +65,21 @@ describe("SearchSettings", () => {
     expect(indexPrefix?.closest("details")).not.toBeNull();
     expect(indexPrefix?.closest("details")?.hasAttribute("open")).toBe(false);
   });
+
+  it("disables the Meilisearch connection check while a save is in flight", () => {
+    useSettingsFormMock.mockReturnValue({ ...makeForm("meilisearch"), isSaving: true });
+
+    const markup = renderToStaticMarkup(
+      <MemoryRouter>
+        <SearchSettings />
+      </MemoryRouter>,
+    );
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    const check = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Check Connection"),
+    );
+
+    expect(check).toHaveAttribute("disabled");
+  });
 });

@@ -50,6 +50,8 @@ const PRIVATE_S3_KEYS = [
 const KEYS = [
   ...PUBLIC_S3_KEYS,
   ...PRIVATE_S3_KEYS,
+  // The User DB tab is not shown. These keys stay on the form so stored
+  // Litestream values still round-trip instead of being dropped on save.
   "s3.user_db_endpoint",
   "s3.user_db_region",
   "s3.user_db_path_style",
@@ -392,34 +394,38 @@ export default function StorageSettings() {
                 />
               )}
               {publicURLAuth === "cloudflare_token" && (
-                <>
-                  <SettingField
-                    label="Token Secret"
-                    type="password"
-                    value={form.getValue("s3.public_token_secret")}
-                    onChange={(v) => form.setValue("s3.public_token_secret", v)}
-                    sensitiveConfigured={form.sensitiveConfigured.includes(
-                      "s3.public_token_secret",
-                    )}
-                  />
-                  <AdvancedSection description="Token query parameter and lifetime. Defaults: verify, 10800 seconds.">
-                    <SettingField
-                      label="Token Param"
-                      value={form.getValue("s3.public_token_param") || "verify"}
-                      onChange={(v) => form.setValue("s3.public_token_param", v)}
-                      hint="verify"
-                    />
-                    <SettingField
-                      label="Token TTL (seconds)"
-                      type="number"
-                      value={form.getValue("s3.public_token_ttl") || "10800"}
-                      onChange={(v) => form.setValue("s3.public_token_ttl", v)}
-                    />
-                  </AdvancedSection>
-                </>
+                <SettingField
+                  label="Token Secret"
+                  type="password"
+                  value={form.getValue("s3.public_token_secret")}
+                  onChange={(v) => form.setValue("s3.public_token_secret", v)}
+                  sensitiveConfigured={form.sensitiveConfigured.includes("s3.public_token_secret")}
+                />
               )}
             </div>
-            <AdvancedSection description="Path-style URLs (bucket in the path, not the hostname). Leave on for MinIO and most self-hosted S3.">
+            <AdvancedSection
+              description={
+                publicURLAuth === "cloudflare_token"
+                  ? "Token query parameter and lifetime (defaults: verify, 10800 seconds), and path-style URLs for MinIO and most self-hosted S3."
+                  : "Path-style URLs (bucket in the path, not the hostname). Leave on for MinIO and most self-hosted S3."
+              }
+            >
+              {publicURLAuth === "cloudflare_token" ? (
+                <>
+                  <SettingField
+                    label="Token Param"
+                    value={form.getValue("s3.public_token_param") || "verify"}
+                    onChange={(v) => form.setValue("s3.public_token_param", v)}
+                    hint="verify"
+                  />
+                  <SettingField
+                    label="Token TTL (seconds)"
+                    type="number"
+                    value={form.getValue("s3.public_token_ttl") || "10800"}
+                    onChange={(v) => form.setValue("s3.public_token_ttl", v)}
+                  />
+                </>
+              ) : null}
               <SettingField
                 label="Path Style"
                 type="toggle"

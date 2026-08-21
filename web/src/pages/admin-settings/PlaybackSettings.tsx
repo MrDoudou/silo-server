@@ -35,8 +35,9 @@ const KEYS = [
 
 export default function PlaybackSettings() {
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
+  const transcodeEnabled = form.getValue("playback.transcode_enabled") !== "false";
   const hwAccel = form.getValue("playback.hw_accel");
-  const hwDetection = useHWAccelDetection(hwAccel !== "none");
+  const hwDetection = useHWAccelDetection(transcodeEnabled && hwAccel !== "none");
   const hwDevice = form.getValue("playback.hw_device");
   const selectedDevices = parseHWDeviceList(hwDevice);
   const deviceRows = buildHWDeviceRows(hwDetection.data, hwDevice);
@@ -69,7 +70,7 @@ export default function PlaybackSettings() {
             value={form.getValue("playback.transcode_enabled")}
             onChange={(v) => form.setValue("playback.transcode_enabled", v)}
           />
-          {form.getValue("playback.transcode_enabled") !== "false" && (
+          {transcodeEnabled && (
             <>
               <SettingField
                 label="Hardware Acceleration"

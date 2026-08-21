@@ -229,4 +229,42 @@ describe("StorageSettings", () => {
     );
     expect(screen.queryByLabelText("Access Key")).not.toBeInTheDocument();
   });
+
+  it("keeps Cloudflare token knobs in the same Advanced section as path style", () => {
+    useCheckAdminSettingsConnectionMock.mockReturnValue({
+      isPending: false,
+      mutateAsync: vi.fn(),
+    });
+    useSettingsFormMock.mockReturnValue({
+      isLoading: false,
+      getValue: (key: string) => {
+        if (key === "s3.public_url_auth") return "cloudflare_token";
+        return "";
+      },
+      setValue: vi.fn(),
+      dirtyCount: 0,
+      save: vi.fn(),
+      discard: vi.fn(),
+      isSaving: false,
+      restartRequired: false,
+      sensitiveConfigured: [],
+      sensitiveStatusReady: true,
+      sensitiveStatusError: false,
+      buildConnectionCheckRequest: vi.fn(),
+      isDirty: () => false,
+    });
+
+    const markup = renderToStaticMarkup(<StorageSettings />);
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    const tokenParam = Array.from(container.querySelectorAll("label")).find(
+      (label) => label.textContent === "Token Param",
+    );
+    const pathStyle = Array.from(container.querySelectorAll("label")).find(
+      (label) => label.textContent === "Path Style",
+    );
+
+    expect(tokenParam?.closest("details")).toBe(pathStyle?.closest("details"));
+    expect(tokenParam?.closest("details")?.querySelectorAll(":scope > summary")).toHaveLength(1);
+  });
 });
