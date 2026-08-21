@@ -96,11 +96,11 @@ export default function GeneralSettings() {
           </div>
         </FieldGroup>
 
-        <AdvancedSection description="Access tokens last 8 hours and refresh tokens 30 days unless you change them. Quiet prefixes silence noisy log lines.">
+        <AdvancedSection description="Access tokens last 1 hour and refresh tokens 30 days unless you change them. Quiet prefixes silence noisy log lines.">
           <SettingField
             label="Access Token Expiry"
             type="duration"
-            hint="e.g. 1h, 30m. Default 8h."
+            hint="e.g. 1h, 30m. Default 1h."
             value={form.getValue("auth.access_token_expiry")}
             onChange={(v) => form.setValue("auth.access_token_expiry", v)}
           />
