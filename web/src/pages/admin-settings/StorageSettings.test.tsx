@@ -173,6 +173,42 @@ describe("StorageSettings", () => {
     expect(screen.getByLabelText("Access Key")).toHaveAttribute("type", "password");
   });
 
+  it("requires an explicit action before replacing a configured Cloudflare token secret", async () => {
+    const resetValue = vi.fn();
+    const setValue = vi.fn();
+    useCheckAdminSettingsConnectionMock.mockReturnValue({
+      isPending: false,
+      mutateAsync: vi.fn(),
+    });
+    useSettingsFormMock.mockReturnValue({
+      isLoading: false,
+      getValue: (key: string) => (key === "s3.public_url_auth" ? "cloudflare_token" : ""),
+      setValue,
+      resetValue,
+      dirtyCount: 0,
+      save: vi.fn(),
+      discard: vi.fn(),
+      isSaving: false,
+      restartRequired: false,
+      sensitiveConfigured: ["s3.public_token_secret"],
+      sensitiveStatusReady: true,
+      sensitiveStatusError: false,
+      buildConnectionCheckRequest: vi.fn(),
+      isDirty: () => false,
+    });
+
+    render(<StorageSettings />);
+
+    expect(screen.queryByLabelText("Token Secret")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Replace Token Secret" }));
+    expect(screen.getByLabelText("Token Secret")).toHaveAttribute("type", "password");
+
+    await userEvent.click(screen.getByRole("button", { name: "Keep saved Token Secret" }));
+    expect(resetValue).toHaveBeenCalledWith("s3.public_token_secret");
+    expect(screen.queryByLabelText("Token Secret")).not.toBeInTheDocument();
+    expect(setValue).not.toHaveBeenCalled();
+  });
+
   it("keeps credential inputs unmounted until protected status is available", () => {
     let sensitiveStatusReady = false;
     useCheckAdminSettingsConnectionMock.mockReturnValue({

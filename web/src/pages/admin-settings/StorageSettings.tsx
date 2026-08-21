@@ -400,14 +400,15 @@ export default function StorageSettings() {
               )}
               {publicURLAuth === "cloudflare_token" && (
                 <>
-                  <SettingField
+                  <S3CredentialField
                     label="Token Secret"
-                    type="password"
                     value={form.getValue("s3.public_token_secret")}
-                    onChange={(v) => form.setValue("s3.public_token_secret", v)}
-                    sensitiveConfigured={form.sensitiveConfigured.includes(
-                      "s3.public_token_secret",
-                    )}
+                    onChange={(v) => setCredentialValue("s3.public_token_secret", v)}
+                    configured={form.sensitiveConfigured.includes("s3.public_token_secret")}
+                    editing={editingSensitiveKeys.has("s3.public_token_secret")}
+                    onReplace={() => beginCredentialReplacement("s3.public_token_secret")}
+                    onKeep={() => keepSavedCredential("s3.public_token_secret")}
+                    disabled={form.isSaving || credentialSaveInProgress}
                   />
                   <SettingField
                     label="Token Param"
