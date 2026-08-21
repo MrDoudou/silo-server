@@ -3,6 +3,7 @@ import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { SettingField } from "./SettingField";
 import { SaveBar } from "./SaveBar";
 import { FieldGroup } from "./FieldGroup";
+import { AdvancedSection } from "./AdvancedSection";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const KEYS = ["scanner.workers", "matcher.workers", "matcher.batch_size", "metadata.cache_images"];
@@ -34,36 +35,13 @@ export default function ScannerSettings() {
       <div className="mb-6 space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">Scanner & Matcher</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Configure scanner performance and metadata matching. Startup and recurring scans are
-          managed in Scheduled Tasks.
+          Artwork caching and matching. Worker counts default to 8; change them under Advanced only
+          if a large library is CPU-bound. Startup and recurring scans are managed in Scheduled
+          Tasks.
         </p>
       </div>
 
       <div className="flex-1 space-y-6">
-        <FieldGroup label="Scanner">
-          <SettingField
-            label="Scanner Workers"
-            type="number"
-            value={form.getValue("scanner.workers")}
-            onChange={(v) => form.setValue("scanner.workers", v)}
-          />
-        </FieldGroup>
-
-        <FieldGroup label="Matcher">
-          <SettingField
-            label="Matcher Workers"
-            type="number"
-            value={form.getValue("matcher.workers")}
-            onChange={(v) => form.setValue("matcher.workers", v)}
-          />
-          <SettingField
-            label="Matcher Batch Size"
-            type="number"
-            value={form.getValue("matcher.batch_size")}
-            onChange={(v) => form.setValue("matcher.batch_size", v)}
-          />
-        </FieldGroup>
-
         <FieldGroup label="Metadata">
           <SettingField
             label="Cache Images to S3"
@@ -73,6 +51,30 @@ export default function ScannerSettings() {
             onChange={(v) => form.setValue("metadata.cache_images", v)}
           />
         </FieldGroup>
+
+        <AdvancedSection description="Scanner and matcher default to 8 workers and a matcher batch of 500.">
+          <SettingField
+            label="Scanner Workers"
+            type="number"
+            hint="How many files to inspect at once. Default 8."
+            value={form.getValue("scanner.workers")}
+            onChange={(v) => form.setValue("scanner.workers", v)}
+          />
+          <SettingField
+            label="Matcher Workers"
+            type="number"
+            hint="How many metadata matches to run at once. Default 8."
+            value={form.getValue("matcher.workers")}
+            onChange={(v) => form.setValue("matcher.workers", v)}
+          />
+          <SettingField
+            label="Matcher Batch Size"
+            type="number"
+            hint="Items claimed per matcher batch. Default 500."
+            value={form.getValue("matcher.batch_size")}
+            onChange={(v) => form.setValue("matcher.batch_size", v)}
+          />
+        </AdvancedSection>
       </div>
 
       <SaveBar

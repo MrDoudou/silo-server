@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  AudioLines,
-  ChevronDown,
-  CircleAlert,
-  CircleCheck,
-  ExternalLink,
-  Languages,
-} from "lucide-react";
+import { AudioLines, CircleAlert, CircleCheck, ExternalLink, Languages } from "lucide-react";
 import { toast } from "sonner";
 
 import type { ConnectionCheckResponse } from "@/api/types";
@@ -20,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 import { SaveBar } from "./SaveBar";
 import { SettingField } from "./SettingField";
+import { AdvancedSection } from "./AdvancedSection";
 
 const TEXT_AI_KEYS = ["ai.base_url", "ai.chat_model", "ai.api_key"] as const;
 const SPEECH_AI_KEYS = [
@@ -515,69 +509,62 @@ export default function AIServicesSettings() {
         </section>
 
         <section className="py-6">
-          <details className="group">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold">Advanced</h3>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  Job concurrency, translation batching, transcription chunks, and account quotas.
-                </p>
-              </div>
-              <ChevronDown className="text-muted-foreground size-4 transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="mt-5 max-w-3xl space-y-1 border-t pt-4">
-              <SettingField
-                label="Max concurrent AI jobs"
-                type="number"
-                value={effectiveValue(
-                  "ai.max_concurrent_jobs",
-                  "subtitle_ai.max_concurrent_jobs",
-                  "2",
-                )}
-                onChange={(next) => setValue("ai.max_concurrent_jobs", next)}
-                hint="Shared by subtitle translation, speech-to-text, and description translation. Changing this value requires a server restart."
-              />
-              <SettingField
-                label="Subtitle batch size"
-                type="number"
-                value={value("subtitle_ai.batch_size", "40")}
-                onChange={(next) => setValue("subtitle_ai.batch_size", next)}
-                hint="Text cues sent in each translation request."
-              />
-              <SettingField
-                label="Subtitle context lines"
-                type="number"
-                value={value("subtitle_ai.context_neighbors", "2")}
-                onChange={(next) => setValue("subtitle_ai.context_neighbors", next)}
-                hint="Previous source cues included for scene continuity."
-              />
-              <SettingField
-                label="Transcription chunk length (seconds)"
-                type="number"
-                value={value("subtitle_ai.asr_chunk_seconds", "600")}
-                onChange={(next) => setValue("subtitle_ai.asr_chunk_seconds", next)}
-                hint="60-600. Shorter chunks reduce timestamp drift but make more requests."
-              />
-              <SettingField
-                label="Transcription limit per account"
-                type="number"
-                value={value("subtitle_ai.transcribe_quota_jobs", "0")}
-                onChange={(next) => setValue("subtitle_ai.transcribe_quota_jobs", next)}
-                hint="0 = unlimited. Profiles share their account's limit."
-              />
-              <SettingField
-                label="Transcription limit period"
-                type="select"
-                value={value("subtitle_ai.transcribe_quota_period", "day")}
-                onChange={(next) => setValue("subtitle_ai.transcribe_quota_period", next)}
-                options={QUOTA_PERIODS.map((period) => ({
-                  value: period,
-                  label: `Per ${period} (rolling ${QUOTA_PERIOD_WINDOW_LABELS[period]})`,
-                }))}
-                hint="Rolling window used for the account limit."
-              />
-            </div>
-          </details>
+          <AdvancedSection
+            variant="flush"
+            description="Job concurrency, translation batching, transcription chunks, and account quotas."
+            contentClassName="mt-5 max-w-3xl space-y-1 divide-y-0"
+          >
+            <SettingField
+              label="Max concurrent AI jobs"
+              type="number"
+              value={effectiveValue(
+                "ai.max_concurrent_jobs",
+                "subtitle_ai.max_concurrent_jobs",
+                "2",
+              )}
+              onChange={(next) => setValue("ai.max_concurrent_jobs", next)}
+              hint="Shared by subtitle translation, speech-to-text, and description translation. Changing this value requires a server restart."
+            />
+            <SettingField
+              label="Subtitle batch size"
+              type="number"
+              value={value("subtitle_ai.batch_size", "40")}
+              onChange={(next) => setValue("subtitle_ai.batch_size", next)}
+              hint="Text cues sent in each translation request."
+            />
+            <SettingField
+              label="Subtitle context lines"
+              type="number"
+              value={value("subtitle_ai.context_neighbors", "2")}
+              onChange={(next) => setValue("subtitle_ai.context_neighbors", next)}
+              hint="Previous source cues included for scene continuity."
+            />
+            <SettingField
+              label="Transcription chunk length (seconds)"
+              type="number"
+              value={value("subtitle_ai.asr_chunk_seconds", "600")}
+              onChange={(next) => setValue("subtitle_ai.asr_chunk_seconds", next)}
+              hint="60-600. Shorter chunks reduce timestamp drift but make more requests."
+            />
+            <SettingField
+              label="Transcription limit per account"
+              type="number"
+              value={value("subtitle_ai.transcribe_quota_jobs", "0")}
+              onChange={(next) => setValue("subtitle_ai.transcribe_quota_jobs", next)}
+              hint="0 = unlimited. Profiles share their account's limit."
+            />
+            <SettingField
+              label="Transcription limit period"
+              type="select"
+              value={value("subtitle_ai.transcribe_quota_period", "day")}
+              onChange={(next) => setValue("subtitle_ai.transcribe_quota_period", next)}
+              options={QUOTA_PERIODS.map((period) => ({
+                value: period,
+                label: `Per ${period} (rolling ${QUOTA_PERIOD_WINDOW_LABELS[period]})`,
+              }))}
+              hint="Rolling window used for the account limit."
+            />
+          </AdvancedSection>
         </section>
       </div>
 

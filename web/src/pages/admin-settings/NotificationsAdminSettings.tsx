@@ -44,6 +44,7 @@ import { useServerNotificationChannels } from "@/hooks/queries/admin/serverNotif
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { cn } from "@/lib/utils";
 import { FieldGroup } from "./FieldGroup";
+import { AdvancedSection } from "./AdvancedSection";
 import { SaveBar } from "./SaveBar";
 import { SettingField } from "./SettingField";
 import ServerNotificationChannels from "./ServerNotificationChannels";
@@ -1156,61 +1157,59 @@ export default function NotificationsAdminSettings() {
         </section>
 
         {/* ── Advanced ── */}
-        <section className="space-y-3">
-          <ZoneHeading
-            title="Advanced"
-            description="Batching, flood control, and cleanup. The defaults work well for most servers."
-          />
-          <div className="grid gap-3 xl:grid-cols-2 xl:gap-6">
-            <FieldGroup label="Fanout Tuning">
-              <SettingField
-                label="Settle Delay (seconds)"
-                hint="How long an event must sit before fanout claims it, so one scan's episodes batch together (default 30)"
-                type="number"
-                value={numberValue("notifications.fanout.settle_seconds", "30")}
-                onChange={(v) => form.setValue("notifications.fanout.settle_seconds", v)}
-              />
-              <SettingField
-                label="Max Series Burst"
-                hint="Max notifications per series per batch; the rest are suppressed to avoid floods (default 3)"
-                type="number"
-                value={numberValue("notifications.fanout.max_series_burst", "3")}
-                onChange={(v) => form.setValue("notifications.fanout.max_series_burst", v)}
-              />
-              <SettingField
-                label="Max Event Age (hours)"
-                hint="Events older than this are dropped instead of delivered late, e.g. after extended downtime (default 72)"
-                type="number"
-                value={numberValue("notifications.fanout.max_event_age_hours", "72")}
-                onChange={(v) => form.setValue("notifications.fanout.max_event_age_hours", v)}
-              />
-            </FieldGroup>
+        <AdvancedSection
+          variant="flush"
+          description="Batching, flood control, and cleanup. The defaults work well for most servers."
+          contentClassName="grid gap-3 divide-y-0 border-0 pt-4 xl:grid-cols-2 xl:gap-6"
+        >
+          <FieldGroup label="Fanout Tuning">
+            <SettingField
+              label="Settle Delay (seconds)"
+              hint="How long an event must sit before fanout claims it, so one scan's episodes batch together (default 30)"
+              type="number"
+              value={numberValue("notifications.fanout.settle_seconds", "30")}
+              onChange={(v) => form.setValue("notifications.fanout.settle_seconds", v)}
+            />
+            <SettingField
+              label="Max Series Burst"
+              hint="Max notifications per series per batch; the rest are suppressed to avoid floods (default 3)"
+              type="number"
+              value={numberValue("notifications.fanout.max_series_burst", "3")}
+              onChange={(v) => form.setValue("notifications.fanout.max_series_burst", v)}
+            />
+            <SettingField
+              label="Max Event Age (hours)"
+              hint="Events older than this are dropped instead of delivered late, e.g. after extended downtime (default 72)"
+              type="number"
+              value={numberValue("notifications.fanout.max_event_age_hours", "72")}
+              onChange={(v) => form.setValue("notifications.fanout.max_event_age_hours", v)}
+            />
+          </FieldGroup>
 
-            <FieldGroup label="Retention">
-              <SettingField
-                label="Read Notifications (days)"
-                hint="How long read inbox entries are kept (default 90)"
-                type="number"
-                value={numberValue("notifications.retention.read_days", "90")}
-                onChange={(v) => form.setValue("notifications.retention.read_days", v)}
-              />
-              <SettingField
-                label="Unread Notifications (days)"
-                hint="How long unread inbox entries are kept (default 180)"
-                type="number"
-                value={numberValue("notifications.retention.unread_days", "180")}
-                onChange={(v) => form.setValue("notifications.retention.unread_days", v)}
-              />
-              <SettingField
-                label="Processed Events (days)"
-                hint="How long processed release events are kept for debugging (default 30)"
-                type="number"
-                value={numberValue("notifications.retention.event_days", "30")}
-                onChange={(v) => form.setValue("notifications.retention.event_days", v)}
-              />
-            </FieldGroup>
-          </div>
-        </section>
+          <FieldGroup label="Retention">
+            <SettingField
+              label="Read Notifications (days)"
+              hint="How long read inbox entries are kept (default 90)"
+              type="number"
+              value={numberValue("notifications.retention.read_days", "90")}
+              onChange={(v) => form.setValue("notifications.retention.read_days", v)}
+            />
+            <SettingField
+              label="Unread Notifications (days)"
+              hint="How long unread inbox entries are kept (default 180)"
+              type="number"
+              value={numberValue("notifications.retention.unread_days", "180")}
+              onChange={(v) => form.setValue("notifications.retention.unread_days", v)}
+            />
+            <SettingField
+              label="Processed Events (days)"
+              hint="How long processed release events are kept for debugging (default 30)"
+              type="number"
+              value={numberValue("notifications.retention.event_days", "30")}
+              onChange={(v) => form.setValue("notifications.retention.event_days", v)}
+            />
+          </FieldGroup>
+        </AdvancedSection>
       </div>
 
       <SaveBar

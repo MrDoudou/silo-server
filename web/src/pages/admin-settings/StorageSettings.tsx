@@ -6,6 +6,7 @@ import { useCheckAdminSettingsConnection } from "@/hooks/queries/admin/settings"
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { SettingField } from "./SettingField";
 import { SaveBar } from "./SaveBar";
+import { AdvancedSection } from "./AdvancedSection";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -278,8 +279,9 @@ export default function StorageSettings() {
       <div className="mb-6 space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">Storage</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Configure separate S3-compatible storage for client-facing assets and private internal
-          Silo artifacts.
+          Two S3-compatible buckets: public assets (artwork, subtitles) and private internal files.
+          Path-style addressing is under Advanced; leave it on for MinIO and most self-hosted
+          stores.
         </p>
       </div>
 
@@ -288,9 +290,6 @@ export default function StorageSettings() {
           <TabsList className="surface-panel-subtle h-auto gap-1 rounded-[1.1rem] border-0 bg-transparent p-1">
             <TabsTrigger value="public">Public Assets</TabsTrigger>
             <TabsTrigger value="private">Private Internal</TabsTrigger>
-            <TabsTrigger value="userdb" disabled title="Reserved for future Litestream replication">
-              User DB
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="public" className="space-y-1 pt-4">
@@ -311,12 +310,6 @@ export default function StorageSettings() {
               label="Region"
               value={form.getValue("s3.public_region")}
               onChange={(v) => form.setValue("s3.public_region", v)}
-            />
-            <SettingField
-              label="Path Style"
-              type="toggle"
-              value={form.getValue("s3.public_path_style")}
-              onChange={(v) => form.setValue("s3.public_path_style", v)}
             />
             <SettingField
               label="Bucket"
@@ -409,21 +402,31 @@ export default function StorageSettings() {
                       "s3.public_token_secret",
                     )}
                   />
-                  <SettingField
-                    label="Token Param"
-                    value={form.getValue("s3.public_token_param") || "verify"}
-                    onChange={(v) => form.setValue("s3.public_token_param", v)}
-                    hint="verify"
-                  />
-                  <SettingField
-                    label="Token TTL (seconds)"
-                    type="number"
-                    value={form.getValue("s3.public_token_ttl") || "10800"}
-                    onChange={(v) => form.setValue("s3.public_token_ttl", v)}
-                  />
+                  <AdvancedSection description="Token query parameter and lifetime. Defaults: verify, 10800 seconds.">
+                    <SettingField
+                      label="Token Param"
+                      value={form.getValue("s3.public_token_param") || "verify"}
+                      onChange={(v) => form.setValue("s3.public_token_param", v)}
+                      hint="verify"
+                    />
+                    <SettingField
+                      label="Token TTL (seconds)"
+                      type="number"
+                      value={form.getValue("s3.public_token_ttl") || "10800"}
+                      onChange={(v) => form.setValue("s3.public_token_ttl", v)}
+                    />
+                  </AdvancedSection>
                 </>
               )}
             </div>
+            <AdvancedSection description="Path-style URLs (bucket in the path, not the hostname). Leave on for MinIO and most self-hosted S3.">
+              <SettingField
+                label="Path Style"
+                type="toggle"
+                value={form.getValue("s3.public_path_style")}
+                onChange={(v) => form.setValue("s3.public_path_style", v)}
+              />
+            </AdvancedSection>
           </TabsContent>
 
           <TabsContent value="private" className="space-y-1 pt-4">
@@ -439,12 +442,6 @@ export default function StorageSettings() {
               label="Region"
               value={form.getValue("s3.private_region")}
               onChange={(v) => form.setValue("s3.private_region", v)}
-            />
-            <SettingField
-              label="Path Style"
-              type="toggle"
-              value={form.getValue("s3.private_path_style")}
-              onChange={(v) => form.setValue("s3.private_path_style", v)}
             />
             <SettingField
               label="Bucket"
@@ -483,53 +480,14 @@ export default function StorageSettings() {
               isPending={privateCheckConnection.isPending}
               disabled={form.isSaving}
             />
-          </TabsContent>
-
-          <TabsContent value="userdb" className="space-y-1 pt-4 opacity-50">
-            <p className="text-muted-foreground mb-4 text-sm">
-              Reserved for Litestream user database replication. Not currently in use.
-            </p>
-            <SettingField
-              label="Endpoint"
-              value={form.getValue("s3.user_db_endpoint")}
-              onChange={(v) => form.setValue("s3.user_db_endpoint", v)}
-              disabled
-            />
-            <SettingField
-              label="Region"
-              value={form.getValue("s3.user_db_region")}
-              onChange={(v) => form.setValue("s3.user_db_region", v)}
-              disabled
-            />
-            <SettingField
-              label="Path Style"
-              type="toggle"
-              value={form.getValue("s3.user_db_path_style")}
-              onChange={(v) => form.setValue("s3.user_db_path_style", v)}
-              disabled
-            />
-            <SettingField
-              label="Bucket"
-              value={form.getValue("s3.user_db_bucket")}
-              onChange={(v) => form.setValue("s3.user_db_bucket", v)}
-              disabled
-            />
-            <SettingField
-              label="Access Key"
-              type="password"
-              value={form.getValue("s3.user_db_access_key")}
-              onChange={(v) => form.setValue("s3.user_db_access_key", v)}
-              sensitiveConfigured={form.sensitiveConfigured.includes("s3.user_db_access_key")}
-              disabled
-            />
-            <SettingField
-              label="Secret Key"
-              type="password"
-              value={form.getValue("s3.user_db_secret_key")}
-              onChange={(v) => form.setValue("s3.user_db_secret_key", v)}
-              sensitiveConfigured={form.sensitiveConfigured.includes("s3.user_db_secret_key")}
-              disabled
-            />
+            <AdvancedSection description="Path-style URLs (bucket in the path, not the hostname). Leave on for MinIO and most self-hosted S3.">
+              <SettingField
+                label="Path Style"
+                type="toggle"
+                value={form.getValue("s3.private_path_style")}
+                onChange={(v) => form.setValue("s3.private_path_style", v)}
+              />
+            </AdvancedSection>
           </TabsContent>
         </Tabs>
       </div>

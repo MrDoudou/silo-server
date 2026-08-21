@@ -151,8 +151,9 @@ export default function AdminSettingsLayout() {
         <div className="min-w-0 space-y-3">
           <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Settings</h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Configure server-wide settings. Most changes apply live; startup-bound fields show a
-            restart warning after they are saved.
+            Configure server-wide settings. Each page shows the decisions most installs need; worker
+            counts, TTLs, and other tuning knobs stay under Advanced with their defaults.
+            Startup-bound fields show a restart warning after they are saved.
           </p>
         </div>
         <SettingsSearchInput

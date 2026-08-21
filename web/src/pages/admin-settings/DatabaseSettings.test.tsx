@@ -49,6 +49,13 @@ describe("DatabaseSettings", () => {
     expect(markup).toContain("Redis");
     expect(markup).toContain("Enable Redis");
     expect(markup).not.toContain("Connection URL");
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    const maxConnections = Array.from(container.querySelectorAll("label")).find(
+      (label) => label.textContent === "Max Connections",
+    );
+    expect(maxConnections?.closest("details")).not.toBeNull();
+    expect(maxConnections?.closest("details")?.hasAttribute("open")).toBe(false);
   });
 
   it("marks the unimplemented SQLite backend as unavailable", () => {

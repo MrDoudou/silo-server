@@ -13,6 +13,7 @@ import {
 import { useAdminServerSettings, useUpdateServerSettings } from "@/hooks/queries/admin/settings";
 
 import { FieldGroup } from "./FieldGroup";
+import { AdvancedSection } from "./AdvancedSection";
 import { SaveBar } from "./SaveBar";
 import { SettingField } from "./SettingField";
 import {
@@ -202,204 +203,212 @@ export default function LogRetentionSettings() {
       <div className="mb-6 space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">Log Retention</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Prune oldest operational logs by global caps and per-bucket overrides. Bucket rules match
-          on component and level. Cleanup cadence and startup runs are configured in Scheduled
-          Tasks.
+          How long operational logs are kept. Size caps, policy decision logs, and per-bucket rules
+          are under Advanced. Cleanup cadence is configured in Scheduled Tasks.
         </p>
       </div>
 
       <fieldset disabled={updateSettings.isPending} className="flex-1 space-y-6">
-        <FieldGroup label="Global Limits">
+        <FieldGroup label="Retention">
           <SettingField
             label="Retention Days"
             type="number"
-            hint="Logs older than this are pruned first."
+            hint="Logs older than this are pruned first. Default 7."
             value={getValue(OPSLOG_RETENTION_DAYS_KEY)}
             onChange={(value) => setValue(OPSLOG_RETENTION_DAYS_KEY, value)}
           />
-          <SettingField
-            label="Max Rows"
-            type="number"
-            hint="Keeps only the newest rows once this total is exceeded."
-            value={getValue(OPSLOG_MAX_ROWS_KEY)}
-            onChange={(value) => setValue(OPSLOG_MAX_ROWS_KEY, value)}
-          />
-          <SettingField
-            label="Max Size (MB)"
-            type="number"
-            hint="Uses estimated log row size. Oldest rows are pruned when the budget is exceeded."
-            value={getValue(OPSLOG_MAX_SIZE_MB_KEY)}
-            onChange={(value) => setValue(OPSLOG_MAX_SIZE_MB_KEY, value)}
-          />
         </FieldGroup>
 
-        <FieldGroup label="Policy Decision Logs">
-          <SettingField
-            label="Decision Log Retention Days"
-            type="number"
-            hint="Policy decisions older than this are pruned by the cleanup task."
-            value={getValue(POLICY_DECISION_LOG_RETENTION_DAYS_KEY)}
-            onChange={(value) => setValue(POLICY_DECISION_LOG_RETENTION_DAYS_KEY, value)}
-          />
-          <SettingField
-            label="Decision Log Verbosity"
-            type="select"
-            hint="Digest omits sampled input and result payloads. Verbose can store those samples in addition to decision metadata."
-            value={getValue(POLICY_DECISION_LOG_VERBOSITY_KEY) || "digest"}
-            onChange={(value) => setValue(POLICY_DECISION_LOG_VERBOSITY_KEY, value)}
-            options={[
-              { value: "digest", label: "Digest" },
-              { value: "verbose", label: "Verbose" },
-            ]}
-          />
-          <SettingField
-            label="Scope Sample Rate"
-            type="number"
-            hint="Logs one sampled scope decision per N allowed decisions. Denials and errors always log."
-            value={getValue(POLICY_DECISION_LOG_SCOPE_SAMPLE_RATE_KEY)}
-            onChange={(value) => setValue(POLICY_DECISION_LOG_SCOPE_SAMPLE_RATE_KEY, value)}
-          />
-        </FieldGroup>
+        <AdvancedSection
+          variant="flush"
+          description="Row and size caps, policy decision logs, and per-component overrides. Defaults keep a week of ops logs and two weeks of policy decisions."
+          contentClassName="space-y-6 divide-y-0 border-0 pt-4"
+        >
+          <FieldGroup label="Global Limits">
+            <SettingField
+              label="Max Rows"
+              type="number"
+              hint="Keeps only the newest rows once this total is exceeded. Default 1,000,000."
+              value={getValue(OPSLOG_MAX_ROWS_KEY)}
+              onChange={(value) => setValue(OPSLOG_MAX_ROWS_KEY, value)}
+            />
+            <SettingField
+              label="Max Size (MB)"
+              type="number"
+              hint="Uses estimated log row size. Oldest rows are pruned when the budget is exceeded. Default 1024."
+              value={getValue(OPSLOG_MAX_SIZE_MB_KEY)}
+              onChange={(value) => setValue(OPSLOG_MAX_SIZE_MB_KEY, value)}
+            />
+          </FieldGroup>
 
-        <FieldGroup label="Bucket Overrides">
-          <div className="space-y-4 py-3">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <div className="text-muted-foreground text-sm">
-                Use tighter rules for noisy buckets like{" "}
-                <span className="font-mono">metadata/info</span>. Set a bucket limit to{" "}
-                <span className="font-mono">0</span> to disable that bucket-specific cap.
+          <FieldGroup label="Policy Decision Logs">
+            <SettingField
+              label="Decision Log Retention Days"
+              type="number"
+              hint="Policy decisions older than this are pruned by the cleanup task."
+              value={getValue(POLICY_DECISION_LOG_RETENTION_DAYS_KEY)}
+              onChange={(value) => setValue(POLICY_DECISION_LOG_RETENTION_DAYS_KEY, value)}
+            />
+            <SettingField
+              label="Decision Log Verbosity"
+              type="select"
+              hint="Digest omits sampled input and result payloads. Verbose can store those samples in addition to decision metadata."
+              value={getValue(POLICY_DECISION_LOG_VERBOSITY_KEY) || "digest"}
+              onChange={(value) => setValue(POLICY_DECISION_LOG_VERBOSITY_KEY, value)}
+              options={[
+                { value: "digest", label: "Digest" },
+                { value: "verbose", label: "Verbose" },
+              ]}
+            />
+            <SettingField
+              label="Scope Sample Rate"
+              type="number"
+              hint="Logs one sampled scope decision per N allowed decisions. Denials and errors always log."
+              value={getValue(POLICY_DECISION_LOG_SCOPE_SAMPLE_RATE_KEY)}
+              onChange={(value) => setValue(POLICY_DECISION_LOG_SCOPE_SAMPLE_RATE_KEY, value)}
+            />
+          </FieldGroup>
+
+          <FieldGroup label="Bucket Overrides">
+            <div className="space-y-4 py-3">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div className="text-muted-foreground text-sm">
+                  Use tighter rules for noisy buckets like{" "}
+                  <span className="font-mono">metadata/info</span>. Set a bucket limit to{" "}
+                  <span className="font-mono">0</span> to disable that bucket-specific cap.
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={restoreRecommendedBuckets}
+                  >
+                    <RotateCcw className="size-4" />
+                    Restore Recommended Rules
+                  </Button>
+                  <Button type="button" size="sm" onClick={addBucketRow}>
+                    <Plus className="size-4" />
+                    Add Rule
+                  </Button>
+                </div>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={restoreRecommendedBuckets}
-                >
-                  <RotateCcw className="size-4" />
-                  Restore Recommended Rules
-                </Button>
-                <Button type="button" size="sm" onClick={addBucketRow}>
-                  <Plus className="size-4" />
-                  Add Rule
-                </Button>
-              </div>
-            </div>
 
-            {effectiveParseError ? (
-              <div className="border-warning/30 bg-warning/10 text-warning rounded-[1rem] border px-3 py-2 text-sm">
-                Existing bucket policy JSON could not be parsed. The editor loaded the recommended
-                rules so you can recover cleanly. Details: {effectiveParseError}
-              </div>
-            ) : null}
+              {effectiveParseError ? (
+                <div className="border-warning/30 bg-warning/10 text-warning rounded-[1rem] border px-3 py-2 text-sm">
+                  Existing bucket policy JSON could not be parsed. The editor loaded the recommended
+                  rules so you can recover cleanly. Details: {effectiveParseError}
+                </div>
+              ) : null}
 
-            {saveError && <p className="text-sm text-red-400">{saveError}</p>}
+              {saveError && <p className="text-sm text-red-400">{saveError}</p>}
 
-            <div className="surface-panel-subtle overflow-x-auto rounded-[1rem]">
-              <table className="w-full border-collapse text-sm">
-                <thead className="bg-muted/40 text-left">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">Component</th>
-                    <th className="px-3 py-2 font-medium">Level</th>
-                    <th className="px-3 py-2 font-medium">Days</th>
-                    <th className="px-3 py-2 font-medium">Max Rows</th>
-                    <th className="px-3 py-2 font-medium">Max Size (MB)</th>
-                    <th className="w-[60px] px-3 py-2 font-medium"> </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {effectiveBucketRows.length === 0 ? (
+              <div className="surface-panel-subtle overflow-x-auto rounded-[1rem]">
+                <table className="w-full border-collapse text-sm">
+                  <thead className="bg-muted/40 text-left">
                     <tr>
-                      <td colSpan={6} className="text-muted-foreground px-3 py-6 text-center">
-                        No bucket overrides configured.
-                      </td>
+                      <th className="px-3 py-2 font-medium">Component</th>
+                      <th className="px-3 py-2 font-medium">Level</th>
+                      <th className="px-3 py-2 font-medium">Days</th>
+                      <th className="px-3 py-2 font-medium">Max Rows</th>
+                      <th className="px-3 py-2 font-medium">Max Size (MB)</th>
+                      <th className="w-[60px] px-3 py-2 font-medium"> </th>
                     </tr>
-                  ) : (
-                    effectiveBucketRows.map((row) => (
-                      <tr key={row.id} className="border-t">
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.component}
-                            onChange={(event) =>
-                              updateBucketRow(row.id, "component", event.target.value)
-                            }
-                            placeholder="metadata"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <Select
-                            value={row.level}
-                            onValueChange={(value) => updateBucketRow(row.id, "level", value)}
-                          >
-                            <SelectTrigger className="w-[120px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {LOG_LEVEL_OPTIONS.map((level) => (
-                                <SelectItem key={level} value={level}>
-                                  {level}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={String(row.retention_days)}
-                            onChange={(event) =>
-                              updateBucketRow(row.id, "retention_days", event.target.value)
-                            }
-                            className="w-[110px]"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={String(row.max_rows)}
-                            onChange={(event) =>
-                              updateBucketRow(row.id, "max_rows", event.target.value)
-                            }
-                            className="w-[140px]"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={String(row.max_size_mb)}
-                            onChange={(event) =>
-                              updateBucketRow(row.id, "max_size_mb", event.target.value)
-                            }
-                            className="w-[140px]"
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <Button
-                            type="button"
-                            size="icon-sm"
-                            variant="outline"
-                            onClick={() => removeBucketRow(row.id)}
-                            aria-label={`Remove ${row.component || "bucket"} rule`}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
+                  </thead>
+                  <tbody>
+                    {effectiveBucketRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-muted-foreground px-3 py-6 text-center">
+                          No bucket overrides configured.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : (
+                      effectiveBucketRows.map((row) => (
+                        <tr key={row.id} className="border-t">
+                          <td className="px-3 py-2">
+                            <Input
+                              value={row.component}
+                              onChange={(event) =>
+                                updateBucketRow(row.id, "component", event.target.value)
+                              }
+                              placeholder="metadata"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Select
+                              value={row.level}
+                              onValueChange={(value) => updateBucketRow(row.id, "level", value)}
+                            >
+                              <SelectTrigger className="w-[120px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {LOG_LEVEL_OPTIONS.map((level) => (
+                                  <SelectItem key={level} value={level}>
+                                    {level}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={String(row.retention_days)}
+                              onChange={(event) =>
+                                updateBucketRow(row.id, "retention_days", event.target.value)
+                              }
+                              className="w-[110px]"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={String(row.max_rows)}
+                              onChange={(event) =>
+                                updateBucketRow(row.id, "max_rows", event.target.value)
+                              }
+                              className="w-[140px]"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={String(row.max_size_mb)}
+                              onChange={(event) =>
+                                updateBucketRow(row.id, "max_size_mb", event.target.value)
+                              }
+                              className="w-[140px]"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="outline"
+                              onClick={() => removeBucketRow(row.id)}
+                              aria-label={`Remove ${row.component || "bucket"} rule`}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-            <div className="text-muted-foreground text-xs leading-5">
-              Matching rows are pruned oldest-first when they exceed the bucket rule. Global caps
-              then prune the oldest rows across every remaining bucket.
+              <div className="text-muted-foreground text-xs leading-5">
+                Matching rows are pruned oldest-first when they exceed the bucket rule. Global caps
+                then prune the oldest rows across every remaining bucket.
+              </div>
             </div>
-          </div>
-        </FieldGroup>
+          </FieldGroup>
+        </AdvancedSection>
       </fieldset>
 
       <SaveBar

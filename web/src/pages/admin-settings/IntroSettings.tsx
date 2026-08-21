@@ -17,6 +17,7 @@ import {
 } from "@/hooks/queries/admin/markers";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { FieldGroup } from "./FieldGroup";
+import { AdvancedSection } from "./AdvancedSection";
 import { SaveBar } from "./SaveBar";
 import { SettingField } from "./SettingField";
 import { formatDateTime } from "@/lib/datetime";
@@ -156,19 +157,6 @@ function ProviderSettingsForm({ provider }: { provider: MarkerProviderConfig }) 
           value={fetchEnabled ? "true" : "false"}
           onChange={(value) => setFetchEnabled(value === "true")}
         />
-        <div className="space-y-1 py-2">
-          <Label htmlFor={priorityID}>Fetch Priority</Label>
-          <Input
-            id={priorityID}
-            type="number"
-            value={fetchPriority}
-            step={1}
-            onChange={(event) => setFetchPriority(event.target.value)}
-            className="w-full sm:w-40"
-            aria-invalid={!priorityValid}
-          />
-          <p className="text-muted-foreground text-xs">Lower numbers win when providers overlap.</p>
-        </div>
         <SettingField
           label="Allow Contributions"
           type="toggle"
@@ -188,24 +176,45 @@ function ProviderSettingsForm({ provider }: { provider: MarkerProviderConfig }) 
           disabled={!provider.is_submitter || !contributeEnabled}
           hint="Scheduled contribution only sends scanner markers that meet the confidence floor."
         />
-        <div className="space-y-1 py-2">
-          <Label htmlFor={minConfidenceID}>Minimum Confidence</Label>
-          <Input
-            id={minConfidenceID}
-            type="number"
-            value={minConfidence}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={(event) => setMinConfidence(event.target.value)}
-            className="w-full sm:w-40"
-            aria-invalid={!confidenceValid}
-            disabled={!provider.is_submitter}
-          />
-          <p className="text-muted-foreground text-xs">
-            Use a decimal from 0 to 1. The default recommendation is 0.95.
-          </p>
-        </div>
+        <AdvancedSection
+          variant="flush"
+          title="Provider tuning"
+          description="Fetch order when providers overlap, and the confidence floor for auto-submitted markers."
+        >
+          <div className="space-y-1 py-2">
+            <Label htmlFor={priorityID}>Fetch Priority</Label>
+            <Input
+              id={priorityID}
+              type="number"
+              value={fetchPriority}
+              step={1}
+              onChange={(event) => setFetchPriority(event.target.value)}
+              className="w-full sm:w-40"
+              aria-invalid={!priorityValid}
+            />
+            <p className="text-muted-foreground text-xs">
+              Lower numbers win when providers overlap.
+            </p>
+          </div>
+          <div className="space-y-1 py-2">
+            <Label htmlFor={minConfidenceID}>Minimum Confidence</Label>
+            <Input
+              id={minConfidenceID}
+              type="number"
+              value={minConfidence}
+              min={0}
+              max={1}
+              step={0.01}
+              onChange={(event) => setMinConfidence(event.target.value)}
+              className="w-full sm:w-40"
+              aria-invalid={!confidenceValid}
+              disabled={!provider.is_submitter}
+            />
+            <p className="text-muted-foreground text-xs">
+              Use a decimal from 0 to 1. The default recommendation is 0.95.
+            </p>
+          </div>
+        </AdvancedSection>
       </div>
 
       {validation && (
@@ -405,7 +414,8 @@ export default function IntroSettings() {
       <div className="mb-6 space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">Intro Markers</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Configure marker lookup, local marker generation, and provider contribution.
+          Choose local detection, online lookup, or both. Provider priority and contribution
+          confidence are under Advanced.
         </p>
       </div>
 

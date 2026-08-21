@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RestartServerButton } from "./RestartServerButton";
+import { AdvancedSection } from "./AdvancedSection";
 
 const DEFAULT_TIER: RateLimitTierConfig = {
   requests_per_second: 10,
@@ -173,8 +174,8 @@ export default function RateLimitSettings() {
       <div className="mb-6 space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">Rate Limiting</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Configure request budgets for protected API routes, API keys, and public authentication or
-          Autoscan endpoints.
+          Keep the limiter on unless you are debugging. Per-IP, API-key, and login budgets stay
+          under Advanced with their defaults.
         </p>
       </div>
 
@@ -232,200 +233,214 @@ export default function RateLimitSettings() {
           </div>
         </div>
 
-        <div className="surface-panel rounded-2xl border-0 px-5 py-4">
-          <div className="mb-3 text-sm font-semibold">Global Settings</div>
-          <div className="space-y-1">
-            <Label htmlFor="global-rps" className="text-sm font-medium">
-              Global Requests Per Second
-            </Label>
-            <Input
-              id="global-rps"
-              type="number"
-              min={1}
-              value={config.global_requests_per_second}
-              onChange={(e) => {
-                const num = parseInt(e.target.value, 10);
-                if (!isNaN(num) && num > 0) {
-                  updateConfigState((prev) => ({ ...prev, global_requests_per_second: num }));
-                }
-              }}
-              className="w-full sm:w-40"
-            />
-            <p className="text-muted-foreground text-xs">
-              Maximum requests per second across every route protected by the rate limiter.
-            </p>
-          </div>
-        </div>
-
-        <div className="surface-panel rounded-2xl border-0 px-5 py-4">
-          <div className="mb-1 text-sm font-semibold">Per-IP Limits</div>
-          <p className="text-muted-foreground mb-3 text-xs">
-            Shared across protected authenticated routes and the public auth/Autoscan endpoints for
-            one IP address.
-          </p>
-          <div className="grid gap-4 sm:grid-cols-3">
+        <AdvancedSection
+          variant="flush"
+          description="Global, per-IP, API-key tier, and login budgets. Defaults are sized for a household or small community."
+          contentClassName="space-y-4 divide-y-0 border-0 pt-4"
+        >
+          <div className="surface-panel rounded-2xl border-0 px-5 py-4">
+            <div className="mb-3 text-sm font-semibold">Global Settings</div>
             <div className="space-y-1">
-              <Label htmlFor="ip-rps" className="text-sm font-medium">
-                Requests / Second
+              <Label htmlFor="global-rps" className="text-sm font-medium">
+                Global Requests Per Second
               </Label>
               <Input
-                id="ip-rps"
+                id="global-rps"
                 type="number"
                 min={1}
-                value={config.ip_requests_per_second}
+                value={config.global_requests_per_second}
                 onChange={(e) => {
                   const num = parseInt(e.target.value, 10);
                   if (!isNaN(num) && num > 0) {
-                    updateConfigState((prev) => ({ ...prev, ip_requests_per_second: num }));
+                    updateConfigState((prev) => ({ ...prev, global_requests_per_second: num }));
                   }
                 }}
-                className="w-full"
+                className="w-full sm:w-40"
               />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="ip-rpm" className="text-sm font-medium">
-                Requests / Minute
-              </Label>
-              <Input
-                id="ip-rpm"
-                type="number"
-                min={1}
-                value={config.ip_requests_per_minute}
-                onChange={(e) => {
-                  const num = parseInt(e.target.value, 10);
-                  if (!isNaN(num) && num > 0) {
-                    updateConfigState((prev) => ({ ...prev, ip_requests_per_minute: num }));
-                  }
-                }}
-                className="w-full"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="ip-burst" className="text-sm font-medium">
-                Burst
-              </Label>
-              <Input
-                id="ip-burst"
-                type="number"
-                min={1}
-                value={config.ip_burst}
-                onChange={(e) => {
-                  const num = parseInt(e.target.value, 10);
-                  if (!isNaN(num) && num > 0) {
-                    updateConfigState((prev) => ({ ...prev, ip_burst: num }));
-                  }
-                }}
-                className="w-full"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Tier Settings */}
-        {Object.keys(TIER_LABELS).map((tier) => {
-          const tierConfig = config.tiers[tier] ?? DEFAULT_TIER;
-          return (
-            <div key={tier} className="surface-panel rounded-2xl border-0 px-5 py-4">
-              <div className="mb-1 text-sm font-semibold">{TIER_LABELS[tier]} Tier</div>
-              <p className="text-muted-foreground mb-3 text-xs">
-                Per API key limits for the {TIER_LABELS[tier]!.toLowerCase()} tier.
+              <p className="text-muted-foreground text-xs">
+                Maximum requests per second across every route protected by the rate limiter.
               </p>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-1">
-                  <Label htmlFor={`${tier}-rps`} className="text-sm font-medium">
-                    Requests / Second
-                  </Label>
-                  <Input
-                    id={`${tier}-rps`}
-                    type="number"
-                    min={1}
-                    value={tierConfig.requests_per_second}
-                    onChange={(e) => handleTierChange(tier, "requests_per_second", e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`${tier}-rpm`} className="text-sm font-medium">
-                    Requests / Minute
-                  </Label>
-                  <Input
-                    id={`${tier}-rpm`}
-                    type="number"
-                    min={1}
-                    value={tierConfig.requests_per_minute}
-                    onChange={(e) => handleTierChange(tier, "requests_per_minute", e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`${tier}-burst`} className="text-sm font-medium">
-                    Burst
-                  </Label>
-                  <Input
-                    id={`${tier}-burst`}
-                    type="number"
-                    min={1}
-                    value={tierConfig.burst}
-                    onChange={(e) => handleTierChange(tier, "burst", e.target.value)}
-                    className="w-full"
-                  />
-                </div>
+            </div>
+          </div>
+
+          <div className="surface-panel rounded-2xl border-0 px-5 py-4">
+            <div className="mb-1 text-sm font-semibold">Per-IP Limits</div>
+            <p className="text-muted-foreground mb-3 text-xs">
+              Shared across protected authenticated routes and the public auth/Autoscan endpoints
+              for one IP address.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-1">
+                <Label htmlFor="ip-rps" className="text-sm font-medium">
+                  Requests / Second
+                </Label>
+                <Input
+                  id="ip-rps"
+                  type="number"
+                  min={1}
+                  value={config.ip_requests_per_second}
+                  onChange={(e) => {
+                    const num = parseInt(e.target.value, 10);
+                    if (!isNaN(num) && num > 0) {
+                      updateConfigState((prev) => ({ ...prev, ip_requests_per_second: num }));
+                    }
+                  }}
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ip-rpm" className="text-sm font-medium">
+                  Requests / Minute
+                </Label>
+                <Input
+                  id="ip-rpm"
+                  type="number"
+                  min={1}
+                  value={config.ip_requests_per_minute}
+                  onChange={(e) => {
+                    const num = parseInt(e.target.value, 10);
+                    if (!isNaN(num) && num > 0) {
+                      updateConfigState((prev) => ({ ...prev, ip_requests_per_minute: num }));
+                    }
+                  }}
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ip-burst" className="text-sm font-medium">
+                  Burst
+                </Label>
+                <Input
+                  id="ip-burst"
+                  type="number"
+                  min={1}
+                  value={config.ip_burst}
+                  onChange={(e) => {
+                    const num = parseInt(e.target.value, 10);
+                    if (!isNaN(num) && num > 0) {
+                      updateConfigState((prev) => ({ ...prev, ip_burst: num }));
+                    }
+                  }}
+                  className="w-full"
+                />
               </div>
             </div>
-          );
-        })}
+          </div>
 
-        <div className="surface-panel rounded-2xl border-0 px-5 py-4">
-          <div className="mb-1 text-sm font-semibold">Auth Endpoint Limits</div>
-          <p className="text-muted-foreground mb-3 text-xs">
-            Per-IP limits for public authentication and Autoscan endpoints. These apply in addition
-            to the global and shared per-IP budgets above.
-          </p>
-          <div className="space-y-4">
-            {Object.keys(AUTH_ENDPOINT_LABELS).map((endpoint) => {
-              const epConfig = config.auth_endpoints[endpoint] ?? DEFAULT_AUTH_ENDPOINT;
-              return (
-                <div key={endpoint}>
-                  <div className="text-muted-foreground mb-2 text-xs font-medium">
-                    {AUTH_ENDPOINT_LABELS[endpoint]}
+          {/* Tier Settings */}
+          {Object.keys(TIER_LABELS).map((tier) => {
+            const tierConfig = config.tiers[tier] ?? DEFAULT_TIER;
+            return (
+              <div key={tier} className="surface-panel rounded-2xl border-0 px-5 py-4">
+                <div className="mb-1 text-sm font-semibold">{TIER_LABELS[tier]} Tier</div>
+                <p className="text-muted-foreground mb-3 text-xs">
+                  Per API key limits for the {TIER_LABELS[tier]!.toLowerCase()} tier.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label htmlFor={`${tier}-rps`} className="text-sm font-medium">
+                      Requests / Second
+                    </Label>
+                    <Input
+                      id={`${tier}-rps`}
+                      type="number"
+                      min={1}
+                      value={tierConfig.requests_per_second}
+                      onChange={(e) =>
+                        handleTierChange(tier, "requests_per_second", e.target.value)
+                      }
+                      className="w-full"
+                    />
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label htmlFor={`${endpoint}-rpm`} className="text-sm font-medium">
-                        Requests / Minute
-                      </Label>
-                      <Input
-                        id={`${endpoint}-rpm`}
-                        type="number"
-                        min={1}
-                        value={epConfig.requests_per_minute}
-                        onChange={(e) =>
-                          handleAuthEndpointChange(endpoint, "requests_per_minute", e.target.value)
-                        }
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor={`${endpoint}-burst`} className="text-sm font-medium">
-                        Burst
-                      </Label>
-                      <Input
-                        id={`${endpoint}-burst`}
-                        type="number"
-                        min={1}
-                        value={epConfig.burst}
-                        onChange={(e) =>
-                          handleAuthEndpointChange(endpoint, "burst", e.target.value)
-                        }
-                        className="w-full"
-                      />
-                    </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`${tier}-rpm`} className="text-sm font-medium">
+                      Requests / Minute
+                    </Label>
+                    <Input
+                      id={`${tier}-rpm`}
+                      type="number"
+                      min={1}
+                      value={tierConfig.requests_per_minute}
+                      onChange={(e) =>
+                        handleTierChange(tier, "requests_per_minute", e.target.value)
+                      }
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`${tier}-burst`} className="text-sm font-medium">
+                      Burst
+                    </Label>
+                    <Input
+                      id={`${tier}-burst`}
+                      type="number"
+                      min={1}
+                      value={tierConfig.burst}
+                      onChange={(e) => handleTierChange(tier, "burst", e.target.value)}
+                      className="w-full"
+                    />
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
+
+          <div className="surface-panel rounded-2xl border-0 px-5 py-4">
+            <div className="mb-1 text-sm font-semibold">Auth Endpoint Limits</div>
+            <p className="text-muted-foreground mb-3 text-xs">
+              Per-IP limits for public authentication and Autoscan endpoints. These apply in
+              addition to the global and shared per-IP budgets above.
+            </p>
+            <div className="space-y-4">
+              {Object.keys(AUTH_ENDPOINT_LABELS).map((endpoint) => {
+                const epConfig = config.auth_endpoints[endpoint] ?? DEFAULT_AUTH_ENDPOINT;
+                return (
+                  <div key={endpoint}>
+                    <div className="text-muted-foreground mb-2 text-xs font-medium">
+                      {AUTH_ENDPOINT_LABELS[endpoint]}
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label htmlFor={`${endpoint}-rpm`} className="text-sm font-medium">
+                          Requests / Minute
+                        </Label>
+                        <Input
+                          id={`${endpoint}-rpm`}
+                          type="number"
+                          min={1}
+                          value={epConfig.requests_per_minute}
+                          onChange={(e) =>
+                            handleAuthEndpointChange(
+                              endpoint,
+                              "requests_per_minute",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor={`${endpoint}-burst`} className="text-sm font-medium">
+                          Burst
+                        </Label>
+                        <Input
+                          id={`${endpoint}-burst`}
+                          type="number"
+                          min={1}
+                          value={epConfig.burst}
+                          onChange={(e) =>
+                            handleAuthEndpointChange(endpoint, "burst", e.target.value)
+                          }
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </AdvancedSection>
 
         <div className="pt-2">
           <Button onClick={handleSave} disabled={updateConfig.isPending}>

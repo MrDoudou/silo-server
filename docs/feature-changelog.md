@@ -1,5 +1,13 @@
 # Feature Changelog
 
+## 2026-08-21
+
+### Put admin settings behind fewer decisions
+The admin settings index and each settings page now lead with the choices a deploying admin has to make. Worker counts, token lifetimes, Meilisearch index tuning, chapter thumbnails, rate-limit budgets, and similar knobs keep their existing defaults under Advanced.
+- Regroups the index into Appearance, Playback, Library, Connections, and Server. Tab URLs (`?tab=…`) are unchanged.
+- Hides Meilisearch connection fields until that provider is selected, download limits until downloads are on, and transcode hardware options until transcoding is on.
+- Removes the unused Storage "User DB" tab (reserved Litestream fields that were disabled).
+
 ## 2026-08-20
 
 ### Make featured heroes read like editorial summaries

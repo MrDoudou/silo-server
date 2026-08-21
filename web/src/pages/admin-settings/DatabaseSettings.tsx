@@ -7,6 +7,7 @@ import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { SettingField } from "./SettingField";
 import { SaveBar } from "./SaveBar";
 import { FieldGroup } from "./FieldGroup";
+import { AdvancedSection } from "./AdvancedSection";
 import { USER_DATABASE_BACKEND_OPTIONS } from "./databaseSettingOptions";
 
 const REDIS_KEYS = ["redis.url"];
@@ -58,20 +59,12 @@ export default function DatabaseSettings() {
       <div className="mb-6 space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">Database</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Configure connection pooling, Redis, and user database replication behavior.
+          Redis is optional. Postgres connection pooling and the user-database backend are under
+          Advanced.
         </p>
       </div>
 
       <div className="flex-1 space-y-6">
-        <FieldGroup label="Main Database">
-          <SettingField
-            label="Max Connections"
-            type="number"
-            value={form.getValue("database.max_connections")}
-            onChange={(v) => form.setValue("database.max_connections", v)}
-          />
-        </FieldGroup>
-
         <FieldGroup label="Redis">
           {redisManagedByEnv && (
             <div className="border-border/70 flex flex-col gap-2 border-b py-3">
@@ -125,7 +118,14 @@ export default function DatabaseSettings() {
           )}
         </FieldGroup>
 
-        <FieldGroup label="User Database">
+        <AdvancedSection description="Pool size defaults to 20 Postgres connections. The user-database backend is Postgres; SQLite is not available yet.">
+          <SettingField
+            label="Max Connections"
+            type="number"
+            hint="Postgres pool size for this process. Default 20."
+            value={form.getValue("database.max_connections")}
+            onChange={(v) => form.setValue("database.max_connections", v)}
+          />
           <SettingField
             label="User DB Backend"
             type="select"
@@ -150,7 +150,7 @@ export default function DatabaseSettings() {
               />
             </>
           )}
-        </FieldGroup>
+        </AdvancedSection>
       </div>
 
       <SaveBar

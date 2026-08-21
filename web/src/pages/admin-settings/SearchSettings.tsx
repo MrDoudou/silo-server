@@ -13,6 +13,7 @@ import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { FieldGroup } from "./FieldGroup";
 import { SaveBar } from "./SaveBar";
 import { SettingField } from "./SettingField";
+import { AdvancedSection } from "./AdvancedSection";
 import { formatDateTime } from "@/lib/datetime";
 
 const MEILI_KEYS = [
@@ -73,7 +74,8 @@ export default function SearchSettings() {
       <div className="mb-6 space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">Search</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Configure catalog search provider selection, Meilisearch connectivity, and index status.
+          Postgres full-text search is built in. Switch to Meilisearch only if you want typo
+          tolerance or semantic search.
         </p>
       </div>
 
@@ -85,131 +87,133 @@ export default function SearchSettings() {
             value={provider}
             onChange={(value) => form.setValue("catalog.search.provider", value)}
             options={[
-              { value: "postgres", label: "Postgres FTS" },
+              { value: "postgres", label: "Postgres (built-in)" },
               { value: "meilisearch", label: "Meilisearch" },
             ]}
+            hint={
+              meiliEnabled
+                ? "Meilisearch needs a reachable URL and API key below."
+                : "Built-in search. No extra service to run."
+            }
           />
         </FieldGroup>
 
-        <FieldGroup label="Meilisearch">
-          <SettingField
-            label="URL"
-            value={form.getValue("catalog.search.meilisearch.url")}
-            onChange={(value) => form.setValue("catalog.search.meilisearch.url", value)}
-            hint="http://localhost:7700"
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="API Key"
-            type="password"
-            value={form.getValue("catalog.search.meilisearch.api_key")}
-            onChange={(value) => form.setValue("catalog.search.meilisearch.api_key", value)}
-            sensitiveConfigured={form.sensitiveConfigured.includes(
-              "catalog.search.meilisearch.api_key",
-            )}
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Index Prefix"
-            value={form.getValue("catalog.search.meilisearch.index") || "silo_media_items"}
-            onChange={(value) => form.setValue("catalog.search.meilisearch.index", value)}
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Timeout (ms)"
-            type="number"
-            value={form.getValue("catalog.search.meilisearch.timeout_ms") || "800"}
-            onChange={(value) => form.setValue("catalog.search.meilisearch.timeout_ms", value)}
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Matching Strategy"
-            type="select"
-            value={form.getValue("catalog.search.meilisearch.matching_strategy") || "last"}
-            onChange={(value) =>
-              form.setValue("catalog.search.meilisearch.matching_strategy", value)
-            }
-            options={[
-              { value: "last", label: "Last" },
-              { value: "all", label: "All" },
-            ]}
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Sync Batch Size"
-            type="number"
-            value={form.getValue("catalog.search.meilisearch.sync_batch_size") || "500"}
-            onChange={(value) => form.setValue("catalog.search.meilisearch.sync_batch_size", value)}
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Rebuild Batch Size"
-            type="number"
-            value={form.getValue("catalog.search.meilisearch.rebuild_batch_size") || "5000"}
-            onChange={(value) =>
-              form.setValue("catalog.search.meilisearch.rebuild_batch_size", value)
-            }
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Rebuild Queue Depth"
-            type="number"
-            value={form.getValue("catalog.search.meilisearch.rebuild_task_queue_depth") || "4"}
-            onChange={(value) =>
-              form.setValue("catalog.search.meilisearch.rebuild_task_queue_depth", value)
-            }
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Indexed Types"
-            value={form.getValue("catalog.search.meilisearch.index_types")}
-            onChange={(value) => form.setValue("catalog.search.meilisearch.index_types", value)}
-            hint="all, video, or movie,series"
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Semantic Search"
-            type="toggle"
-            value={form.getValue("catalog.search.meilisearch.semantic_enabled") || "false"}
-            onChange={(value) =>
-              form.setValue("catalog.search.meilisearch.semantic_enabled", value)
-            }
-            hint="Uses existing recommendation embeddings for hybrid catalog search."
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Semantic Ratio"
-            type="number"
-            value={form.getValue("catalog.search.meilisearch.semantic_ratio") || "0.50"}
-            onChange={(value) => form.setValue("catalog.search.meilisearch.semantic_ratio", value)}
-            hint="0.50"
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Embedder"
-            value={form.getValue("catalog.search.meilisearch.embedder") || "silo_recommendations"}
-            onChange={(value) => form.setValue("catalog.search.meilisearch.embedder", value)}
-            disabled={!meiliEnabled}
-          />
-          <SettingField
-            label="Binary Quantized Vectors"
-            type="toggle"
-            value={form.getValue("catalog.search.meilisearch.binary_quantized") || "false"}
-            onChange={(value) =>
-              form.setValue("catalog.search.meilisearch.binary_quantized", value)
-            }
-            hint="~30x smaller raw vectors (overall index size roughly halves) with a small semantic-relevance cost. Only affects the index when Semantic Search is enabled. Changing this requires a full index rebuild (Rebuild Catalog Search Index) before sync resumes."
-            disabled={!meiliEnabled}
-          />
-          <div className="py-3">
-            <ConnectionCheckAction
-              onClick={handleCheckConnection}
-              result={connectionResult}
-              isPending={checkConnection.isPending}
-              disabled={!meiliEnabled}
+        {meiliEnabled ? (
+          <FieldGroup label="Meilisearch">
+            <SettingField
+              label="URL"
+              value={form.getValue("catalog.search.meilisearch.url")}
+              onChange={(value) => form.setValue("catalog.search.meilisearch.url", value)}
+              hint="http://localhost:7700"
             />
-          </div>
-        </FieldGroup>
+            <SettingField
+              label="API Key"
+              type="password"
+              value={form.getValue("catalog.search.meilisearch.api_key")}
+              onChange={(value) => form.setValue("catalog.search.meilisearch.api_key", value)}
+              sensitiveConfigured={form.sensitiveConfigured.includes(
+                "catalog.search.meilisearch.api_key",
+              )}
+            />
+            <SettingField
+              label="Semantic Search"
+              type="toggle"
+              value={form.getValue("catalog.search.meilisearch.semantic_enabled") || "false"}
+              onChange={(value) =>
+                form.setValue("catalog.search.meilisearch.semantic_enabled", value)
+              }
+              hint="Uses existing recommendation embeddings for hybrid catalog search."
+            />
+            <div className="py-3">
+              <ConnectionCheckAction
+                onClick={handleCheckConnection}
+                result={connectionResult}
+                isPending={checkConnection.isPending}
+              />
+            </div>
+          </FieldGroup>
+        ) : null}
+
+        {meiliEnabled ? (
+          <AdvancedSection description="Index name, timeouts, batch sizes, and vector settings. Defaults work for most catalogs.">
+            <SettingField
+              label="Index Prefix"
+              value={form.getValue("catalog.search.meilisearch.index") || "silo_media_items"}
+              onChange={(value) => form.setValue("catalog.search.meilisearch.index", value)}
+            />
+            <SettingField
+              label="Timeout (ms)"
+              type="number"
+              value={form.getValue("catalog.search.meilisearch.timeout_ms") || "800"}
+              onChange={(value) => form.setValue("catalog.search.meilisearch.timeout_ms", value)}
+            />
+            <SettingField
+              label="Matching Strategy"
+              type="select"
+              value={form.getValue("catalog.search.meilisearch.matching_strategy") || "last"}
+              onChange={(value) =>
+                form.setValue("catalog.search.meilisearch.matching_strategy", value)
+              }
+              options={[
+                { value: "last", label: "Last" },
+                { value: "all", label: "All" },
+              ]}
+            />
+            <SettingField
+              label="Sync Batch Size"
+              type="number"
+              value={form.getValue("catalog.search.meilisearch.sync_batch_size") || "500"}
+              onChange={(value) =>
+                form.setValue("catalog.search.meilisearch.sync_batch_size", value)
+              }
+            />
+            <SettingField
+              label="Rebuild Batch Size"
+              type="number"
+              value={form.getValue("catalog.search.meilisearch.rebuild_batch_size") || "5000"}
+              onChange={(value) =>
+                form.setValue("catalog.search.meilisearch.rebuild_batch_size", value)
+              }
+            />
+            <SettingField
+              label="Rebuild Queue Depth"
+              type="number"
+              value={form.getValue("catalog.search.meilisearch.rebuild_task_queue_depth") || "4"}
+              onChange={(value) =>
+                form.setValue("catalog.search.meilisearch.rebuild_task_queue_depth", value)
+              }
+            />
+            <SettingField
+              label="Indexed Types"
+              value={form.getValue("catalog.search.meilisearch.index_types")}
+              onChange={(value) => form.setValue("catalog.search.meilisearch.index_types", value)}
+              hint="all, video, or movie,series"
+            />
+            <SettingField
+              label="Semantic Ratio"
+              type="number"
+              value={form.getValue("catalog.search.meilisearch.semantic_ratio") || "0.50"}
+              onChange={(value) =>
+                form.setValue("catalog.search.meilisearch.semantic_ratio", value)
+              }
+              hint="0.50"
+            />
+            <SettingField
+              label="Embedder"
+              value={form.getValue("catalog.search.meilisearch.embedder") || "silo_recommendations"}
+              onChange={(value) => form.setValue("catalog.search.meilisearch.embedder", value)}
+            />
+            <SettingField
+              label="Binary Quantized Vectors"
+              type="toggle"
+              value={form.getValue("catalog.search.meilisearch.binary_quantized") || "false"}
+              onChange={(value) =>
+                form.setValue("catalog.search.meilisearch.binary_quantized", value)
+              }
+              hint="~30x smaller raw vectors (overall index size roughly halves) with a small semantic-relevance cost. Only affects the index when Semantic Search is enabled. Changing this requires a full index rebuild (Rebuild Catalog Search Index) before sync resumes."
+            />
+          </AdvancedSection>
+        ) : null}
 
         <FieldGroup label="Status">
           {statusLoading || !status ? (

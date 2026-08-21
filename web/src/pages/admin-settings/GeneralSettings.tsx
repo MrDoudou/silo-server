@@ -3,6 +3,7 @@ import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { SettingField } from "./SettingField";
 import { SaveBar } from "./SaveBar";
 import { FieldGroup } from "./FieldGroup";
+import { AdvancedSection } from "./AdvancedSection";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const KEYS = [
@@ -38,28 +39,11 @@ export default function GeneralSettings() {
       <div className="mb-6 space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">General</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Authentication, token lifetimes, networking, and server logging behavior.
+          Logging and reverse-proxy trust. Session token lifetimes sit under Advanced.
         </p>
       </div>
 
       <div className="flex-1 space-y-6">
-        <FieldGroup label="Authentication">
-          <SettingField
-            label="Access Token Expiry"
-            type="duration"
-            hint="e.g. 1h, 30m"
-            value={form.getValue("auth.access_token_expiry")}
-            onChange={(v) => form.setValue("auth.access_token_expiry", v)}
-          />
-          <SettingField
-            label="Refresh Token Expiry"
-            type="duration"
-            hint="e.g. 30d, 720h"
-            value={form.getValue("auth.refresh_token_expiry")}
-            onChange={(v) => form.setValue("auth.refresh_token_expiry", v)}
-          />
-        </FieldGroup>
-
         <FieldGroup label="Logging">
           <SettingField
             label="Log Level"
@@ -72,12 +56,6 @@ export default function GeneralSettings() {
               { value: "warn", label: "Warn" },
               { value: "error", label: "Error" },
             ]}
-          />
-          <SettingField
-            label="Quiet Log Prefixes"
-            hint="Comma-separated message prefixes to silence, such as metadata or scanner. A trailing colon is optional."
-            value={form.getValue("server.log_quiet")}
-            onChange={(v) => form.setValue("server.log_quiet", v)}
           />
         </FieldGroup>
 
@@ -117,6 +95,29 @@ export default function GeneralSettings() {
             </ul>
           </div>
         </FieldGroup>
+
+        <AdvancedSection description="Access tokens last 8 hours and refresh tokens 30 days unless you change them. Quiet prefixes silence noisy log lines.">
+          <SettingField
+            label="Access Token Expiry"
+            type="duration"
+            hint="e.g. 1h, 30m. Default 8h."
+            value={form.getValue("auth.access_token_expiry")}
+            onChange={(v) => form.setValue("auth.access_token_expiry", v)}
+          />
+          <SettingField
+            label="Refresh Token Expiry"
+            type="duration"
+            hint="e.g. 30d, 720h. Default 30d."
+            value={form.getValue("auth.refresh_token_expiry")}
+            onChange={(v) => form.setValue("auth.refresh_token_expiry", v)}
+          />
+          <SettingField
+            label="Quiet Log Prefixes"
+            hint="Comma-separated message prefixes to silence, such as metadata or scanner. A trailing colon is optional."
+            value={form.getValue("server.log_quiet")}
+            onChange={(v) => form.setValue("server.log_quiet", v)}
+          />
+        </AdvancedSection>
       </div>
 
       <SaveBar

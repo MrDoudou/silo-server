@@ -64,7 +64,7 @@ describe("AdminSettingsLayout", () => {
   it("renders the grouped navigation sections", () => {
     const markup = renderLayout();
 
-    for (const group of ["Server", "Media", "Connections", "Data"]) {
+    for (const group of ["Appearance", "Playback", "Library", "Connections", "Server"]) {
       expect(markup).toContain(`>${group}<`);
     }
   });
@@ -77,7 +77,7 @@ describe("AdminSettingsLayout", () => {
     expect(
       screen.queryByRole("navigation", { name: "Admin settings sections categories" }),
     ).not.toBeInTheDocument();
-    for (const group of ["Server", "Media", "Connections", "Data"]) {
+    for (const group of ["Appearance", "Playback", "Library", "Connections", "Server"]) {
       expect(screen.getAllByRole("heading", { name: group })).toHaveLength(1);
       expect(
         screen.queryByRole("link", { name: new RegExp(`^${group}, \\d+ settings`) }),
@@ -88,7 +88,7 @@ describe("AdminSettingsLayout", () => {
   it("uses one desktop grid and card geometry for every settings group", () => {
     const markup = renderLayout();
 
-    expect(markup.match(/2xl:grid-cols-4/g)).toHaveLength(4);
+    expect(markup.match(/2xl:grid-cols-4/g)).toHaveLength(5);
     expect(markup).not.toContain("2xl:grid-cols-3");
     expect(markup.match(/lg:h-28/g)).toHaveLength(20);
     expect(markup.match(/lg:line-clamp-3/g)).toHaveLength(20);
@@ -126,7 +126,7 @@ describe("AdminSettingsLayout", () => {
   it("renders the settings index at the root and preserves tab deep links", () => {
     renderInteractiveLayout();
 
-    expect(screen.getByRole("link", { name: /General.*Authentication/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /General.*Log level/ })).toHaveAttribute(
       "href",
       "/admin/settings?tab=general",
     );

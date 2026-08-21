@@ -48,6 +48,8 @@ describe("StorageSettings", () => {
     expect(markup).toContain("Private Internal");
     expect(markup).toContain("Check Connection");
     expect(markup).not.toContain("Storage location change");
+    expect(markup).not.toContain("User DB");
+    expect(markup).not.toContain("Litestream");
   });
 
   it("warns about the artwork cache when a public storage identity field is edited", () => {

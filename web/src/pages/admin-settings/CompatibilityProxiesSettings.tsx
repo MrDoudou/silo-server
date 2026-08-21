@@ -24,6 +24,7 @@ import { hasPinnedJellyfinWebInstalled } from "@/lib/jellyfinCompat";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 
 import { FieldGroup } from "./FieldGroup";
+import { AdvancedSection } from "./AdvancedSection";
 import { SaveBar } from "./SaveBar";
 import { SettingField } from "./SettingField";
 import { formatDateTime } from "@/lib/datetime";
@@ -217,7 +218,8 @@ export default function CompatibilityProxiesSettings() {
       <div className="mb-6 space-y-2">
         <h2 className="text-xl font-semibold tracking-tight">Compatibility Proxies</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Configure protocol-compatible listener surfaces for external client apps.
+          Enable Jellyfin or Audiobookshelf protocol listeners for existing apps. Public URL and
+          server name are the usual setup; session TTLs and emulated versions are under Advanced.
         </p>
       </div>
 
@@ -438,26 +440,10 @@ export default function CompatibilityProxiesSettings() {
               )) ||
                 null}
             </div>
-
-            <div className="divide-border divide-y">
-              <SettingField
-                label="Pinned Web Version (Optional)"
-                hint="Optional. Leave blank to auto-select the latest compatible patch for the emulated API version."
-                value={form.getValue("jellyfin_compat.web_version")}
-                onChange={(v) => form.setValue("jellyfin_compat.web_version", v)}
-              />
-              <SettingField
-                label="Web Install Directory (Optional)"
-                hint="Optional. Defaults to Silo's managed Jellyfin Web install directory."
-                value={form.getValue("jellyfin_compat.web_install_dir")}
-                onChange={(v) => form.setValue("jellyfin_compat.web_install_dir", v)}
-              />
-            </div>
           </div>
 
           <div className="space-y-4 py-3">
             <h3 className="text-sm font-medium">Server Identity</h3>
-
             <div className="divide-border divide-y">
               <SettingField
                 label="Public URL"
@@ -469,6 +455,8 @@ export default function CompatibilityProxiesSettings() {
                 value={form.getValue("jellyfin_compat.server_name")}
                 onChange={(v) => form.setValue("jellyfin_compat.server_name", v)}
               />
+            </div>
+            <AdvancedSection description="Server ID, emulated Jellyfin version, session lifetimes, and Web UI install paths.">
               <SettingField
                 label="Server ID"
                 value={form.getValue("jellyfin_compat.server_id")}
@@ -482,7 +470,7 @@ export default function CompatibilityProxiesSettings() {
               <SettingField
                 label="Session TTL"
                 type="duration"
-                hint="e.g. 24h"
+                hint="e.g. 24h. Default 87600h."
                 value={form.getValue("jellyfin_compat.session_ttl")}
                 onChange={(v) => form.setValue("jellyfin_compat.session_ttl", v)}
               />
@@ -493,7 +481,19 @@ export default function CompatibilityProxiesSettings() {
                 value={form.getValue("jellyfin_compat.playback_session_ttl")}
                 onChange={(v) => form.setValue("jellyfin_compat.playback_session_ttl", v)}
               />
-            </div>
+              <SettingField
+                label="Pinned Web Version (Optional)"
+                hint="Optional. Leave blank to auto-select the latest compatible patch for the emulated API version."
+                value={form.getValue("jellyfin_compat.web_version")}
+                onChange={(v) => form.setValue("jellyfin_compat.web_version", v)}
+              />
+              <SettingField
+                label="Web Install Directory (Optional)"
+                hint="Optional. Defaults to Silo's managed Jellyfin Web install directory."
+                value={form.getValue("jellyfin_compat.web_install_dir")}
+                onChange={(v) => form.setValue("jellyfin_compat.web_install_dir", v)}
+              />
+            </AdvancedSection>
           </div>
         </CollapsibleFieldGroup>
 
