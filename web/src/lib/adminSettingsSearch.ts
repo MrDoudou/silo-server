@@ -413,7 +413,7 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       {
         id: "general",
         label: "General",
-        description: "Log level, trusted proxies, and session token lifetimes.",
+        description: "Log level and trusted proxies. Token lifetimes stay under Advanced.",
         keywords: [
           "access token",
           "refresh token",
