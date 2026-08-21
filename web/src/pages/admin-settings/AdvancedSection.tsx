@@ -10,7 +10,6 @@ interface AdvancedSectionProps {
   title?: string;
   description?: string;
   children: ReactNode;
-  defaultOpen?: boolean;
   /** panel matches FieldGroup; flush sits in a page that already provides the surface. */
   variant?: "panel" | "flush";
   contentClassName?: string;
@@ -20,7 +19,6 @@ export function AdvancedSection({
   title = "Advanced",
   description = ADVANCED_SETTINGS_DESCRIPTION,
   children,
-  defaultOpen = false,
   variant = "panel",
   contentClassName,
 }: AdvancedSectionProps) {
@@ -33,7 +31,6 @@ export function AdvancedSection({
         "group",
         variant === "panel" && "surface-panel rounded-2xl border-0 p-4 sm:p-5",
       )}
-      defaultOpen={defaultOpen}
     >
       <summary
         aria-controls={contentId}
