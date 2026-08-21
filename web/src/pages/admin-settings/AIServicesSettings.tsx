@@ -213,7 +213,7 @@ export default function AIServicesSettings() {
   const batchSize = parseStrictInteger(value("subtitle_ai.batch_size", "40"));
   const contextLines = parseStrictInteger(value("subtitle_ai.context_neighbors", "2"));
   const chunkSeconds = parseStrictInteger(value("subtitle_ai.asr_chunk_seconds", "600"));
-  const quotaJobs = Number.parseInt(value("subtitle_ai.transcribe_quota_jobs", "0"), 10);
+  const quotaJobs = parseStrictInteger(value("subtitle_ai.transcribe_quota_jobs", "0"));
   const advancedInvalid =
     maxConcurrent === null ||
     maxConcurrent < 1 ||
@@ -224,7 +224,7 @@ export default function AIServicesSettings() {
     chunkSeconds === null ||
     chunkSeconds < 60 ||
     chunkSeconds > 600 ||
-    !Number.isInteger(quotaJobs) ||
+    quotaJobs === null ||
     quotaJobs < 0;
 
   function setValue(key: string, nextValue: string) {
@@ -290,7 +290,7 @@ export default function AIServicesSettings() {
       toast.error("Transcription chunk length must be between 60 and 600 seconds.");
       return;
     }
-    if (!Number.isInteger(quotaJobs) || quotaJobs < 0) {
+    if (quotaJobs === null || quotaJobs < 0) {
       toast.error("Transcription limit must be zero or a positive whole number.");
       return;
     }

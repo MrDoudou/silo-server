@@ -220,6 +220,11 @@ describe("AIServicesSettings", () => {
       "120seconds",
       "Transcription chunk length must be between 60 and 600 seconds.",
     ],
+    [
+      "subtitle_ai.transcribe_quota_jobs",
+      "1.5",
+      "Transcription limit must be zero or a positive whole number.",
+    ],
   ])("rejects malformed integer input for %s", async (key, malformedValue, message) => {
     const user = userEvent.setup();
     dirtyCount = 1;
