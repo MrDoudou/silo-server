@@ -1420,12 +1420,14 @@ func (r *PostgresRepository) scanConnection(row pgx.Row) (Connection, error) {
 }
 
 type storedPluginCredentials struct {
-	AccessToken      string            `json:"access_token"`
-	RefreshToken     string            `json:"refresh_token,omitempty"`
-	TokenExpiresAt   *time.Time        `json:"expires_at,omitempty"`
-	TokenType        string            `json:"token_type,omitempty"`
-	Scopes           []string          `json:"scopes,omitempty"`
-	SecretAttributes map[string]string `json:"secret_attributes,omitempty"`
+	AccessToken         string            `json:"access_token"`
+	RefreshToken        string            `json:"refresh_token,omitempty"`
+	TokenExpiresAt      *time.Time        `json:"expires_at,omitempty"`
+	TokenType           string            `json:"token_type,omitempty"`
+	Scopes              []string          `json:"scopes,omitempty"`
+	SecretAttributes    map[string]string `json:"secret_attributes,omitempty"`
+	PluginConfigValues  map[string]string `json:"plugin_config_values,omitempty"`
+	PluginConfigSecrets map[string]string `json:"plugin_config_secrets,omitempty"`
 }
 
 func (r *PostgresRepository) pluginCredentialsForConnection(conn Connection) (string, error) {
@@ -1440,12 +1442,14 @@ func (r *PostgresRepository) pluginCredentialsForConnection(conn Connection) (st
 
 func (r *PostgresRepository) encodePluginCredentials(conn Connection) (string, error) {
 	payload, err := json.Marshal(storedPluginCredentials{
-		AccessToken:      conn.AccessToken,
-		RefreshToken:     conn.RefreshToken,
-		TokenExpiresAt:   conn.TokenExpiresAt,
-		TokenType:        conn.TokenType,
-		Scopes:           conn.Scopes,
-		SecretAttributes: conn.SecretAttributes,
+		AccessToken:         conn.AccessToken,
+		RefreshToken:        conn.RefreshToken,
+		TokenExpiresAt:      conn.TokenExpiresAt,
+		TokenType:           conn.TokenType,
+		Scopes:              conn.Scopes,
+		SecretAttributes:    conn.SecretAttributes,
+		PluginConfigValues:  conn.PluginConfigValues,
+		PluginConfigSecrets: conn.PluginConfigSecrets,
 	})
 	if err != nil {
 		return "", fmt.Errorf("encode watch provider credentials: %w", err)
@@ -1481,6 +1485,8 @@ func (r *PostgresRepository) decodePluginCredentials(conn *Connection, encoded s
 	conn.TokenType = credentials.TokenType
 	conn.Scopes = append([]string(nil), credentials.Scopes...)
 	conn.SecretAttributes = cloneStringMap(credentials.SecretAttributes)
+	conn.PluginConfigValues = cloneStringMap(credentials.PluginConfigValues)
+	conn.PluginConfigSecrets = cloneStringMap(credentials.PluginConfigSecrets)
 	return nil
 }
 

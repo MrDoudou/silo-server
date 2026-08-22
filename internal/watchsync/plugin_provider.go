@@ -221,6 +221,8 @@ func (p *PluginProvider) ConnectWithAPIKeyConfig(
 	if err != nil {
 		return TokenSet{}, ProviderAccount{}, err
 	}
+	tokens.PluginConfigValues = cloneStringMap(connectionValues.GetValues())
+	tokens.PluginConfigSecrets = cloneStringMap(connectionValues.GetSecretValues())
 	return tokens, account, nil
 }
 
@@ -557,9 +559,12 @@ func (p *PluginProvider) authenticatedContext(ctx context.Context, conn Connecti
 		return nil, err
 	}
 	return &pluginv1.WatchSyncAuthenticatedContext{
-		CapabilityId:   p.capabilityID,
-		ProviderConfig: config,
-		Credentials:    credentialsFromConnection(conn),
+		CapabilityId: p.capabilityID,
+		ProviderConfig: mergeWatchSyncProviderConfig(config, &pluginv1.WatchSyncProviderConfig{
+			Values:       conn.PluginConfigValues,
+			SecretValues: conn.PluginConfigSecrets,
+		}),
+		Credentials: credentialsFromConnection(conn),
 	}, nil
 }
 

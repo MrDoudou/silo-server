@@ -637,6 +637,10 @@ func (s *Service) persistConnection(
 	conn.UserID = userID
 	conn.ProfileID = profileID
 	conn = connectionWithTokens(conn, tokens)
+	if tokens.PluginConfigValues != nil || tokens.PluginConfigSecrets != nil {
+		conn.PluginConfigValues = cloneStringMap(tokens.PluginConfigValues)
+		conn.PluginConfigSecrets = cloneStringMap(tokens.PluginConfigSecrets)
+	}
 	conn.ProviderAccountID = account.ID
 	conn.ProviderUsername = account.Username
 	conn.LastError = ""

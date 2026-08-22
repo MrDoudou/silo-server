@@ -259,6 +259,104 @@ func TestPluginProviderValidatesAndOverlaysConnectionConfig(t *testing.T) {
 	if _, _, err := provider.ConnectWithAPIKeyConfig(context.Background(), "token", nil); err == nil || !strings.Contains(err.Error(), "required") {
 		t.Fatalf("missing config error = %v", err)
 	}
+	if tokens, _, err := provider.ConnectWithAPIKeyConfig(context.Background(), "token", ConnectionConfigValues{
+		"floppy": {"base_url": "https://personal.example.com"},
+	}); err != nil {
+		t.Fatal(err)
+	} else if tokens.PluginConfigValues["floppy.base_url"] != "https://personal.example.com" {
+		t.Fatalf("connect overlay = %#v", tokens.PluginConfigValues)
+	}
+}
+
+func TestAuthenticatedPluginRPCsKeepConnectionConfigOverlay(t *testing.T) {
+	client := &fakeWatchSyncPluginClient{}
+	provider, err := NewPluginProvider(PluginProviderOptions{
+		InstallationID: 4, ProviderKey: testPluginProviderKey, CapabilityID: testPluginCapabilityID,
+		Descriptor: &pluginv1.WatchSyncProviderDescriptor{
+			AuthMethods:   []pluginv1.WatchSyncAuthMethod{pluginv1.WatchSyncAuthMethod_WATCH_SYNC_AUTH_METHOD_API_KEY},
+			ImportWatched: true, MaxBatchSize: 25,
+		},
+		ResolveClient: func(context.Context, int, string) (WatchSyncPluginClient, error) { return client, nil },
+		ResolveConfig: func(context.Context, int) (*pluginv1.WatchSyncProviderConfig, error) {
+			return &pluginv1.WatchSyncProviderConfig{
+				Values:       map[string]string{"floppy.base_url": "https://legacy.example.com"},
+				SecretValues: map[string]string{"floppy.token": "install-secret"},
+			}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = provider.FetchWatchedBatch(context.Background(), ServerConfig{}, Connection{
+		PluginConfigValues:  map[string]string{"floppy.base_url": "https://personal.example.com"},
+		PluginConfigSecrets: map[string]string{"floppy.token": "profile-secret"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(client.listRequests) != 1 {
+		t.Fatalf("list requests = %d, want 1", len(client.listRequests))
+	}
+	config := client.listRequests[0].GetContext().GetProviderConfig()
+	if config.GetValues()["floppy.base_url"] != "https://personal.example.com" {
+		t.Fatalf("list base URL = %q, want personal overlay", config.GetValues()["floppy.base_url"])
+	}
+	if config.GetSecretValues()["floppy.token"] != "profile-secret" {
+		t.Fatalf("list secret = %q, want profile overlay", config.GetSecretValues()["floppy.token"])
+	}
+	if _, ok := config.GetValues()["floppy.token"]; ok {
+		t.Fatal("overlay secret leaked into non-secret values")
+	}
+
+	client.refreshResponse = &pluginv1.WatchSyncCredentialResponse{
+		Credentials: &pluginv1.WatchSyncCredentials{AccessToken: testRotatedAccessToken, TokenType: testBearerTokenType},
+	}
+	if _, err := provider.RefreshToken(context.Background(), ServerConfig{}, Connection{
+		AccessToken:         "old",
+		RefreshToken:        testOldRefreshToken,
+		PluginConfigValues:  map[string]string{"floppy.base_url": "https://personal.example.com"},
+		PluginConfigSecrets: map[string]string{"floppy.token": "profile-secret"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	config = client.refreshRequest.GetContext().GetProviderConfig()
+	if config.GetValues()["floppy.base_url"] != "https://personal.example.com" ||
+		config.GetSecretValues()["floppy.token"] != "profile-secret" {
+		t.Fatalf("refresh overlay = values %#v secrets %#v", config.GetValues(), config.GetSecretValues())
+	}
+}
+
+func TestPersistUpdatedCredentialsKeepsConnectionConfigOverlay(t *testing.T) {
+	repository := &fakePluginCredentialRepository{}
+	provider, err := NewPluginProvider(PluginProviderOptions{
+		InstallationID: 4, ProviderKey: testPluginProviderKey, CapabilityID: testPluginCapabilityID,
+		Descriptor: &pluginv1.WatchSyncProviderDescriptor{
+			AuthMethods: []pluginv1.WatchSyncAuthMethod{pluginv1.WatchSyncAuthMethod_WATCH_SYNC_AUTH_METHOD_API_KEY},
+		},
+		ResolveClient: func(context.Context, int, string) (WatchSyncPluginClient, error) {
+			return &fakeWatchSyncPluginClient{}, nil
+		},
+		Repository: repository,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	saved, err := provider.persistUpdatedCredentials(context.Background(), Connection{
+		AccessToken:        "old",
+		RefreshToken:       testOldRefreshToken,
+		PluginConfigValues: map[string]string{"floppy.base_url": "https://personal.example.com"},
+	}, &pluginv1.WatchSyncCredentials{AccessToken: "rotated", TokenType: testBearerTokenType})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.PluginConfigValues["floppy.base_url"] != "https://personal.example.com" {
+		t.Fatalf("saved overlay = %#v", saved.PluginConfigValues)
+	}
+	if repository.saved.PluginConfigValues["floppy.base_url"] != "https://personal.example.com" {
+		t.Fatalf("persisted overlay = %#v", repository.saved.PluginConfigValues)
+	}
 }
 
 func TestPluginProviderClassifiesAndRedactsConnectionSecrets(t *testing.T) {

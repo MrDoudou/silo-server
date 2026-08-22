@@ -29,7 +29,9 @@ func TestPluginCredentialBundleRoundTrip(t *testing.T) {
 		Provider: "plugin:4:tracker", UserID: 7, ProfileID: "profile",
 		AccessToken: testAccessToken, RefreshToken: testRefreshToken, TokenExpiresAt: &expiresAt,
 		TokenType: testDPoPTokenType, Scopes: []string{testHistoryScope, "watchlist"},
-		SecretAttributes: map[string]string{"instance": testOneValue},
+		SecretAttributes:    map[string]string{"instance": testOneValue},
+		PluginConfigValues:  map[string]string{"floppy.base_url": "https://personal.example.com"},
+		PluginConfigSecrets: map[string]string{"floppy.token": "profile-secret"},
 	}
 	encoded, err := repository.encodePluginCredentials(input)
 	if err != nil {
@@ -44,7 +46,9 @@ func TestPluginCredentialBundleRoundTrip(t *testing.T) {
 	}
 	if output.AccessToken != input.AccessToken || output.RefreshToken != input.RefreshToken ||
 		output.TokenType != input.TokenType || !output.TokenExpiresAt.Equal(expiresAt) ||
-		!reflect.DeepEqual(output.Scopes, input.Scopes) || !reflect.DeepEqual(output.SecretAttributes, input.SecretAttributes) {
+		!reflect.DeepEqual(output.Scopes, input.Scopes) || !reflect.DeepEqual(output.SecretAttributes, input.SecretAttributes) ||
+		!reflect.DeepEqual(output.PluginConfigValues, input.PluginConfigValues) ||
+		!reflect.DeepEqual(output.PluginConfigSecrets, input.PluginConfigSecrets) {
 		t.Fatalf("decoded credentials = %#v", output)
 	}
 }

@@ -1559,6 +1559,38 @@ func TestServiceSyncConnectionRejectsBlankAccessToken(t *testing.T) {
 	}
 }
 
+func TestPersistConnectionStoresPluginConfigOverlay(t *testing.T) {
+	repo := newServiceFakeRepo()
+	service := NewService(repo, NewRegistry())
+
+	saved, err := service.persistConnection(context.Background(), "plugin:4:floppy", 7, "profile-1", TokenSet{
+		AccessToken:         "token",
+		PluginConfigValues:  map[string]string{"floppy.base_url": "https://personal.example.com"},
+		PluginConfigSecrets: map[string]string{"floppy.token": "profile-secret"},
+	}, ProviderAccount{ID: "acct", Username: "ada"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.PluginConfigValues["floppy.base_url"] != "https://personal.example.com" ||
+		saved.PluginConfigSecrets["floppy.token"] != "profile-secret" {
+		t.Fatalf("saved overlay = values %#v secrets %#v", saved.PluginConfigValues, saved.PluginConfigSecrets)
+	}
+
+	rotated, err := service.persistConnection(context.Background(), "plugin:4:floppy", 7, "profile-1", TokenSet{
+		AccessToken: "rotated",
+	}, ProviderAccount{ID: "acct", Username: "ada"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rotated.AccessToken != "rotated" {
+		t.Fatalf("access token = %q, want rotated", rotated.AccessToken)
+	}
+	if rotated.PluginConfigValues["floppy.base_url"] != "https://personal.example.com" ||
+		rotated.PluginConfigSecrets["floppy.token"] != "profile-secret" {
+		t.Fatalf("rotated overlay = values %#v secrets %#v", rotated.PluginConfigValues, rotated.PluginConfigSecrets)
+	}
+}
+
 func TestServiceSyncConnectionRefreshesExpiredToken(t *testing.T) {
 	repo := newServiceFakeRepo()
 	now := time.Date(2026, 5, 4, 12, 0, 0, 0, time.UTC)

@@ -195,18 +195,24 @@ func (c ServerConfig) Configured() bool {
 }
 
 type Connection struct {
-	ID                           string
-	Provider                     string
-	UserID                       int
-	ProfileID                    string
-	ProviderAccountID            string
-	ProviderUsername             string
-	AccessToken                  string
-	RefreshToken                 string
-	TokenExpiresAt               *time.Time
-	TokenType                    string
-	Scopes                       []string
-	SecretAttributes             map[string]string
+	ID                string
+	Provider          string
+	UserID            int
+	ProfileID         string
+	ProviderAccountID string
+	ProviderUsername  string
+	AccessToken       string
+	RefreshToken      string
+	TokenExpiresAt    *time.Time
+	TokenType         string
+	Scopes            []string
+	SecretAttributes  map[string]string
+	// PluginConfigValues and PluginConfigSecrets are the per-connection
+	// provider-config overlay captured at connect. Authenticated plugin RPCs
+	// merge them over the installation-wide config so a profile's server URL
+	// and secrets survive past ExchangeAPIKey.
+	PluginConfigValues           map[string]string
+	PluginConfigSecrets          map[string]string
 	ImportWatchedEnabled         bool
 	ImportProgressEnabled        bool
 	ExportWatchedEnabled         bool
@@ -354,6 +360,11 @@ type TokenSet struct {
 	TokenType        string
 	Scopes           []string
 	SecretAttributes map[string]string
+	// PluginConfigValues and PluginConfigSecrets are set only by plugin
+	// API-key connect. Token refresh and credential rotation leave them empty
+	// so connectionWithTokens cannot wipe a stored overlay.
+	PluginConfigValues  map[string]string
+	PluginConfigSecrets map[string]string
 }
 
 type ProviderAccount struct {
