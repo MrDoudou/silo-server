@@ -38,6 +38,7 @@ export interface BrowserPlexServer {
   accessToken: string;
   remoteURL: string;
   localURL: string;
+  connectionURLs: string[];
   owned: boolean;
   hasRemoteURL: boolean;
   hasLocalURL: boolean;
@@ -149,6 +150,7 @@ export async function listPlexResources(token: string): Promise<BrowserPlexServe
         accessToken: entry.accessToken,
         remoteURL: "",
         localURL: "",
+        connectionURLs: entry.connections.map((connection) => connection.uri),
         owned: entry.owned,
         hasRemoteURL: false,
         hasLocalURL: false,
@@ -188,4 +190,14 @@ export async function completePlexAuthentication(
 
 export function getPreferredPlexServerURL(server: BrowserPlexServer): string {
   return server.remoteURL || server.localURL;
+}
+
+export function getPlexServerURLs(server: BrowserPlexServer): string[] {
+  const candidates = [
+    getPreferredPlexServerURL(server),
+    ...server.connectionURLs,
+    server.remoteURL,
+    server.localURL,
+  ];
+  return [...new Set(candidates.map((candidate) => candidate.trim()).filter(Boolean))];
 }

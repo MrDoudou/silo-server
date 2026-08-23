@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -254,7 +255,7 @@ func (s *Service) CreateRun(ctx context.Context, userID int, input CreateRunInpu
 		}
 		sourceType = SourceTypePlex
 		connectionMode = mode
-		provider = NewPlexServerProvider(s.plex, auth.BaseURL, auth.Token).WithAccountToken(auth.AccountToken)
+		provider = NewPlexServerProvider(s.plex, auth.BaseURLs, auth.Token).WithAccountToken(auth.AccountToken)
 
 	default:
 		return nil, fmt.Errorf("unsupported source type")
@@ -360,17 +361,20 @@ func (s *Service) resolvePlexAuth(ctx context.Context, userID int, input CreateR
 		if server == nil {
 			return nil, "", fmt.Errorf("selected Plex server not found in session")
 		}
-		baseURL := firstNonEmpty(server.RemoteURL, server.LocalURL)
-		if baseURL == "" {
+		alternatives := append([]string(nil), server.ConnectionURLs...)
+		alternatives = append(alternatives, server.LocalURL)
+		baseURLs := plexBaseURLCandidates(server.RemoteURL, alternatives)
+		if len(baseURLs) == 0 {
 			return nil, "", fmt.Errorf("selected Plex server has no usable address")
 		}
 		if err := s.repo.ConsumePlexSession(ctx, session.ID); err != nil {
 			return nil, "", err
 		}
-		return &plexAuth{BaseURL: baseURL, Token: server.AccessToken, AccountToken: session.AuthToken}, ConnectionModePlexOAuth, nil
+		return &plexAuth{BaseURLs: baseURLs, Token: server.AccessToken, AccountToken: session.AuthToken}, ConnectionModePlexOAuth, nil
 	}
 
-	if input.PlexBaseURL != "" {
+	baseURLs := plexBaseURLCandidates(input.PlexBaseURL, input.PlexBaseURLs)
+	if len(baseURLs) > 0 {
 		if input.PlexToken == "" {
 			return nil, "", fmt.Errorf("plex_token is required for browser Plex imports")
 		}
@@ -378,7 +382,7 @@ func (s *Service) resolvePlexAuth(ctx context.Context, userID int, input CreateR
 		// PlexToken is a PMS access token, which account-level APIs (the
 		// watchlist) reject. Falling back to PlexToken keeps manually pasted
 		// plex.tv account tokens working.
-		return &plexAuth{BaseURL: input.PlexBaseURL, Token: input.PlexToken, AccountToken: firstNonEmpty(input.PlexAccountToken, input.PlexToken)}, ConnectionModePlexOAuth, nil
+		return &plexAuth{BaseURLs: baseURLs, Token: input.PlexToken, AccountToken: firstNonEmpty(input.PlexAccountToken, input.PlexToken)}, ConnectionModePlexOAuth, nil
 	}
 	if input.PlexToken != "" {
 		return nil, "", fmt.Errorf("plex_base_url is required for browser Plex imports")
@@ -398,10 +402,34 @@ func (s *Service) resolvePlexAuth(ctx context.Context, userID int, input CreateR
 		if input.PlexToken == "" {
 			return nil, "", fmt.Errorf("plex_token is required for predefined Plex sources")
 		}
-		return &plexAuth{BaseURL: source.BaseURL, Token: input.PlexToken, AccountToken: firstNonEmpty(input.PlexAccountToken, input.PlexToken)}, ConnectionModePredefined, nil
+		return &plexAuth{BaseURLs: []string{source.BaseURL}, Token: input.PlexToken, AccountToken: firstNonEmpty(input.PlexAccountToken, input.PlexToken)}, ConnectionModePredefined, nil
 	}
 
 	return nil, "", fmt.Errorf("plex_session_id, plex_base_url, or source_id is required for Plex imports")
+}
+
+const maxPlexConnectionCandidates = 8
+
+func plexBaseURLCandidates(primary string, alternatives []string) []string {
+	result := make([]string, 0, min(1+len(alternatives), maxPlexConnectionCandidates))
+	seen := make(map[string]struct{}, cap(result))
+	appendCandidate := func(candidate string) {
+		candidate = strings.TrimRight(strings.TrimSpace(candidate), "/")
+		if candidate == "" || len(result) >= maxPlexConnectionCandidates {
+			return
+		}
+		if _, exists := seen[candidate]; exists {
+			return
+		}
+		seen[candidate] = struct{}{}
+		result = append(result, candidate)
+	}
+
+	appendCandidate(primary)
+	for _, candidate := range alternatives {
+		appendCandidate(candidate)
+	}
+	return result
 }
 
 // addToWatchlist puts a matched watchlist import onto the importing

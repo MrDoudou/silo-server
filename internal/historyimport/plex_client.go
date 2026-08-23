@@ -117,9 +117,11 @@ func (c *PlexClient) GetResources(ctx context.Context, token string) ([]PlexServ
 			Name:             entry.Name,
 			ClientIdentifier: entry.ClientIdentifier,
 			AccessToken:      entry.AccessToken,
+			ConnectionURLs:   make([]string, 0, len(entry.Connections)),
 			Owned:            entry.Owned,
 		}
 		for _, conn := range entry.Connections {
+			server.ConnectionURLs = append(server.ConnectionURLs, conn.URI)
 			if conn.Local {
 				server.LocalURL = conn.URI
 				server.HasLocalURL = true
@@ -165,6 +167,12 @@ type plexMediaContainer struct {
 			Title string `json:"title"`
 		} `json:"Directory"`
 	} `json:"MediaContainer"`
+}
+
+type plexLibrarySection struct {
+	Key   string
+	Type  string
+	Title string
 }
 
 // items returns the container's media entries regardless of whether the
@@ -225,7 +233,7 @@ func (g *PlexGuids) UnmarshalJSON(data []byte) error {
 	return fmt.Errorf("unsupported Plex Guid payload: %s", string(data))
 }
 
-func (c *PlexClient) FetchLibrarySections(ctx context.Context, baseURL, token string) ([]struct{ Key, Type, Title string }, error) {
+func (c *PlexClient) FetchLibrarySections(ctx context.Context, baseURL, token string) ([]plexLibrarySection, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/library/sections", nil)
 	if err != nil {
 		return nil, err
@@ -235,9 +243,9 @@ func (c *PlexClient) FetchLibrarySections(ctx context.Context, baseURL, token st
 	if err := c.doJSON(req, &container); err != nil {
 		return nil, fmt.Errorf("fetching Plex library sections: %w", err)
 	}
-	var sections []struct{ Key, Type, Title string }
+	var sections []plexLibrarySection
 	for _, dir := range container.MediaContainer.Directory {
-		sections = append(sections, struct{ Key, Type, Title string }{dir.Key, dir.Type, dir.Title})
+		sections = append(sections, plexLibrarySection{Key: dir.Key, Type: dir.Type, Title: dir.Title})
 	}
 	return sections, nil
 }
