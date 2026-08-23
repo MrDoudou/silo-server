@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,14 +15,24 @@ import (
 )
 
 const (
-	cacheMetadataImagesIntervalMs = int64(60 * 1000)
-	// Claim only work that can start immediately. Claiming a large queue page
-	// stamps one lease on every row up front; with two workers, the unstarted
+	cacheMetadataImagesWorkersEnv = "SILO_METADATA_IMAGE_CACHE_WORKERS"
+
+	cacheMetadataImagesIntervalMs     = int64(60 * 1000)
+	cacheMetadataImagesDefaultWorkers = 4
+	// Keep claim batches small independently of configured concurrency. Claiming
+	// a large queue page stamps one lease on every row up front, so an unstarted
 	// tail could expire and be reclaimed before this execution reaches it.
 	cacheMetadataImagesClaimLimit = 2
-	cacheMetadataImagesWorkers    = 2
 	cacheMetadataImagesMaxRuntime = 10 * time.Minute
 )
+
+func cacheMetadataImagesWorkers() int {
+	workers, err := strconv.Atoi(strings.TrimSpace(os.Getenv(cacheMetadataImagesWorkersEnv)))
+	if err != nil || workers <= 0 {
+		return cacheMetadataImagesDefaultWorkers
+	}
+	return workers
+}
 
 type MetadataImageCacheRunner interface {
 	DrainUntilIdle(ctx context.Context, workerID string, claimLimit int, concurrency int, maxRuntime time.Duration, reportProgress metadata.ImageCacheRunProgressReporter) (metadata.ImageCacheRunStats, error)
@@ -135,7 +147,7 @@ func executeMetadataImages(ctx context.Context, progress taskmanager.ProgressRep
 		ctx,
 		workerID,
 		cacheMetadataImagesClaimLimit,
-		cacheMetadataImagesWorkers,
+		cacheMetadataImagesWorkers(),
 		maxRuntime,
 		func(update metadata.ImageCacheRunStats) {
 			percent := cacheMetadataImagesPercent(update)

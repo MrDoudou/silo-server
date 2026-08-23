@@ -93,6 +93,7 @@ func TestBackfillMetadataImagesTaskProperties(t *testing.T) {
 }
 
 func TestCacheMetadataImagesTaskReportsStats(t *testing.T) {
+	t.Setenv(cacheMetadataImagesWorkersEnv, "6")
 	runner := &fakeMetadataImageCacheRunner{
 		updates: []metadata.ImageCacheRunStats{{
 			Batches:   2,
@@ -116,10 +117,10 @@ func TestCacheMetadataImagesTaskReportsStats(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	if runner.claimLimit != 2 {
-		t.Fatalf("claimLimit = %d, want one immediately-startable job per worker", runner.claimLimit)
+		t.Fatalf("claimLimit = %d, want fixed claim size 2", runner.claimLimit)
 	}
-	if runner.concurrency != 2 {
-		t.Fatalf("concurrency = %d, want 2", runner.concurrency)
+	if runner.concurrency != 6 {
+		t.Fatalf("concurrency = %d, want configured 6", runner.concurrency)
 	}
 	if runner.maxRuntime != 10*time.Minute {
 		t.Fatalf("maxRuntime = %s, want 10m", runner.maxRuntime)
@@ -145,6 +146,7 @@ func TestCacheMetadataImagesTaskReportsStats(t *testing.T) {
 }
 
 func TestBackfillMetadataImagesTaskReportsDiscovery(t *testing.T) {
+	t.Setenv(cacheMetadataImagesWorkersEnv, "1")
 	runner := &fakeMetadataImageCacheRunner{stats: metadata.ImageCacheRunStats{
 		Batches:          2,
 		EnqueuedExisting: 5,
@@ -162,7 +164,10 @@ func TestBackfillMetadataImagesTaskReportsDiscovery(t *testing.T) {
 		t.Fatalf("maxRuntime = %s, want no deadline for manual backfill", runner.maxRuntime)
 	}
 	if runner.claimLimit != 2 {
-		t.Fatalf("claimLimit = %d, want one immediately-startable job per worker", runner.claimLimit)
+		t.Fatalf("claimLimit = %d, want fixed claim size 2", runner.claimLimit)
+	}
+	if runner.concurrency != 1 {
+		t.Fatalf("concurrency = %d, want configured 1", runner.concurrency)
 	}
 	if len(runner.workerIDs) != 1 || !strings.Contains(runner.workerIDs[0], ":backfill:") {
 		t.Fatalf("backfill worker IDs = %#v, want one execution-scoped backfill owner", runner.workerIDs)
@@ -173,6 +178,22 @@ func TestBackfillMetadataImagesTaskReportsDiscovery(t *testing.T) {
 	want := "Discovered 5 existing, Batches 2, claimed 5, cached 5, 0 failed attempts, skipped 0, uploaded 0 variants, found 0 existing variants, deleted 0 old successes"
 	if got := progress.messages[len(progress.messages)-1]; got != want {
 		t.Fatalf("final message = %q, want %q", got, want)
+	}
+}
+
+func TestCacheMetadataImagesWorkersDefaultsForInvalidOverride(t *testing.T) {
+	t.Setenv(cacheMetadataImagesWorkersEnv, "")
+	if got := cacheMetadataImagesWorkers(); got != 4 {
+		t.Fatalf("cacheMetadataImagesWorkers() = %d, want default 4", got)
+	}
+
+	for _, value := range []string{"", "0", "-1", "not-a-number"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv(cacheMetadataImagesWorkersEnv, value)
+			if got := cacheMetadataImagesWorkers(); got != cacheMetadataImagesDefaultWorkers {
+				t.Fatalf("cacheMetadataImagesWorkers() = %d, want default %d", got, cacheMetadataImagesDefaultWorkers)
+			}
+		})
 	}
 }
 
