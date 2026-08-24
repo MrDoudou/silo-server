@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/models"
+	"github.com/Silo-Server/silo-server/internal/tonemap"
 	"github.com/Silo-Server/silo-server/internal/userstore"
 )
 
@@ -85,6 +87,10 @@ type playbackSessionRow struct {
 	EffectivePlayMethod      string `json:"effective_play_method,omitempty"`
 	IsJellyfinClient         bool   `json:"is_jellyfin_client,omitempty"`
 	CompatOrigin             bool   `json:"-"`
+	// Telemetry carries measured delivery for this session. It is populated only
+	// by the live-sessions endpoint, and its absence there is meaningful: it means
+	// stream telemetry has no record of bytes reaching a viewer.
+	Telemetry *sessionTelemetry `json:"telemetry,omitempty"`
 }
 
 // playbackSessionsCapabilitiesResponse advertises the additive fields of the
@@ -115,21 +121,28 @@ type playbackSessionsCapabilitiesResponse struct {
 	// absent on a row then means the reporting node did not know the encoded
 	// layout.
 	TargetAudioChannels bool `json:"target_audio_channels"`
+	// StreamTelemetryLiveSessions reports that GET /admin/sessions/live exists:
+	// the telemetry-backed live list, which merges the legacy projection with the
+	// measured byte flow and decorates each row with a telemetry block. A client
+	// must feature-detect it rather than assume it, and must read the envelope's
+	// source field rather than treating the list as authoritative.
+	StreamTelemetryLiveSessions bool `json:"stream_telemetry_live_sessions"`
 }
 
 // HandleGetSessionsCapabilities exposes additive feature support for the live
 // admin session payload (GET /admin/sessions/capabilities).
 func (h *AdminHandler) HandleGetSessionsCapabilities(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, playbackSessionsCapabilitiesResponse{
-		EffectivePlayMethod:       true,
-		EffectivePlayMethodValues: []string{"direct", "remux", "transcode", "audio"},
-		IsJellyfinClient:          true,
-		TranscodeHWAccel:          true,
-		ToneMapMode:               true,
-		ToneMapModeValues:         []string{"hardware", "software"},
-		ClientBuild:               true,
-		ClientChannel:             true,
-		TargetAudioChannels:       true,
+		EffectivePlayMethod:         true,
+		EffectivePlayMethodValues:   effectivePlayMethodValues,
+		IsJellyfinClient:            true,
+		TranscodeHWAccel:            true,
+		ToneMapMode:                 true,
+		ToneMapModeValues:           toneMapModeValues,
+		ClientBuild:                 true,
+		ClientChannel:               true,
+		TargetAudioChannels:         true,
+		StreamTelemetryLiveSessions: true,
 	})
 }
 
@@ -137,6 +150,12 @@ func (h *AdminHandler) HandleGetSessionsCapabilities(w http.ResponseWriter, _ *h
 type PlaybackSessionsQuery struct {
 	// UserID, when positive, limits results to sessions owned by that account.
 	UserID int
+	// SessionIDs, when non-empty, fetches exactly these sessions instead of the
+	// newest page. The live view is the spine of /admin/sessions/live and can
+	// carry far more sessions than the default page, so a display lookup that
+	// kept the ORDER BY ... LIMIT would silently return rows with no title,
+	// poster or position for everything past the cut.
+	SessionIDs []string
 }
 
 type playbackSessionsReader interface {
@@ -248,12 +267,27 @@ func (l *PlaybackSessionsLoader) Load(
 		 LEFT JOIN media_items series_mi ON series_mi.content_id = e.series_id
 		 LEFT JOIN stream_nodes remote_node ON remote_node.url = s.transcode_node_url`
 
-	var args []any
+	var (
+		args       []any
+		conditions []string
+	)
 	if query.UserID > 0 {
-		sql += " WHERE s.user_id = $1"
 		args = append(args, query.UserID)
+		conditions = append(conditions, "s.user_id = $"+strconv.Itoa(len(args)))
 	}
-	sql += " ORDER BY s.started_at DESC LIMIT 200"
+	if len(query.SessionIDs) > 0 {
+		args = append(args, query.SessionIDs)
+		conditions = append(conditions, "s.session_id = ANY($"+strconv.Itoa(len(args))+")")
+	}
+	if len(conditions) > 0 {
+		sql += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	sql += " ORDER BY s.started_at DESC"
+	if len(query.SessionIDs) == 0 {
+		// The page cap applies only to the unfiltered listing. An explicit id set
+		// is already bounded by its caller.
+		sql += " LIMIT 200"
+	}
 
 	rows, err := l.pool.Query(ctx, sql, args...)
 	if err != nil {
@@ -427,18 +461,42 @@ func sessionComponentDecision(playMethod string, transcodeAudio bool, targetVide
 // Returns "" when the decisions are unknown (empty or unrecognized
 // play_method, e.g. a stale row from an older node), so consumers can
 // distinguish "unknown" from a definite bucket instead of inventing one.
+// The closed bucket vocabulary effectivePlayMethod emits, and the per-stream
+// decisions it reads. Named because the capabilities endpoint advertises the
+// same list to independently deployed clients, and the two drifting apart would
+// tell a client to expect a value the server never sends.
+const (
+	playMethodDirect    = "direct"
+	playMethodRemux     = "remux"
+	playMethodTranscode = "transcode"
+	playMethodAudio     = "audio"
+
+	decisionDirect    = "direct"
+	decisionTranscode = "transcode"
+)
+
+// effectivePlayMethodValues is the advertised vocabulary, in bucket order.
+var effectivePlayMethodValues = []string{
+	playMethodDirect, playMethodRemux, playMethodTranscode, playMethodAudio,
+}
+
+// toneMapModeValues is the advertised tone-map vocabulary. Built from the
+// tonemap constants rather than spelled out, so a mode added there cannot drift
+// from the one this endpoint claims to support.
+var toneMapModeValues = []string{string(tonemap.ModeHardware), string(tonemap.ModeSoftware)}
+
 func effectivePlayMethod(videoDecision, audioDecision string) string {
 	switch {
 	case videoDecision == "" && audioDecision == "":
 		return ""
-	case videoDecision == "transcode":
-		return "transcode"
-	case audioDecision == "transcode":
-		return "audio"
-	case videoDecision == "direct" && audioDecision == "direct":
-		return "direct"
+	case videoDecision == decisionTranscode:
+		return playMethodTranscode
+	case audioDecision == decisionTranscode:
+		return playMethodAudio
+	case videoDecision == decisionDirect && audioDecision == decisionDirect:
+		return playMethodDirect
 	default:
-		return "remux"
+		return playMethodRemux
 	}
 }
 

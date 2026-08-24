@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { AdminSessionActions } from "@/components/AdminSessionActions";
 import { AdminSectionCommandDialog } from "@/components/AdminSectionCommandDialog";
 import { useEventChannel } from "@/components/realtimeEventsContext";
-import { fetchAdminStats, useAdminStats, useAdminSessions } from "@/hooks/queries/admin/stats";
+import { fetchAdminStats, useAdminStats, useAdminLiveSessions } from "@/hooks/queries/admin/stats";
 import { useAdminPluginInstallations } from "@/hooks/queries/admin/plugins";
 import { usePolicyCapability } from "@/hooks/queries/admin/policy";
 import { useAdminUsers } from "@/hooks/queries/admin/users";
@@ -56,6 +56,11 @@ import { buildAdminCommandNavSections } from "@/lib/adminNavigation";
 import { compareActiveScans, formatActiveScanMode, formatActiveScanProgress } from "@/lib/scanRuns";
 import { JellyfinSessionPill } from "@/components/JellyfinSessionPill";
 import {
+  describeLiveSessionsSource,
+  describeSessionDelivery,
+  type LiveSessionsSourceDisplay,
+} from "@/lib/sessionTelemetry";
+import {
   activityMethodMeta,
   classifyActivityMethod,
   getSessionClientLabel,
@@ -84,7 +89,12 @@ function formatDashboardLibraryScanProgress(scan: ScanRun, activeScanCount: numb
 export default function AdminDashboard() {
   const queryClient = useQueryClient();
   const statsQuery = useAdminStats();
-  const sessionsQuery = useAdminSessions();
+  // Sessions a client reports as playing but which have delivered nothing are
+  // hidden by default. The operator can reveal them, so nothing is ever
+  // unrecoverably hidden — but the default list answers "who is actually
+  // receiving video?" rather than "who says they are watching?".
+  const [showHiddenSessions, setShowHiddenSessions] = useState(false);
+  const sessionsQuery = useAdminLiveSessions(showHiddenSessions);
   const librariesQuery = useAdminLibraries();
   const usersQuery = useAdminUsers();
   const { data: adminInstallations } = useAdminPluginInstallations();
@@ -97,7 +107,8 @@ export default function AdminDashboard() {
   const [lastDashboardUpdatedAt, setLastDashboardUpdatedAt] = useState<number | null>(null);
   const [relativeUpdatedNow, setRelativeUpdatedNow] = useState(() => Date.now());
 
-  const sessions = sessionsQuery.data ?? [];
+  const sessions = sessionsQuery.data?.sessions ?? [];
+  const sessionsSource = describeLiveSessionsSource(sessionsQuery.data);
   const libraries = librariesQuery.data ?? [];
   const users = usersQuery.data ?? [];
   const { refetch: refetchSessions } = sessionsQuery;
@@ -293,6 +304,9 @@ export default function AdminDashboard() {
 
       <NowPlayingSection
         sessions={sessions}
+        source={sessionsSource}
+        showHiddenSessions={showHiddenSessions}
+        onToggleHiddenSessions={setShowHiddenSessions}
         isLoading={sessionsQuery.isLoading}
         error={sessionsQuery.error}
       />
@@ -499,6 +513,7 @@ function StreamCard({ session }: { session: AdminSession }) {
   const clientLabel = getSessionClientLabel(session);
   const method = classifyActivityMethod(session);
   const methodColor = activityMethodMeta(method).badgeClass;
+  const delivery = describeSessionDelivery(session);
 
   return (
     <div className="surface-panel flex gap-3.5 rounded-2xl border-0 p-3.5 transition-colors duration-150">
@@ -591,6 +606,54 @@ function StreamCard({ session }: { session: AdminSession }) {
           )}
         </div>
 
+        {/* Measured delivery. Absent entirely for a session telemetry has no
+            record of, which is itself the signal. */}
+        {delivery ? (
+          <div className="text-muted-foreground mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+            <span className="text-foreground font-semibold">{delivery.rate ?? "measuring…"}</span>
+            <span>{delivery.bytes} delivered</span>
+            {delivery.degraded ? (
+              <span title="Some records were dropped; this total is a floor.">at least</span>
+            ) : null}
+            {delivery.noDelivery ? (
+              <span
+                title="A client reports this as playing, but no bytes were measured leaving the server."
+                className="border-destructive/40 text-destructive inline-flex rounded border px-1 py-px font-semibold"
+              >
+                delivering nothing
+              </span>
+            ) : null}
+            {delivery.unclaimed ? (
+              <span
+                title="Bytes are going out, but no playback session manager claims this session."
+                className="border-destructive/40 text-destructive inline-flex rounded border px-1 py-px font-semibold"
+              >
+                unclaimed
+              </span>
+            ) : null}
+            {delivery.viewerIpCount > 1 ? (
+              <span
+                title="More than one address pulled bytes for this session."
+                className="border-border/60 bg-muted/30 inline-flex rounded border px-1 py-px font-semibold"
+              >
+                {delivery.viewerIpCount} IPs
+              </span>
+            ) : null}
+            {delivery.identityConflict ? (
+              <span
+                title="Publishers disagreed about who is watching this session."
+                className="border-destructive/40 text-destructive inline-flex rounded border px-1 py-px font-semibold"
+              >
+                identity conflict
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <div className="text-muted-foreground mb-1.5 text-[10px] italic">
+            no byte flow measured
+          </div>
+        )}
+
         {/* User */}
         <div className="mt-auto flex items-center gap-1.5">
           <div
@@ -617,10 +680,16 @@ function SessionProfilePill({ label }: { label: string }) {
 
 function NowPlayingSection({
   sessions,
+  source,
+  showHiddenSessions,
+  onToggleHiddenSessions,
   isLoading,
   error,
 }: {
   sessions: AdminSession[];
+  source: LiveSessionsSourceDisplay;
+  showHiddenSessions: boolean;
+  onToggleHiddenSessions: (next: boolean) => void;
   isLoading: boolean;
   error: unknown;
 }) {
@@ -641,18 +710,47 @@ function NowPlayingSection({
     );
   }
 
-  if (sessions.length === 0) return null;
+  // An empty list still renders when idle rows are being hidden: otherwise the
+  // section vanishes and the operator has no way to reach the reveal control.
+  if (sessions.length === 0 && !source.canRevealHidden) return null;
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
-        <div className="text-base font-bold">Now Playing</div>
-        <Link
-          to="/admin/activity"
-          className="text-muted-foreground hover:text-primary text-[11px] transition-colors"
-        >
-          View all {sessions.length} streams ›
-        </Link>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="text-base font-bold">Now Playing</div>
+          {source.label ? (
+            <span
+              title={source.detail}
+              className={`inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold ${
+                source.trustworthy
+                  ? "border-primary/20 bg-primary/10 text-primary"
+                  : "border-border/60 bg-muted/30 text-muted-foreground"
+              }`}
+            >
+              {source.label}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-3">
+          {source.canRevealHidden ? (
+            <button
+              type="button"
+              onClick={() => onToggleHiddenSessions(!showHiddenSessions)}
+              className="text-muted-foreground hover:text-primary text-[11px] transition-colors"
+            >
+              {showHiddenSessions
+                ? "Hide sessions delivering nothing"
+                : `Show ${source.hiddenCount} delivering nothing`}
+            </button>
+          ) : null}
+          <Link
+            to="/admin/activity"
+            className="text-muted-foreground hover:text-primary text-[11px] transition-colors"
+          >
+            View all {sessions.length} streams ›
+          </Link>
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         {sessions.slice(0, 4).map((session) => (

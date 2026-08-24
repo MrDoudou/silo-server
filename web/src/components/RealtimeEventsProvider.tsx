@@ -67,6 +67,7 @@ const CATALOG_ITEM_CHANGED_EVENTS = new Set([
 const SCOPED_CATALOG_LIBRARY_EVENTS = new Set(["catalog.library.changed", "library.changed"]);
 const DASHBOARD_QUERY_KEYS = [
   adminKeys.stats(),
+  // Prefix-matched, so this also covers the live-session variants under it.
   adminKeys.sessions(),
   adminKeys.libraries(),
   adminKeys.users(),
@@ -309,6 +310,13 @@ function hydrateSessions(
     return;
   }
   queryClient.setQueryData(adminKeys.sessions(), sessions);
+  // setQueryData above is an exact-key write, so unlike an invalidation it does
+  // NOT reach the live-session queries nested under that key — they need this.
+  // They also cannot be hydrated from this payload: a realtime session event
+  // carries the legacy row only, with no measured byte flow to filter or
+  // decorate it, so writing it here would quietly replace a telemetry-backed
+  // list with a legacy one while the envelope still claimed "measured".
+  void queryClient.invalidateQueries({ queryKey: adminKeys.liveSessionsRoot() });
   void queryClient.invalidateQueries({ queryKey: adminKeys.stats() });
 }
 

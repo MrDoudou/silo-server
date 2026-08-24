@@ -1158,6 +1158,8 @@ func NewRouter(deps Dependencies) chi.Router {
 		adminHandler.RestartStatus = restartStatus
 		adminHandler.CatalogSearchStatus = catalogSearchService
 		adminHandler.DiagnosticsStore = diagnosticsStore
+		adminHandler.StreamTelemetry = deps.StreamTelemetry
+		adminHandler.StreamTelemetryViewCache = deps.StreamTelemetryViewCache
 		if settingsRepo != nil {
 			adminHandler.SettingsRepo = settingsRepo
 		}
@@ -2891,6 +2893,13 @@ func NewRouter(deps Dependencies) chi.Router {
 							}
 
 							r.Get("/sessions", adminHandler.HandleListSessions)
+							// The telemetry-backed live list. Additive alongside
+							// /admin/sessions, which keeps its array shape for the
+							// clients already reading it: this endpoint needs an
+							// envelope to say whether the list is telemetry-backed
+							// or a legacy fallback, and that cannot be expressed in
+							// a bare array.
+							r.Get("/sessions/live", adminHandler.HandleListLiveSessions)
 							// P0d parity projection: the merged telemetry view beside
 							// both legacy live-session projections and their diff. It
 							// compares only — the repoint is the separate retirement
