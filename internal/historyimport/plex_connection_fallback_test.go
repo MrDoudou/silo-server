@@ -122,6 +122,21 @@ func TestPlexServerProviderPublicConnectionsBlockPrivateDestinations(t *testing.
 	}
 }
 
+func TestFetchPlexLibrarySectionsRejectsMissingMediaContainer(t *testing.T) {
+	t.Parallel()
+
+	notPlex := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer notPlex.Close()
+
+	_, err := NewPlexClient().FetchLibrarySections(context.Background(), notPlex.URL, "server-token")
+	if err == nil || !strings.Contains(err.Error(), "MediaContainer") {
+		t.Fatalf("FetchLibrarySections error = %v, want missing MediaContainer rejection", err)
+	}
+}
+
 func TestNewPlexRunProviderRestrictsOnlyProfileOAuth(t *testing.T) {
 	t.Parallel()
 
@@ -158,6 +173,7 @@ func TestPublicPlexAddress(t *testing.T) {
 		{address: "::10.0.0.1", want: false},
 		{address: "::ffff:10.0.0.1", want: false},
 		{address: "::ffff:8.8.8.8", want: true},
+		{address: "64:ff9b:1::10.0.0.1", want: false},
 		{address: "100::1", want: false},
 		{address: "2001::1", want: false},
 		{address: "2001:10::1", want: false},

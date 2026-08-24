@@ -52,6 +52,7 @@ var (
 		netip.MustParsePrefix("::1/128"),
 		netip.MustParsePrefix("::/96"),
 		netip.MustParsePrefix("64:ff9b::/96"),
+		netip.MustParsePrefix("64:ff9b:1::/48"),
 		netip.MustParsePrefix("100::/64"),
 		netip.MustParsePrefix("2001::/32"),
 		netip.MustParsePrefix("2001:2::/48"),
@@ -273,22 +274,24 @@ func (c *PlexClient) GetCurrentUser(ctx context.Context, token string) (*PlexAcc
 	return &account, nil
 }
 
+type plexMediaContainerBody struct {
+	Size      int        `json:"size"`
+	TotalSize int        `json:"totalSize"`
+	Offset    int        `json:"offset"`
+	Metadata  []PlexItem `json:"Metadata"`
+	// Video mirrors Metadata: the discover API inconsistently keys some
+	// responses on "Video" instead of "Metadata" (movie items in
+	// particular), so both must be decoded.
+	Video     []PlexItem `json:"Video"`
+	Directory []struct {
+		Key   string `json:"key"`
+		Type  string `json:"type"`
+		Title string `json:"title"`
+	} `json:"Directory"`
+}
+
 type plexMediaContainer struct {
-	MediaContainer struct {
-		Size      int        `json:"size"`
-		TotalSize int        `json:"totalSize"`
-		Offset    int        `json:"offset"`
-		Metadata  []PlexItem `json:"Metadata"`
-		// Video mirrors Metadata: the discover API inconsistently keys some
-		// responses on "Video" instead of "Metadata" (movie items in
-		// particular), so both must be decoded.
-		Video     []PlexItem `json:"Video"`
-		Directory []struct {
-			Key   string `json:"key"`
-			Type  string `json:"type"`
-			Title string `json:"title"`
-		} `json:"Directory"`
-	} `json:"MediaContainer"`
+	MediaContainer plexMediaContainerBody `json:"MediaContainer"`
 }
 
 type plexLibrarySection struct {
@@ -361,9 +364,14 @@ func (c *PlexClient) FetchLibrarySections(ctx context.Context, baseURL, token st
 		return nil, err
 	}
 	c.setPlexHeaders(req, token)
-	var container plexMediaContainer
+	var container struct {
+		MediaContainer *plexMediaContainerBody `json:"MediaContainer"`
+	}
 	if err := c.doJSON(req, &container); err != nil {
 		return nil, fmt.Errorf("fetching Plex library sections: %w", err)
+	}
+	if container.MediaContainer == nil {
+		return nil, fmt.Errorf("fetching Plex library sections: response is missing MediaContainer")
 	}
 	var sections []plexLibrarySection
 	for _, dir := range container.MediaContainer.Directory {
