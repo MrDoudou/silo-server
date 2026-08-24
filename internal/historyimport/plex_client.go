@@ -31,8 +31,9 @@ const (
 )
 
 var (
-	errPrivatePlexDestination = errors.New("plex destination resolves to a private or special-use network")
-	plexDeniedNetworks        = []netip.Prefix{
+	errPrivatePlexDestination  = errors.New("plex destination resolves to a private or special-use network")
+	errInsecurePlexDestination = errors.New("profile Plex imports require HTTPS destinations")
+	plexDeniedNetworks         = []netip.Prefix{
 		netip.MustParsePrefix("0.0.0.0/8"),
 		netip.MustParsePrefix("10.0.0.0/8"),
 		netip.MustParsePrefix("100.64.0.0/10"),
@@ -106,17 +107,32 @@ func newPublicPlexHTTPClient(timeout time.Duration) *http.Client {
 	}
 	return &http.Client{
 		Timeout:   timeout,
-		Transport: transport,
+		Transport: &publicPlexTransport{base: transport},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return errors.New("too many Plex redirects")
 			}
-			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
-				return errors.New("plex redirect uses an unsupported URL scheme")
+			if req.URL.Scheme != "https" {
+				return errInsecurePlexDestination
 			}
 			return nil
 		},
 	}
+}
+
+type publicPlexTransport struct {
+	base *http.Transport
+}
+
+func (t *publicPlexTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Scheme != "https" {
+		return nil, errInsecurePlexDestination
+	}
+	return t.base.RoundTrip(req)
+}
+
+func (t *publicPlexTransport) CloseIdleConnections() {
+	t.base.CloseIdleConnections()
 }
 
 func publicPlexDialContext(dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
@@ -410,9 +426,10 @@ func (c *PlexClient) fetchSectionItems(ctx context.Context, baseURL, token, sect
 		if err := c.doJSON(req, &container); err != nil {
 			return nil, fmt.Errorf("fetching Plex section items (section %s, type %d, offset %d): %w", sectionKey, mediaType, offset, err)
 		}
-		allItems = append(allItems, container.MediaContainer.Metadata...)
-		offset += len(container.MediaContainer.Metadata)
-		if offset >= container.MediaContainer.TotalSize || len(container.MediaContainer.Metadata) == 0 {
+		pageItems := container.items()
+		allItems = append(allItems, pageItems...)
+		offset += len(pageItems)
+		if offset >= container.MediaContainer.TotalSize || len(pageItems) == 0 {
 			break
 		}
 	}

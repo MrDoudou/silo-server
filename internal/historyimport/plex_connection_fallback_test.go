@@ -104,7 +104,7 @@ func TestPlexServerProviderPublicConnectionsBlockPrivateDestinations(t *testing.
 	t.Parallel()
 
 	var requests atomic.Int32
-	privateServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	privateServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requests.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"MediaContainer":{}}`))
@@ -122,6 +122,28 @@ func TestPlexServerProviderPublicConnectionsBlockPrivateDestinations(t *testing.
 	}
 }
 
+func TestPlexServerProviderPublicConnectionsRejectCleartextHTTP(t *testing.T) {
+	t.Parallel()
+
+	var requests atomic.Int32
+	cleartextServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"MediaContainer":{}}`))
+	}))
+	defer cleartextServer.Close()
+
+	provider := NewPlexServerProvider(NewPlexClient(), []string{cleartextServer.URL}, "server-token").
+		WithPublicConnectionsOnly()
+	_, _, err := provider.Fetch(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "HTTPS") {
+		t.Fatalf("Fetch error = %v, want cleartext HTTP rejection", err)
+	}
+	if got := requests.Load(); got != 0 {
+		t.Fatalf("cleartext destination received %d requests, want 0", got)
+	}
+}
+
 func TestFetchPlexLibrarySectionsRejectsMissingMediaContainer(t *testing.T) {
 	t.Parallel()
 
@@ -134,6 +156,32 @@ func TestFetchPlexLibrarySectionsRejectsMissingMediaContainer(t *testing.T) {
 	_, err := NewPlexClient().FetchLibrarySections(context.Background(), notPlex.URL, "server-token")
 	if err == nil || !strings.Contains(err.Error(), "MediaContainer") {
 		t.Fatalf("FetchLibrarySections error = %v, want missing MediaContainer rejection", err)
+	}
+}
+
+func TestFetchPlexSectionItemsAcceptsVideoAndPaginates(t *testing.T) {
+	t.Parallel()
+
+	plexServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch got := r.URL.Query().Get("X-Plex-Container-Start"); got {
+		case "0":
+			_, _ = w.Write([]byte(`{"MediaContainer":{"totalSize":2,"Video":[{"ratingKey":"movie-1","type":"movie","title":"First"}]}}`))
+		case "1":
+			_, _ = w.Write([]byte(`{"MediaContainer":{"totalSize":2,"Video":[{"ratingKey":"movie-2","type":"movie","title":"Second"}]}}`))
+		default:
+			t.Errorf("X-Plex-Container-Start = %q, want 0 or 1", got)
+			http.Error(w, "unexpected offset", http.StatusBadRequest)
+		}
+	}))
+	defer plexServer.Close()
+
+	items, err := NewPlexClient().FetchSectionItems(context.Background(), plexServer.URL, "server-token", "1", 1)
+	if err != nil {
+		t.Fatalf("FetchSectionItems: %v", err)
+	}
+	if len(items) != 2 || items[0].RatingKey != "movie-1" || items[1].RatingKey != "movie-2" {
+		t.Fatalf("items = %+v, want both Video pages", items)
 	}
 }
 
