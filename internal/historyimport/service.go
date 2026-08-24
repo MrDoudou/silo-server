@@ -255,7 +255,7 @@ func (s *Service) CreateRun(ctx context.Context, userID int, input CreateRunInpu
 		}
 		sourceType = SourceTypePlex
 		connectionMode = mode
-		provider = NewPlexServerProvider(s.plex, auth.BaseURLs, auth.Token).WithAccountToken(auth.AccountToken)
+		provider = newPlexRunProvider(s.plex, auth, mode)
 
 	default:
 		return nil, fmt.Errorf("unsupported source type")
@@ -287,6 +287,16 @@ func (s *Service) CreateRun(ctx context.Context, userID int, input CreateRunInpu
 
 	go s.executeRun(created, provider)
 	return created, nil
+}
+
+func newPlexRunProvider(client *PlexClient, auth *plexAuth, connectionMode string) *PlexServerProvider {
+	provider := NewPlexServerProvider(client, auth.BaseURLs, auth.Token).WithAccountToken(auth.AccountToken)
+	if connectionMode == ConnectionModePlexOAuth {
+		// Profile OAuth candidates are user-selected. Only addresses from an
+		// administrator-configured predefined source may reach private networks.
+		provider.WithPublicConnectionsOnly()
+	}
+	return provider
 }
 
 func (s *Service) resolveAuth(ctx context.Context, userID int, connectionMode string, input CreateRunInput) (*embyLocalAuth, error) {

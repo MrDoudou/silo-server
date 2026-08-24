@@ -30,6 +30,14 @@ func (p *PlexServerProvider) WithAccountToken(token string) *PlexServerProvider 
 	return p
 }
 
+// WithPublicConnectionsOnly prevents profile OAuth imports from reaching LAN,
+// loopback, link-local, and other special-use destinations. Admin-configured
+// saved sources intentionally keep the unrestricted client.
+func (p *PlexServerProvider) WithPublicConnectionsOnly() *PlexServerProvider {
+	p.client = p.client.publicDestinationsOnly()
+	return p
+}
+
 func (p *PlexServerProvider) Fetch(ctx context.Context) ([]Record, []string, error) {
 	sections, err := p.fetchLibrarySections(ctx)
 	if err != nil {

@@ -3,9 +3,12 @@ package historyimport
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -27,6 +30,40 @@ const (
 	plexWatchlistPageSize = 100
 )
 
+var (
+	errPrivatePlexDestination = errors.New("plex destination resolves to a private or special-use network")
+	plexDeniedNetworks        = []netip.Prefix{
+		netip.MustParsePrefix("0.0.0.0/8"),
+		netip.MustParsePrefix("10.0.0.0/8"),
+		netip.MustParsePrefix("100.64.0.0/10"),
+		netip.MustParsePrefix("127.0.0.0/8"),
+		netip.MustParsePrefix("169.254.0.0/16"),
+		netip.MustParsePrefix("172.16.0.0/12"),
+		netip.MustParsePrefix("192.0.0.0/24"),
+		netip.MustParsePrefix("192.0.2.0/24"),
+		netip.MustParsePrefix("192.88.99.0/24"),
+		netip.MustParsePrefix("192.168.0.0/16"),
+		netip.MustParsePrefix("198.18.0.0/15"),
+		netip.MustParsePrefix("198.51.100.0/24"),
+		netip.MustParsePrefix("203.0.113.0/24"),
+		netip.MustParsePrefix("224.0.0.0/4"),
+		netip.MustParsePrefix("240.0.0.0/4"),
+		netip.MustParsePrefix("::/128"),
+		netip.MustParsePrefix("::1/128"),
+		netip.MustParsePrefix("::/96"),
+		netip.MustParsePrefix("64:ff9b::/96"),
+		netip.MustParsePrefix("100::/64"),
+		netip.MustParsePrefix("2001::/32"),
+		netip.MustParsePrefix("2001:2::/48"),
+		netip.MustParsePrefix("2001:10::/28"),
+		netip.MustParsePrefix("2001:20::/28"),
+		netip.MustParsePrefix("2001:db8::/32"),
+		netip.MustParsePrefix("2002::/16"),
+		netip.MustParsePrefix("fc00::/7"),
+		netip.MustParsePrefix("fe80::/10"),
+	}
+)
+
 type PlexClient struct {
 	httpClient *http.Client
 	limiter    *upstreamRateLimiter
@@ -44,6 +81,91 @@ func NewPlexClient() *PlexClient {
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		limiter:    sharedHistoryImportUpstreamLimiter,
 	}
+}
+
+func (c *PlexClient) publicDestinationsOnly() *PlexClient {
+	clone := *c
+	timeout := 30 * time.Second
+	if c.httpClient != nil && c.httpClient.Timeout > 0 {
+		timeout = c.httpClient.Timeout
+	}
+	clone.httpClient = newPublicPlexHTTPClient(timeout)
+	return &clone
+}
+
+func newPublicPlexHTTPClient(timeout time.Duration) *http.Client {
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	transport := &http.Transport{
+		Proxy:               nil,
+		DialContext:         publicPlexDialContext(dialer),
+		ForceAttemptHTTP2:   true,
+		MaxIdleConns:        16,
+		IdleConnTimeout:     60 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return errors.New("too many Plex redirects")
+			}
+			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+				return errors.New("plex redirect uses an unsupported URL scheme")
+			}
+			return nil
+		},
+	}
+}
+
+func publicPlexDialContext(dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+
+		var addresses []netip.Addr
+		if literal, parseErr := netip.ParseAddr(host); parseErr == nil {
+			addresses = []netip.Addr{literal}
+		} else {
+			addresses, err = net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		var dialErrors []error
+		for _, candidate := range addresses {
+			if !publicPlexAddress(candidate) {
+				continue
+			}
+			conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(candidate.String(), port))
+			if dialErr == nil {
+				return conn, nil
+			}
+			dialErrors = append(dialErrors, dialErr)
+		}
+		if len(dialErrors) > 0 {
+			return nil, errors.Join(dialErrors...)
+		}
+		return nil, errPrivatePlexDestination
+	}
+}
+
+func publicPlexAddress(address netip.Addr) bool {
+	if address.Is4In6() {
+		address = address.Unmap()
+	}
+	if !address.IsGlobalUnicast() {
+		return false
+	}
+	for _, denied := range plexDeniedNetworks {
+		if denied.Contains(address) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *PlexClient) CreatePin(ctx context.Context) (pinID int, pinCode string, err error) {
