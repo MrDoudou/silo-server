@@ -371,9 +371,9 @@ func (s *Service) resolvePlexAuth(ctx context.Context, userID int, input CreateR
 		if server == nil {
 			return nil, "", fmt.Errorf("selected Plex server not found in session")
 		}
-		alternatives := append([]string(nil), server.ConnectionURLs...)
-		alternatives = append(alternatives, server.LocalURL)
-		baseURLs := plexBaseURLCandidates(server.RemoteURL, alternatives)
+		// ConnectionURLs already carries every advertised connection, local
+		// ones included, so only the preferred remote address is promoted.
+		baseURLs := plexBaseURLCandidates(server.RemoteURL, server.ConnectionURLs)
 		if len(baseURLs) == 0 {
 			return nil, "", fmt.Errorf("selected Plex server has no usable address")
 		}
@@ -412,20 +412,26 @@ func (s *Service) resolvePlexAuth(ctx context.Context, userID int, input CreateR
 		if input.PlexToken == "" {
 			return nil, "", fmt.Errorf("plex_token is required for predefined Plex sources")
 		}
-		return &plexAuth{BaseURLs: []string{source.BaseURL}, Token: input.PlexToken, AccountToken: firstNonEmpty(input.PlexAccountToken, input.PlexToken)}, ConnectionModePredefined, nil
+		return &plexAuth{BaseURLs: plexBaseURLCandidates(source.BaseURL, nil), Token: input.PlexToken, AccountToken: firstNonEmpty(input.PlexAccountToken, input.PlexToken)}, ConnectionModePredefined, nil
 	}
 
 	return nil, "", fmt.Errorf("plex_session_id, plex_base_url, or source_id is required for Plex imports")
 }
 
-const maxPlexConnectionCandidates = 8
+// MaxPlexConnectionCandidates bounds how many advertised Plex connections one
+// run races. It is exported so the history-import capability endpoint can
+// report the real limit instead of restating it.
+const MaxPlexConnectionCandidates = 8
 
+// plexBaseURLCandidates is the single normalization point for Plex base URLs:
+// it trims, drops empties, dedupes, and caps the list. Everything downstream
+// (plexAuth.BaseURLs, PlexServerProvider) expects an already-normalized slice.
 func plexBaseURLCandidates(primary string, alternatives []string) []string {
-	result := make([]string, 0, min(1+len(alternatives), maxPlexConnectionCandidates))
+	result := make([]string, 0, min(1+len(alternatives), MaxPlexConnectionCandidates))
 	seen := make(map[string]struct{}, cap(result))
 	appendCandidate := func(candidate string) {
 		candidate = strings.TrimRight(strings.TrimSpace(candidate), "/")
-		if candidate == "" || len(result) >= maxPlexConnectionCandidates {
+		if candidate == "" || len(result) >= MaxPlexConnectionCandidates {
 			return
 		}
 		if _, exists := seen[candidate]; exists {

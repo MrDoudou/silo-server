@@ -33,6 +33,7 @@ const (
 var (
 	errPrivatePlexDestination  = errors.New("plex destination resolves to a private or special-use network")
 	errInsecurePlexDestination = errors.New("profile Plex imports require HTTPS destinations")
+	errPlexDialTimeout         = errors.New("plex dial budget exhausted before any address was reachable")
 	plexDeniedNetworks         = []netip.Prefix{
 		netip.MustParsePrefix("0.0.0.0/8"),
 		netip.MustParsePrefix("10.0.0.0/8"),
@@ -106,18 +107,74 @@ func newPublicPlexHTTPClient(timeout time.Duration) *http.Client {
 		TLSHandshakeTimeout: 10 * time.Second,
 	}
 	return &http.Client{
-		Timeout:   timeout,
-		Transport: &publicPlexTransport{base: transport},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return errors.New("too many Plex redirects")
-			}
-			if req.URL.Scheme != "https" {
-				return errInsecurePlexDestination
-			}
-			return nil
-		},
+		Timeout:       timeout,
+		Transport:     &publicPlexTransport{base: transport},
+		CheckRedirect: checkPublicPlexRedirect,
 	}
+}
+
+// checkPublicPlexRedirect bounds the redirect chain, keeps it on HTTPS, and
+// drops the Plex credential when the chain leaves the host it was minted for.
+//
+// net/http strips Authorization, Cookie, and WWW-Authenticate across a
+// cross-host redirect but knows nothing about X-Plex-Token, so a redirect from
+// a user-supplied Plex address to an attacker's host would otherwise hand that
+// host the user's token. Same-host redirects (including a port change) keep it.
+func checkPublicPlexRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("too many Plex redirects")
+	}
+	if req.URL.Scheme != "https" {
+		return errInsecurePlexDestination
+	}
+	if len(via) > 0 {
+		previous := via[len(via)-1].URL
+		if !strings.EqualFold(previous.Hostname(), req.URL.Hostname()) {
+			req.Header.Del("X-Plex-Token")
+		}
+	}
+	return nil
+}
+
+// plexDialTimeoutFloor keeps a long address list from partitioning the dial
+// budget into attempts too short to ever succeed. It matches the "sane minimum"
+// net/http applies in partialDeadline.
+const plexDialTimeoutFloor = 2 * time.Second
+
+// plexDialBudget is the deadline the whole address list shares: the caller's
+// context deadline or the dialer's own timeout, whichever lands first. A zero
+// return means neither imposes one.
+func plexDialBudget(ctx context.Context, dialer *net.Dialer, now time.Time) time.Time {
+	var deadline time.Time
+	if dialer != nil && dialer.Timeout > 0 {
+		deadline = now.Add(dialer.Timeout)
+	}
+	if ctxDeadline, ok := ctx.Deadline(); ok && (deadline.IsZero() || ctxDeadline.Before(deadline)) {
+		deadline = ctxDeadline
+	}
+	return deadline
+}
+
+// plexPartialDeadline splits the remaining budget across the addresses still
+// untried, mirroring net/http's partialDeadline: without it a couple of
+// black-holed A/AAAA records each consume the full dial timeout and exhaust the
+// enclosing HTTP budget before a reachable address is ever tried.
+func plexPartialDeadline(now, deadline time.Time, addressesRemaining int) (time.Time, error) {
+	if deadline.IsZero() {
+		return time.Time{}, nil
+	}
+	remaining := deadline.Sub(now)
+	if remaining <= 0 {
+		return time.Time{}, errPlexDialTimeout
+	}
+	if addressesRemaining < 1 {
+		addressesRemaining = 1
+	}
+	timeout := remaining / time.Duration(addressesRemaining)
+	if timeout < plexDialTimeoutFloor {
+		timeout = min(remaining, plexDialTimeoutFloor)
+	}
+	return now.Add(timeout), nil
 }
 
 type publicPlexTransport struct {
@@ -152,21 +209,39 @@ func publicPlexDialContext(dialer *net.Dialer) func(context.Context, string, str
 			}
 		}
 
-		var dialErrors []error
+		candidates := make([]netip.Addr, 0, len(addresses))
 		for _, candidate := range addresses {
-			if !publicPlexAddress(candidate) {
-				continue
+			if publicPlexAddress(candidate) {
+				candidates = append(candidates, candidate)
 			}
-			conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(candidate.String(), port))
+		}
+		if len(candidates) == 0 {
+			return nil, errPrivatePlexDestination
+		}
+
+		budget := plexDialBudget(ctx, dialer, time.Now())
+		var dialErrors []error
+		for i, candidate := range candidates {
+			attemptDeadline, err := plexPartialDeadline(time.Now(), budget, len(candidates)-i)
+			if err != nil {
+				dialErrors = append(dialErrors, err)
+				break
+			}
+			attemptCtx, cancel := ctx, context.CancelFunc(func() {})
+			if !attemptDeadline.IsZero() {
+				attemptCtx, cancel = context.WithDeadline(ctx, attemptDeadline)
+			}
+			conn, dialErr := dialer.DialContext(attemptCtx, network, net.JoinHostPort(candidate.String(), port))
+			cancel()
 			if dialErr == nil {
 				return conn, nil
 			}
 			dialErrors = append(dialErrors, dialErr)
+			if ctx.Err() != nil {
+				break
+			}
 		}
-		if len(dialErrors) > 0 {
-			return nil, errors.Join(dialErrors...)
-		}
-		return nil, errPrivatePlexDestination
+		return nil, errors.Join(dialErrors...)
 	}
 }
 

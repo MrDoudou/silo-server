@@ -192,12 +192,13 @@ export function getPreferredPlexServerURL(server: BrowserPlexServer): string {
   return server.remoteURL || server.localURL;
 }
 
+/**
+ * Every advertised address for a server, preferred one first, for the run's
+ * `plex_base_urls`. `connectionURLs` already holds every connection Plex
+ * advertised — remoteURL and localURL are picked out of that same list — so
+ * only the preference needs promoting; the rest is dedup.
+ */
 export function getPlexServerURLs(server: BrowserPlexServer): string[] {
-  const candidates = [
-    getPreferredPlexServerURL(server),
-    ...server.connectionURLs,
-    server.remoteURL,
-    server.localURL,
-  ];
+  const candidates = [getPreferredPlexServerURL(server), ...server.connectionURLs];
   return [...new Set(candidates.map((candidate) => candidate.trim()).filter(Boolean))];
 }

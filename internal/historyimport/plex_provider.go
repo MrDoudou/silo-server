@@ -15,10 +15,15 @@ type PlexServerProvider struct {
 	accountToken string
 }
 
+// NewPlexServerProvider takes the advertised connections in preference order,
+// already trimmed, deduped, and capped by plexBaseURLCandidates — resolvePlexAuth
+// owns that normalization because it also decides, from the resulting list,
+// whether the request names a usable server at all. The slice is copied so a
+// caller's later mutation cannot reorder a run's fallbacks mid-flight.
 func NewPlexServerProvider(client *PlexClient, baseURLs []string, token string) *PlexServerProvider {
 	return &PlexServerProvider{
 		client:   client,
-		baseURLs: plexBaseURLCandidates("", baseURLs),
+		baseURLs: append([]string(nil), baseURLs...),
 		token:    token,
 	}
 }
