@@ -602,7 +602,8 @@ func audioAvailableQualitiesV3(source SourceDescriptorV3) []AvailableQualityV3 {
 const (
 	// decisionReasonBandwidthCapV3 marks a plan whose recipe was constrained by
 	// the request's bandwidth cap rather than by decode capability.
-	decisionReasonBandwidthCapV3 = "quality_bandwidth_cap"
+	decisionReasonBandwidthCapV3   = "quality_bandwidth_cap"
+	decisionReasonBandwidthLimitV3 = "quality_bandwidth_limit"
 
 	// decisionReasonClientManagedDynamicRangeV3 marks an original-file plan
 	// whose executor owns source-to-output dynamic-range presentation.
@@ -964,14 +965,16 @@ type QualityResultV3 struct {
 
 // ResolveQualityPolicyV3 selects the delivery quality for a plan.
 //
-// bandwidth_cap_kbps is a hard delivery ceiling and is honored in every
-// quality mode: source-preserving delivery is degraded when the source bitrate
-// exceeds the cap, fixed rungs are lowered when their ladder bitrate exceeds
-// it, and "auto" folds the cap into bandwidth-based rung selection. A metered
-// connection with neither a cap nor a bandwidth estimate limits auto
-// selection to the conservative 720p rung — the rung auto would pick for a
-// mid-range bandwidth estimate — instead of assuming the link can sustain the
-// original stream.
+// bandwidth_cap_kbps bounds the video encode and is honored in every quality
+// mode: source-preserving delivery is degraded when the source bitrate exceeds
+// the cap, fixed rungs are lowered when their ladder bitrate exceeds it, and
+// "auto" applies the cap and bandwidth estimate as independent ceilings, taking
+// the lower resulting rung after evaluating each against its own ladder. A
+// transcoded stream also carries AAC audio on top of that video bitrate: 192
+// kbps for stereo or 384 kbps for a preserved 5.1 layout. A metered connection
+// with neither a cap nor a bandwidth estimate limits auto selection to the
+// conservative 720p rung — the rung auto would pick for a mid-range bandwidth
+// estimate — instead of assuming the link can sustain the original stream.
 func ResolveQualityPolicyV3(request StartRequestV3, source SourceDescriptorV3) QualityResultV3 {
 	quality, changed := NormalizeQualityV3(request.QualityPreference)
 	var warnings []DegradationWarningV3
@@ -995,8 +998,8 @@ func ResolveQualityPolicyV3(request StartRequestV3, source SourceDescriptorV3) Q
 	switch {
 	case quality == QualityOriginalV3:
 		// Only reached when the source bitrate exceeds the cap: the cap is a
-		// hard ceiling and outranks the original preference.
-		targetHeight = ladderHeightForBandwidthV3(int(float64(capKbps) * 0.8))
+		// hard video encode ceiling and outranks the original preference.
+		targetHeight = ladderHeightForCapV3(capKbps)
 		capApplied = true
 	case quality != "auto":
 		targetHeight, _ = strconv.Atoi(strings.TrimSuffix(quality, "p"))
@@ -1008,14 +1011,21 @@ func ResolveQualityPolicyV3(request StartRequestV3, source SourceDescriptorV3) Q
 			targetHeight = maxHeight
 			reason = "quality_device_limit"
 		}
-		bandwidth := optionalValueV3(request.BandwidthEstimateKbps)
-		if capKbps > 0 && (bandwidth == 0 || capKbps < bandwidth) {
-			bandwidth = capKbps
+		estimate := optionalValueV3(request.BandwidthEstimateKbps)
+		if capKbps > 0 {
+			if capped := minPositiveV3(targetHeight, ladderHeightForCapV3(capKbps)); capped != targetHeight {
+				targetHeight = capped
+				reason = decisionReasonBandwidthLimitV3
+				capApplied = true
+			}
 		}
-		if bandwidth > 0 {
-			targetHeight = minPositiveV3(targetHeight, ladderHeightForBandwidthV3(int(float64(bandwidth)*0.8)))
-			reason = "quality_bandwidth_limit"
-		} else if request.Metered {
+		if estimate > 0 {
+			if estimated := minPositiveV3(targetHeight, ladderHeightForBandwidthV3(int(float64(estimate)*0.8))); estimated != targetHeight {
+				targetHeight = estimated
+				reason = decisionReasonBandwidthLimitV3
+			}
+		}
+		if capKbps == 0 && estimate == 0 && request.Metered {
 			if capped := minPositiveV3(targetHeight, 720); capped != targetHeight {
 				targetHeight = capped
 				reason = "quality_metered_limit"
@@ -1036,7 +1046,7 @@ func ResolveQualityPolicyV3(request StartRequestV3, source SourceDescriptorV3) Q
 		wouldPreserve := source.Height > 0 && targetHeight >= source.Height
 		if (wouldPreserve && capExceededBySource) || (!wouldPreserve && ladderBitrateKbpsV3(targetHeight) > capKbps) {
 			capApplied = true
-			if capHeight := ladderHeightForBandwidthV3(int(float64(capKbps) * 0.8)); capHeight < targetHeight {
+			if capHeight := ladderHeightForCapV3(capKbps); capHeight < targetHeight {
 				targetHeight = capHeight
 			}
 		}
@@ -1066,8 +1076,9 @@ func ResolveQualityPolicyV3(request StartRequestV3, source SourceDescriptorV3) Q
 	width, bitrate := qualityDimensionsV3(effectiveHeight, source.Width, source.Height)
 	if capKbps > 0 && bitrate > capKbps {
 		// The ladder has no rung below 480p, so a cap under the lowest rung's
-		// bitrate is honored by lowering the encode target directly: the cap
-		// is a hard delivery ceiling, never advisory.
+		// bitrate is honored by lowering the video encode target directly.
+		// Transcoded AAC audio (192 kbps stereo or 384 kbps for a preserved
+		// 5.1 layout) is carried on top of this video bitrate.
 		bitrate = capKbps
 	}
 	result := QualityResultV3{Label: label, Width: width, Height: effectiveHeight, BitrateKbps: bitrate, PreservesSource: !capApplied && source.Height > 0 && effectiveHeight >= source.Height, ExplicitRung: explicitRung, Reason: reason, Warnings: warnings}
@@ -1372,6 +1383,28 @@ func ladderHeightForBandwidthV3(kbps int) int {
 		return 480
 	}
 }
+
+// ladderHeightForCapV3 picks the highest rung whose encode bitrate fits inside a
+// hard delivery cap. ladderHeightForBandwidthV3 reads a measured link estimate and
+// keeps headroom for protocol overhead and jitter; a cap is an explicit ceiling on
+// the encode itself, so a rung is admissible when its ladder bitrate is at or below
+// the cap — no headroom subtraction, and no separate threshold table to drift from
+// ladderBitrateKbpsV3. A rung priced exactly at the cap is admitted, so the video
+// encode may consume the entire cap.
+//
+// 480p is a resolution floor, not an affordability result: the ladder has no rung
+// below it, so a cap under 1500 still returns 480p and the caller is responsible for
+// clamping the encode bitrate down to the cap (see the trailing clamp at the end of
+// ResolveQualityPolicyV3).
+func ladderHeightForCapV3(kbps int) int {
+	for _, height := range []int{2160, 1080, 720} {
+		if ladderBitrateKbpsV3(height) <= kbps {
+			return height
+		}
+	}
+	return 480
+}
+
 func minPositiveV3(a, b int) int {
 	if a <= 0 {
 		return b

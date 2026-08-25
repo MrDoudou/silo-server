@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1950,6 +1951,216 @@ func TestResolveQualityPolicyV3HonorsBandwidthCapInAllModes(t *testing.T) {
 	}
 }
 
+func TestResolveQualityPolicyV3MapsBandwidthCapToAffordableRung(t *testing.T) {
+	source := SourceDescriptorV3{Width: 1920, Height: 1080, BitrateKbps: 13_302}
+	tests := []struct {
+		name            string
+		cap             int
+		wantHeight      int
+		wantBitrate     int
+		wantPreserves   bool
+		wantTranscode   bool
+		wantCapWarning  bool
+		wantAutoWarning bool
+	}{
+		{name: "exact 1080p price", cap: 6_000, wantHeight: 1080, wantBitrate: 6_000, wantTranscode: true, wantCapWarning: true, wantAutoWarning: true},
+		{name: "below 1080p price", cap: 5_999, wantHeight: 720, wantBitrate: 2_000, wantTranscode: true, wantCapWarning: true, wantAutoWarning: true},
+		{name: "cap without link headroom", cap: 8_000, wantHeight: 1080, wantBitrate: 6_000, wantTranscode: true, wantCapWarning: true, wantAutoWarning: true},
+		{name: "old 1080p boundary", cap: 10_000, wantHeight: 1080, wantBitrate: 6_000, wantTranscode: true, wantCapWarning: true, wantAutoWarning: true},
+		{name: "exact 720p price", cap: 2_000, wantHeight: 720, wantBitrate: 2_000, wantTranscode: true, wantCapWarning: true, wantAutoWarning: true},
+		{name: "below 720p price", cap: 1_999, wantHeight: 480, wantBitrate: 1_500, wantTranscode: true, wantCapWarning: true, wantAutoWarning: true},
+		{name: "below ladder floor", cap: 1_000, wantHeight: 480, wantBitrate: 1_000, wantTranscode: true, wantCapWarning: true, wantAutoWarning: true},
+		{name: "inert above source", cap: 20_000, wantHeight: 1080, wantBitrate: 13_302, wantPreserves: true},
+	}
+
+	for _, quality := range []string{"1080p", "auto", "original"} {
+		for _, tt := range tests {
+			t.Run(quality+"/"+tt.name, func(t *testing.T) {
+				req := validStartRequestV3()
+				req.QualityPreference = quality
+				req.BandwidthCapKbps = &tt.cap
+
+				result := ResolveQualityPolicyV3(req, source)
+				if result.Height != tt.wantHeight || result.BitrateKbps != tt.wantBitrate || result.PreservesSource != tt.wantPreserves || result.RequiresTranscode != tt.wantTranscode {
+					t.Fatalf("result = %#v", result)
+				}
+				wantCapWarning := tt.wantCapWarning
+				if quality == "auto" {
+					wantCapWarning = tt.wantAutoWarning
+				}
+				if got := hasDegradationWarningV3(result.Warnings, "bandwidth_cap_applied"); got != wantCapWarning {
+					t.Fatalf("cap warning = %t, want %t; warnings = %#v", got, wantCapWarning, result.Warnings)
+				}
+			})
+		}
+	}
+}
+
+func TestResolveQualityPolicyV3BandwidthCapBoundsVideoEncode(t *testing.T) {
+	cap := 6_000
+	req := validStartRequestV3()
+	req.QualityPreference = "auto"
+	req.BandwidthCapKbps = &cap
+	source := SourceDescriptorV3{Width: 3840, Height: 2160, BitrateKbps: 40_000}
+
+	result := ResolveQualityPolicyV3(req, source)
+	if result.Height != 1080 || result.BitrateKbps != cap {
+		t.Fatalf("result = %#v, want 1080p with %d kbps video", result, cap)
+	}
+}
+
+func TestResolveQualityPolicyV3KeepsBindingDeviceLimitReasonWithSlackCap(t *testing.T) {
+	cap := 50_000
+	req := validStartRequestV3()
+	req.QualityPreference = "auto"
+	req.BandwidthCapKbps = &cap
+	req.Capabilities.MaxResolution = "720p"
+	source := SourceDescriptorV3{Width: 3840, Height: 2160, BitrateKbps: 40_000}
+
+	result := ResolveQualityPolicyV3(req, source)
+	if result.Height != 720 || result.Reason != "quality_device_limit" || hasDegradationWarningV3(result.Warnings, "bandwidth_cap_applied") {
+		t.Fatalf("result = %#v, want binding device-limit reason", result)
+	}
+}
+
+func TestResolveQualityPolicyV3AppliesCapAndEstimateAsIndependentCeilings(t *testing.T) {
+	source := SourceDescriptorV3{Width: 1920, Height: 1080, BitrateKbps: 13_302}
+	tests := []struct {
+		name        string
+		cap         int
+		estimate    int
+		wantHeight  int
+		wantBitrate int
+		wantReason  string
+		wantWarning bool
+	}{
+		{name: "estimate binds despite smaller cap value", cap: 7_500, estimate: 9_200, wantHeight: 720, wantBitrate: 2_000, wantReason: decisionReasonBandwidthLimitV3},
+		{name: "cap binds", cap: 6_000, estimate: 50_000, wantHeight: 1080, wantBitrate: 6_000, wantReason: decisionReasonBandwidthCapV3, wantWarning: true},
+		{name: "estimate binds", cap: 50_000, estimate: 9_200, wantHeight: 720, wantBitrate: 2_000, wantReason: decisionReasonBandwidthLimitV3},
+		{name: "equal inputs preserve estimate ceiling", cap: 9_200, estimate: 9_200, wantHeight: 720, wantBitrate: 2_000, wantReason: decisionReasonBandwidthLimitV3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := validStartRequestV3()
+			req.QualityPreference = "auto"
+			req.BandwidthCapKbps = &tt.cap
+			req.BandwidthEstimateKbps = &tt.estimate
+
+			result := ResolveQualityPolicyV3(req, source)
+			if result.Height != tt.wantHeight || result.BitrateKbps != tt.wantBitrate || !result.RequiresTranscode || result.PreservesSource || result.Reason != tt.wantReason {
+				t.Fatalf("result = %#v", result)
+			}
+			if got := hasDegradationWarningV3(result.Warnings, "bandwidth_cap_applied"); got != tt.wantWarning {
+				t.Fatalf("cap warning = %t, want %t; warnings = %#v", got, tt.wantWarning, result.Warnings)
+			}
+		})
+	}
+}
+
+func TestResolveQualityPolicyV3PreservesEstimateOnlyMapping(t *testing.T) {
+	source := SourceDescriptorV3{Width: 1920, Height: 1080, BitrateKbps: 13_302}
+	tests := []struct {
+		estimate      int
+		wantHeight    int
+		wantPreserves bool
+		wantTranscode bool
+		wantReason    string
+	}{
+		{estimate: 9_200, wantHeight: 720, wantTranscode: true, wantReason: decisionReasonBandwidthLimitV3},
+		{estimate: 10_000, wantHeight: 1080, wantPreserves: true, wantReason: "quality_auto_source"},
+	}
+
+	for _, tt := range tests {
+		t.Run(strconv.Itoa(tt.estimate), func(t *testing.T) {
+			req := validStartRequestV3()
+			req.QualityPreference = "auto"
+			req.BandwidthEstimateKbps = &tt.estimate
+
+			result := ResolveQualityPolicyV3(req, source)
+			if result.Height != tt.wantHeight || result.PreservesSource != tt.wantPreserves || result.RequiresTranscode != tt.wantTranscode || result.Reason != tt.wantReason {
+				t.Fatalf("result = %#v", result)
+			}
+		})
+	}
+}
+
+func TestResolveQualityPolicyV3MeteredYieldsToCapOrEstimate(t *testing.T) {
+	source := SourceDescriptorV3{Width: 1920, Height: 1080, BitrateKbps: 13_302}
+
+	t.Run("no bandwidth evidence", func(t *testing.T) {
+		req := validStartRequestV3()
+		req.QualityPreference = "auto"
+		req.Metered = true
+		result := ResolveQualityPolicyV3(req, source)
+		if result.Height != 720 || result.Reason != "quality_metered_limit" {
+			t.Fatalf("result = %#v", result)
+		}
+	})
+
+	t.Run("cap present", func(t *testing.T) {
+		cap := 6_000
+		req := validStartRequestV3()
+		req.QualityPreference = "auto"
+		req.Metered = true
+		req.BandwidthCapKbps = &cap
+		result := ResolveQualityPolicyV3(req, source)
+		if result.Height != 1080 || result.Reason != decisionReasonBandwidthCapV3 {
+			t.Fatalf("result = %#v", result)
+		}
+	})
+
+	t.Run("estimate present", func(t *testing.T) {
+		estimate := 50_000
+		req := validStartRequestV3()
+		req.QualityPreference = "auto"
+		req.Metered = true
+		req.BandwidthEstimateKbps = &estimate
+		result := ResolveQualityPolicyV3(req, source)
+		if result.Height != 1080 || !result.PreservesSource || result.Reason != "quality_auto_source" {
+			t.Fatalf("result = %#v", result)
+		}
+	})
+}
+
+func TestResolveQualityPolicyV3CapSupportsTopRung(t *testing.T) {
+	cap := 20_000
+	req := validStartRequestV3()
+	req.QualityPreference = "auto"
+	req.BandwidthCapKbps = &cap
+	source := SourceDescriptorV3{Width: 3840, Height: 2160, BitrateKbps: 40_000}
+
+	result := ResolveQualityPolicyV3(req, source)
+	if result.Height != 2160 || result.BitrateKbps != cap || !result.RequiresTranscode || result.PreservesSource || !hasDegradationWarningV3(result.Warnings, "bandwidth_cap_applied") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestLadderHeightForCapV3Boundaries(t *testing.T) {
+	tests := []struct {
+		cap        int
+		wantHeight int
+	}{
+		{cap: 0, wantHeight: 480},
+		{cap: 1_499, wantHeight: 480},
+		{cap: 1_500, wantHeight: 480},
+		{cap: 1_999, wantHeight: 480},
+		{cap: 2_000, wantHeight: 720},
+		{cap: 5_999, wantHeight: 720},
+		{cap: 6_000, wantHeight: 1080},
+		{cap: 19_999, wantHeight: 1080},
+		{cap: 20_000, wantHeight: 2160},
+	}
+
+	for _, tt := range tests {
+		t.Run(strconv.Itoa(tt.cap), func(t *testing.T) {
+			if got := ladderHeightForCapV3(tt.cap); got != tt.wantHeight {
+				t.Fatalf("ladderHeightForCapV3(%d) = %d, want %d", tt.cap, got, tt.wantHeight)
+			}
+		})
+	}
+}
+
 func TestResolveQualityPolicyV3MeteredWithoutEvidencePrefersConservativeRung(t *testing.T) {
 	source := SourceDescriptorV3{Width: 3840, Height: 2160, BitrateKbps: 20_000}
 	req := validStartRequestV3()
@@ -1963,7 +2174,7 @@ func TestResolveQualityPolicyV3MeteredWithoutEvidencePrefersConservativeRung(t *
 	estimate := 30_000
 	req.BandwidthEstimateKbps = &estimate
 	result = ResolveQualityPolicyV3(req, source)
-	if !result.PreservesSource || result.Reason != "quality_bandwidth_limit" {
+	if !result.PreservesSource || result.Reason != "quality_auto_source" {
 		t.Fatalf("metered with estimate = %#v", result)
 	}
 

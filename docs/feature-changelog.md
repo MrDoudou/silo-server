@@ -1,5 +1,11 @@
 # Feature Changelog
 
+## 2026-08-25
+
+### Choose the highest video rung within a bandwidth cap
+
+A bandwidth cap now selects the highest ladder rung whose video bitrate fits within it, so a 6 Mbps ceiling delivers 1080p instead of 720p. The cap bounds the video encode; transcoded AAC audio is carried in addition to that bitrate.
+
 ## 2026-08-24
 
 ### Play HDR video on SDR-only devices
