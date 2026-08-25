@@ -14,6 +14,7 @@ import { reportRouteEventV3 } from "../route-events-v3";
 import { buildPlayerStreamUrl } from "../stream-url";
 import { randomUUID } from "@/lib/uuid";
 import {
+  FEATURE_CAPABILITY_WARMING_V3,
   FEATURE_OUTPUT_CHANGE_V3,
   MAX_ATTEMPT_COUNT_V3,
   MAX_ATTEMPTED_PLAN_KEYS_V3,
@@ -54,6 +55,7 @@ function capabilityWarmingRetryDelayV3(
   if (
     !terminal?.retryable ||
     terminal.reason !== CAPABILITY_WARMING_REASON_V3 ||
+    !decision.server_features.includes(FEATURE_CAPABILITY_WARMING_V3) ||
     elapsedMs >= CAPABILITY_WARMING_RETRY_BUDGET_MS
   ) {
     return null;
@@ -397,7 +399,10 @@ export function usePlaybackSession(
   const adoptionWaitersRef = useRef<Array<{ loadSequence: number; resolve: () => void }>>([]);
   const warmingRetryEpochRef = useRef(0);
   const warmingRetryWaitersRef = useRef(new Set<() => void>());
+  const activeStartAbortRef = useRef<AbortController | null>(null);
+  const activeStartWarmingRef = useRef(false);
   const activeReplanAbortRef = useRef<AbortController | null>(null);
+  const activeReplanWarmingRef = useRef(false);
   const pendingReplanRef = useRef<{
     options: ReplanOptions;
     loadSequence: number;
@@ -577,6 +582,7 @@ export function usePlaybackSession(
       position: number,
       forceStartPosition: boolean,
       playbackAttemptId: string,
+      signal?: AbortSignal,
     ): Promise<DecisionResponseV3> => {
       const body = buildStartRequestV3({
         extraClientFeatures: VIDEO_CLIENT_FEATURES_V3,
@@ -598,6 +604,7 @@ export function usePlaybackSession(
       return playerFetch<DecisionResponseV3>(config, "/playback/start", {
         method: "POST",
         body: JSON.stringify(body),
+        signal,
       });
     },
     [
@@ -689,6 +696,9 @@ export function usePlaybackSession(
       const previousSessionId = sessionIdRef.current;
       const hasExistingSession = !!previousState.sessionId && !!previousState.streamUrl;
       const loadSequence = ++loadSequenceRef.current;
+      activeStartAbortRef.current?.abort();
+      const startAbort = new AbortController();
+      activeStartAbortRef.current = startAbort;
       const warmingRetryEpoch = warmingRetryEpochRef.current;
       const previousAttempt = {
         playbackAttemptId: playbackAttemptIdRef.current,
@@ -774,6 +784,7 @@ export function usePlaybackSession(
             retryPosition,
             forceStartPosition,
             playbackAttemptId,
+            startAbort.signal,
           );
 
           if (loadSequence !== loadSequenceRef.current) {
@@ -791,7 +802,11 @@ export function usePlaybackSession(
             retryIndex,
             Date.now() - warmingRetryStartedAt,
           );
-          if (retryDelay == null) break;
+          if (retryDelay == null) {
+            activeStartWarmingRef.current = false;
+            break;
+          }
+          activeStartWarmingRef.current = true;
           setState((current) => ({
             ...current,
             loading: !hasExistingSession,
@@ -858,6 +873,10 @@ export function usePlaybackSession(
         if (loadSequence !== loadSequenceRef.current) {
           return;
         }
+        if (startAbort.signal.aborted) {
+          restoreInterruptedReplacement();
+          return;
+        }
 
         if (hasExistingSession && allowPreserveExistingSessionOnError) {
           console.error(replacementErrorMessage, err);
@@ -874,6 +893,10 @@ export function usePlaybackSession(
         const nextError = describePlaybackSessionError(err, initialErrorMessage);
         retirePreviousSession(nextError);
       } finally {
+        if (activeStartAbortRef.current === startAbort) {
+          activeStartAbortRef.current = null;
+          activeStartWarmingRef.current = false;
+        }
         endAdoption(loadSequence);
       }
     },
@@ -1018,6 +1041,10 @@ export function usePlaybackSession(
               resolve,
               planId: plan.plan_id,
             };
+            if (isPendingFailureRecovery && activeReplanWarmingRef.current) {
+              activeReplanAbortRef.current?.abort();
+              interruptCapabilityWarmingRetries();
+            }
           });
         }
         return false;
@@ -1097,7 +1124,11 @@ export function usePlaybackSession(
             retryIndex,
             Date.now() - warmingRetryStartedAt,
           );
-          if (retryDelay == null) break;
+          if (retryDelay == null) {
+            activeReplanWarmingRef.current = false;
+            break;
+          }
+          activeReplanWarmingRef.current = true;
           if (warmingRetryEpoch !== warmingRetryEpochRef.current) return false;
           const retryDelayElapsed = await waitForCapabilityWarmingRetry(
             retryDelay,
@@ -1180,6 +1211,7 @@ export function usePlaybackSession(
         if (activeReplanAbortRef.current === replanAbort) {
           activeReplanAbortRef.current = null;
         }
+        activeReplanWarmingRef.current = false;
         replanInFlightRef.current = false;
         setState((current) => (current.replanning ? { ...current, replanning: false } : current));
 
@@ -1216,6 +1248,7 @@ export function usePlaybackSession(
       clientPlaybackContext,
       config,
       endAdoption,
+      interruptCapabilityWarmingRetries,
       maxBitrateKbps,
       retireActiveSession,
       waitForCapabilityWarmingRetry,
@@ -1360,6 +1393,9 @@ export function usePlaybackSession(
         pendingReplanRef.current = null;
         pendingReplan?.resolve(false);
         if (planRef.current?.plan_id === planId) {
+          if (activeStartWarmingRef.current) {
+            activeStartAbortRef.current?.abort();
+          }
           activeReplanAbortRef.current?.abort();
         }
         interruptCapabilityWarmingRetries();

@@ -106,13 +106,13 @@ the document is always the full one:
   "features": ["playback_plan_v3", "neutral_playback_v3_contract_v1", "layout_aware_passthrough", "playback_route_diagnostics",
                "device_quirks_v1", "seek_reanchor_v1", "output_change_v1", "direct_stream_resume_v1",
                "header_authenticated_media_v1", "authorized_media_origins_v1", "software_video_decode_v1",
-               "plan_invalidated_v1", "plan_source_duration_v1"],
+               "plan_invalidated_v1", "capability_warming_v1", "plan_source_duration_v1"],
   "deliveries": ["original_http", "server_remux_progressive", "server_remux_hls", "server_transcode_hls"],
   "transformations": [{"name": "audio_to_aac", "executor": "server", "recipe_version": "1", "validated_claims": ["audio_decode"]}]
 }
 ```
 
-The thirteen feature strings above are the full set this server version advertises:
+The fourteen feature strings above are the full set this server version advertises:
 
 | Feature | What it promises |
 | --- | --- |
@@ -128,6 +128,7 @@ The thirteen feature strings above are the full set this server version advertis
 | `authorized_media_origins_v1` | Meaningful only with the token above: the client also honors credential-free absolute media URLs on server-designated proxy origins, which restores distributed egress for a header-authenticated attempt (§4.1) |
 | `software_video_decode_v1` | Exact/platform-attested clients may qualify bounded `video_decode[]` entries with `hardware: false` for direct/original delivery; without the opt-in those evidence tiers remain hardware-only (§3) |
 | `plan_invalidated_v1` | The client can be told mid-session that the plan it is playing was withdrawn, over the realtime `plan_invalidated` command, and replans off it. A session that did not negotiate it is stopped instead (§6.1) |
+| `capability_warming_v1` | Decisions may return the retryable `capability_warming` terminal with `retry_after_ms`; clients may wait and retry the same requested file instead of treating the incomplete inventory as definitive (§7.3) |
 | `plan_source_duration_v1` | `source.duration_seconds` is populated when known, so its absence means *unknown* rather than *unsupported* (§5) |
 
 That last one is the reason feature detection is a list and not a version
@@ -986,7 +987,9 @@ HDR, 4K, or transcode-policy reason — deselecting the subtitle restores playba
 `capability_warming` means the bounded planning request ended before the shared
 tone-map inventory became definitive. It is retryable and never authorizes an
 alternate media-file selection; a client should keep the requested file pinned
-while retrying.
+while retrying. Automatic retry requires the server-advertised
+`capability_warming_v1` feature; without it, a client treats the terminal as a
+normal adaptation refusal and surfaces the server message.
 
 ### 7.4 Route event names
 

@@ -324,7 +324,7 @@ describe("usePlaybackSession capability warming", () => {
           return jsonResponse(
             {
               protocol_version: 3,
-              server_features: ["playback_plan_v3"],
+              server_features: ["playback_plan_v3", "capability_warming_v1"],
               outcome: "adaptation_unavailable",
               terminal: {
                 reason: "capability_warming",
@@ -375,6 +375,43 @@ describe("usePlaybackSession capability warming", () => {
     unmount();
   });
 
+  it("does not retry a warming terminal without the advertised retry contract", async () => {
+    let startCount = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/playback/start")) {
+        startCount += 1;
+        return jsonResponse(
+          {
+            protocol_version: 3,
+            server_features: ["playback_plan_v3"],
+            outcome: "adaptation_unavailable",
+            terminal: {
+              reason: "capability_warming",
+              message: "Tone-map capability discovery is still warming.",
+              retryable: true,
+              retry_after_ms: 1,
+            },
+          },
+          { status: 201 },
+        );
+      }
+      if (url.endsWith("/playback/route-events")) return new Response(null, { status: 202 });
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, unmount } = renderHook(
+      () => usePlaybackSession("request-warming-unadvertised", [], [], 7, 0, false, "auto"),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.error).toContain("still checking"));
+    expect(startCount).toBe(1);
+    unmount();
+  });
+
   it("refreshes a replacement start position while capability warming", async () => {
     const startBodies: Array<{
       file_id: number;
@@ -395,7 +432,7 @@ describe("usePlaybackSession capability warming", () => {
           return jsonResponse(
             {
               protocol_version: 3,
-              server_features: ["playback_plan_v3"],
+              server_features: ["playback_plan_v3", "capability_warming_v1"],
               outcome: "adaptation_unavailable",
               terminal: {
                 reason: "capability_warming",
@@ -411,7 +448,7 @@ describe("usePlaybackSession capability warming", () => {
         return jsonResponse(
           {
             protocol_version: 3,
-            server_features: ["playback_plan_v3"],
+            server_features: ["playback_plan_v3", "capability_warming_v1"],
             outcome: "playable",
             session_id: replacement ? "session-replacement" : "session-initial",
             playback_plan: fixturePlanV3({
@@ -1419,7 +1456,7 @@ describe("usePlaybackSession replans", () => {
         if (replanBodies.length === 1) {
           return jsonResponse({
             protocol_version: 3,
-            server_features: ["playback_plan_v3"],
+            server_features: ["playback_plan_v3", "capability_warming_v1"],
             outcome: "adaptation_unavailable",
             terminal: {
               reason: "capability_warming",
@@ -1463,6 +1500,82 @@ describe("usePlaybackSession replans", () => {
     expect(replanBodies[0]!.position_seconds).toBe(30);
     expect(replanBodies[1]!.position_seconds).toBe(37);
     expect(result.current.error).toBeNull();
+    unmount();
+  });
+
+  it("aborts a warming user-intent replan when failure recovery is queued", async () => {
+    const replanBodies: Array<{ operation: string }> = [];
+    let warmingRetryAborted = false;
+    const decision = (plan: ReturnType<typeof fixturePlanV3>) => ({
+      protocol_version: 3,
+      server_features: ["playback_plan_v3", "capability_warming_v1"],
+      outcome: "playable",
+      session_id: plan.session_id,
+      playback_plan: plan,
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/playback/start")) {
+        return jsonResponse(decision(fixturePlanV3()), { status: 201 });
+      }
+      if (url.endsWith("/playback/session-1/replan")) {
+        replanBodies.push(JSON.parse(String(init?.body)) as { operation: string });
+        if (replanBodies.length === 1) {
+          return jsonResponse({
+            protocol_version: 3,
+            server_features: ["playback_plan_v3", "capability_warming_v1"],
+            outcome: "adaptation_unavailable",
+            terminal: {
+              reason: "capability_warming",
+              message: "Tone-map capability discovery is still warming.",
+              retryable: true,
+              retry_after_ms: 0,
+            },
+          });
+        }
+        if (replanBodies.length === 2) {
+          return new Promise<Response>((_resolve, reject) => {
+            const abort = () => {
+              warmingRetryAborted = true;
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            };
+            if (init?.signal?.aborted) abort();
+            else init?.signal?.addEventListener("abort", abort, { once: true });
+          });
+        }
+        return jsonResponse(
+          decision(
+            fixturePlanV3({
+              plan_id: "plan:failure-recovery",
+              plan_attempt_key: "v3:failure-recovery",
+            }),
+          ),
+        );
+      }
+      if (url.endsWith("/playback/route-events")) return new Response(null, { status: 202 });
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, unmount } = renderHook(
+      () => usePlaybackSession("request-warming-recovery", [], [], 7, 0, false, "auto"),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.plan).not.toBeNull());
+
+    act(() => result.current.changeQuality("720p", 30));
+    await waitFor(() => expect(replanBodies).toHaveLength(2));
+    act(() => result.current.recoverFromFailure({ classification: "decoder_failure" }, 31));
+
+    await waitFor(() => expect(replanBodies).toHaveLength(3), { timeout: 500 });
+    expect(warmingRetryAborted).toBe(true);
+    expect(replanBodies.map((body) => body.operation)).toEqual([
+      "quality_change",
+      "quality_change",
+      "failure_recovery",
+    ]);
+    await waitFor(() => expect(result.current.plan?.plan_id).toBe("plan:failure-recovery"));
     unmount();
   });
 
@@ -2015,7 +2128,7 @@ describe("usePlaybackSession server-invalidated plans", () => {
         if (replanBodies.length === 1) {
           return jsonResponse({
             protocol_version: 3,
-            server_features: ["playback_plan_v3"],
+            server_features: ["playback_plan_v3", "capability_warming_v1"],
             outcome: "adaptation_unavailable",
             terminal: {
               reason: "capability_warming",
@@ -2075,8 +2188,9 @@ describe("usePlaybackSession server-invalidated plans", () => {
     unmount();
   });
 
-  it("interrupts a warming replacement start before handling an invalidation", async () => {
+  it("aborts an in-flight warming replacement retry before handling an invalidation", async () => {
     let startCount = 0;
+    let replacementRetryAborted = false;
     const replanBodies: Array<Record<string, unknown>> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -2085,20 +2199,30 @@ describe("usePlaybackSession server-invalidated plans", () => {
         if (startCount === 1) {
           return jsonResponse(playableDecision(fixturePlanV3()), { status: 201 });
         }
-        return jsonResponse(
-          {
-            protocol_version: 3,
-            server_features: ["playback_plan_v3"],
-            outcome: "adaptation_unavailable",
-            terminal: {
-              reason: "capability_warming",
-              message: "Tone-map capability discovery is still warming.",
-              retryable: true,
-              retry_after_ms: 4_000,
+        if (startCount === 2) {
+          return jsonResponse(
+            {
+              protocol_version: 3,
+              server_features: ["playback_plan_v3", "capability_warming_v1"],
+              outcome: "adaptation_unavailable",
+              terminal: {
+                reason: "capability_warming",
+                message: "Tone-map capability discovery is still warming.",
+                retryable: true,
+                retry_after_ms: 0,
+              },
             },
-          },
-          { status: 201 },
-        );
+            { status: 201 },
+          );
+        }
+        return new Promise<Response>((_resolve, reject) => {
+          const abort = () => {
+            replacementRetryAborted = true;
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          };
+          if (init?.signal?.aborted) abort();
+          else init?.signal?.addEventListener("abort", abort, { once: true });
+        });
       }
       if (url.endsWith("/playback/session-1/replan")) {
         replanBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
@@ -2125,7 +2249,7 @@ describe("usePlaybackSession server-invalidated plans", () => {
     await waitFor(() => expect(result.current.plan?.plan_id).toBe("plan:0123456789abcdef"));
 
     act(() => result.current.switchVersion(99, 100));
-    await waitFor(() => expect(startCount).toBe(2));
+    await waitFor(() => expect(startCount).toBe(3));
 
     let outcome: boolean | undefined;
     act(() => {
@@ -2138,6 +2262,7 @@ describe("usePlaybackSession server-invalidated plans", () => {
 
     await waitFor(() => expect(replanBodies).toHaveLength(1), { timeout: 500 });
     await waitFor(() => expect(outcome).toBe(true));
+    expect(replacementRetryAborted).toBe(true);
     expect(replanBodies[0]).toMatchObject({
       operation: "failure_recovery",
       failed_plan_id: "plan:0123456789abcdef",
