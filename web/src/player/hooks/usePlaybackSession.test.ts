@@ -2271,6 +2271,75 @@ describe("usePlaybackSession server-invalidated plans", () => {
     unmount();
   });
 
+  it("aborts the first in-flight replacement request before handling an invalidation", async () => {
+    let startCount = 0;
+    let replacementStartAborted = false;
+    const replanBodies: Array<Record<string, unknown>> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/playback/start")) {
+        startCount += 1;
+        if (startCount === 1) {
+          return jsonResponse(playableDecision(fixturePlanV3()), { status: 201 });
+        }
+        return new Promise<Response>((_resolve, reject) => {
+          const abort = () => {
+            replacementStartAborted = true;
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          };
+          if (init?.signal?.aborted) abort();
+          else init?.signal?.addEventListener("abort", abort, { once: true });
+        });
+      }
+      if (url.endsWith("/playback/session-1/replan")) {
+        replanBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return jsonResponse(
+          playableDecision(
+            fixturePlanV3({
+              plan_id: "plan:first-replacement-invalidation",
+              plan_attempt_key: "v3:first-replacement-invalidation",
+              delivery: "server_transcode_hls",
+            }),
+          ),
+        );
+      }
+      if (url.endsWith("/playback/route-events")) return new Response(null, { status: 202 });
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, unmount } = renderHook(
+      () => usePlaybackSession("request-1", [], [], 7, 0, false, "auto"),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.plan?.plan_id).toBe("plan:0123456789abcdef"));
+
+    act(() => result.current.switchVersion(99, 100));
+    await waitFor(() => expect(startCount).toBe(2));
+
+    let outcome: boolean | undefined;
+    act(() => {
+      void result.current
+        .invalidatePlan("plan:0123456789abcdef", "video_copy_unsafe", 100)
+        .then((value) => {
+          outcome = value;
+        });
+    });
+
+    await waitFor(() => expect(replanBodies).toHaveLength(1), { timeout: 500 });
+    await waitFor(() => expect(outcome).toBe(true));
+    expect(replacementStartAborted).toBe(true);
+    expect(replanBodies[0]).toMatchObject({
+      operation: "failure_recovery",
+      failed_plan_id: "plan:0123456789abcdef",
+    });
+    await waitFor(() =>
+      expect(result.current.plan?.plan_id).toBe("plan:first-replacement-invalidation"),
+    );
+    unmount();
+  });
+
   it("aborts an in-flight replan when the server invalidates the current plan", async () => {
     const replanBodies: Array<Record<string, unknown>> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

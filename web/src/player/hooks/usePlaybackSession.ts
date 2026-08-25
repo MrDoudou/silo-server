@@ -400,7 +400,6 @@ export function usePlaybackSession(
   const warmingRetryEpochRef = useRef(0);
   const warmingRetryWaitersRef = useRef(new Set<() => void>());
   const activeStartAbortRef = useRef<AbortController | null>(null);
-  const activeStartWarmingRef = useRef(false);
   const activeReplanAbortRef = useRef<AbortController | null>(null);
   const activeReplanWarmingRef = useRef(false);
   const pendingReplanRef = useRef<{
@@ -803,10 +802,8 @@ export function usePlaybackSession(
             Date.now() - warmingRetryStartedAt,
           );
           if (retryDelay == null) {
-            activeStartWarmingRef.current = false;
             break;
           }
-          activeStartWarmingRef.current = true;
           setState((current) => ({
             ...current,
             loading: !hasExistingSession,
@@ -895,7 +892,6 @@ export function usePlaybackSession(
       } finally {
         if (activeStartAbortRef.current === startAbort) {
           activeStartAbortRef.current = null;
-          activeStartWarmingRef.current = false;
         }
         endAdoption(loadSequence);
       }
@@ -1387,15 +1383,15 @@ export function usePlaybackSession(
       if (settling) {
         // A server invalidation is subject to an eight-second acknowledgement
         // deadline. It supersedes queued replans and wakes any capability-
-        // warming delay immediately; the in-flight response may still adopt,
-        // so wait for that one request before deciding which plan was revoked.
+        // warming delay immediately. Abort a replacement start as soon as the
+        // plan still on screen is invalidated: even its first cold request can
+        // remain in capability discovery longer than the command deadline.
+        // Replans still reconcile a response that committed before its abort.
         const pendingReplan = pendingReplanRef.current;
         pendingReplanRef.current = null;
         pendingReplan?.resolve(false);
         if (planRef.current?.plan_id === planId) {
-          if (activeStartWarmingRef.current) {
-            activeStartAbortRef.current?.abort();
-          }
+          activeStartAbortRef.current?.abort();
           activeReplanAbortRef.current?.abort();
         }
         interruptCapabilityWarmingRetries();
