@@ -68,7 +68,10 @@ const (
 	nodeRecipeWriteTimeoutV3 = 2 * time.Second
 )
 
-var errSubtitleStoreUnavailableV3 = errors.New("subtitle store unavailable")
+var (
+	errSubtitleStoreUnavailableV3 = errors.New("subtitle store unavailable")
+	errRemoteCapabilityWarmingV3  = errors.New("remote capability discovery is still warming")
+)
 
 type v3NodeCapabilityCache struct {
 	transformations     []playback.TransformationV3
@@ -408,6 +411,13 @@ func (h *PlaybackHandler) lookupRemoteCapabilitiesV3(ctx context.Context, nodeUR
 			h.v3NodeCapabilitiesMu.Unlock()
 			return current, nil
 		}
+		// A planning deadline or an explicit warming response says nothing
+		// definitive about the node. Caching it for the ordinary failure TTL
+		// would make every bounded client retry replay the same stale error.
+		if toneMapCapabilityDiscoveryIncompleteV3(err) {
+			h.v3NodeCapabilitiesMu.Unlock()
+			return v3NodeCapabilityCache{}, err
+		}
 		h.v3NodeCapabilities[nodeURL] = v3NodeCapabilityCache{err: err, expiresAt: completedAt.Add(v3NodeCapabilityErrorTTL), probeRequestTimeout: entry.probeRequestTimeout}
 		h.v3NodeCapabilitiesMu.Unlock()
 		return v3NodeCapabilityCache{}, err
@@ -693,7 +703,7 @@ func (snapshot *hlsPlanningSnapshotV3) capabilityError() error {
 }
 
 func toneMapCapabilityDiscoveryIncompleteV3(err error) bool {
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, errRemoteCapabilityWarmingV3)
 }
 
 func terminalDependsOnToneMapCapabilitiesV3(terminal *playback.TerminalV3) bool {
@@ -737,12 +747,11 @@ func retryIncompletePlaybackSettingsV3(result playback.PlannerResultV3, settings
 	if settingsErr == nil || result.Terminal == nil {
 		return result
 	}
-	terminal := result.Terminal
-	settingsDependent := terminal.Reason == playback.TerminalHDRTranscodeUnsupportedV3 ||
-		(terminal.Reason == terminalNoAlternateVersionV3 && terminal.Message == playback.TerminalMessage4KTranscodeDisabledV3) ||
-		(terminal.Reason == terminalSubtitleConversionUnsupportedV3 &&
-			(strings.Contains(terminal.Message, "this HDR source") || strings.Contains(terminal.Message, "4K transcoding is disabled")))
-	if !settingsDependent {
+	// A settings failure suppresses alternate-version planning above. Any
+	// terminal that would otherwise be eligible for that fallback is therefore
+	// provisional, even when its wording is about subtitles rather than HDR or
+	// the 4K policy directly.
+	if !terminalAllowsAlternateFileV3(result.Terminal) {
 		return result
 	}
 	result.Terminal = &playback.TerminalV3{

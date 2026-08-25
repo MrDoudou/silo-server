@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -4924,7 +4925,7 @@ func TestLookupRemoteCapabilitiesStartsCacheTTLAfterRequestCompletes(t *testing.
 		ttl    time.Duration
 	}{
 		{name: "success", status: http.StatusOK, ttl: v3NodeCapabilityTTL},
-		{name: "error", status: http.StatusServiceUnavailable, ttl: v3NodeCapabilityErrorTTL},
+		{name: "error", status: http.StatusNotFound, ttl: v3NodeCapabilityErrorTTL},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			const requestDelay = 80 * time.Millisecond
@@ -4946,6 +4947,34 @@ func TestLookupRemoteCapabilitiesStartsCacheTTLAfterRequestCompletes(t *testing.
 				t.Fatalf("cache lifetime from request start = %s, want at least %s", lifetime, minimumLifetime)
 			}
 		})
+	}
+}
+
+func TestLookupRemoteCapabilitiesDoesNotCachePlanningDeadline(t *testing.T) {
+	var requests atomic.Int32
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if requests.Add(1) == 1 {
+			<-request.Context().Done()
+			return
+		}
+		_ = json.NewEncoder(w).Encode(playback.HWAccelInfo{})
+	}))
+	defer remote.Close()
+
+	handler := NewPlaybackHandler(playback.NewSessionManager(0, 0))
+	firstCtx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	if _, err := handler.lookupRemoteCapabilitiesV3(firstCtx, remote.URL, true); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("first lookup error = %v, want deadline exceeded", err)
+	}
+	if entry, ok := handler.v3NodeCapabilities[remote.URL]; ok && entry.err != nil && time.Now().Before(entry.expiresAt) {
+		t.Fatalf("planning deadline was negatively cached until %s", entry.expiresAt)
+	}
+	if _, err := handler.lookupRemoteCapabilitiesV3(context.Background(), remote.URL, true); err != nil {
+		t.Fatalf("retry lookup error = %v", err)
+	}
+	if requests.Load() != 2 {
+		t.Fatalf("remote requests = %d, want a fresh request after the deadline", requests.Load())
 	}
 }
 

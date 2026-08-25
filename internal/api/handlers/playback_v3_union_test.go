@@ -467,6 +467,7 @@ func TestIncompletePlaybackSettingsMakePolicyTerminalsRetryable(t *testing.T) {
 		{Reason: playback.TerminalHDRTranscodeUnsupportedV3, Message: "HDR unavailable"},
 		{Reason: terminalSubtitleConversionUnsupportedV3, Message: "The selected subtitle must be burned into the video, but this HDR source cannot be re-encoded."},
 		{Reason: terminalSubtitleConversionUnsupportedV3, Message: "The selected subtitle must be burned into the video, but 4K transcoding is disabled."},
+		{Reason: terminalSubtitleConversionUnsupportedV3, Message: "The selected subtitle format cannot be preserved on this version."},
 		{Reason: terminalNoAlternateVersionV3, Message: playback.TerminalMessage4KTranscodeDisabledV3},
 	}
 	for _, terminal := range tests {
@@ -630,6 +631,42 @@ func TestHLSToneMapCapabilityInventoryV3TreatsCompletedNodeFailureAsDefinitive(t
 	}
 	if len(inventory.union) != 0 {
 		t.Fatalf("failed node contributed capabilities: %#v", inventory.union)
+	}
+}
+
+func TestHLSToneMapCapabilityInventoryV3RetriesNodeWarmingResponse(t *testing.T) {
+	var requests atomic.Int32
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if requests.Add(1) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		writeJSON(w, http.StatusOK, playback.HWAccelInfo{ToneMapCapabilities: tonemap.Capabilities{{
+			Mode: tonemap.ModeSoftware, Backend: tonemap.BackendSoftware, Filter: tonemap.SoftwareFilterBT2390,
+			SourceKinds: []tonemap.SourceKind{tonemap.SourcePQ},
+		}}})
+	}))
+	defer remote.Close()
+
+	handler := NewPlaybackHandler(playback.NewSessionManager(0, 0))
+	handler.JWTSecret = "test-secret"
+	handler.NodePlanner = enumeratingNodePlannerV3{urls: []string{remote.URL}}
+	handler.SettingsRepo = &mutablePlaybackSettingsV3{values: map[string]string{config.PlaybackLocalTranscodeFallbackSettingKey: "false"}}
+
+	first, err := handler.hlsToneMapCapabilityInventoryV3(context.Background())
+	if !errors.Is(err, errRemoteCapabilityWarmingV3) {
+		t.Fatalf("first inventory error = %v, want remote capability warming", err)
+	}
+	if len(first.union) != 0 {
+		t.Fatalf("warming node contributed capabilities: %#v", first.union)
+	}
+
+	second, err := handler.hlsToneMapCapabilityInventoryV3(context.Background())
+	if err != nil {
+		t.Fatalf("retry inventory error = %v", err)
+	}
+	if requests.Load() != 2 || !second.union.Supports(tonemap.ModeSoftware, tonemap.SourcePQ) {
+		t.Fatalf("retry requests = %d capabilities = %#v, want a fresh successful probe", requests.Load(), second.union)
 	}
 }
 

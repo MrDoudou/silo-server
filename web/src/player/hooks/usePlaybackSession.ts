@@ -362,6 +362,9 @@ export function usePlaybackSession(
   // decide against, so only it is waited on.
   const adoptionsInFlightRef = useRef(new Map<number, number>());
   const adoptionWaitersRef = useRef<Array<{ loadSequence: number; resolve: () => void }>>([]);
+  const warmingRetryEpochRef = useRef(0);
+  const warmingRetryWaitersRef = useRef(new Set<() => void>());
+  const activeReplanAbortRef = useRef<AbortController | null>(null);
   const pendingReplanRef = useRef<{
     options: ReplanOptions;
     loadSequence: number;
@@ -425,6 +428,31 @@ export function usePlaybackSession(
       adoptionWaitersRef.current.push({ loadSequence, resolve });
     });
   }, []);
+
+  const interruptCapabilityWarmingRetries = useCallback(() => {
+    warmingRetryEpochRef.current += 1;
+    for (const interrupt of Array.from(warmingRetryWaitersRef.current)) interrupt();
+  }, []);
+
+  const waitForCapabilityWarmingRetry = useCallback(
+    (delayMillis: number, epoch: number): Promise<boolean> =>
+      new Promise<boolean>((resolve) => {
+        let settled = false;
+        let timeoutId = 0;
+        const finish = (elapsed: boolean) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timeoutId);
+          warmingRetryWaitersRef.current.delete(interrupt);
+          resolve(elapsed);
+        };
+        const interrupt = () => finish(false);
+        warmingRetryWaitersRef.current.add(interrupt);
+        timeoutId = window.setTimeout(() => finish(true), delayMillis);
+        if (epoch !== warmingRetryEpochRef.current) interrupt();
+      }),
+    [],
+  );
 
   const reportEvent = useCallback(
     (
@@ -966,6 +994,9 @@ export function usePlaybackSession(
         });
 
       const loadSequence = loadSequenceRef.current;
+      const warmingRetryEpoch = warmingRetryEpochRef.current;
+      const replanAbort = new AbortController();
+      activeReplanAbortRef.current = replanAbort;
       replanInFlightRef.current = true;
       beginAdoption(loadSequence);
       setState((current) => ({
@@ -981,14 +1012,19 @@ export function usePlaybackSession(
           decision = await playerFetch<DecisionResponseV3>(
             config,
             `/playback/${sessionId}/replan`,
-            { method: "POST", body: JSON.stringify(buildBody()) },
+            { method: "POST", body: JSON.stringify(buildBody()), signal: replanAbort.signal },
           );
 
           if (loadSequence !== loadSequenceRef.current) return false;
 
           const retryDelay = capabilityWarmingRetryDelayV3(decision, retryIndex);
           if (retryDelay == null) break;
-          await new Promise<void>((resolve) => window.setTimeout(resolve, retryDelay));
+          if (warmingRetryEpoch !== warmingRetryEpochRef.current) return false;
+          const retryDelayElapsed = await waitForCapabilityWarmingRetry(
+            retryDelay,
+            warmingRetryEpoch,
+          );
+          if (!retryDelayElapsed) return false;
           if (loadSequence !== loadSequenceRef.current) return false;
         }
 
@@ -1027,6 +1063,7 @@ export function usePlaybackSession(
         }
         return adopted;
       } catch (err) {
+        if (replanAbort.signal.aborted) return false;
         if (loadSequence !== loadSequenceRef.current) return false;
         if (retireSessionOnRefusal) {
           console.error("Failed to refresh playback output", err);
@@ -1041,6 +1078,9 @@ export function usePlaybackSession(
         }));
         return false;
       } finally {
+        if (activeReplanAbortRef.current === replanAbort) {
+          activeReplanAbortRef.current = null;
+        }
         replanInFlightRef.current = false;
         setState((current) => (current.replanning ? { ...current, replanning: false } : current));
 
@@ -1079,6 +1119,7 @@ export function usePlaybackSession(
       endAdoption,
       maxBitrateKbps,
       retireActiveSession,
+      waitForCapabilityWarmingRetry,
     ],
   );
   issueReplanRef.current = replan;
@@ -1211,7 +1252,20 @@ export function usePlaybackSession(
   const invalidatePlan = useCallback(
     async (planId: string, reason: string, currentPosition: number): Promise<boolean> => {
       const settling = awaitAdoptionSettled();
-      if (settling) await settling;
+      if (settling) {
+        // A server invalidation is subject to an eight-second acknowledgement
+        // deadline. It supersedes queued replans and wakes any capability-
+        // warming delay immediately; the in-flight response may still adopt,
+        // so wait for that one request before deciding which plan was revoked.
+        const pendingReplan = pendingReplanRef.current;
+        pendingReplanRef.current = null;
+        pendingReplan?.resolve(false);
+        if (planRef.current?.plan_id === planId) {
+          activeReplanAbortRef.current?.abort();
+        }
+        interruptCapabilityWarmingRetries();
+        await settling;
+      }
       const plan = planRef.current;
       if (!plan) return false;
       // The command names the plan the server invalidated. Once the client has
@@ -1228,7 +1282,7 @@ export function usePlaybackSession(
         failure: { classification, message: "The server invalidated this plan." },
       });
     },
-    [awaitAdoptionSettled, replan, reportEvent],
+    [awaitAdoptionSettled, interruptCapabilityWarmingRetries, replan, reportEvent],
   );
 
   const reanchorSeek = useCallback(
