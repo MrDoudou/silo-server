@@ -4099,20 +4099,12 @@ func cachedImageVariantPath(path, imageType, size string) string {
 	return artworkkey.Variant(path, variant)
 }
 
-// imageTypeFromCachedPath returns the image type segment ("poster", "backdrop",
-// "logo", "still") encoded in a cached S3 image path of the form
-// ".../{imageType}/{variant}.{ext}". It returns "" for full URLs,
-// plugin-prefixed paths, or paths with no directory segment.
+// imageTypeFromCachedPath returns the image type ("poster", "backdrop",
+// "logo", "still") a stored artwork key belongs to, for both the portable and
+// the legacy key grammars. It returns "" for full URLs, plugin-prefixed paths,
+// or paths with no directory segment.
 func imageTypeFromCachedPath(path string) string {
-	if path == "" || strings.Contains(path, "://") {
-		return ""
-	}
-	lastSlash := strings.LastIndex(path, "/")
-	if lastSlash <= 0 {
-		return ""
-	}
-	dir := path[:lastSlash]
-	return dir[strings.LastIndex(dir, "/")+1:]
+	return artworkkey.ImageTypeFromKey(path)
 }
 
 // ImageTypeFromCachedPath returns the image type ("poster", "backdrop",

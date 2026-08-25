@@ -25,6 +25,8 @@ import (
 	"github.com/Silo-Server/silo-server/internal/access"
 	"github.com/Silo-Server/silo-server/internal/adminjob"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
+	"github.com/Silo-Server/silo-server/internal/artworkupload"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/collage"
 	"github.com/Silo-Server/silo-server/internal/collections/templates"
@@ -37,14 +39,23 @@ import (
 )
 
 type LibraryCollectionHandler struct {
-	repo                  *catalog.LibraryCollectionRepository
-	service               *catalog.LibraryCollectionService
-	itemRepo              *catalog.ItemRepository
-	Executor              *catalog.QueryExecutor
-	detailSvc             *catalog.DetailService
-	presignTTL            time.Duration
-	httpClient            *http.Client
-	s3GP                  *s3client.Client
+	repo       *catalog.LibraryCollectionRepository
+	service    *catalog.LibraryCollectionService
+	itemRepo   *catalog.ItemRepository
+	Executor   *catalog.QueryExecutor
+	detailSvc  *catalog.DetailService
+	httpClient *http.Client
+	// s3GP is retained only to sweep the mutable per-collection objects
+	// written before collection artwork became content-addressed. New artwork
+	// is written through uploads and read through ArtworkURLs.
+	s3GP    *s3client.Client
+	uploads *artworkupload.Materializer
+	// ArtworkURLs resolves a stored artwork key to a URL a client can load.
+	ArtworkURLs ArtworkURLResolver
+	// ArtworkObjects reads stored artwork bytes directly. Collage generation
+	// uses it so composing a poster never depends on the server being able to
+	// fetch its own delivery URLs over HTTP.
+	ArtworkObjects        ArtworkObjectStore
 	FrontendFS            fs.FS
 	SectionRepo           *sections.Repository
 	UserCollectionPool    *pgxpool.Pool
@@ -83,9 +94,9 @@ func NewLibraryCollectionHandler(
 	repo *catalog.LibraryCollectionRepository,
 	service *catalog.LibraryCollectionService,
 	itemRepo *catalog.ItemRepository,
-	presignTTL time.Duration,
 	httpClient *http.Client,
 	s3GP *s3client.Client,
+	uploads *artworkupload.Materializer,
 ) *LibraryCollectionHandler {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
@@ -95,9 +106,9 @@ func NewLibraryCollectionHandler(
 		repo:             repo,
 		service:          service,
 		itemRepo:         itemRepo,
-		presignTTL:       presignTTL,
 		httpClient:       httpClient,
 		s3GP:             s3GP,
+		uploads:          uploads,
 		TemplateRegistry: templates.Default,
 	}
 }
@@ -110,8 +121,9 @@ func (h *LibraryCollectionHandler) SetDetailService(svc *catalog.DetailService) 
 // SetupCollage enables automatic poster collage generation for collections.
 // Must be called after SetDetailService.
 func (h *LibraryCollectionHandler) SetupCollage() {
-	if h.s3GP == nil || h.detailSvc == nil {
-		slog.Info("collage: auto-generation disabled", "s3_configured", h.s3GP != nil, "detail_svc_configured", h.detailSvc != nil)
+	if !h.uploads.Available() || h.detailSvc == nil {
+		slog.Info("collage: auto-generation disabled",
+			"artwork_storage_configured", h.uploads.Available(), "detail_svc_configured", h.detailSvc != nil)
 		return
 	}
 	h.service.CollageGen = h
@@ -123,13 +135,14 @@ func (h *LibraryCollectionHandler) storeBundledTemplatePoster(
 	collectionID, posterPath string,
 	fromTemplate bool,
 ) (bool, string, string, error) {
-	storedPath, thumbhash, stored, err := storeBundledCollectionPosterIfS3Configured(
+	// Admin collections live in library_collections, a catalog table the
+	// artwork revision GC's reference union covers, so tracking is safe.
+	storedPath, thumbhash, stored, err := storeBundledCollectionPoster(
 		ctx,
-		h.s3GP,
+		h.uploads,
 		h.FrontendFS,
-		collectionID,
-		adminCollectionImagePrefix,
 		posterPath,
+		true,
 	)
 	if err != nil || !stored {
 		if err != nil {
@@ -186,14 +199,9 @@ func (h *LibraryCollectionHandler) GenerateCollectionPoster(ctx context.Context,
 	imageData := make([][]byte, 0, len(paths))
 	fetchFailed := 0
 	for _, path := range paths {
-		url := resolved[path]
-		if url == "" {
-			fetchFailed++
-			continue
-		}
-		data, err := h.fetchImageURL(ctx, url)
+		data, err := h.loadCollageImage(ctx, path, resolved[path])
 		if err != nil {
-			slog.DebugContext(ctx, "collage: failed to fetch poster image", "component", "api", "url", url, "error", err)
+			slog.DebugContext(ctx, "collage: failed to load poster image", "component", "api", "path", path, "error", err)
 			fetchFailed++
 			continue
 		}
@@ -210,7 +218,8 @@ func (h *LibraryCollectionHandler) GenerateCollectionPoster(ctx context.Context,
 		return err
 	}
 
-	// Delete any existing auto-generated images before uploading new ones.
+	// Remove any legacy mutable objects this collection still owns; the
+	// content-addressed revision it may be replacing is collected by reference.
 	if err := h.deleteCollectionImages(ctx, collectionID, "poster"); err != nil {
 		slog.WarnContext(ctx, "collage: failed to clean up old poster images", "component", "api", "collection_id", collectionID, "error", err)
 	}
@@ -235,6 +244,36 @@ func (h *LibraryCollectionHandler) GenerateCollectionPoster(ctx context.Context,
 
 	slog.InfoContext(ctx, "collage: poster generated successfully", "component", "api", "collection_id", collectionID, "s3_path", s3Path)
 	return nil
+}
+
+// loadCollageImage reads one item poster for collage composition.
+//
+// Artwork already materialized in the store is read from the store: its
+// delivery URL is relative to whatever origin the client used, so the server
+// cannot fetch it over HTTP, and going through the network to reach bytes on
+// its own disk would be wasteful even where it could. Everything else — a
+// provider URL, a plugin reference — still resolves to an absolute URL and is
+// downloaded.
+func (h *LibraryCollectionHandler) loadCollageImage(ctx context.Context, path, resolvedURL string) ([]byte, error) {
+	if h.ArtworkObjects != nil {
+		key := cardThumbnailPath(strings.TrimSpace(path))
+		if artworkstore.ValidateKey(key) == nil {
+			object, err := h.ArtworkObjects.Open(ctx, key)
+			if err == nil {
+				defer func() { _ = object.Close() }()
+				return io.ReadAll(io.LimitReader(object.Body, collectionImageMaxBytes))
+			}
+			if !errors.Is(err, artworkstore.ErrNotFound) {
+				return nil, err
+			}
+			// A missing object falls through: the row may still point at a
+			// provider URL the resolver can reach.
+		}
+	}
+	if resolvedURL == "" {
+		return nil, fmt.Errorf("no resolvable source for %q", path)
+	}
+	return h.fetchImageURL(ctx, resolvedURL)
 }
 
 // fetchImageURL downloads an image from a resolved URL.
@@ -814,7 +853,7 @@ func (h *LibraryCollectionHandler) HandleListLibraryUserCollections(w http.Respo
 		collections = []usercollections.ServerVisibleCollection{}
 	}
 	for i := range collections {
-		collections[i].PosterURL = h.presignGPURL(r, collections[i].PosterPath)
+		collections[i].PosterURL = h.collectionArtworkURL(r, collections[i].PosterPath)
 	}
 	writeJSON(w, http.StatusOK, serverUserCollectionsListResponse{Collections: collections})
 }
@@ -875,7 +914,7 @@ func (h *LibraryCollectionHandler) HandleListLibraryCollections(w http.ResponseW
 			}
 			sorted := applyUserCollectionSort(userCollections, g.DefaultSortMode)
 			for i := range sorted {
-				posterURL := h.presignGPURL(r, sorted[i].PosterPath)
+				posterURL := h.collectionArtworkURL(r, sorted[i].PosterPath)
 				creatorProfileID := sorted[i].CreatorProfileID
 				colls = append(colls, libraryTabCollection{
 					ID:               sorted[i].ID,
@@ -893,7 +932,7 @@ func (h *LibraryCollectionHandler) HandleListLibraryCollections(w http.ResponseW
 				colls = append(colls, libraryTabCollection{
 					ID:              c.ID,
 					Title:           c.Title,
-					PosterURL:       h.presignGPURL(r, c.PosterURL),
+					PosterURL:       h.collectionArtworkURL(r, c.PosterURL),
 					PosterThumbhash: c.PosterThumbhash,
 					ItemCount:       c.ItemCount,
 					Featured:        c.Featured,
@@ -920,7 +959,7 @@ func (h *LibraryCollectionHandler) HandleListLibraryCollections(w http.ResponseW
 			uColls = append(uColls, libraryTabCollection{
 				ID:              c.ID,
 				Title:           c.Title,
-				PosterURL:       h.presignGPURL(r, c.PosterURL),
+				PosterURL:       h.collectionArtworkURL(r, c.PosterURL),
 				PosterThumbhash: c.PosterThumbhash,
 				ItemCount:       c.ItemCount,
 				Featured:        c.Featured,
@@ -1436,9 +1475,11 @@ func (h *LibraryCollectionHandler) deleteServerCollection(ctx context.Context, c
 		}
 	}
 
-	// Clean up S3 images before deleting the collection row. Failures here
-	// only leak storage; the collection row delete must still proceed so the
-	// admin's request succeeds.
+	// Clean up the collection's legacy mutable objects before deleting its row.
+	// Failures here only leak storage; the row delete must still proceed so the
+	// admin's request succeeds. Content-addressed revisions are not swept: they
+	// may back other rows, and the deleted row's references stop existing, which
+	// is what makes the artwork collector reclaim them.
 	if h.s3GP != nil {
 		prefix := fmt.Sprintf("collection-images/%s/", collectionID)
 		keys, err := h.s3GP.ListObjects(ctx, h.s3GP.Bucket(), prefix)
@@ -3278,24 +3319,9 @@ func (h *LibraryCollectionHandler) presignURL(r *http.Request, path string, vari
 	return ""
 }
 
-func (h *LibraryCollectionHandler) presignGPURL(r *http.Request, path string) string {
-	if path == "" {
-		return ""
-	}
-	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-		return path
-	}
-	if strings.HasPrefix(path, "/") {
-		return path
-	}
-	if h.s3GP == nil {
-		return ""
-	}
-	url, err := h.s3GP.PresignGetURL(r.Context(), h.s3GP.Bucket(), cardThumbnailPath(path), h.presignTTL)
-	if err != nil {
-		return ""
-	}
-	return url
+// collectionArtworkURL resolves stored collection artwork at card size.
+func (h *LibraryCollectionHandler) collectionArtworkURL(r *http.Request, path string) string {
+	return resolveStoredCardImageURL(r.Context(), h.ArtworkURLs, path)
 }
 
 func (h *LibraryCollectionHandler) toLibraryCollectionResponse(r *http.Request, collection *models.LibraryCollection) libraryCollectionResponse {
@@ -3311,8 +3337,8 @@ func (h *LibraryCollectionHandler) toLibraryCollectionResponse(r *http.Request, 
 		SortOrder:         collection.SortOrder,
 		GroupID:           collection.GroupID,
 		Featured:          collection.Featured,
-		PosterURL:         h.presignGPURL(r, collection.PosterURL),
-		BackdropURL:       h.presignGPURL(r, collection.BackdropURL),
+		PosterURL:         h.collectionArtworkURL(r, collection.PosterURL),
+		BackdropURL:       h.collectionArtworkURL(r, collection.BackdropURL),
 		PosterThumbhash:   collection.PosterThumbhash,
 		BackdropThumbhash: collection.BackdropThumbhash,
 		SourceURL:         collection.SourceURL,
@@ -3688,12 +3714,15 @@ func (h *LibraryCollectionHandler) processCollectionImage(
 	collectionID string,
 	imageType string,
 	fileData []byte,
-) (s3Path string, thumbhashStr string, err error) {
-	return uploadCollectionImageVariants(ctx, h.s3GP, adminCollectionImagePrefix, collectionID, imageType, fileData)
+) (storedPath string, thumbhashStr string, err error) {
+	_ = collectionID // the stored key is derived from content, not identity
+	// Admin collections live in library_collections, a catalog table the
+	// artwork revision GC's reference union covers, so tracking is safe.
+	return materializeCollectionImage(ctx, h.uploads, imageType, fileData, true)
 }
 
 func (h *LibraryCollectionHandler) deleteCollectionImages(ctx context.Context, collectionID, imageType string) error {
-	return removeCollectionImageVariants(ctx, h.s3GP, adminCollectionImagePrefix, collectionID, imageType)
+	return removeLegacyCollectionImageVariants(ctx, h.s3GP, adminCollectionImagePrefix, collectionID, imageType)
 }
 
 func (h *LibraryCollectionHandler) processArtworkInputs(r *http.Request, collectionID, posterSourceURL, backdropSourceURL string) error {

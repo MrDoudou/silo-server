@@ -1,24 +1,29 @@
 // Package imagecache downloads images from URLs, generates sized variants,
-// computes thumbhashes, and uploads all variants to S3.
+// computes thumbhashes, and writes every variant to the canonical artwork
+// store.
+//
+// Materialized artwork is content-addressed: the produced variant set decides
+// the logical keys, so the store never learns which provider, item, library, or
+// server the image came from, and re-encoding the same bytes converges on the
+// same immutable revision instead of mutating one. See
+// internal/artworkkey/portable.go for the format.
 package imagecache
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/imageutil"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 )
@@ -28,20 +33,17 @@ const (
 	downloadTimeout  = 30 * time.Second
 )
 
-// ObjectPutter is the S3 interface required by Cacher.
-type ObjectPutter interface {
-	PutObject(ctx context.Context, bucket, key string, data []byte) error
-	Bucket() string
+// ObjectStore is the subset of artworkstore.Store the image pipeline needs:
+// write an immutable object, and ask whether one already holds exactly these
+// bytes. Every artworkstore backend satisfies it, and the pipeline stays free
+// of buckets, roots, prefixes, and URL policy.
+type ObjectStore interface {
+	WriteImmutable(ctx context.Context, key string, data []byte, meta artworkstore.ObjectMetadata) error
+	Matches(ctx context.Context, key string, data []byte) (bool, error)
 }
 
-type objectMatcher interface {
-	ObjectMatches(ctx context.Context, bucket, key string, data []byte) (bool, error)
-}
-
-// ArtworkRevisionTracker persists the object manifest for an immutable
-// revision. The cacher first records an empty, image-type-backed manifest so
-// partial uploads remain collectible, then replaces it with the exact keys
-// only after every upload succeeds.
+// ArtworkRevisionTracker persists the exact object manifest for an immutable
+// revision before any object is uploaded.
 type ArtworkRevisionTracker interface {
 	TrackArtworkRevision(ctx context.Context, originalPath, imageType string, objectKeys []string) error
 }
@@ -51,10 +53,10 @@ type ImageURLResolver interface {
 	ResolveImageURL(ctx context.Context, path string, variant string) string
 }
 
-// CacheRequest describes a single image to cache. For season posters and
-// episode stills, ContentID is the parent series's provider ID and the
-// SeasonNumber / EpisodeNumber fields scope the S3 key so siblings do not
-// collide. Both pointers are nil for item-level images.
+// CacheRequest describes a single image to cache. The identity fields describe
+// what is being cached and travel into logs and error messages; they no longer
+// decide where it is stored, because the portable layout addresses artwork by
+// the bytes it produced.
 type CacheRequest struct {
 	SourceURL     string
 	ProviderID    string
@@ -65,17 +67,21 @@ type CacheRequest struct {
 	EpisodeNumber *int
 	Language      string
 	ImageResolver ImageURLResolver // optional; used when SourceURL is a plugin:// path
-	// KeyDiscriminator, when set, is inserted into the S3 key between the
-	// content ID and the image type (local sidecar art uses the file's 8-hex
-	// content hash) so re-cached art rotates to a fresh key.
+	// KeyDiscriminator carries the local sidecar's content hash.
+	//
+	// It no longer affects the object key: content addressing already rotates
+	// a sidecar's key whenever its bytes change, which is exactly what the
+	// discriminator was for. Callers still compute it, and it stays here as
+	// the caller's record of which sidecar revision it read.
 	KeyDiscriminator string
 }
 
 // CacheResult is returned by Cache on success.
 type CacheResult struct {
-	BasePath         string // S3 key prefix, e.g. "tmdb/movies/550/poster"
+	BasePath         string // revision directory holding every variant and the manifest
 	OriginalPath     string // exact immutable original-variant object key
 	Revision         string // content revision shared by generated variants
+	ManifestPath     string // completeness marker written after every variant
 	VariantPaths     map[string]string
 	Thumbhash        string // base64-encoded
 	Ext              string // file extension including dot (e.g. ".jpg", ".png")
@@ -83,32 +89,33 @@ type CacheResult struct {
 	ExistingVariants int
 }
 
-// Cacher downloads and stores image variants to S3.
+// Cacher downloads images and materializes them into the canonical artwork
+// store.
 type Cacher struct {
-	s3                ObjectPutter
+	store             ObjectStore
 	revisionTracker   ArtworkRevisionTracker
 	httpClient        *http.Client
 	enforcePublicURLs bool
 }
 
-// New creates a new Cacher backed by the given ObjectPutter.
-func New(s3 ObjectPutter) *Cacher {
-	return &Cacher{s3: s3, httpClient: newSecureHTTPClient(), enforcePublicURLs: true}
+// New creates a Cacher that materializes artwork through the given store.
+func New(store ObjectStore) *Cacher {
+	return &Cacher{store: store, httpClient: newSecureHTTPClient(), enforcePublicURLs: true}
 }
 
 // SetArtworkRevisionTracker wires durable revision lifecycle tracking. The
-// production server configures this whenever object storage is available.
+// production server configures this whenever artwork storage is available.
 func (c *Cacher) SetArtworkRevisionTracker(tracker ArtworkRevisionTracker) {
 	if c != nil {
 		c.revisionTracker = tracker
 	}
 }
 
-func newWithHTTPClient(s3 ObjectPutter, client *http.Client) *Cacher {
+func newWithHTTPClient(store ObjectStore, client *http.Client) *Cacher {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	return &Cacher{s3: s3, httpClient: client}
+	return &Cacher{store: store, httpClient: client}
 }
 
 // CacheImage implements metadata.ImageCacher using the internal Cache method.
@@ -163,8 +170,7 @@ func cacheImageResultFromCacheResult(result *CacheResult) *metadata.CacheImageRe
 // CacheAudiobookCover is a thin convenience over CacheBytes specifically
 // for the audiobook scanner. Avoids exporting the imagecache request
 // struct to the scanner package (which would create an import cycle
-// scanner -> imagecache -> metadata -> scanner). Stores under
-// "local/audiobooks/{contentID}/poster/...".
+// scanner -> imagecache -> metadata -> scanner).
 func (c *Cacher) CacheAudiobookCover(ctx context.Context, data []byte, contentID string) (storedPath string, thumbhash string, err error) {
 	res, err := c.CacheBytes(ctx, data, CacheRequest{
 		ProviderID:  "local",
@@ -178,9 +184,8 @@ func (c *Cacher) CacheAudiobookCover(ctx context.Context, data []byte, contentID
 	return res.OriginalPath, res.Thumbhash, nil
 }
 
-// CacheEbookCover stores an embedded ebook cover under
-// "local/ebooks/{contentID}/poster/..." using the same poster variants as
-// provider-hosted book artwork.
+// CacheEbookCover stores an embedded ebook cover using the same poster
+// variants as provider-hosted book artwork.
 func (c *Cacher) CacheEbookCover(ctx context.Context, data []byte, contentID string) (storedPath string, thumbhash string, err error) {
 	res, err := c.CacheBytes(ctx, data, CacheRequest{
 		ProviderID:  "local",
@@ -195,11 +200,11 @@ func (c *Cacher) CacheEbookCover(ctx context.Context, data []byte, contentID str
 }
 
 // validateCacheRequest checks the required identity fields and the
-// episode/season invariant shared by Cache and CacheBytes. Keeping it in one
-// place prevents the season/episode guard from drifting between the two paths:
-// buildBasePath only appends the episode segment inside the SeasonNumber branch,
-// so an episode without a season would silently collide distinct episodes' art
-// under the same S3 key.
+// episode/season invariant shared by Cache and CacheBytes.
+//
+// None of these fields reach the object key any more, but a request that
+// cannot say what it is caching is a caller bug worth failing on rather than
+// materializing anonymous artwork nothing will ever publish.
 func validateCacheRequest(req CacheRequest) error {
 	if strings.TrimSpace(req.ProviderID) == "" {
 		return fmt.Errorf("imagecache: provider ID is required")
@@ -216,10 +221,23 @@ func validateCacheRequest(req CacheRequest) error {
 	return nil
 }
 
-// CacheBytes performs the same variant generation, thumbhash, and S3 upload as
-// Cache but starts from raw image bytes already in hand. Used by the
-// audiobook scanner to push embedded M4B cover art into S3 without round-
-// tripping through HTTP.
+// CacheBytes performs the same variant generation, thumbhash, and storage as
+// Cache but starts from raw image bytes already in hand. Used by the audiobook
+// and ebook scanners to materialize embedded cover art without round-tripping
+// through HTTP.
+//
+// The write order is load-bearing:
+//
+//  1. produce every variant, then address the revision from those bytes;
+//  2. register the complete object set for garbage collection *before* the
+//     first byte is written, so a crash mid-write leaves reclaimable objects
+//     rather than orphans;
+//  3. write the image objects;
+//  4. write manifest.json last, once every image object is durable, so a
+//     manifest's presence means the revision is complete.
+//
+// Publication — pointing a catalog row at OriginalPath — happens after this
+// returns, in the caller that owns the target row.
 func (c *Cacher) CacheBytes(ctx context.Context, data []byte, req CacheRequest) (*CacheResult, error) {
 	if err := validateCacheRequest(req); err != nil {
 		return nil, err
@@ -231,36 +249,37 @@ func (c *Cacher) CacheBytes(ctx context.Context, data []byte, req CacheRequest) 
 	if err != nil {
 		return nil, fmt.Errorf("imagecache: thumbhash: %w", err)
 	}
-	widths := variantWidths(req.ImageType)
-	result, err := imageutil.GenerateVariants(data, widths)
+	imageType := metadata.ImageTypeToString(req.ImageType)
+	result, err := imageutil.GenerateVariants(data, artworkkey.VariantWidths(imageType))
 	if err != nil {
 		return nil, fmt.Errorf("imagecache: generate variants: %w", err)
 	}
-	basePath := buildBasePath(req)
-	bucket := c.s3.Bucket()
-	revision := variantRevision(result)
-	variantPaths := buildVariantPaths(basePath, revision, result)
-	originalPath := variantPaths[artworkkey.OriginalVariant]
-	if err := c.trackRevision(ctx, req.ImageType, originalPath, nil); err != nil {
-		return nil, err
-	}
-
-	uploadStats, err := c.uploadVariants(ctx, bucket, result, variantPaths)
+	revision, err := buildRevision(imageType, result)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.trackRevision(ctx, req.ImageType, originalPath, variantPaths); err != nil {
+	if err := c.trackRevision(ctx, imageType, revision); err != nil {
+		return nil, err
+	}
+
+	writeStats, err := c.writeVariants(ctx, revision, result)
+	if err != nil {
+		return nil, err
+	}
+	manifestMediaType := artworkstore.MediaTypeForKey(artworkkey.ManifestName)
+	if err := c.writeObject(ctx, revision.ManifestKey, revision.ManifestJSON, manifestMediaType); err != nil {
 		return nil, err
 	}
 	return &CacheResult{
-		BasePath:         basePath,
-		OriginalPath:     variantPaths[artworkkey.OriginalVariant],
-		Revision:         revision,
-		VariantPaths:     variantPaths,
+		BasePath:         revision.Directory,
+		OriginalPath:     revision.OriginalKey,
+		Revision:         revision.Revision,
+		ManifestPath:     revision.ManifestKey,
+		VariantPaths:     revision.VariantKeys,
 		Thumbhash:        thumbhash,
-		Ext:              result.Ext,
-		UploadedVariants: uploadStats.uploaded,
-		ExistingVariants: uploadStats.existing,
+		Ext:              revision.Ext,
+		UploadedVariants: writeStats.uploaded,
+		ExistingVariants: writeStats.existing,
 	}, nil
 }
 
@@ -292,44 +311,59 @@ func (c *Cacher) Cache(ctx context.Context, req CacheRequest) (*CacheResult, err
 	return c.CacheBytes(ctx, data, req)
 }
 
-// variantWidths returns the resize widths for the given image type. The
-// ladder itself is owned by artworkkey so key expansion and GC manifests can
-// never drift from what is generated here.
-func variantWidths(t metadata.ImageType) []int {
-	return artworkkey.VariantWidths(metadata.ImageTypeToString(t))
+// buildRevision addresses the produced variant set: the revision digest, every
+// logical key, and the canonical manifest bytes.
+func buildRevision(imageType string, result *imageutil.VariantResult) (*artworkkey.PortableRevision, error) {
+	variants := make([]artworkkey.VariantBytes, 0, len(result.Variants))
+	for _, variant := range result.Variants {
+		variants = append(variants, artworkkey.VariantBytes{Name: variant.Key, Data: variant.Data})
+	}
+	mediaType := artworkstore.MediaTypeForKey(artworkkey.OriginalVariant + result.Ext)
+	revision, err := artworkkey.BuildPortableRevision(artworkkey.RevisionInput{
+		ImageType: imageType,
+		MediaType: mediaType,
+		Ext:       result.Ext,
+		Variants:  variants,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("imagecache: address revision: %w", err)
+	}
+	return revision, nil
 }
 
-type uploadVariantStats struct {
+type writeVariantStats struct {
 	uploaded int
 	existing int
 }
 
-func (c *Cacher) uploadVariants(ctx context.Context, bucket string, result *imageutil.VariantResult, variantPaths map[string]string) (uploadVariantStats, error) {
+func (c *Cacher) writeVariants(ctx context.Context, revision *artworkkey.PortableRevision, result *imageutil.VariantResult) (writeVariantStats, error) {
 	var wg sync.WaitGroup
-	uploadErrs := make([]error, len(result.Variants))
-	stats := make([]uploadVariantStats, len(result.Variants))
+	writeErrs := make([]error, len(result.Variants))
+	stats := make([]writeVariantStats, len(result.Variants))
 	for i, v := range result.Variants {
 		wg.Add(1)
 		go func(idx int, variant imageutil.Variant) {
 			defer wg.Done()
-			key := variantPaths[variant.Key]
-			if exists, err := objectMatches(ctx, c.s3, bucket, key, variant.Data); err != nil {
-				uploadErrs[idx] = fmt.Errorf("imagecache: check existing %s: %w", key, err)
+			key := revision.VariantKeys[variant.Key]
+			exists, err := c.store.Matches(ctx, key, variant.Data)
+			if err != nil {
+				writeErrs[idx] = fmt.Errorf("imagecache: check existing %s: %w", key, err)
 				return
-			} else if exists {
+			}
+			if exists {
 				stats[idx].existing = 1
 				return
 			}
-			if err := putObjectWithRetry(ctx, c.s3, bucket, key, variant.Data); err != nil {
-				uploadErrs[idx] = fmt.Errorf("imagecache: upload %s: %w", key, err)
+			if err := c.writeObject(ctx, key, variant.Data, revision.MediaType); err != nil {
+				writeErrs[idx] = err
 				return
 			}
 			stats[idx].uploaded = 1
 		}(i, v)
 	}
 	wg.Wait()
-	var total uploadVariantStats
-	for _, err := range uploadErrs {
+	var total writeVariantStats
+	for _, err := range writeErrs {
 		if err != nil {
 			return total, err
 		}
@@ -341,150 +375,52 @@ func (c *Cacher) uploadVariants(ctx context.Context, bucket string, result *imag
 	return total, nil
 }
 
-func variantRevision(result *imageutil.VariantResult) string {
-	h := sha256.New()
-	_, _ = io.WriteString(h, "silo-artwork-v1\x00")
-	_, _ = io.WriteString(h, result.Ext)
-	_, _ = h.Write([]byte{0})
-	variants := append([]imageutil.Variant(nil), result.Variants...)
-	sort.Slice(variants, func(i, j int) bool { return variants[i].Key < variants[j].Key })
-	var size [8]byte
-	for _, variant := range variants {
-		_, _ = io.WriteString(h, variant.Key)
-		_, _ = h.Write([]byte{0})
-		binary.BigEndian.PutUint64(size[:], uint64(len(variant.Data)))
-		_, _ = h.Write(size[:])
-		_, _ = h.Write(variant.Data)
-	}
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-func buildVariantPaths(basePath, revision string, result *imageutil.VariantResult) map[string]string {
-	paths := make(map[string]string, len(result.Variants))
-	for _, variant := range result.Variants {
-		paths[variant.Key] = artworkkey.Build(basePath, variant.Key, revision, result.Ext)
-	}
-	return paths
-}
-
-func (c *Cacher) trackRevision(ctx context.Context, imageType metadata.ImageType, originalPath string, variantPaths map[string]string) error {
+// trackRevision registers every object the revision will occupy, manifest
+// included, before the first write. The tracker refuses paths containing
+// "://", which portable keys never do.
+func (c *Cacher) trackRevision(ctx context.Context, imageType string, revision *artworkkey.PortableRevision) error {
 	if c == nil || c.revisionTracker == nil {
 		return nil
 	}
-	keys := make([]string, 0, len(variantPaths))
-	for _, key := range variantPaths {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	if err := c.revisionTracker.TrackArtworkRevision(ctx, originalPath, metadata.ImageTypeToString(imageType), keys); err != nil {
+	if err := c.revisionTracker.TrackArtworkRevision(ctx, revision.OriginalKey, imageType, revision.ObjectKeys()); err != nil {
 		return fmt.Errorf("imagecache: track artwork revision: %w", err)
 	}
 	return nil
 }
 
-// objectMatches reports whether the object at key already holds exactly data.
-// Backends that cannot verify content report false so the immutable object is
-// rewritten; bare existence must never be accepted as a content match.
-func objectMatches(ctx context.Context, putter ObjectPutter, bucket, key string, data []byte) (bool, error) {
-	matcher, ok := putter.(objectMatcher)
-	if !ok {
-		return false, nil
-	}
-	return matcher.ObjectMatches(ctx, bucket, key, data)
-}
-
-func putObjectWithRetry(ctx context.Context, putter ObjectPutter, bucket, key string, data []byte) error {
+// writeObject stores one immutable object, retrying transient backend
+// failures. Deterministic rejections — a malformed key, or existing bytes that
+// disagree with ours — are returned immediately: retrying cannot change them,
+// and a content mismatch on a content-addressed key means the store is corrupt
+// or someone else wrote there, which must surface rather than be papered over.
+func (c *Cacher) writeObject(ctx context.Context, key string, data []byte, mediaType string) error {
 	const maxAttempts = 3
+	meta := artworkstore.ObjectMetadata{MediaType: mediaType}
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		if err := putter.PutObject(ctx, bucket, key, data); err != nil {
-			lastErr = err
-			if attempt == maxAttempts-1 {
-				// Final attempt failed; return immediately without a pointless backoff.
-				break
-			}
-			timer := time.NewTimer(time.Duration(attempt+1) * 500 * time.Millisecond)
-			select {
-			case <-timer.C:
-				continue
-			case <-ctx.Done():
-				timer.Stop()
-				return ctx.Err()
-			}
+		err := c.store.WriteImmutable(ctx, key, data, meta)
+		if err == nil {
+			return nil
 		}
-		return nil
-	}
-	return lastErr
-}
-
-// buildBasePath constructs the S3 key prefix for a given image. Season
-// posters and episode stills nest under their parent series so a single
-// DeletePrefix on the series prefix cascades to all child images.
-//
-//	item-level:        {provider}/{type}/{id}/{imageType}
-//	localized item:   {provider}/{type}/{id}/localizations/{lang}/{imageType}
-//	season:           {provider}/{type}/{id}/seasons/{n}/{imageType}
-//	localized season: {provider}/{type}/{id}/localizations/{lang}/seasons/{n}/{imageType}
-//	episode:          {provider}/{type}/{id}/seasons/{n}/episodes/{m}/{imageType}
-//
-// A non-empty KeyDiscriminator (local sidecar content hash) is inserted
-// immediately before the image type so the variant's parent directory stays
-// the image type segment (the imageTypeFromCachedPath contract).
-func buildBasePath(req CacheRequest) string {
-	imageTypeName := imageTypeName(req.ImageType)
-	base := fmt.Sprintf("%s/%s/%s", req.ProviderID, req.ContentType, req.ContentID)
-	if lang := normalizeImageLanguage(req.Language); lang != "" {
-		base = fmt.Sprintf("%s/localizations/%s", base, lang)
-	}
-	if req.SeasonNumber != nil {
-		base = fmt.Sprintf("%s/seasons/%d", base, *req.SeasonNumber)
-		if req.EpisodeNumber != nil {
-			base = fmt.Sprintf("%s/episodes/%d", base, *req.EpisodeNumber)
+		lastErr = err
+		if errors.Is(err, artworkstore.ErrContentMismatch) ||
+			errors.Is(err, artworkstore.ErrInvalidKey) ||
+			errors.Is(err, artworkstore.ErrNotRegularFile) {
+			break
+		}
+		if attempt == maxAttempts-1 {
+			// Final attempt failed; return immediately without a pointless backoff.
+			break
+		}
+		timer := time.NewTimer(time.Duration(attempt+1) * 500 * time.Millisecond)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
 		}
 	}
-	if discriminator := strings.TrimSpace(req.KeyDiscriminator); discriminator != "" {
-		base = base + "/" + discriminator
-	}
-	return base + "/" + imageTypeName
-}
-
-// imageTypeName returns the lowercase string name for an ImageType.
-func imageTypeName(t metadata.ImageType) string {
-	switch t {
-	case metadata.ImagePoster:
-		return "poster"
-	case metadata.ImageBackdrop:
-		return "backdrop"
-	case metadata.ImageLogo:
-		return "logo"
-	case metadata.ImageStill:
-		return "still"
-	case metadata.ImageProfile:
-		return "profile"
-	default:
-		return "unknown"
-	}
-}
-
-func normalizeImageLanguage(language string) string {
-	language = strings.ToLower(strings.TrimSpace(language))
-	if language == "" {
-		return ""
-	}
-	var b strings.Builder
-	for _, r := range language {
-		switch {
-		case r >= 'a' && r <= 'z':
-			b.WriteRune(r)
-		case r >= '0' && r <= '9':
-			b.WriteRune(r)
-		case r == '-' || r == '_':
-			b.WriteRune(r)
-		default:
-			b.WriteByte('_')
-		}
-	}
-	return strings.Trim(b.String(), "_")
+	return fmt.Errorf("imagecache: write %s: %w", key, lastErr)
 }
 
 // downloadImage fetches the image at the given URL, enforcing size, timeout,

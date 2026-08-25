@@ -27,6 +27,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/adminjob"
 	"github.com/Silo-Server/silo-server/internal/ai/llm"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/auth"
 	"github.com/Silo-Server/silo-server/internal/cache"
 	"github.com/Silo-Server/silo-server/internal/catalog"
@@ -1608,6 +1609,11 @@ var sensitiveSettingKeys = catalog.SensitiveSettingKeys
 // server_settings store but is not part of the administrator settings API.
 var machineManagedSettingKeys = map[string]bool{
 	config.ArtworkStorageReconcileCheckpointKey: true,
+	// The artwork store pin records what the catalog's live artwork keys were
+	// materialized against. Administrators choose artwork.storage_backend;
+	// editing the pin would let a node reinterpret those keys against
+	// different storage, which is the exact failure it exists to prevent.
+	artworkstore.StorePinSettingKey: true,
 }
 
 func redactAdminSettings(values map[string]string) {

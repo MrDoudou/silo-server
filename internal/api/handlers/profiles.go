@@ -15,6 +15,7 @@ import (
 
 	"github.com/Silo-Server/silo-server/internal/access"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
+	"github.com/Silo-Server/silo-server/internal/artworkupload"
 	evt "github.com/Silo-Server/silo-server/internal/events"
 	"github.com/Silo-Server/silo-server/internal/models"
 	"github.com/Silo-Server/silo-server/internal/userstore"
@@ -28,8 +29,23 @@ type ProfileHandler struct {
 		GetByID(ctx context.Context, id int) (*models.User, error)
 	}
 	ProfileTokens *access.ProfileTokenService
-	AvatarStore   profileAvatarStore
-	AvatarTTL     time.Duration
+	// AvatarStore is the legacy per-profile avatar bucket, kept so avatars
+	// uploaded before profile avatars became content-addressed keep resolving
+	// and keep being cleaned up.
+	AvatarStore profileAvatarStore
+	AvatarTTL   time.Duration
+	// ArtworkUploads materializes uploaded avatars into the canonical artwork
+	// store. Nil means avatar upload is unavailable.
+	ArtworkUploads *artworkupload.Materializer
+	// TrackArtworkRevisions registers uploaded avatar revisions with artwork
+	// garbage collection. Set only when the user store keeps profile rows in
+	// catalog tables (the Postgres backend): the collector's reference union
+	// cannot see rows in per-user SQLite files, so tracking there would delete
+	// live avatars once the grace period expires. Untracked uploads leak their
+	// displaced predecessors instead, which is the safe direction.
+	TrackArtworkRevisions bool
+	// ArtworkURLs resolves a stored avatar key to a URL a client can load.
+	ArtworkURLs ArtworkURLResolver
 	// DeviceLibraryPurger removes a deleted profile's device rows (and, via
 	// cascade, its managed downloads and subscriptions). Profiles may live
 	// outside Postgres, so no FK cascade covers these shared tables.
@@ -227,7 +243,7 @@ func (h *ProfileHandler) HandleListProfiles(w http.ResponseWriter, r *http.Reque
 
 	resp := profileListResponse{
 		Profiles:            h.toProfileResponses(r.Context(), store, profiles),
-		AvatarUploadEnabled: h.AvatarStore != nil,
+		AvatarUploadEnabled: h.ArtworkUploads.Available(),
 	}
 
 	writeJSON(w, http.StatusOK, resp)
@@ -757,7 +773,7 @@ func (h *ProfileHandler) toProfileResponses(
 func (h *ProfileHandler) profileResponseWith(
 	ctx context.Context, p userstore.Profile, prefs profilePreferences,
 ) profileResponse {
-	avatarSource, avatarURL := resolveProfileAvatar(ctx, h.AvatarStore, h.AvatarTTL, p.Avatar)
+	avatarSource, avatarURL := resolveProfileAvatar(ctx, h.ArtworkURLs, h.AvatarStore, h.AvatarTTL, p.Avatar)
 	return profileResponse{
 		ID:                         p.ID,
 		Name:                       p.Name,

@@ -895,12 +895,26 @@ func dirSetToSlice(set map[string]struct{}) []string {
 	return dirs
 }
 
-// imageDeletePrefix returns the S3 prefix to sweep when deleting the content
-// that owns the cached image at path. Local artwork keys carry a content-hash
-// segment (local/{contentType}/{contentID}/{hash8}/{imageType}/...), so local
-// paths trim to local/{contentType}/{contentID}/ — deleting every stale hash
-// prefix, not just the live one. Other keys keep the per-image-type dir.
+// imageDeletePrefix returns the storage prefix to sweep when deleting the
+// content that owns the cached image at path, or "" when the key must not be
+// swept at all.
+//
+// Portable keys (artwork/v1/...) are content-addressed, so one revision
+// directory can be the artwork of several items, people, or libraries at once.
+// A prefix sweep cannot tell those apart, so portable artwork is never swept
+// here: the deletion fires the displacement triggers, and reference-aware
+// revision GC rechecks every catalog surface under a row lock before removing
+// anything.
+//
+// Legacy keys are scoped to one provider item and keep their sweep. Legacy
+// local artwork carries a content-hash segment
+// (local/{contentType}/{contentID}/{hash8}/{imageType}/...), so those trim to
+// local/{contentType}/{contentID}/ — deleting every stale hash prefix, not just
+// the live one. Other legacy keys keep the per-image-type dir.
 func imageDeletePrefix(path string) string {
+	if artworkkey.IsPortableKey(path) {
+		return ""
+	}
 	if !strings.HasPrefix(path, "local/") {
 		return pathDir(path)
 	}

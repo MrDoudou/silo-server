@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/cache"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 
@@ -63,31 +64,28 @@ type pluginImageResolverSourceEntry struct {
 // by parsing the prefix, routing to the correct plugin, and returning resolved URLs.
 // It implements catalog.ImageResolver and the catalog expiry-aware resolver extension.
 type PluginImageResolver struct {
-	mu           sync.RWMutex
-	sources      map[string][]pluginImageResolverSourceEntry
-	s3Presigner  s3ImagePresigner
-	s3PresignTTL time.Duration
-	urlCache     *cache.TTLCache[catalog.ResolvedImageURL]
-	// existsCache remembers which cached artwork rungs are actually in the
-	// bucket, so the ladder fallback costs at most one HEAD per key per window
-	// rather than one per request.
-	existsCache *cache.TTLCache[bool]
-	group       singleflight.Group
+	mu       sync.RWMutex
+	sources  map[string][]pluginImageResolverSourceEntry
+	artwork  artworkURLResolver
+	urlCache *cache.TTLCache[catalog.ResolvedImageURL]
+	group    singleflight.Group
 }
 
 // NewPluginImageResolver creates a new resolver with no registered sources.
 func NewPluginImageResolver() *PluginImageResolver {
 	return &PluginImageResolver{
-		sources:      make(map[string][]pluginImageResolverSourceEntry),
-		s3PresignTTL: 15 * time.Minute,
-		urlCache:     cache.NewTTLCache[catalog.ResolvedImageURL](),
-		existsCache:  cache.NewTTLCache[bool](),
+		sources:  make(map[string][]pluginImageResolverSourceEntry),
+		urlCache: cache.NewTTLCache[catalog.ResolvedImageURL](),
 	}
 }
 
-type s3ImagePresigner interface {
-	PresignGetURL(ctx context.Context, bucket, key string, expiry time.Duration) (string, error)
-	Bucket() string
+// artworkURLResolver mints fetchable URLs for logical artwork keys — the
+// scheme-less paths stored in the catalog's image columns. It hides which
+// backend holds the object: an S3 store returns a presigned, public, or CDN
+// URL the client fetches directly, and a filesystem store returns a short-lived
+// signed URL on Silo's own artwork route. *artworkurl.Resolver implements it.
+type artworkURLResolver interface {
+	ResolveArtworkURLs(ctx context.Context, keys []string) map[string]artworkstore.ResolvedURL
 }
 
 // RegisterSource registers a plugin provider as a source for resolving images
@@ -142,22 +140,22 @@ func ValidImageResolverScheme(scheme string) bool {
 		!strings.Contains(scheme, "://")
 }
 
-func (r *PluginImageResolver) SetS3Presigner(presigner s3ImagePresigner, ttl time.Duration) {
+// SetArtworkURLResolver wires the canonical artwork store's URL minter. Until
+// it is set, stored keys resolve to nothing: a bare key is not a URL, and
+// guessing one would be worse than reporting no image.
+func (r *PluginImageResolver) SetArtworkURLResolver(resolver artworkURLResolver) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.s3Presigner = presigner
-	if ttl > 0 {
-		r.s3PresignTTL = ttl
-	}
+	r.artwork = resolver
+	r.mu.Unlock()
+	// Cached URLs were minted by the previous backend, so drop them rather
+	// than keep serving URLs the new one cannot honor.
+	r.urlCache.InvalidatePrefix("")
 }
 
 // Close stops the resolver cache sweeper.
 func (r *PluginImageResolver) Close() {
 	if r.urlCache != nil {
 		r.urlCache.Close()
-	}
-	if r.existsCache != nil {
-		r.existsCache.Close()
 	}
 }
 
@@ -219,8 +217,7 @@ func (r *PluginImageResolver) ResolveImageURLsWithExpiry(ctx context.Context, pa
 	}
 
 	r.mu.RLock()
-	presigner := r.s3Presigner
-	s3TTL := r.s3PresignTTL
+	artwork := r.artwork
 	sourcesSnapshot := make(map[string][]pluginImageResolverSourceEntry, len(grouped))
 	for pluginID := range grouped {
 		if pluginID == "" {
@@ -237,7 +234,7 @@ func (r *PluginImageResolver) ResolveImageURLsWithExpiry(ctx context.Context, pa
 		flightKey := resolvedImageBatchFlightKey(pluginID, variant, entries)
 		value, err, _ := r.group.Do(flightKey, func() (any, error) {
 			if pluginID == "" {
-				return r.resolveS3Batch(ctx, presigner, s3TTL, entries), nil
+				return resolveStoredArtworkBatch(ctx, artwork, entries), nil
 			}
 			sources := sourcesSnapshot[pluginID]
 			if len(sources) == 0 {
@@ -314,43 +311,31 @@ func (r *PluginImageResolver) resolvePluginBatchWithFallback(
 	return resolved
 }
 
-func (r *PluginImageResolver) resolveS3Batch(
+// resolveStoredArtworkBatch resolves the schemeless paths: keys of objects
+// already held in the canonical artwork store. Whether that produces an
+// object-store URL the client fetches directly or a signed URL served by Silo
+// is the store's decision, not this resolver's.
+//
+// Unresolvable keys are omitted rather than mapped to an empty URL, so callers
+// fall back to whatever they show for missing artwork.
+func resolveStoredArtworkBatch(
 	ctx context.Context,
-	presigner s3ImagePresigner,
-	ttl time.Duration,
+	artwork artworkURLResolver,
 	entries []resolveEntry,
 ) map[string]catalog.ResolvedImageURL {
 	resolved := make(map[string]catalog.ResolvedImageURL, len(entries))
-	if presigner == nil {
+	if artwork == nil {
 		return resolved
 	}
-	// Only the cached-key path walks the ladder: plugin- and http-resolved
-	// images do not live in this bucket and choose their own variant.
-	checker, _ := presigner.(s3ImageExistenceChecker)
-	now := time.Now()
-	expiresAt := now.Add(ttl)
-
-	// Walk the ladder for the whole batch before presigning any of it. Each walk
-	// can cost a HEAD or two against storage, and a browse page resolves a
-	// hundred images: done one after another that is seconds of latency in front
-	// of the JSON. Presigning itself is local signing work, so only this part is
-	// worth parallelizing.
-	ladderKeys := r.resolveLadderKeys(ctx, checker, presigner.Bucket(), entries)
-
-	for _, entry := range entries {
-		resolvedKey := ladderKeys[entry.originalPath]
-		key := resolvedKey.key
-		fellBack := resolvedKey.fellBack
-		url, err := presigner.PresignGetURL(ctx, presigner.Bucket(), key, ttl)
-		if err != nil {
-			slog.ErrorContext(ctx, "s3 image resolution failed", "component", "metadata", "path", key, "error", err)
+	keys := make([]string, len(entries))
+	for i, entry := range entries {
+		keys[i] = entry.originalPath
+	}
+	for key, url := range artwork.ResolveArtworkURLs(ctx, keys) {
+		if url.URL == "" {
 			continue
 		}
-		expiry := expiresAt
-		if fellBack {
-			expiry = fallbackURLExpiry(expiry, now)
-		}
-		resolved[entry.originalPath] = catalog.ResolvedImageURL{URL: url, ExpiresAt: &expiry}
+		resolved[key] = catalog.ResolvedImageURL{URL: url.URL, ExpiresAt: url.ExpiresAt}
 	}
 	return resolved
 }

@@ -1,0 +1,778 @@
+package artworkstore
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+const (
+	testRevision = "9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4d3c2b1a0"
+	testKey      = "artwork/v1/objects/poster/9f/" + testRevision + "/original.webp"
+	siblingKey   = "artwork/v1/objects/poster/9f/" + testRevision + "/w500.webp"
+)
+
+func newTestStore(t *testing.T) *FilesystemStore {
+	t.Helper()
+	store, err := NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFilesystemStore: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Probe(context.Background()); err != nil {
+		t.Fatalf("Probe: %v", err)
+	}
+	return store
+}
+
+func mustWrite(t *testing.T, store *FilesystemStore, key string, data []byte) {
+	t.Helper()
+	if err := store.WriteImmutable(context.Background(), key, data, ObjectMetadata{MediaType: "image/webp"}); err != nil {
+		t.Fatalf("WriteImmutable(%q): %v", key, err)
+	}
+}
+
+func readObject(t *testing.T, store *FilesystemStore, key string) ([]byte, ObjectInfo) {
+	t.Helper()
+	object, err := store.Open(context.Background(), key)
+	if err != nil {
+		t.Fatalf("Open(%q): %v", key, err)
+	}
+	defer func() { _ = object.Close() }()
+	data, err := io.ReadAll(object.Body)
+	if err != nil {
+		t.Fatalf("reading %q: %v", key, err)
+	}
+	return data, object.Info
+}
+
+func TestNewFilesystemStoreRejectsUnusableRoots(t *testing.T) {
+	for _, root := range []string{"", "   ", "relative/path", "/"} {
+		if _, err := NewFilesystemStore(root); err == nil {
+			t.Errorf("NewFilesystemStore(%q) = nil error, want failure", root)
+		}
+	}
+}
+
+func TestWriteImmutableStoresObject(t *testing.T) {
+	store := newTestStore(t)
+	data := []byte("poster-bytes")
+	mustWrite(t, store, testKey, data)
+
+	got, info := readObject(t, store, testKey)
+	if !bytes.Equal(got, data) {
+		t.Fatalf("body = %q, want %q", got, data)
+	}
+	if info.Key != testKey {
+		t.Errorf("Key = %q, want %q", info.Key, testKey)
+	}
+	if info.SizeBytes != int64(len(data)) {
+		t.Errorf("SizeBytes = %d, want %d", info.SizeBytes, len(data))
+	}
+	if info.MediaType != "image/webp" {
+		t.Errorf("MediaType = %q, want image/webp", info.MediaType)
+	}
+	if !strings.HasPrefix(info.ETag, `"`) || !strings.HasSuffix(info.ETag, `"`) || len(info.ETag) < 4 {
+		t.Errorf("ETag = %q, want a quoted entity tag", info.ETag)
+	}
+	if info.ModTime.IsZero() {
+		t.Error("ModTime is zero")
+	}
+
+	statInfo, err := store.Stat(context.Background(), testKey)
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if statInfo != info {
+		t.Errorf("Stat = %+v, want %+v", statInfo, info)
+	}
+
+	// The store is private to the server user; nothing else reads the tree.
+	fileInfo, err := os.Stat(filepath.Join(store.Root(), filepath.FromSlash(testKey)))
+	if err != nil {
+		t.Fatalf("stat on disk: %v", err)
+	}
+	if perm := fileInfo.Mode().Perm(); perm != storeFilePerm {
+		t.Errorf("object permissions = %o, want %o", perm, storeFilePerm)
+	}
+	dirInfo, err := os.Stat(filepath.Dir(filepath.Join(store.Root(), filepath.FromSlash(testKey))))
+	if err != nil {
+		t.Fatalf("stat directory on disk: %v", err)
+	}
+	if perm := dirInfo.Mode().Perm(); perm != storeDirPerm {
+		t.Errorf("directory permissions = %o, want %o", perm, storeDirPerm)
+	}
+}
+
+// TestWriteImmutableIsIdempotent proves a repeated write of identical bytes is
+// a no-op: the pipeline re-materializes the same revision routinely and must
+// not churn the object or leave temporary files behind.
+func TestWriteImmutableIsIdempotent(t *testing.T) {
+	store := newTestStore(t)
+	data := []byte("poster-bytes")
+	mustWrite(t, store, testKey, data)
+
+	diskPath := filepath.Join(store.Root(), filepath.FromSlash(testKey))
+	before, err := os.Stat(diskPath)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+
+	mustWrite(t, store, testKey, data)
+
+	after, err := os.Stat(diskPath)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if !os.SameFile(before, after) {
+		t.Error("second write replaced the stored object; want an untouched no-op")
+	}
+	assertNoTempFiles(t, store)
+	assertDirEntries(t, filepath.Dir(diskPath), 1)
+}
+
+// TestWriteImmutableRejectsDifferentContent is the immutability guard: a key is
+// a content address, so different bytes must never overwrite it.
+func TestWriteImmutableRejectsDifferentContent(t *testing.T) {
+	store := newTestStore(t)
+	original := []byte("poster-bytes")
+	mustWrite(t, store, testKey, original)
+
+	err := store.WriteImmutable(context.Background(), testKey, []byte("different-bytes"), ObjectMetadata{})
+	if !errors.Is(err, ErrContentMismatch) {
+		t.Fatalf("WriteImmutable = %v, want ErrContentMismatch", err)
+	}
+	got, _ := readObject(t, store, testKey)
+	if !bytes.Equal(got, original) {
+		t.Fatalf("stored bytes = %q, want the original %q", got, original)
+	}
+	assertNoTempFiles(t, store)
+}
+
+func TestWriteImmutableRejectsEmptyData(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.WriteImmutable(context.Background(), testKey, nil, ObjectMetadata{}); err == nil {
+		t.Fatal("WriteImmutable(nil) = nil, want an error")
+	}
+	if _, err := store.Stat(context.Background(), testKey); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("Stat = %v, want ErrNotFound", err)
+	}
+}
+
+// TestWriteImmutableConcurrentSameKey exercises the case the cache queue
+// actually produces: several workers materializing the same revision at once.
+// Every writer must succeed and the object must be complete.
+func TestWriteImmutableConcurrentSameKey(t *testing.T) {
+	store := newTestStore(t)
+	data := bytes.Repeat([]byte("poster"), 4096)
+
+	const writers = 8
+	start := make(chan struct{})
+	errs := make(chan error, writers)
+	var wg sync.WaitGroup
+	for i := 0; i < writers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			errs <- store.WriteImmutable(context.Background(), testKey, data, ObjectMetadata{})
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent WriteImmutable: %v", err)
+		}
+	}
+	got, _ := readObject(t, store, testKey)
+	if !bytes.Equal(got, data) {
+		t.Fatalf("stored bytes differ from the written bytes (%d vs %d)", len(got), len(data))
+	}
+	assertNoTempFiles(t, store)
+	assertDirEntries(t, filepath.Dir(filepath.Join(store.Root(), filepath.FromSlash(testKey))), 1)
+}
+
+// TestWriteImmutableConcurrentDifferentContent is the pathological case: two
+// payloads racing for one key. Exactly one content may win, losers must see
+// ErrContentMismatch, and the stored object must never be a blend of the two.
+func TestWriteImmutableConcurrentDifferentContent(t *testing.T) {
+	store := newTestStore(t)
+	first := bytes.Repeat([]byte("a"), 8192)
+	second := bytes.Repeat([]byte("b"), 8192)
+
+	const writersPerPayload = 4
+	start := make(chan struct{})
+	errs := make(chan error, writersPerPayload*2)
+	var wg sync.WaitGroup
+	for i := 0; i < writersPerPayload; i++ {
+		for _, payload := range [][]byte{first, second} {
+			wg.Add(1)
+			go func(data []byte) {
+				defer wg.Done()
+				<-start
+				errs <- store.WriteImmutable(context.Background(), testKey, data, ObjectMetadata{})
+			}(payload)
+		}
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	succeeded := 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			succeeded++
+		case errors.Is(err, ErrContentMismatch):
+		default:
+			t.Fatalf("concurrent WriteImmutable = %v, want nil or ErrContentMismatch", err)
+		}
+	}
+	if succeeded == 0 {
+		t.Fatal("no writer succeeded")
+	}
+	got, _ := readObject(t, store, testKey)
+	if !bytes.Equal(got, first) && !bytes.Equal(got, second) {
+		t.Fatal("stored object matches neither payload; a write was torn")
+	}
+	assertNoTempFiles(t, store)
+}
+
+// TestWriteWhileGarbageCollectionPrunes covers the real interaction between
+// materialization and reference-aware GC: deleting the last object in a
+// revision directory prunes it, and a writer that loses its destination
+// directory mid-write must recover instead of failing the cache job.
+func TestWriteWhileGarbageCollectionPrunes(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	data := []byte("poster-bytes")
+
+	// One materialization per round, each followed by the GC deleting that
+	// revision — the deleter never spins, so a write only ever contends with a
+	// prune that a real cleanup pass would also perform.
+	const rounds = 100
+	written := make(chan struct{}, 1)
+	var wg sync.WaitGroup
+	failures := make(chan error, 2)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		defer close(written)
+		for i := 0; i < rounds; i++ {
+			if err := store.WriteImmutable(ctx, testKey, data, ObjectMetadata{}); err != nil {
+				failures <- err
+				return
+			}
+			written <- struct{}{}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for range written {
+			if _, err := store.DeleteObjects(ctx, []string{testKey}); err != nil {
+				failures <- err
+				return
+			}
+		}
+	}()
+	wg.Wait()
+	close(failures)
+	for err := range failures {
+		t.Fatalf("write/delete race: %v", err)
+	}
+	assertNoTempFiles(t, store)
+}
+
+func TestIsLinkUnsupported(t *testing.T) {
+	if isLinkUnsupported(os.ErrExist) {
+		t.Error("an existing destination must not be mistaken for a filesystem without hard links")
+	}
+	if isLinkUnsupported(os.ErrNotExist) {
+		t.Error("a missing source must not be mistaken for a filesystem without hard links")
+	}
+	if !isLinkUnsupported(errors.ErrUnsupported) {
+		t.Error("ErrUnsupported must select the rename fallback")
+	}
+	if !isLinkUnsupported(os.ErrPermission) {
+		t.Error("a refused link must select the rename fallback")
+	}
+}
+
+// TestInvalidKeysAreRejectedByEveryOperation makes sure key validation is not
+// only in the write path: a signed delivery URL reaches Open and Stat, and GC
+// reaches DeleteObjects.
+func TestInvalidKeysAreRejectedByEveryOperation(t *testing.T) {
+	store := newTestStore(t)
+
+	outsideDir := t.TempDir()
+	secretPath := filepath.Join(outsideDir, "secret.txt")
+	if err := os.WriteFile(secretPath, []byte("secret"), 0o600); err != nil {
+		t.Fatalf("seeding outside file: %v", err)
+	}
+
+	badKeys := []string{
+		"",
+		"../" + filepath.Base(outsideDir) + "/secret.txt",
+		"artwork/../../" + filepath.Base(outsideDir) + "/secret.txt",
+		secretPath,
+		"artwork/v1\x00/original.webp",
+		`artwork\v1\original.webp`,
+		".silo-artwork-store",
+		"artwork/v1/" + tempFilePrefix + "abc",
+		"artwork//v1/original.webp",
+	}
+	ctx := context.Background()
+	for _, key := range badKeys {
+		if err := store.WriteImmutable(ctx, key, []byte("x"), ObjectMetadata{}); !errors.Is(err, ErrInvalidKey) {
+			t.Errorf("WriteImmutable(%q) = %v, want ErrInvalidKey", key, err)
+		}
+		if _, err := store.Open(ctx, key); !errors.Is(err, ErrInvalidKey) {
+			t.Errorf("Open(%q) = %v, want ErrInvalidKey", key, err)
+		}
+		if _, err := store.Stat(ctx, key); !errors.Is(err, ErrInvalidKey) {
+			t.Errorf("Stat(%q) = %v, want ErrInvalidKey", key, err)
+		}
+		if _, err := store.Matches(ctx, key, []byte("x")); !errors.Is(err, ErrInvalidKey) {
+			t.Errorf("Matches(%q) = %v, want ErrInvalidKey", key, err)
+		}
+		deleted, err := store.DeleteObjects(ctx, []string{key})
+		if !errors.Is(err, ErrInvalidKey) {
+			t.Errorf("DeleteObjects(%q) = %v, want ErrInvalidKey", key, err)
+		}
+		if deleted != 0 {
+			t.Errorf("DeleteObjects(%q) deleted %d, want 0", key, deleted)
+		}
+	}
+
+	if data, err := os.ReadFile(secretPath); err != nil || string(data) != "secret" {
+		t.Fatalf("outside file was disturbed: data=%q err=%v", data, err)
+	}
+	entries, err := os.ReadDir(store.Root())
+	if err != nil {
+		t.Fatalf("reading store root: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("store root has %d entries after rejected keys, want 0", len(entries))
+	}
+}
+
+// TestOperationsRefuseSymlinkedObject covers a tampered or hand-built store:
+// an entry that is not a plain file is reported as corruption instead of being
+// followed, so artwork delivery can never read an arbitrary file and an
+// immutable write can never clobber a symlink target.
+func TestOperationsRefuseSymlinkedObject(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	outsideDir := t.TempDir()
+	targetPath := filepath.Join(outsideDir, "outside.txt")
+	if err := os.WriteFile(targetPath, []byte("outside-bytes"), 0o600); err != nil {
+		t.Fatalf("seeding outside file: %v", err)
+	}
+
+	// An in-root object the second symlink can point at.
+	mustWrite(t, store, siblingKey, []byte("sibling-bytes"))
+
+	linkPath := filepath.Join(store.Root(), filepath.FromSlash(testKey))
+	if err := os.MkdirAll(filepath.Dir(linkPath), storeDirPerm); err != nil {
+		t.Fatalf("creating directory: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		target string
+	}{
+		{"escaping symlink", targetPath},
+		{"in-root symlink", filepath.Join(store.Root(), filepath.FromSlash(siblingKey))},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := os.Remove(linkPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("clearing link: %v", err)
+			}
+			if err := os.Symlink(tc.target, linkPath); err != nil {
+				t.Fatalf("creating symlink: %v", err)
+			}
+
+			if object, err := store.Open(ctx, testKey); err == nil {
+				_ = object.Close()
+				t.Fatal("Open followed a symlink")
+			} else if !errors.Is(err, ErrNotRegularFile) {
+				t.Fatalf("Open = %v, want ErrNotRegularFile", err)
+			}
+			if _, err := store.Stat(ctx, testKey); !errors.Is(err, ErrNotRegularFile) {
+				t.Fatalf("Stat = %v, want ErrNotRegularFile", err)
+			}
+			if _, err := store.Matches(ctx, testKey, []byte("outside-bytes")); !errors.Is(err, ErrNotRegularFile) {
+				t.Fatalf("Matches = %v, want ErrNotRegularFile", err)
+			}
+			if err := store.WriteImmutable(ctx, testKey, []byte("new-bytes"), ObjectMetadata{}); !errors.Is(err, ErrNotRegularFile) {
+				t.Fatalf("WriteImmutable = %v, want ErrNotRegularFile", err)
+			}
+			if data, err := os.ReadFile(targetPath); err != nil || string(data) != "outside-bytes" {
+				t.Fatalf("symlink target was modified: data=%q err=%v", data, err)
+			}
+		})
+	}
+
+	// GC must still be able to remove the corrupt entry, and doing so must not
+	// touch what it pointed at.
+	deleted, err := store.DeleteObjects(ctx, []string{testKey})
+	if err != nil || deleted != 1 {
+		t.Fatalf("DeleteObjects = (%d, %v), want (1, nil)", deleted, err)
+	}
+	if _, err := os.Lstat(linkPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("symlink still present: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(store.Root(), filepath.FromSlash(siblingKey))); err != nil {
+		t.Fatalf("symlink target inside the store was removed: %v", err)
+	}
+}
+
+// TestWriteRefusesSymlinkedDirectoryEscape covers a symlinked *directory*
+// planted inside the tree: os.Root must keep the write from landing outside
+// the configured root.
+func TestWriteRefusesSymlinkedDirectoryEscape(t *testing.T) {
+	store := newTestStore(t)
+	outsideDir := t.TempDir()
+
+	linkDir := filepath.Join(store.Root(), "artwork")
+	if err := os.Symlink(outsideDir, linkDir); err != nil {
+		t.Fatalf("creating directory symlink: %v", err)
+	}
+
+	err := store.WriteImmutable(context.Background(), testKey, []byte("poster-bytes"), ObjectMetadata{})
+	if err == nil {
+		t.Fatal("WriteImmutable through an escaping directory symlink succeeded")
+	}
+	entries, err := os.ReadDir(outsideDir)
+	if err != nil {
+		t.Fatalf("reading outside dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("wrote %d entries outside the store root", len(entries))
+	}
+}
+
+func TestMatchesReportsStoredContent(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	data := []byte("poster-bytes")
+
+	matched, err := store.Matches(ctx, testKey, data)
+	if err != nil || matched {
+		t.Fatalf("Matches on a missing object = (%v, %v), want (false, nil)", matched, err)
+	}
+
+	mustWrite(t, store, testKey, data)
+
+	if matched, err := store.Matches(ctx, testKey, data); err != nil || !matched {
+		t.Fatalf("Matches = (%v, %v), want (true, nil)", matched, err)
+	}
+	if matched, err := store.Matches(ctx, testKey, []byte("other-bytes!")); err != nil || matched {
+		t.Fatalf("Matches with different bytes of equal length = (%v, %v), want (false, nil)", matched, err)
+	}
+	if matched, err := store.Matches(ctx, testKey, []byte("short")); err != nil || matched {
+		t.Fatalf("Matches with different length = (%v, %v), want (false, nil)", matched, err)
+	}
+}
+
+// TestOpenBodyIsSeekable pins what the signed delivery route needs: a body it
+// can hand to http.ServeContent so a range request is answered without reading
+// the object into memory.
+func TestOpenBodyIsSeekable(t *testing.T) {
+	store := newTestStore(t)
+	data := []byte("poster-bytes")
+	mustWrite(t, store, testKey, data)
+
+	object, err := store.Open(context.Background(), testKey)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = object.Close() }()
+
+	seeker, ok := object.ReadSeeker()
+	if !ok {
+		t.Fatal("filesystem object body is not seekable")
+	}
+	if _, err := seeker.Seek(7, io.SeekStart); err != nil {
+		t.Fatalf("Seek: %v", err)
+	}
+	tail, err := io.ReadAll(seeker)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if string(tail) != "bytes" {
+		t.Fatalf("tail = %q, want %q", tail, "bytes")
+	}
+}
+
+func TestOpenAndStatMissingObject(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if _, err := store.Open(ctx, testKey); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("Open = %v, want ErrNotFound", err)
+	}
+	if _, err := store.Stat(ctx, testKey); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("Stat = %v, want ErrNotFound", err)
+	}
+}
+
+// TestDeleteObjectsCountsAndPrunes pins the two behaviors the revision GC
+// depends on: an already-absent key counts as deleted (matching the S3 batch
+// delete the GC's strict count check was written against), and emptied
+// revision directories do not accumulate.
+func TestDeleteObjectsCountsAndPrunes(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	mustWrite(t, store, testKey, []byte("poster-bytes"))
+	mustWrite(t, store, siblingKey, []byte("variant-bytes"))
+
+	missingKey := "artwork/v1/objects/poster/9f/" + testRevision + "/w300.webp"
+	deleted, err := store.DeleteObjects(ctx, []string{testKey, missingKey})
+	if err != nil {
+		t.Fatalf("DeleteObjects: %v", err)
+	}
+	if deleted != 2 {
+		t.Fatalf("deleted = %d, want 2 (a missing key counts as deleted)", deleted)
+	}
+	revisionDir := filepath.Dir(filepath.Join(store.Root(), filepath.FromSlash(testKey)))
+	if _, err := os.Stat(revisionDir); err != nil {
+		t.Fatalf("revision directory removed while it still holds an object: %v", err)
+	}
+
+	deleted, err = store.DeleteObjects(ctx, []string{siblingKey})
+	if err != nil {
+		t.Fatalf("DeleteObjects: %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("deleted = %d, want 1", deleted)
+	}
+	if _, err := os.Stat(revisionDir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("emptied revision directory was not pruned: %v", err)
+	}
+	// The fixed levels above the revision — format, image type, shard — stay,
+	// so deletes never fight concurrent materializations for them.
+	if _, err := os.Stat(filepath.Dir(revisionDir)); err != nil {
+		t.Fatalf("shard directory was pruned: %v", err)
+	}
+
+	if deleted, err := store.DeleteObjects(ctx, nil); deleted != 0 || err != nil {
+		t.Fatalf("DeleteObjects(nil) = (%d, %v), want (0, nil)", deleted, err)
+	}
+}
+
+func TestDeleteObjectsReportsPerKeyFailures(t *testing.T) {
+	store := newTestStore(t)
+	mustWrite(t, store, testKey, []byte("poster-bytes"))
+
+	deleted, err := store.DeleteObjects(context.Background(), []string{testKey, "../escape"})
+	if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("DeleteObjects = %v, want ErrInvalidKey", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("deleted = %d, want 1 (the valid key still goes)", deleted)
+	}
+}
+
+// TestCleanTempFilesRemovesCrashDebris simulates a crash mid-write: temporary
+// files left behind are invisible to the catalog but still occupy bytes.
+func TestCleanTempFilesRemovesCrashDebris(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	mustWrite(t, store, testKey, []byte("poster-bytes"))
+
+	revisionDir := filepath.Dir(filepath.Join(store.Root(), filepath.FromSlash(testKey)))
+	stale := filepath.Join(revisionDir, tempFilePrefix+"staleentry01")
+	staleAtRoot := filepath.Join(store.Root(), tempFilePrefix+"staleroot0001")
+	fresh := filepath.Join(revisionDir, tempFilePrefix+"freshentry01")
+	for _, path := range []string{stale, staleAtRoot, fresh} {
+		if err := os.WriteFile(path, []byte("partial"), storeFilePerm); err != nil {
+			t.Fatalf("seeding %s: %v", path, err)
+		}
+	}
+	old := time.Now().Add(-48 * time.Hour)
+	for _, path := range []string{stale, staleAtRoot} {
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatalf("aging %s: %v", path, err)
+		}
+	}
+
+	removed, err := store.CleanTempFiles(ctx, time.Hour)
+	if err != nil {
+		t.Fatalf("CleanTempFiles: %v", err)
+	}
+	if removed != 2 {
+		t.Fatalf("removed = %d, want 2", removed)
+	}
+	for _, path := range []string{stale, staleAtRoot} {
+		if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("stale temporary file %s survived: %v", path, err)
+		}
+	}
+	if _, err := os.Lstat(fresh); err != nil {
+		t.Errorf("in-flight temporary file was deleted: %v", err)
+	}
+	if _, err := store.Stat(ctx, testKey); err != nil {
+		t.Errorf("stored object was disturbed: %v", err)
+	}
+
+	// A non-positive grace falls back to DefaultTempFileGrace rather than
+	// deleting everything in flight.
+	if _, err := store.CleanTempFiles(ctx, 0); err != nil {
+		t.Fatalf("CleanTempFiles with default grace: %v", err)
+	}
+	if _, err := os.Lstat(fresh); err != nil {
+		t.Errorf("default grace removed an in-flight temporary file: %v", err)
+	}
+}
+
+func TestProbeCreatesRootAndLeavesNoResidue(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "nested", "artwork")
+	store, err := NewFilesystemStore(root)
+	if err != nil {
+		t.Fatalf("NewFilesystemStore: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Probe(context.Background()); err != nil {
+		t.Fatalf("Probe: %v", err)
+	}
+	info, err := os.Stat(root)
+	if err != nil {
+		t.Fatalf("stat root: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatal("root is not a directory")
+	}
+	if perm := info.Mode().Perm(); perm != storeDirPerm {
+		t.Errorf("root permissions = %o, want %o", perm, storeDirPerm)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("reading root: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("probe left %d entries behind", len(entries))
+	}
+}
+
+func TestProbeFailsWhenRootIsAFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "artwork")
+	if err := os.WriteFile(path, []byte("not a store"), 0o600); err != nil {
+		t.Fatalf("seeding file: %v", err)
+	}
+	store, err := NewFilesystemStore(path)
+	if err != nil {
+		t.Fatalf("NewFilesystemStore: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Probe(context.Background()); err == nil {
+		t.Fatal("Probe on a file root = nil, want failure")
+	}
+}
+
+func TestProbeFailsWhenRootIsNotWritable(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: permission bits do not restrict writes")
+	}
+	root := filepath.Join(t.TempDir(), "artwork")
+	if err := os.MkdirAll(root, 0o500); err != nil {
+		t.Fatalf("creating read-only root: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(root, 0o700) })
+
+	store, err := NewFilesystemStore(root)
+	if err != nil {
+		t.Fatalf("NewFilesystemStore: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Probe(context.Background()); err == nil {
+		t.Fatal("Probe on an unwritable root = nil, want failure")
+	}
+}
+
+func TestOperationsRespectContextCancellation(t *testing.T) {
+	store := newTestStore(t)
+	mustWrite(t, store, testKey, []byte("poster-bytes"))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := store.WriteImmutable(ctx, siblingKey, []byte("x"), ObjectMetadata{}); !errors.Is(err, context.Canceled) {
+		t.Errorf("WriteImmutable = %v, want context.Canceled", err)
+	}
+	if _, err := store.Open(ctx, testKey); !errors.Is(err, context.Canceled) {
+		t.Errorf("Open = %v, want context.Canceled", err)
+	}
+	if _, err := store.Stat(ctx, testKey); !errors.Is(err, context.Canceled) {
+		t.Errorf("Stat = %v, want context.Canceled", err)
+	}
+	if _, err := store.Matches(ctx, testKey, []byte("x")); !errors.Is(err, context.Canceled) {
+		t.Errorf("Matches = %v, want context.Canceled", err)
+	}
+	if _, err := store.DeleteObjects(ctx, []string{testKey}); !errors.Is(err, context.Canceled) {
+		t.Errorf("DeleteObjects = %v, want context.Canceled", err)
+	}
+	if err := store.Probe(ctx); !errors.Is(err, context.Canceled) {
+		t.Errorf("Probe = %v, want context.Canceled", err)
+	}
+}
+
+// TestFilesystemStoreProvidesNoDirectURLs pins the delivery contract: local
+// objects are served through the signed artwork route, never as a direct URL,
+// so no local path can leak into a client URL.
+func TestFilesystemStoreProvidesNoDirectURLs(t *testing.T) {
+	var store Store = &FilesystemStore{}
+	if _, ok := store.(DirectURLProvider); ok {
+		t.Fatal("FilesystemStore implements DirectURLProvider; local stores must not mint direct URLs")
+	}
+}
+
+func TestClosedStoreFailsCleanly(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := store.WriteImmutable(context.Background(), testKey, []byte("x"), ObjectMetadata{}); err == nil {
+		t.Fatal("WriteImmutable on a closed store = nil, want an error")
+	}
+}
+
+func assertNoTempFiles(t *testing.T, store *FilesystemStore) {
+	t.Helper()
+	err := filepath.WalkDir(store.Root(), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), tempFilePrefix) {
+			t.Errorf("temporary file left behind: %s", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking store: %v", err)
+	}
+}
+
+func assertDirEntries(t *testing.T, dir string, want int) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("reading %s: %v", dir, err)
+	}
+	if len(entries) != want {
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		t.Fatalf("%s holds %d entries (%s), want %d", dir, len(entries), strings.Join(names, ", "), want)
+	}
+}

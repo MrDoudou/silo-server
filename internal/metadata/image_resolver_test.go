@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -326,44 +327,64 @@ func TestPluginImageResolverCoalescesConcurrentBatchMisses(t *testing.T) {
 	}
 }
 
-type fakeS3ImagePresigner struct {
+// fakeArtworkURLResolver stands in for the canonical artwork store's URL
+// minter. It counts batches so the caching assertions can tell a cache hit
+// from a re-mint.
+type fakeArtworkURLResolver struct {
 	calls int
 	ttl   time.Duration
 }
 
-func (p *fakeS3ImagePresigner) PresignGetURL(_ context.Context, _ string, key string, expiry time.Duration) (string, error) {
-	p.calls++
-	p.ttl = expiry
-	return fmt.Sprintf("s3:%s:%d", key, p.calls), nil
+func (r *fakeArtworkURLResolver) ResolveArtworkURLs(_ context.Context, keys []string) map[string]artworkstore.ResolvedURL {
+	r.calls++
+	expiresAt := time.Now().Add(r.ttl)
+	resolved := make(map[string]artworkstore.ResolvedURL, len(keys))
+	for _, key := range keys {
+		resolved[key] = artworkstore.ResolvedURL{
+			URL:       fmt.Sprintf("https://artwork.test/%s?mint=%d", key, r.calls),
+			ExpiresAt: &expiresAt,
+		}
+	}
+	return resolved
 }
 
-func (p *fakeS3ImagePresigner) Bucket() string {
-	return "metadata"
-}
-
-func TestPluginImageResolverS3URLsCarryConfiguredExpiry(t *testing.T) {
-	presigner := &fakeS3ImagePresigner{}
+func TestPluginImageResolverStoredArtworkURLsCarryExpiry(t *testing.T) {
+	artwork := &fakeArtworkURLResolver{ttl: 10 * time.Minute}
 	resolver := NewPluginImageResolver()
 	defer resolver.Close()
-	resolver.SetS3Presigner(presigner, 10*time.Minute)
+	resolver.SetArtworkURLResolver(artwork)
 
+	const key = "artwork/v1/objects/poster/ab/abcd/original.webp"
 	before := time.Now()
-	first := resolver.ResolveImageURLWithExpiry(context.Background(), "poster.jpg", "featured")
-	second := resolver.ResolveImageURLWithExpiry(context.Background(), "poster.jpg", "featured")
+	first := resolver.ResolveImageURLWithExpiry(context.Background(), key, "featured")
+	second := resolver.ResolveImageURLWithExpiry(context.Background(), key, "featured")
 
 	if first.URL == "" || second.URL != first.URL {
-		t.Fatalf("cached S3 URLs = first %q second %q", first.URL, second.URL)
+		t.Fatalf("cached artwork URLs = first %q second %q", first.URL, second.URL)
 	}
-	if presigner.calls != 1 {
-		t.Fatalf("s3 presign calls = %d, want 1", presigner.calls)
-	}
-	if presigner.ttl != 10*time.Minute {
-		t.Fatalf("s3 presign ttl = %s, want 10m", presigner.ttl)
+	if artwork.calls != 1 {
+		t.Fatalf("artwork resolutions = %d, want 1", artwork.calls)
 	}
 	if first.ExpiresAt == nil {
-		t.Fatal("S3 resolved URL missing expiry")
+		t.Fatal("resolved artwork URL missing expiry")
 	}
 	if first.ExpiresAt.Before(before.Add(9*time.Minute)) || first.ExpiresAt.After(before.Add(11*time.Minute)) {
-		t.Fatalf("S3 expiry = %s, want about 10m from now", first.ExpiresAt.Sub(before))
+		t.Fatalf("artwork expiry = %s, want about 10m from now", first.ExpiresAt.Sub(before))
+	}
+}
+
+// Without a store URL minter a bare key is not a URL, and inventing one would
+// publish a reference no client can fetch.
+func TestPluginImageResolverWithoutArtworkResolverReturnsNoURL(t *testing.T) {
+	resolver := NewPluginImageResolver()
+	defer resolver.Close()
+
+	resolved := resolver.ResolveImageURLWithExpiry(
+		context.Background(),
+		"artwork/v1/objects/poster/ab/abcd/original.webp",
+		"featured",
+	)
+	if resolved.URL != "" {
+		t.Fatalf("resolved URL = %q, want empty", resolved.URL)
 	}
 }

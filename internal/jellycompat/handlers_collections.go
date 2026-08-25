@@ -240,10 +240,9 @@ func (h *ItemsHandler) boxSetFromCollection(ctx context.Context, c *models.Libra
 }
 
 // presignCollectionPoster resolves a collection artwork reference to a
-// fetchable URL. Collection posters are stored as S3 keys in the
-// general-purpose bucket (same bucket as library posters); absolute and
-// app-relative references pass through untouched (matching the main API's
-// presignGPURL semantics).
+// fetchable URL. Collection posters are stored as artwork keys (the same
+// storage library posters use); absolute and app-relative references pass
+// through untouched (matching the main API's presignGPURL semantics).
 func (h *ItemsHandler) presignCollectionPoster(ctx context.Context, path string) string {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -252,18 +251,14 @@ func (h *ItemsHandler) presignCollectionPoster(ctx context.Context, path string)
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "/") {
 		return path
 	}
-	if h.posterPresigner == nil {
+	if h.artworkURLs == nil {
 		return ""
 	}
-	ttl := h.presignTTL
-	if ttl <= 0 {
-		ttl = 4 * time.Hour
-	}
-	url, err := h.posterPresigner.PresignGetURL(ctx, h.posterPresigner.Bucket(), path, ttl)
+	resolved, err := h.artworkURLs.ResolveArtworkURL(ctx, path)
 	if err != nil {
 		return ""
 	}
-	return url
+	return resolved.URL
 }
 
 // boxSetsByIDs maps the given collection IDs to BoxSet DTOs, skipping any the

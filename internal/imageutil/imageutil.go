@@ -17,14 +17,31 @@ import (
 )
 
 const (
-	webpQuality              = 90
-	thumbhashSourceDimension = 100
+	webpQuality                = 90
+	maxCachedOriginalDimension = 1920
+	thumbhashSourceDimension   = 100
+
+	// maxSourcePixels bounds the decoded size of any source image before the
+	// pipeline fully decodes it. Byte limits on uploads do not bound pixels: a
+	// ~1 MB PNG can declare tens of thousands of pixels per side and cost
+	// gigabytes of RAM and minutes of CPU to decode (a decompression bomb).
+	// 80 MP comfortably exceeds 8K artwork (~33 MP) and current consumer
+	// camera sensors while capping a single decode at a few hundred MB.
+	maxSourcePixels = 80_000_000
 )
 
-// MaxCachedOriginalDimension caps the longest edge of a cached "original"
-// variant. Provider artwork wider than this is downscaled on ingest, so a
-// client asking for the original size never receives more pixels than this.
-const MaxCachedOriginalDimension = 1920
+// checkSourceDimensions rejects images whose header-declared dimensions are
+// invalid or would decode to more than maxSourcePixels. Dimensions come from a
+// cheap header read, so the check runs before any full decode.
+func checkSourceDimensions(width, height int) error {
+	if width <= 0 || height <= 0 {
+		return fmt.Errorf("imageutil: invalid image dimensions %dx%d", width, height)
+	}
+	if int64(width)*int64(height) > maxSourcePixels {
+		return fmt.Errorf("imageutil: image dimensions %dx%d exceed the %d-pixel limit", width, height, maxSourcePixels)
+	}
+	return nil
+}
 
 // Variant holds a named image variant (e.g. "original", "w500").
 type Variant struct {
@@ -51,6 +68,9 @@ func GenerateVariants(data []byte, widths []int) (*VariantResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("imageutil: invalid image: %w", err)
 	}
+	if err := checkSourceDimensions(size.Width, size.Height); err != nil {
+		return nil, err
+	}
 
 	variants := make([]Variant, 0, len(widths)+1)
 
@@ -61,7 +81,7 @@ func GenerateVariants(data []byte, widths []int) (*VariantResult, error) {
 		Quality:       webpQuality,
 		StripMetadata: true,
 	}
-	fitWithin(&originalOptions, size, MaxCachedOriginalDimension)
+	fitWithin(&originalOptions, size, maxCachedOriginalDimension)
 	original, err := bimg.NewImage(data).Process(originalOptions)
 	if err != nil {
 		return nil, fmt.Errorf("imageutil: encode original: %w", err)
@@ -100,6 +120,9 @@ func GenerateSquareVariants(data []byte, sizes []int) (*VariantResult, error) {
 	size, err := img.Size()
 	if err != nil {
 		return nil, fmt.Errorf("imageutil: invalid image: %w", err)
+	}
+	if err := checkSourceDimensions(size.Width, size.Height); err != nil {
+		return nil, err
 	}
 
 	squareSize := size.Width
@@ -198,6 +221,9 @@ func normalizeThumbhashSource(data []byte) ([]byte, error) {
 	size, err := img.Size()
 	if err != nil {
 		return nil, fmt.Errorf("imageutil: invalid image: %w", err)
+	}
+	if err := checkSourceDimensions(size.Width, size.Height); err != nil {
+		return nil, err
 	}
 	opts := bimg.Options{
 		Type:          bimg.PNG,

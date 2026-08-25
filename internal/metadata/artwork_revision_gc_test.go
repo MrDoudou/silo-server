@@ -25,9 +25,7 @@ type blockingArtworkRevisionDeleter struct {
 	deleted [][]string
 }
 
-func (d *blockingArtworkRevisionDeleter) Bucket() string { return "artwork" }
-
-func (d *blockingArtworkRevisionDeleter) DeleteObjects(ctx context.Context, _ string, keys []string) (int, error) {
+func (d *blockingArtworkRevisionDeleter) DeleteObjects(ctx context.Context, keys []string) (int, error) {
 	d.once.Do(func() { close(d.started) })
 	if d.release != nil {
 		select {

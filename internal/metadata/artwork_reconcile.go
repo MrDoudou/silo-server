@@ -14,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
 // Retry parameters for the bulk-reset UPDATEs below. They run concurrently
@@ -72,11 +74,12 @@ func retryOnDeadlock(ctx context.Context, op func() error) error {
 	}
 }
 
-// ArtworkObjectChecker is the S3 surface the reconciler needs: existence
-// checks against the public asset bucket. Satisfied by *s3client.Client.
+// ArtworkObjectChecker is the artwork-store surface the reconciler needs:
+// existence checks by logical key. Every backend satisfies it, so the
+// reconciler heals rows whose objects vanished from a bucket and from a
+// filesystem store identically.
 type ArtworkObjectChecker interface {
-	ObjectExists(ctx context.Context, bucket, key string) (bool, error)
-	Bucket() string
+	Stat(ctx context.Context, key string) (artworkstore.ObjectInfo, error)
 }
 
 // nonProviderImageSchemesSQL mirrors isNonProviderImageScheme for use inside
@@ -264,10 +267,16 @@ func (s artworkSweepSurface) parseKeys(raw []string) ([]any, error) {
 	return values, nil
 }
 
+// cachedPredicate selects rows whose path column holds a store object key.
+// A scheme-bearing value is a remote source, and a leading slash is an
+// app-relative bundled asset (collection template posters, avatar presets)
+// served straight from the frontend — neither is an object this sweep can look
+// up, and clearing a bundled asset because the store has no such key would
+// discard a perfectly good image.
 func (s artworkSweepSurface) cachedPredicate() string {
 	return fmt.Sprintf(
-		`coalesce(%s, '') NOT IN ('', '-') AND %s NOT LIKE '%%://%%'`,
-		s.pathCol, s.pathCol,
+		`coalesce(%s, '') NOT IN ('', '-') AND %s NOT LIKE '%%://%%' AND %s NOT LIKE '/%%'`,
+		s.pathCol, s.pathCol, s.pathCol,
 	)
 }
 
@@ -336,20 +345,39 @@ func artworkSweepSurfaces() []artworkSweepSurface {
 	}
 }
 
-// ArtworkCacheReconciler verifies cached artwork keys against the public S3
-// bucket and resets rows whose objects are missing, so the existing pipelines
-// (image cache queue, book enrichment, chapter thumbnail backfill, collection
-// collage generation) rebuild them in the currently configured storage.
+// ArtworkCacheReconciler verifies cached artwork keys against the canonical
+// artwork store and resets rows whose objects are missing, so the existing
+// pipelines (image cache queue, book enrichment, chapter thumbnail backfill,
+// collection collage generation) rebuild them in the currently configured
+// storage.
 type ArtworkCacheReconciler struct {
-	pool *pgxpool.Pool
-	s3   ArtworkObjectChecker
+	pool  *pgxpool.Pool
+	store ArtworkObjectChecker
+	// chapterStore verifies chapter-thumbnail keys. Chapter thumbnails are
+	// written by internal/chapterthumbs straight to the public S3 bucket, not
+	// through the canonical artwork store, so on a local-pinned store with a
+	// bucket configured the two must be checked against different backends —
+	// checking chapter keys against the filesystem store would clear every
+	// live thumbnail. Nil means no backend holds chapter thumbnails and the
+	// chapter pass is skipped entirely: an unverifiable reference is left
+	// alone rather than cleared.
+	chapterStore ArtworkObjectChecker
 }
 
-func NewArtworkCacheReconciler(pool *pgxpool.Pool, s3 ArtworkObjectChecker) *ArtworkCacheReconciler {
-	if pool == nil || s3 == nil {
+func NewArtworkCacheReconciler(pool *pgxpool.Pool, store ArtworkObjectChecker) *ArtworkCacheReconciler {
+	if pool == nil || store == nil {
 		return nil
 	}
-	return &ArtworkCacheReconciler{pool: pool, s3: s3}
+	return &ArtworkCacheReconciler{pool: pool, store: store}
+}
+
+// SetChapterThumbnailChecker wires the backend that actually holds chapter
+// thumbnails (the public S3 bucket). Without it the reconciler never touches
+// chapter-thumbnail references.
+func (r *ArtworkCacheReconciler) SetChapterThumbnailChecker(checker ArtworkObjectChecker) {
+	if r != nil {
+		r.chapterStore = checker
+	}
 }
 
 // Run executes a full reconcile: probe, then either a bulk reset or a
@@ -371,7 +399,7 @@ func (r *ArtworkCacheReconciler) RunResumable(
 	progress func(percent float64, message string),
 ) (ArtworkReconcileStats, error) {
 	stats := ArtworkReconcileStats{Mode: ArtworkReconcileModeVerify}
-	if r == nil || r.pool == nil || r.s3 == nil {
+	if r == nil || r.pool == nil || r.store == nil {
 		return stats, fmt.Errorf("artwork reconcile: not configured")
 	}
 	if progress == nil {
@@ -420,10 +448,19 @@ func (r *ArtworkCacheReconciler) RunResumable(
 			}
 			progress(pct, fmt.Sprintf("Reset %s", s.name))
 		}
-		if err := r.bulkResetChapterThumbnails(ctx, &stats); err != nil {
-			return stats, err
+		// Chapter thumbnails live in their own backend, so the canonical
+		// store's miss rate says nothing about them: verify them per row
+		// against that backend (like the alwaysVerify surfaces) instead of
+		// blind-resetting, and leave them untouched when no backend holds
+		// them at all.
+		if r.chapterStore != nil {
+			if err := r.sweepChapterThumbnails(ctx, &stats, func(done int) {
+				progress(95, fmt.Sprintf("Verifying chapter thumbnails (%d rows)", done))
+			}); err != nil {
+				return stats, err
+			}
+			progress(95, "Verified chapter thumbnails")
 		}
-		progress(95, "Reset chapter thumbnails")
 		return stats, nil
 	}
 
@@ -667,21 +704,34 @@ func (r *ArtworkCacheReconciler) probe(ctx context.Context, surfaces []artworkSw
 		}
 		keys = append(keys, sampled...)
 	}
-	chapterKeys, err := r.queryStrings(ctx, `
-		SELECT e->>'thumbnail_path'
-		FROM media_files, jsonb_array_elements(chapters) e
-		WHERE chapters IS NOT NULL AND coalesce(e->>'thumbnail_path', '') <> ''
-		LIMIT $1
-	`, perSurface)
-	if err != nil {
-		return fmt.Errorf("artwork reconcile: sampling chapter thumbnails: %w", err)
+	// Chapter thumbnails live in their own backend (see chapterStore); sample
+	// them only when that backend exists, and HEAD them against it rather than
+	// the canonical store.
+	var chapterKeys []string
+	if r.chapterStore != nil {
+		sampled, err := r.queryStrings(ctx, `
+			SELECT e->>'thumbnail_path'
+			FROM media_files, jsonb_array_elements(chapters) e
+			WHERE chapters IS NOT NULL AND coalesce(e->>'thumbnail_path', '') <> ''
+			LIMIT $1
+		`, perSurface)
+		if err != nil {
+			return fmt.Errorf("artwork reconcile: sampling chapter thumbnails: %w", err)
+		}
+		chapterKeys = sampled
 	}
-	keys = append(keys, chapterKeys...)
-	if len(keys) == 0 {
+	if len(keys)+len(chapterKeys) == 0 {
 		return nil
 	}
 
-	present, missing, errored := r.headBatch(ctx, keys)
+	present, missing, errored := r.headBatch(ctx, r.store, keys)
+	if len(chapterKeys) > 0 {
+		chPresent, chMissing, chErrored := r.headBatch(ctx, r.chapterStore, chapterKeys)
+		present += chPresent
+		missing += chMissing
+		errored += chErrored
+	}
+	keys = append(keys, chapterKeys...)
 	stats.Sampled = present + missing
 	stats.SampleMissing = missing
 	stats.Errors += errored
@@ -712,10 +762,10 @@ func (r *ArtworkCacheReconciler) queryStrings(ctx context.Context, q string, arg
 	return out, rows.Err()
 }
 
-// headBatch checks the given keys with bounded concurrency and returns
-// (present, missing, errored) counts.
-func (r *ArtworkCacheReconciler) headBatch(ctx context.Context, keys []string) (present, missing, errored int) {
-	verdicts := r.headKeys(ctx, keys)
+// headBatch checks the given keys against checker with bounded concurrency and
+// returns (present, missing, errored) counts.
+func (r *ArtworkCacheReconciler) headBatch(ctx context.Context, checker ArtworkObjectChecker, keys []string) (present, missing, errored int) {
+	verdicts := r.headKeysWith(ctx, checker, keys)
 	for _, v := range verdicts {
 		switch {
 		case v.err != nil:
@@ -734,9 +784,15 @@ type headVerdict struct {
 	err     error
 }
 
-// headKeys HEADs every key with bounded concurrency, preserving order.
+// headKeys probes every key against the canonical store with bounded
+// concurrency, preserving order.
 func (r *ArtworkCacheReconciler) headKeys(ctx context.Context, keys []string) []headVerdict {
-	bucket := r.s3.Bucket()
+	return r.headKeysWith(ctx, r.store, keys)
+}
+
+// headKeysWith probes every key against checker with bounded concurrency,
+// preserving order.
+func (r *ArtworkCacheReconciler) headKeysWith(ctx context.Context, checker ArtworkObjectChecker, keys []string) []headVerdict {
 	verdicts := make([]headVerdict, len(keys))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, artworkReconcileHeadWorkers)
@@ -746,7 +802,7 @@ func (r *ArtworkCacheReconciler) headKeys(ctx context.Context, keys []string) []
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			exists, err := r.objectExistsWithRetry(ctx, bucket, key)
+			exists, err := objectExistsWithRetry(ctx, checker, key)
 			verdicts[i] = headVerdict{missing: err == nil && !exists, err: err}
 		}(i, key)
 	}
@@ -754,17 +810,29 @@ func (r *ArtworkCacheReconciler) headKeys(ctx context.Context, keys []string) []
 	return verdicts
 }
 
-func (r *ArtworkCacheReconciler) objectExistsWithRetry(ctx context.Context, bucket, key string) (bool, error) {
+func objectExistsWithRetry(ctx context.Context, checker ArtworkObjectChecker, key string) (bool, error) {
 	const maxAttempts = 3
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		// Per-attempt deadline: a stalled HEAD must fail this attempt and
 		// move on, not hold the retry loop open until the run's context dies.
 		attemptCtx, cancel := context.WithTimeout(ctx, artworkReconcileHeadTimeout)
-		exists, err := r.s3.ObjectExists(attemptCtx, bucket, key)
+		_, err := checker.Stat(attemptCtx, key)
 		cancel()
 		if err == nil {
-			return exists, nil
+			return true, nil
+		}
+		// A clean miss is an answer, not a transport failure: it is exactly
+		// what this sweep exists to find, so it must not consume the retry
+		// budget or the run's error budget.
+		if errors.Is(err, artworkstore.ErrNotFound) {
+			return false, nil
+		}
+		// A key the store refuses is deterministic. Report it rather than
+		// retrying, and never treat it as "missing": that would reset rows on
+		// the strength of a value this sweep simply cannot address.
+		if errors.Is(err, artworkstore.ErrInvalidKey) {
+			return false, err
 		}
 		lastErr = err
 		if attempt == maxAttempts-1 {
@@ -1078,66 +1146,17 @@ const chapterThumbnailFilesPredicate = `chapters IS NOT NULL AND EXISTS (
 )`
 
 func (r *ArtworkCacheReconciler) countChapterThumbnailFiles(ctx context.Context) (int, error) {
+	// No chapter backend means no chapter pass: reporting zero rows keeps the
+	// verify sweep and its checkpoints from ever scheduling one.
+	if r.chapterStore == nil {
+		return 0, nil
+	}
 	var n int
 	q := `SELECT count(*) FROM media_files WHERE ` + chapterThumbnailFilesPredicate
 	if err := r.pool.QueryRow(ctx, q).Scan(&n); err != nil {
 		return 0, fmt.Errorf("artwork reconcile: counting chapter thumbnail files: %w", err)
 	}
 	return n, nil
-}
-
-func (r *ArtworkCacheReconciler) bulkResetChapterThumbnails(ctx context.Context, stats *ArtworkReconcileStats) error {
-	// Batched for the same reason as bulkUpdateInBatches: unbatched, this locks
-	// every media_files row with chapter thumbnails for the whole run, and the
-	// per-row jsonb_agg rebuild makes it slow. The id cursor keeps each batch's
-	// scan from re-evaluating the JSONB predicate over every previously reset
-	// row, and guarantees termination outright; the SET also empties every
-	// thumbnail_path the predicate looks for.
-	stmt := `
-		WITH batch AS (
-			SELECT id FROM media_files
-			WHERE ` + chapterThumbnailFilesPredicate + ` AND id > $1
-			ORDER BY id
-			LIMIT ` + strconv.Itoa(artworkReconcileBulkBatchSize) + `
-			FOR UPDATE
-		), updated AS (
-			UPDATE media_files
-				SET chapters = (
-					SELECT jsonb_agg(
-						CASE WHEN coalesce(e->>'thumbnail_path', '') <> ''
-							THEN (e - 'thumbnail_retry_after' - 'thumbnail_failed_at' - 'thumbnail_last_error')
-								|| '{"thumbnail_path": "", "thumbnail_thumbhash": ""}'::jsonb
-							ELSE e
-						END
-						ORDER BY ord
-					)
-					FROM jsonb_array_elements(chapters) WITH ORDINALITY AS t(e, ord)
-				),
-				chapter_thumbnail_retry_after = NULL
-				WHERE id IN (SELECT id FROM batch)
-				RETURNING 1
-		)
-		SELECT (SELECT count(*) FROM updated), (SELECT max(id) FROM batch)`
-
-	cursor := int64(0)
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		var rows int64
-		var lastID *int64
-		if err := retryOnDeadlock(ctx, func() error {
-			return r.pool.QueryRow(ctx, stmt, cursor).Scan(&rows, &lastID)
-		}); err != nil {
-			return fmt.Errorf("artwork reconcile: bulk clearing chapter thumbnails: %w", err)
-		}
-		stats.Cleared += int(rows)
-		stats.Checked += int(rows)
-		if lastID == nil {
-			return nil
-		}
-		cursor = *lastID
-	}
 }
 
 // chapterFileRow is one media_files row in the chapter thumbnail sweep.
@@ -1164,6 +1183,12 @@ func (r *ArtworkCacheReconciler) sweepChapterThumbnailsFrom(
 	done int,
 	onBatch func(cursor int64, done int, checkpointable bool) error,
 ) error {
+	// Guard for resumed checkpoints written when a chapter backend existed:
+	// with no backend to ask, leaving the references alone is the only safe
+	// verdict.
+	if r.chapterStore == nil {
+		return nil
+	}
 	for {
 		rows, err := r.pool.Query(ctx, `
 			SELECT id, chapters FROM media_files
@@ -1235,7 +1260,7 @@ func (r *ArtworkCacheReconciler) reconcileChapterBatch(ctx context.Context, batc
 		return nil
 	}
 
-	verdicts := r.headKeys(ctx, keys)
+	verdicts := r.headKeysWith(ctx, r.chapterStore, keys)
 	changed := make(map[int]bool, len(batch))
 	for vi, v := range verdicts {
 		stats.Checked++

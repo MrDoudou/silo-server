@@ -26,10 +26,12 @@ const (
 	artworkRevisionDormantRecheck = 24 * time.Hour
 )
 
-// ArtworkRevisionDeleter is the object-storage surface used by revision GC.
+// ArtworkRevisionDeleter is the artwork-store surface used by revision GC. It
+// is the store's own batch-delete contract: logical keys only, no bucket, so GC
+// behaves identically on every backend. Already-absent keys count as deleted on
+// both, which is what makes the strict count check below meaningful.
 type ArtworkRevisionDeleter interface {
-	DeleteObjects(ctx context.Context, bucket string, keys []string) (int, error)
-	Bucket() string
+	DeleteObjects(ctx context.Context, keys []string) (int, error)
 }
 
 // ArtworkRevisionGCStats summarizes one bounded cleanup pass.
@@ -47,22 +49,22 @@ type ArtworkRevisionGCStats struct {
 // revisions only after their grace period and while no catalog surface
 // references them. Work is leased with SKIP LOCKED so multiple workers are safe.
 type ArtworkRevisionGarbageCollector struct {
-	pool *pgxpool.Pool
-	s3   ArtworkRevisionDeleter
+	pool  *pgxpool.Pool
+	store ArtworkRevisionDeleter
 }
 
-func NewArtworkRevisionGarbageCollector(pool *pgxpool.Pool, s3 ArtworkRevisionDeleter) *ArtworkRevisionGarbageCollector {
-	if pool == nil || s3 == nil {
+func NewArtworkRevisionGarbageCollector(pool *pgxpool.Pool, store ArtworkRevisionDeleter) *ArtworkRevisionGarbageCollector {
+	if pool == nil || store == nil {
 		return nil
 	}
-	return &ArtworkRevisionGarbageCollector{pool: pool, s3: s3}
+	return &ArtworkRevisionGarbageCollector{pool: pool, store: store}
 }
 
 // Run processes one bounded batch. Failed deletions are retried with
 // exponential backoff; an expired lease is recoverable by another worker.
 func (g *ArtworkRevisionGarbageCollector) Run(ctx context.Context) (ArtworkRevisionGCStats, error) {
 	stats := ArtworkRevisionGCStats{}
-	if g == nil || g.pool == nil || g.s3 == nil {
+	if g == nil || g.pool == nil || g.store == nil {
 		return stats, fmt.Errorf("artwork revision GC is not configured")
 	}
 
@@ -300,7 +302,7 @@ func (g *ArtworkRevisionGarbageCollector) processCandidate(
 		objectKeys = artworkkey.ObjectKeys(originalPath, imageType)
 	}
 	if len(objectKeys) > 0 {
-		deleted, err := g.s3.DeleteObjects(ctx, g.s3.Bucket(), objectKeys)
+		deleted, err := g.store.DeleteObjects(ctx, objectKeys)
 		if err == nil && deleted != len(objectKeys) {
 			err = fmt.Errorf("deleted %d of %d artwork objects", deleted, len(objectKeys))
 		}
@@ -352,11 +354,106 @@ type artworkReferenceQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
+// artworkNoRemoteSource is the remote-source predicate for a surface whose
+// artwork cannot be re-downloaded: nothing matches it, so such a row is always
+// cleared rather than repointed.
+const artworkNoRemoteSource = "FALSE"
+
+// artworkReferenceSurface is one column that can hold a live reference to a
+// stored artwork object.
+//
+// It is a superset of the reconciler's sweep surfaces: a column can be worth
+// protecting from deletion without being worth sweeping. Profile avatars are
+// the case in point — their column holds a prefixed reference rather than a
+// bare key, so the reconciler cannot verify it row by row, but the collector
+// must still see it or it would delete avatars that are plainly in use.
+//
+// Every surface listed here is checked before an object is deleted, so an
+// omission is a data-loss bug, not a leak. The union can only see catalog
+// Postgres tables: on installs with userdb.backend=sqlite, profile and
+// personal-collection rows live in per-user database files instead, which is
+// why the upload handlers only Track user-owned revisions when the user store
+// is Postgres-backed (see api.Dependencies.UserArtworkTracked).
+type artworkReferenceSurface struct {
+	name  string
+	table string
+	// pathExpr is a SQL expression over the row yielding the object key.
+	pathExpr string
+	// filter restricts the surface to rows that actually hold a key. Empty
+	// means every row qualifies.
+	filter string
+	// resetSet repoints a row at its re-downloadable source. Empty when the
+	// surface has none.
+	resetSet string
+	// remoteSource selects rows resetSet applies to, or "FALSE".
+	remoteSource string
+	// clearSet blanks a row that cannot be reset, so its owning pipeline
+	// refills it.
+	clearSet string
+}
+
+// matchPredicate selects the rows of this surface referencing $1.
+func (s artworkReferenceSurface) matchPredicate() string {
+	predicate := s.pathExpr + " = $1"
+	if s.filter != "" {
+		predicate += " AND " + s.filter
+	}
+	return predicate
+}
+
+// artworkReferenceSurfaces lists every column the collector treats as a live
+// reference.
+func artworkReferenceSurfaces() []artworkReferenceSurface {
+	sweeps := artworkSweepSurfaces()
+	surfaces := make([]artworkReferenceSurface, 0, len(sweeps)+1)
+	for _, sweep := range sweeps {
+		surface := artworkReferenceSurface{
+			name:         sweep.name,
+			table:        sweep.table,
+			pathExpr:     sweep.pathCol,
+			remoteSource: sweep.remoteSourcePredicate(),
+			clearSet:     sweep.clearSet,
+		}
+		if sweep.sourceCol != "" {
+			surface.resetSet = sweep.resetSet()
+		}
+		surfaces = append(surfaces, surface)
+	}
+	return append(surfaces, profileAvatarReferenceSurface())
+}
+
+// profileAvatarUploadPrefix marks a profile avatar that is an uploaded object
+// rather than a bundled preset or a generated remote URL. It mirrors the
+// constant the profile handlers write; the two must not drift, which is what
+// the accompanying test pins.
+const profileAvatarUploadPrefix = "upload:"
+
+// profileAvatarReferenceSurface protects uploaded profile avatars from
+// collection. user_profiles.avatar stores "upload:<object key>", so the key is
+// recovered by dropping the prefix; presets ("preset:<id>") and DiceBear URLs
+// are excluded by the filter rather than by hoping they never collide with a
+// key.
+func profileAvatarReferenceSurface() artworkReferenceSurface {
+	return artworkReferenceSurface{
+		name:         "profile avatars",
+		table:        "user_profiles",
+		pathExpr:     fmt.Sprintf("substr(avatar, %d)", len(profileAvatarUploadPrefix)+1),
+		filter:       fmt.Sprintf("avatar LIKE '%s%%'", profileAvatarUploadPrefix),
+		remoteSource: artworkNoRemoteSource,
+		clearSet:     "avatar = '', updated_at = NOW()",
+	}
+}
+
 func artworkReferenceUnionSQL() string {
-	surfaces := artworkSweepSurfaces()
+	surfaces := artworkReferenceSurfaces()
 	parts := make([]string, 0, len(surfaces))
 	for _, surface := range surfaces {
-		parts = append(parts, fmt.Sprintf("SELECT %s AS path FROM %s WHERE %s = ANY($1)", surface.pathCol, surface.table, surface.pathCol))
+		part := "SELECT " + surface.pathExpr + " AS path FROM " + surface.table +
+			" WHERE " + surface.pathExpr + " = ANY($1)"
+		if surface.filter != "" {
+			part += " AND " + surface.filter
+		}
+		parts = append(parts, part)
 	}
 	return strings.Join(parts, " UNION ALL ")
 }
@@ -471,18 +568,18 @@ func (g *ArtworkRevisionGarbageCollector) sweepDormant(ctx context.Context, limi
 // cleared for their owning pipeline to refill.
 func (g *ArtworkRevisionGarbageCollector) healDeletedReferences(ctx context.Context, originalPath string) (bool, error) {
 	healed := false
-	for _, surface := range artworkSweepSurfaces() {
-		if surface.sourceCol != "" {
-			resetSQL := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = $1 AND %s`,
-				surface.table, surface.resetSet(), surface.pathCol, surface.remoteSourcePredicate())
+	for _, surface := range artworkReferenceSurfaces() {
+		if surface.resetSet != "" {
+			resetSQL := fmt.Sprintf(`UPDATE %s SET %s WHERE %s AND %s`,
+				surface.table, surface.resetSet, surface.matchPredicate(), surface.remoteSource)
 			tag, err := g.pool.Exec(ctx, resetSQL, originalPath)
 			if err != nil {
 				return healed, fmt.Errorf("artwork revision GC: heal %s: %w", surface.name, err)
 			}
 			healed = healed || tag.RowsAffected() > 0
 		}
-		clearSQL := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = $1 AND NOT (%s)`,
-			surface.table, surface.clearSet, surface.pathCol, surface.remoteSourcePredicate())
+		clearSQL := fmt.Sprintf(`UPDATE %s SET %s WHERE %s AND NOT (%s)`,
+			surface.table, surface.clearSet, surface.matchPredicate(), surface.remoteSource)
 		tag, err := g.pool.Exec(ctx, clearSQL, originalPath)
 		if err != nil {
 			return healed, fmt.Errorf("artwork revision GC: heal %s: %w", surface.name, err)

@@ -41,7 +41,9 @@ import (
 	"github.com/Silo-Server/silo-server/internal/adminjob"
 	"github.com/Silo-Server/silo-server/internal/api"
 	"github.com/Silo-Server/silo-server/internal/api/handlers"
-	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
+	"github.com/Silo-Server/silo-server/internal/artworkupload"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/audiobooks"
 	"github.com/Silo-Server/silo-server/internal/audiobooks/abs"
 	"github.com/Silo-Server/silo-server/internal/audiobooks/podcastfeed"
@@ -1309,6 +1311,91 @@ func main() {
 		configureS3Clients(cfg, &deps)
 	}
 
+	// Step 3b: Open the canonical artwork store. Object storage is optional;
+	// artwork storage is not, so this is the single place that decides which
+	// backend the whole image pipeline, revision GC, and delivery use.
+	//
+	// Every failure here is fatal on purpose. An unwritable local root, or a
+	// store that disagrees with the recorded pin, must stop the server rather
+	// than fall back — falling back would either serve missing artwork from an
+	// empty backend or start a second divergent copy of every image. A bucket
+	// that is merely unreachable right now is not a startup failure; it
+	// degrades /ready, exactly as before. See internal/artworkstore.
+	if needsS3 && deps.DB != nil {
+		var s3ArtworkClient artworkstore.S3Client
+		if deps.S3Public != nil {
+			s3ArtworkClient = deps.S3Public
+		}
+		artworkHandle, artworkErr := artworkstore.Open(appCtx, artworkstore.Options{
+			Backend:   cfg.Artwork.StorageBackend,
+			LocalPath: cfg.Artwork.LocalPath,
+			S3:        s3ArtworkClient,
+			Settings:  settingsRepo,
+		})
+		if artworkErr != nil {
+			log.Fatalf("artwork storage: %v", artworkErr)
+		}
+		defer func() { _ = artworkHandle.Close() }()
+		deps.ArtworkStore = artworkHandle
+		slog.Info("artwork storage opened",
+			"backend", artworkHandle.Backend,
+			"root", artworkHandle.LocalRoot(),
+			"generation", artworkHandle.Generation)
+	}
+
+	// Step 3c: Artwork URL minting. One resolver decides for every delivery
+	// surface — catalog responses, jellycompat, admin — whether a stored key
+	// becomes a URL the client fetches straight from the object store or a
+	// short-lived signed URL on Silo's own artwork route. No caller tests for a
+	// configured bucket.
+	var (
+		artworkURLSigner *artworkurl.Signer
+		artworkURLs      *artworkurl.Resolver
+	)
+	if deps.ArtworkStore != nil {
+		// Read live: artwork.url_ttl is hot-reloadable, and already-minted
+		// URLs keep the lifetime they were signed with.
+		artworkURLTTL := func() time.Duration {
+			if deps.LiveConfig != nil {
+				if live := deps.LiveConfig(); live != nil {
+					return live.Artwork.URLTTL
+				}
+			}
+			return cfg.Artwork.URLTTL
+		}
+		directURLs, directDelivery := deps.ArtworkStore.DirectURL()
+		signer, signerErr := artworkurl.NewSigner(cfg.Auth.JWTSecret, artworkURLTTL)
+		switch {
+		case signerErr != nil && !directDelivery:
+			// A filesystem store has no other way to reach a client, so an
+			// unusable signer means no artwork at all rather than degraded
+			// artwork.
+			log.Fatalf("artwork storage: %v", signerErr)
+		case signerErr != nil:
+			slog.Warn("artwork url signing unavailable; artwork is delivered directly by the object store",
+				"component", "app", "error", signerErr)
+		default:
+			artworkURLSigner = signer
+		}
+		resolver, resolverErr := artworkurl.NewResolver(directURLs, artworkURLSigner, artworkURLTTL)
+		if resolverErr != nil {
+			log.Fatalf("artwork storage: %v", resolverErr)
+		}
+		artworkURLs = resolver
+		deps.ArtworkURLSigner = artworkURLSigner
+		deps.ArtworkURLs = artworkURLs
+
+		// Raw-upload surfaces (library posters, collection artwork, profile
+		// avatars) share the pipeline's store and its revision lifecycle, so an
+		// uploaded image is stored, delivered, reconciled, and collected exactly
+		// like provider artwork.
+		uploads := artworkupload.NewMaterializer(deps.ArtworkStore.Store)
+		if deps.DB != nil {
+			uploads.SetRevisionTracker(catalog.NewArtworkRevisionTracker(deps.DB))
+		}
+		deps.ArtworkUploads = uploads
+	}
+
 	var literaryWorkService *literaryworks.Service
 	if deps.DB != nil {
 		literaryWorkService = literaryworks.NewService(literaryworks.NewRepository(deps.DB))
@@ -1627,12 +1714,11 @@ func main() {
 			pluginService.AddLifecycleHook(reloadImageResolvers)
 			reloadImageResolvers(appCtx)
 		}
-		if deps.S3Public != nil {
-			presignTTL := cfg.S3.MetadataPresignExpiry
-			if presignTTL <= 0 {
-				presignTTL = 4 * time.Hour
-			}
-			imageResolver.SetS3Presigner(deps.S3Public, deps.S3Public.EffectivePresignTTL(presignTTL))
+		// Schemeless catalog image paths are keys in the canonical artwork
+		// store; the resolver turns them into whatever URL that backend serves
+		// them through.
+		if artworkURLs != nil {
+			imageResolver.SetArtworkURLResolver(artworkURLs)
 		}
 		deps.ImageResolver = imageResolver
 		deps.PluginImageResolver = imageResolver
@@ -1739,10 +1825,12 @@ func main() {
 		// metadb://) can be resolved to presigned HTTP URLs in API responses.
 		metadataService.SetImageResolver(imageResolver)
 
-		// Wire the image cacher whenever object storage is available so explicit
-		// admin image applies can succeed even if automatic metadata caching is off.
-		if deps.S3Public != nil {
-			imageCacher := imagecache.New(deps.S3Public)
+		// Wire the image cacher whenever *any* artwork store exists — bucket or
+		// directory — so explicit admin image applies can succeed even if
+		// automatic metadata caching is off. The pipeline addresses objects by
+		// logical key and never learns which backend it is writing to.
+		if deps.ArtworkStore != nil {
+			imageCacher := imagecache.New(deps.ArtworkStore.Store)
 			imageCacher.SetArtworkRevisionTracker(catalog.NewArtworkRevisionTracker(deps.DB))
 			metadataService.SetImageCacher(imageCacher)
 			imageCacheJobs := metadata.NewImageCacheJobRepository(deps.DB)
@@ -1764,7 +1852,13 @@ func main() {
 			// library's roots and sweep stale hashed local/ prefixes on re-cache.
 			// The processor host must mount the libraries, like the metadata worker.
 			metadataImageCacheProcessor.SetLibraryRootResolver(deps.FolderRepo)
-			metadataImageCacheProcessor.SetImagePrefixDeleter(deps.S3Public)
+			// Prefix sweeps only ever apply to the legacy S3 local/ key scheme.
+			// Portable revisions are content-addressed and shared between rows,
+			// so they are never prefix-deleted; the reference-aware revision GC
+			// owns their lifecycle on every backend.
+			if deps.S3Public != nil {
+				metadataImageCacheProcessor.SetImagePrefixDeleter(deps.S3Public)
+			}
 			metadataService.SetAutoCacheImages(cfg.Metadata.CacheImages)
 			metadataImageCacheProcessor.SetEnabled(cfg.Metadata.CacheImages)
 			configWatcher.OnChange(func(_, updated *config.Config) {
@@ -1952,6 +2046,11 @@ func main() {
 
 	// Step 5: Create user store provider (if needed).
 	var userStoreProvider userstore.UserStoreProvider
+	// userArtworkTracked: only the Postgres provider keeps profile and
+	// personal-collection rows in catalog tables the artwork revision GC can
+	// see; SQLite user stores must not register their uploads for collection.
+	// See api.Dependencies.UserArtworkTracked.
+	userArtworkTracked := false
 	if needsUserDB {
 		switch cfg.UserDB.Backend {
 		case "sqlite":
@@ -1965,6 +2064,7 @@ func main() {
 			slog.Info("user store initialized", "backend", "sqlite", "max_open", poolConfig.MaxOpen)
 		default: // "postgres"
 			userStoreProvider = pgstore.NewPostgresProvider(deps.DB)
+			userArtworkTracked = true
 			slog.Info("user store initialized", "backend", "postgres")
 		}
 		defer userStoreProvider.Close()
@@ -2055,6 +2155,7 @@ func main() {
 	var compatTerminalRecoveryReady <-chan struct{}
 	if userStoreProvider != nil {
 		deps.UserStoreProvider = userStoreProvider
+		deps.UserArtworkTracked = userArtworkTracked
 	}
 	if watchProviderService != nil {
 		historyRepo := historyimport.NewRepository(deps.DB, deps.SecretCipher)
@@ -2396,12 +2497,13 @@ func main() {
 
 	// White-label branding: one service shared by the API (public read + admin
 	// upload), the frontend handler (index.html title, favicon, manifest), and
-	// the artwork reconcile task. S3 is optional — pass a nil AssetStore (not
-	// the typed-nil *s3client.Client) when it isn't configured so text branding
-	// still works without it.
+	// the artwork reconcile task. Assets live in the canonical artwork store, so
+	// branding uploads now work on a filesystem backend too. Artwork storage is
+	// still optional — pass a nil AssetStore (not a typed-nil handle) when it
+	// isn't available so text branding keeps working without it.
 	var brandingStore branding.AssetStore
-	if deps.S3Public != nil {
-		brandingStore = deps.S3Public
+	if deps.ArtworkStore != nil {
+		brandingStore = deps.ArtworkStore.Store
 	}
 	brandingSvc := branding.NewService(settingsRepo, brandingStore)
 
@@ -2419,9 +2521,16 @@ func main() {
 		}
 		taskMgr.Register(tasks.NewCleanupOrphanedMediaItemsTask(catalog.NewOrphanedProvisionalCleaner(deps.DB)))
 		taskMgr.Register(tasks.NewBackfillMediaItemAliasesTask(catalog.NewItemAliasRepository(deps.DB)))
-		if deps.S3Public != nil {
+		if deps.ArtworkStore != nil {
+			// The temp-file sweeper only exists on the filesystem backend; the
+			// nil check avoids handing the task a typed-nil interface.
+			var artworkTempSweeper tasks.ArtworkTempFileSweeper
+			if local := deps.ArtworkStore.Local(); local != nil {
+				artworkTempSweeper = local
+			}
 			taskMgr.Register(tasks.NewCleanupArtworkRevisionsTask(
-				metadata.NewArtworkRevisionGarbageCollector(deps.DB, deps.S3Public),
+				metadata.NewArtworkRevisionGarbageCollector(deps.DB, deps.ArtworkStore.Store),
+				artworkTempSweeper,
 			))
 		}
 		catalogSearchIndexer := catalog.NewCatalogSearchIndexerFromSettings(deps.DB, settingsRepo, catalogSearchStartupSettings)
@@ -2518,32 +2627,42 @@ func main() {
 			taskMgr.Register(tasks.NewRefreshMetadataTask(refreshWorker, metadataService))
 		}
 		if metadataImageCacheProcessor != nil {
-			cacheImagesTask := tasks.NewCacheMetadataImagesTask(metadataImageCacheProcessor)
-			// Artwork cached under an older variant ladder is missing the rungs
-			// a client can now ask for. Arm the one-shot regeneration pass; it
-			// records the version it finished and then costs nothing.
-			cacheImagesTask.SetLadderBackfill(
-				metadata.NewImageLadderBackfillStateRepository(pool),
-				artworkkey.LadderVersion,
-			)
-			taskMgr.Register(cacheImagesTask)
+			taskMgr.Register(tasks.NewCacheMetadataImagesTask(metadataImageCacheProcessor))
 			taskMgr.Register(tasks.NewBackfillMetadataImagesTask(metadataImageCacheProcessor))
 		}
-		if deps.S3Public != nil {
-			identity := tasks.ArtworkStorageIdentity(cfg.S3.Public.Endpoint, cfg.S3.Public.Bucket, cfg.S3.Public.KeyPrefix)
-			// Seed the fingerprint on first boot. After a provider change the
+		if deps.ArtworkStore != nil {
+			identity := tasks.LocalArtworkStorageIdentity(deps.ArtworkStore.Generation)
+			if deps.ArtworkStore.Backend == artworkstore.BackendS3 {
+				identity = tasks.ArtworkStorageIdentity(cfg.S3.Public.Endpoint, cfg.S3.Public.Bucket, cfg.S3.Public.KeyPrefix)
+			}
+			// Seed the fingerprint on first boot. After a storage change the
 			// stored (old) identity survives this call, so the startup preflight
 			// can warn without mutating artwork; an administrator must migrate
 			// objects and run the reconcile task explicitly.
 			if _, err := settingsRepo.SetIfAbsent(appCtx, tasks.ArtworkStorageIdentityKey, identity); err != nil {
 				slog.Warn("artwork reconcile: seeding storage identity failed", "error", err)
 			}
+			// Branding assets still live in the public bucket, so they are only
+			// reconcilable where that bucket exists.
 			var brandingReconciler tasks.BrandingAssetReconciler
 			if brandingSvc != nil && brandingSvc.HasStorage() {
 				brandingReconciler = brandingSvc
 			}
+			artworkReconciler := metadata.NewArtworkCacheReconciler(deps.DB, deps.ArtworkStore.Store)
+			// Chapter thumbnails are written by internal/chapterthumbs straight
+			// to the public bucket, never through the canonical artwork store,
+			// so they must be verified against that bucket — even when the
+			// artwork store itself is pinned to the local filesystem. Without a
+			// bucket the reconciler leaves chapter references untouched.
+			if deps.S3Public != nil {
+				if chapterChecker, chapterErr := artworkstore.NewS3Store(deps.S3Public); chapterErr == nil {
+					artworkReconciler.SetChapterThumbnailChecker(chapterChecker)
+				} else {
+					slog.Warn("artwork reconcile: chapter thumbnail verification unavailable", "error", chapterErr)
+				}
+			}
 			taskMgr.Register(tasks.NewReconcileArtworkCacheTask(
-				metadata.NewArtworkCacheReconciler(deps.DB, deps.S3Public),
+				artworkReconciler,
 				settingsRepo,
 				brandingReconciler,
 				identity,
@@ -2889,10 +3008,16 @@ func main() {
 				collectionRepo,
 				deps.CollectionService,
 				itemRepo,
-				4*time.Hour,
 				nil,
 				deps.S3Public,
+				deps.ArtworkUploads,
 			)
+			if artworkURLs != nil {
+				collectionHandler.ArtworkURLs = artworkURLs
+			}
+			if deps.ArtworkStore != nil {
+				collectionHandler.ArtworkObjects = deps.ArtworkStore.Store
+			}
 			collectionHandler.FrontendFS = deps.FrontendFS
 			collectionHandler.SectionRepo = sectionRepo
 			collectionHandler.FolderRepo = deps.FolderRepo
@@ -3022,8 +3147,21 @@ func main() {
 				catalog.SetActiveSearchIndexProvider(activeSearchProvider)
 			}
 
+			// Stored artwork keys (library posters, collection artwork) resolve
+			// through the same backend-neutral minter the native API uses. A
+			// signed native URL is root-relative and belongs to the native
+			// listener, so the compat surface serves those bytes itself rather
+			// than redirecting a compat client to its own port.
+			if artworkURLs != nil {
+				compatDeps.ArtworkURLs = artworkURLs
+			}
+			if deps.ArtworkStore != nil {
+				if artworkDelivery := handlers.NewArtworkHandler(deps.ArtworkStore.Store, artworkURLSigner); artworkDelivery != nil {
+					compatDeps.ArtworkDelivery = artworkDelivery
+				}
+			}
+
 			if deps.S3Public != nil {
-				compatDeps.PosterPresigner = deps.S3Public
 				compatDeps.S3Client = deps.S3Public
 				compatDeps.S3Bucket = deps.S3Public.Bucket()
 			}

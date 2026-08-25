@@ -79,6 +79,11 @@ type ObjectInfo struct {
 	Key          string
 	SizeBytes    int64
 	LastModified *time.Time
+	// ContentType and ETag are populated by StatObject. The listing paths
+	// leave them empty: ListObjectsV2 does not report a content type, and
+	// callers that list are inventorying keys, not serving bytes.
+	ContentType string
+	ETag        string
 }
 
 // NewClient creates a new S3 Client from the given BucketConfig.
@@ -429,6 +434,37 @@ func (c *Client) ObjectExists(ctx context.Context, bucket, key string) (bool, er
 	}
 
 	return true, nil
+}
+
+// StatObject returns object metadata without transferring the body. Returns
+// ErrNotFound when the object does not exist.
+func (c *Client) StatObject(ctx context.Context, bucket, key string) (ObjectInfo, error) {
+	objectKey := c.prefixedKey(key)
+	out, err := c.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		if isNotFoundErr(err) {
+			return ObjectInfo{}, ErrNotFound
+		}
+		return ObjectInfo{}, fmt.Errorf("s3 HeadObject %s/%s: %w", bucket, key, err)
+	}
+
+	info := ObjectInfo{Key: key, ETag: aws.ToString(out.ETag), ContentType: aws.ToString(out.ContentType)}
+	if out.ContentLength != nil {
+		info.SizeBytes = *out.ContentLength
+	}
+	info.LastModified = out.LastModified
+	return info, nil
+}
+
+// ReadURLExpires reports whether the URLs PresignGetURL produces stop working
+// after their requested lifetime. Unsigned public-endpoint URLs do not: they
+// are permanent as long as the object exists, so callers must not cache them
+// with an artificial expiry or advertise one to clients.
+func (c *Client) ReadURLExpires() bool {
+	return c.publicEndpoint == "" || c.urlAuth != URLAuthPublic
 }
 
 // ObjectMatches checks that an immutable object exists with the expected

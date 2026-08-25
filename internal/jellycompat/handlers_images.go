@@ -16,6 +16,13 @@ import (
 	"github.com/Silo-Server/silo-server/internal/models"
 )
 
+// ArtworkDelivery serves a signed Silo artwork URL in process, reporting
+// whether the URL addressed that route at all. *handlers.ArtworkHandler
+// implements it.
+type ArtworkDelivery interface {
+	ServeArtworkURL(w http.ResponseWriter, r *http.Request, artworkURL string) bool
+}
+
 // ImagesHandler serves Jellyfin-compatible image routes.
 type ImagesHandler struct {
 	content      ContentService
@@ -29,10 +36,14 @@ type ImagesHandler struct {
 	seasonRepo   imageSeasonRepository
 	episodeRepo  imageEpisodeRepository
 	accessFilter AccessFilterResolver
-	posterSigner LibraryPosterPresigner
-	presignTTL   time.Duration
+	artworkURLs  ArtworkURLResolver
 	imageTags    *imageTagSigner
 	httpClient   *http.Client
+	// artwork is optional; when set, artwork URLs that address Silo's own
+	// signed artwork route are served in process instead of being redirected
+	// or proxied. The compat surface listens on its own port, so a
+	// root-relative native URL has no meaning to a compat client.
+	artwork ArtworkDelivery
 	// collections is optional; when set, BoxSet (library collection) artwork
 	// resolves durably instead of depending on the in-memory image cache.
 	collections collectionSource
@@ -65,7 +76,7 @@ type imageFolderRepository interface {
 }
 
 // NewImagesHandler creates a Jellyfin-compatible image route handler.
-func NewImagesHandler(content ContentService, codec *ResourceIDCodec, sessions *SessionStore, images *ImageCache, personRepo *catalog.PersonRepository, detailSvc *catalog.DetailService, itemRepo *catalog.ItemRepository, folderRepo *catalog.FolderRepository, seasonRepo *catalog.SeasonRepository, episodeRepo *catalog.EpisodeRepository, accessFilter AccessFilterResolver, posterSigner LibraryPosterPresigner, presignTTL time.Duration, imageTagSecret string, httpClient *http.Client) *ImagesHandler {
+func NewImagesHandler(content ContentService, codec *ResourceIDCodec, sessions *SessionStore, images *ImageCache, personRepo *catalog.PersonRepository, detailSvc *catalog.DetailService, itemRepo *catalog.ItemRepository, folderRepo *catalog.FolderRepository, seasonRepo *catalog.SeasonRepository, episodeRepo *catalog.EpisodeRepository, accessFilter AccessFilterResolver, artworkURLs ArtworkURLResolver, imageTagSecret string, httpClient *http.Client) *ImagesHandler {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -88,8 +99,7 @@ func NewImagesHandler(content ContentService, codec *ResourceIDCodec, sessions *
 		seasonRepo:   seasonRepo,
 		episodeRepo:  episodeRepo,
 		accessFilter: accessFilter,
-		posterSigner: posterSigner,
-		presignTTL:   presignTTL,
+		artworkURLs:  artworkURLs,
 		imageTags:    newImageTagSigner(imageTagSecret),
 		httpClient:   httpClient,
 	}
@@ -473,7 +483,7 @@ func (h *ImagesHandler) serveGeneratedPoster(w http.ResponseWriter, caption stri
 }
 
 func (h *ImagesHandler) resolveLibraryImageURLFromTag(ctx context.Context, routeID string, libraryID int, imageType, _ string, tag string) (catalog.ResolvedImageURL, bool, error) {
-	if imageType != "Primary" || h.folderRepo == nil || h.posterSigner == nil {
+	if imageType != "Primary" || h.folderRepo == nil || h.artworkURLs == nil {
 		return catalog.ResolvedImageURL{}, false, nil
 	}
 	folder, err := h.folderRepo.GetByID(ctx, libraryID)
@@ -495,18 +505,14 @@ func (h *ImagesHandler) resolveLibraryImageURLFromTag(ctx context.Context, route
 }
 
 func (h *ImagesHandler) presignLibraryPosterURL(ctx context.Context, posterPath string) string {
-	if posterPath == "" || h.posterSigner == nil {
+	if posterPath == "" || h.artworkURLs == nil {
 		return ""
 	}
-	ttl := h.presignTTL
-	if ttl <= 0 {
-		ttl = 4 * time.Hour
-	}
-	imageURL, err := h.posterSigner.PresignGetURL(ctx, h.posterSigner.Bucket(), posterPath, ttl)
+	resolved, err := h.artworkURLs.ResolveArtworkURL(ctx, posterPath)
 	if err != nil {
 		return ""
 	}
-	return imageURL
+	return resolved.URL
 }
 
 func (h *ImagesHandler) resolveItemImageURLFromReposWithoutSession(ctx context.Context, routeID, contentID, imageType, imageSize, tag string) (catalog.ResolvedImageURL, bool, error) {
@@ -627,6 +633,14 @@ func firstResolvedImageURL(values ...catalog.ResolvedImageURL) catalog.ResolvedI
 }
 
 func (h *ImagesHandler) serveImageURL(w http.ResponseWriter, r *http.Request, imageURL string) {
+	// Artwork stored by Silo itself resolves to a signed URL on the native
+	// artwork route, which is root-relative and lives on the native listener —
+	// a compat client redirected there would resolve it against this compat
+	// port. Serve those bytes in process instead: that answers proxying and
+	// redirecting clients alike, with the caller's conditional headers intact.
+	if h.artwork != nil && h.artwork.ServeArtworkURL(w, r, imageURL) {
+		return
+	}
 	// App-relative references (bundled collection-template posters) have no
 	// remote origin to redirect or proxy to, so serve their bytes from the
 	// embedded frontend assets instead.

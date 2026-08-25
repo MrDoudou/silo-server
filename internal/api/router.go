@@ -24,6 +24,9 @@ import (
 	"github.com/Silo-Server/silo-server/internal/ai/llm"
 	"github.com/Silo-Server/silo-server/internal/api/handlers"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
+	"github.com/Silo-Server/silo-server/internal/artworkupload"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/auth"
 	"github.com/Silo-Server/silo-server/internal/autoscan"
 	"github.com/Silo-Server/silo-server/internal/branding"
@@ -100,18 +103,44 @@ type Dependencies struct {
 	DB                           *pgxpool.Pool
 	SecretCipher                 *secret.Cipher // at-rest credential cipher (required when DB is set)
 	FrontendFS                   fs.FS
-	S3Public                     *s3client.Client              // public assets bucket client (may be nil)
-	S3Private                    *s3client.Client              // private internal bucket client (may be nil)
-	S3UserDB                     *s3client.Client              // user-db bucket client (may be nil)
-	BrandingService              *branding.Service             // white-label branding (nil when DB unavailable)
-	FolderRepo                   *catalog.FolderRepository     // media folder repository (may be nil)
-	FileRepo                     *scanner.FileRepository       // media file repository (may be nil)
-	Scanner                      *scanner.Scanner              // scanner instance (may be nil)
-	LibraryIngester              *libraryingest.Executor       // shared library ingest executor (may be nil)
-	ProbeEnsurer                 handlers.PlaybackProbeEnsurer // on-demand probe repair for playback/detail (may be nil)
-	UserStoreProvider            userstore.UserStoreProvider   // user store provider (may be nil)
-	SessionMgr                   *playback.SessionManager      // playback session manager (may be nil)
-	StreamTelemetry              *streamtelemetry.Registry     // local observation-only stream telemetry (may be nil)
+	S3Public                     *s3client.Client // public assets bucket client (may be nil)
+	S3Private                    *s3client.Client // private internal bucket client (may be nil)
+	S3UserDB                     *s3client.Client // user-db bucket client (may be nil)
+	// ArtworkStore is the opened, probed, and pin-verified canonical artwork
+	// store. Nil on nodes that do not own artwork storage. Callers address it
+	// by logical key only; whether it is a bucket or a directory is private
+	// to the handle.
+	ArtworkStore *artworkstore.Handle
+	// ArtworkURLSigner mints and verifies the short-lived signed URLs the
+	// native artwork route serves stored artwork through. Nil when the cluster
+	// authentication secret is unavailable, which leaves the route
+	// unregistered rather than serving artwork nobody can address.
+	ArtworkURLSigner *artworkurl.Signer
+	// ArtworkURLs resolves a logical artwork key to a fetchable URL on
+	// whichever backend holds it. Nil on nodes without artwork storage.
+	ArtworkURLs *artworkurl.Resolver
+	// ArtworkUploads materializes administrator- and user-supplied images —
+	// library posters, collection artwork, profile avatars — into the artwork
+	// store. Nil on nodes without artwork storage, which is what makes those
+	// upload endpoints report 503 instead of failing mid-write.
+	ArtworkUploads    *artworkupload.Materializer
+	BrandingService   *branding.Service             // white-label branding (nil when DB unavailable)
+	FolderRepo        *catalog.FolderRepository     // media folder repository (may be nil)
+	FileRepo          *scanner.FileRepository       // media file repository (may be nil)
+	Scanner           *scanner.Scanner              // scanner instance (may be nil)
+	LibraryIngester   *libraryingest.Executor       // shared library ingest executor (may be nil)
+	ProbeEnsurer      handlers.PlaybackProbeEnsurer // on-demand probe repair for playback/detail (may be nil)
+	UserStoreProvider userstore.UserStoreProvider   // user store provider (may be nil)
+	// UserArtworkTracked reports whether user-owned artwork references —
+	// profile avatars, personal collection posters — land in catalog tables
+	// the artwork revision GC's reference union can see. True only for the
+	// Postgres user store; the SQLite backend keeps those rows in per-user
+	// database files the collector cannot query, so tracking such an upload
+	// would schedule a live image for deletion (an untracked upload merely
+	// leaks its displaced predecessors).
+	UserArtworkTracked bool
+	SessionMgr         *playback.SessionManager  // playback session manager (may be nil)
+	StreamTelemetry    *streamtelemetry.Registry // local observation-only stream telemetry (may be nil)
 	// StreamTelemetryViewCache serves the merged global view with bounded
 	// staleness so the admin parity endpoint never rebuilds it per request.
 	StreamTelemetryViewCache *streamtelemetry.ViewCache
@@ -281,6 +310,9 @@ func NewRouter(deps Dependencies) chi.Router {
 	}
 
 	readyHandler := handlers.NewReadyHandler(pgPinger, s3Checker)
+	if deps.ArtworkStore != nil {
+		readyHandler.SetArtworkStorage(deps.ArtworkStore)
+	}
 
 	// Resolves whether a declared profile belongs to the user and is the
 	// household primary profile. Nil (no user store) disables the
@@ -548,10 +580,15 @@ func NewRouter(deps Dependencies) chi.Router {
 			libraryHandler.JobRepo = adminjob.NewRepository(deps.DB)
 		}
 
-		// Library poster uploads are writable client-facing assets, so they
-		// belong in the public assets bucket.
+		// S3Meta only backs chapter-thumbnail capability reporting and the
+		// cleanup of legacy per-library poster objects; posters themselves are
+		// written to and read from the canonical artwork store.
 		if deps.S3Public != nil {
 			libraryHandler.S3Meta = deps.S3Public
+		}
+		libraryHandler.ArtworkUploads = deps.ArtworkUploads
+		if deps.ArtworkURLs != nil {
+			libraryHandler.ArtworkURLs = deps.ArtworkURLs
 		}
 
 		// Wire provider chain repos for per-library provider priority management.
@@ -862,6 +899,11 @@ func NewRouter(deps Dependencies) chi.Router {
 		profileHandler.EventsHub = deps.EventsHub
 		profileHandler.ProfileTokens = profileTokenService
 		profileHandler.AvatarStore = deps.S3Private
+		profileHandler.ArtworkUploads = deps.ArtworkUploads
+		profileHandler.TrackArtworkRevisions = deps.UserArtworkTracked
+		if deps.ArtworkURLs != nil {
+			profileHandler.ArtworkURLs = deps.ArtworkURLs
+		}
 		profileHandler.SessionsReader = playbackSessionsLoader
 		personalDataHandler = handlers.NewPersonalDataHandler(deps.UserStoreProvider, itemRepo)
 		if detailSvc != nil {
@@ -890,7 +932,11 @@ func NewRouter(deps Dependencies) chi.Router {
 		}
 		if deps.S3Public != nil {
 			collectionHandler.S3GP = deps.S3Public
-			collectionHandler.PresignTTL = 4 * time.Hour
+		}
+		collectionHandler.ArtworkUploads = deps.ArtworkUploads
+		collectionHandler.TrackArtworkRevisions = deps.UserArtworkTracked
+		if deps.ArtworkURLs != nil {
+			collectionHandler.ArtworkURLs = deps.ArtworkURLs
 		}
 		settingsHandler = handlers.NewSettingsHandler(deps.UserStoreProvider)
 		settingsHandler.EventsHub = deps.EventsHub
@@ -1639,10 +1685,16 @@ func NewRouter(deps Dependencies) chi.Router {
 			libraryCollectionRepo,
 			libraryCollectionService,
 			itemRepo,
-			4*time.Hour,
 			nil,
 			deps.S3Public,
+			deps.ArtworkUploads,
 		)
+		if deps.ArtworkURLs != nil {
+			libraryCollectionHandler.ArtworkURLs = deps.ArtworkURLs
+		}
+		if deps.ArtworkStore != nil {
+			libraryCollectionHandler.ArtworkObjects = deps.ArtworkStore.Store
+		}
 		libraryCollectionHandler.FrontendFS = deps.FrontendFS
 		libraryCollectionHandler.Executor = &catalog.QueryExecutor{Pool: deps.DB}
 		libraryCollectionHandler.SectionRepo = sectionRepo
@@ -1841,6 +1893,21 @@ func NewRouter(deps Dependencies) chi.Router {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", healthHandler.ServeHTTP)
 		r.Get("/ready", readyHandler.ServeHTTP)
+
+		// Artwork delivery. Public because a browser <img> element cannot
+		// attach a bearer header: the signature in the URL is the capability,
+		// minted only while building an authenticated catalog response.
+		//
+		// Registered only when clients cannot fetch artwork from the backend
+		// themselves, which keeps the route and the capability's
+		// delivery_modes describing the same thing: a bucket-backed store
+		// delivers directly and never proxies bytes through the API.
+		if deps.ArtworkStore != nil && deps.ArtworkURLs != nil && !deps.ArtworkURLs.DirectDelivery() {
+			if artworkHandler := handlers.NewArtworkHandler(deps.ArtworkStore.Store, deps.ArtworkURLSigner); artworkHandler != nil {
+				r.Get("/artwork/{"+handlers.ArtworkKeyParam+"}", artworkHandler.ServeHTTP)
+				r.Head("/artwork/{"+handlers.ArtworkKeyParam+"}", artworkHandler.ServeHTTP)
+			}
+		}
 
 		// Branding handler is shared between the public read/serve endpoints
 		// (registered with the theme endpoints below) and the admin
@@ -2396,15 +2463,22 @@ func NewRouter(deps Dependencies) chi.Router {
 				if collectionHandler != nil {
 					var userImportHandler *handlers.UserCollectionImportHandler
 					if deps.UserCollectionSync != nil {
+						// Pass a nil interface rather than a typed-nil pointer
+						// when artwork URLs are unavailable.
+						var artworkURLs handlers.ArtworkURLResolver
+						if deps.ArtworkURLs != nil {
+							artworkURLs = deps.ArtworkURLs
+						}
 						userImportHandler = handlers.NewUserCollectionImportHandler(
 							deps.UserStoreProvider,
 							deps.UserCollectionSync,
 							deps.UserCollectionScheduler,
 							nil,
 							deps.MDBListClient,
-							deps.S3Public,
+							deps.ArtworkUploads,
+							deps.UserArtworkTracked,
+							artworkURLs,
 							deps.FrontendFS,
-							4*time.Hour,
 						)
 					}
 					r.Route("/collections", func(r chi.Router) {
@@ -2794,6 +2868,18 @@ func NewRouter(deps Dependencies) chi.Router {
 					r.Get("/stream/{session_id}/subtitles/{track}", observeNative(deps.StreamTelemetry, http.MethodGet, "/api/v1/stream/{session_id}/subtitles/{track}", streamHandler.HandleSubtitle))
 					r.Head("/stream/{session_id}/subtitles/{track}", observeNative(deps.StreamTelemetry, http.MethodHead, "/api/v1/stream/{session_id}/subtitles/{track}", streamHandler.HandleSubtitle))
 					r.Get("/stream/{session_id}/subtitles/{track}/fonts", observeNative(deps.StreamTelemetry, http.MethodGet, "/api/v1/stream/{session_id}/subtitles/{track}/fonts", streamHandler.HandleSubtitleFonts))
+				}
+
+				// Artwork storage and delivery capability. Lets a client or
+				// administrator observe how artwork is stored and fetched
+				// without sniffing a URL shape; it exposes no location.
+				if deps.ArtworkStore != nil {
+					artworkCapabilityHandler := handlers.NewArtworkCapabilityHandler(
+						deps.ArtworkStore.Backend,
+						deps.ArtworkURLs.DirectDelivery(),
+						func() string { return deps.CurrentConfig().Artwork.RemoteMaterialization },
+					)
+					r.Get("/artwork/capability", artworkCapabilityHandler.HandleCapability)
 				}
 
 				// Download routes.

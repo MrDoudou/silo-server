@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
 // fakeObjectChecker treats every key as present unless listed in missing or
@@ -24,9 +26,7 @@ type fakeObjectChecker struct {
 	checked  map[string]int
 }
 
-func (f *fakeObjectChecker) Bucket() string { return "test-bucket" }
-
-func (f *fakeObjectChecker) ObjectExists(_ context.Context, _ string, key string) (bool, error) {
+func (f *fakeObjectChecker) Stat(_ context.Context, key string) (artworkstore.ObjectInfo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.checked == nil {
@@ -34,9 +34,12 @@ func (f *fakeObjectChecker) ObjectExists(_ context.Context, _ string, key string
 	}
 	f.checked[key]++
 	if f.errorAll || f.erroring[key] {
-		return false, errors.New("simulated storage error")
+		return artworkstore.ObjectInfo{}, errors.New("simulated storage error")
 	}
-	return !f.missing[key], nil
+	if f.missing[key] {
+		return artworkstore.ObjectInfo{}, artworkstore.ErrNotFound
+	}
+	return artworkstore.ObjectInfo{Key: key, SizeBytes: 1}, nil
 }
 
 func TestShouldBulkReset(t *testing.T) {
@@ -189,7 +192,11 @@ func TestArtworkReconcileVerifySweep(t *testing.T) {
 		key("coll"):            true,
 		fmt.Sprintf("library-posters/arc-%d.png", suffix): true,
 	}}
-	stats, err := NewArtworkCacheReconciler(pool, checker).Run(ctx, nil)
+	reconciler := NewArtworkCacheReconciler(pool, checker)
+	// Chapter thumbnails are verified against their own backend; without this
+	// wiring the chapter pass is skipped entirely (pinned below).
+	reconciler.SetChapterThumbnailChecker(checker)
+	stats, err := reconciler.Run(ctx, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
