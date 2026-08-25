@@ -17,6 +17,7 @@ import (
 const (
 	probeCommandTimeout = 5 * time.Second
 	probeNegativeTTL    = 15 * time.Second
+	probePositiveTTL    = 5 * time.Minute
 	probeTimeoutSlack   = time.Second
 	probeEndpointSlack  = 20 * time.Second
 	probeRequestSlack   = 5 * time.Second
@@ -34,8 +35,9 @@ const decodeProbeFixtureBase64 = "AAAAAUABDAH//wIgAAADAJAAAAMAAAMAHpWUCQAAAAFCAQ
 // output. Tests inject it to model individual FFmpeg capabilities and failures.
 type CommandRunner func(context.Context, string, ...string) ([]byte, error)
 
-// probeCacheEntry stores either a permanent positive capability result or a
-// short-lived negative result that is eligible for retry.
+// probeCacheEntry stores a bounded capability result. Positive inventories can
+// be partial (for example software succeeded while a hardware smoke test did
+// not), so they must be refreshed rather than pinned until process restart.
 type probeCacheEntry struct {
 	capabilities Capabilities
 	expiresAt    time.Time
@@ -78,7 +80,10 @@ func probeCached(ctx context.Context, ffmpegPath, hardwareBackend, hardwareDevic
 		if err != nil {
 			return nil, err
 		}
-		entry := probeCacheEntry{capabilities: append(Capabilities(nil), result...)}
+		entry := probeCacheEntry{
+			capabilities: append(Capabilities(nil), result...),
+			expiresAt:    now().Add(probePositiveTTL),
+		}
 		if len(result) == 0 {
 			entry.expiresAt = now().Add(probeNegativeTTL)
 		}
@@ -149,10 +154,9 @@ func probeCacheKey(ffmpegPath, hardwareBackend, hardwareDevice string) string {
 	return strings.Join([]string{binaryIdentity, backend, device, strings.Join(driverIdentities, ",")}, "\x00")
 }
 
-// probeCacheEntryCurrent reports whether a positive result or unexpired
-// negative result may be reused.
+// probeCacheEntryCurrent reports whether a bounded discovery result may be reused.
 func probeCacheEntryCurrent(entry probeCacheEntry, now time.Time) bool {
-	return len(entry.capabilities) > 0 || now.Before(entry.expiresAt)
+	return now.Before(entry.expiresAt)
 }
 
 // ProbeTotalTimeout budgets one bounded deadline for every listing and smoke

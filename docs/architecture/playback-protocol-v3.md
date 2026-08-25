@@ -193,7 +193,9 @@ the same replay/conflict rules and gives terminal route events an addressable
 authorization record.
 
 A client generates a fresh `playback_attempt_id` per user-initiated playback and
-reuses it only to retry a request whose response it did not receive.
+reuses it only to retry a request whose response it did not receive. After any
+response is received, including a retryable terminal, a follow-up start mints a
+new ID so the server does not replay the durable response.
 
 **Omission is a request, not a default.** Two start fields mean "you decide" when
 absent, and the server answers from stored user state rather than from a
@@ -945,7 +947,10 @@ The plan will play, but something the user might notice was given up.
 ### 7.3 Terminal reasons
 
 Playback will not proceed. `terminal.retryable` says whether trying again could
-help. Delivered inside a `201` (start) or `200` (replan), never a 4xx.
+help. A retryable terminal may include `retry_after_ms`; each retry of a start
+must mint a fresh `playback_attempt_id`, because an attempt decision is
+idempotently replayed. Delivered inside a `201` (start) or `200` (replan), never
+a 4xx.
 
 *Planner:* `adaptation_exhausted`, `adaptation_unavailable`,
 `client_hls_unsupported`, `conversion_tool_unavailable`,
@@ -966,12 +971,17 @@ HDR, 4K, or transcode-policy reason — deselecting the subtitle restores playba
 `subtitle_artifact_unavailable`, `capacity_unavailable`,
 `local_transcode_disabled`,
 `audio_transcoding_disabled`,
-`transcode_start_failed`, `transcode_node_unavailable`,
+`capability_warming`, `transcode_start_failed`, `transcode_node_unavailable`,
 `transcode_node_capability_unavailable`, `track_unavailable`,
 `invalid_seek_position`, `invalid_replan`, `seek_reanchor_route_changed`,
 `seek_reanchor_recipe_unavailable`,
 `seek_reanchor_intent_mismatch`, `seek_failure_recovery_intent_mismatch`,
 `policy_denied`.
+
+`capability_warming` means the bounded planning request ended before the shared
+tone-map inventory became definitive. It is retryable and never authorizes an
+alternate media-file selection; a client should keep the requested file pinned
+while retrying.
 
 ### 7.4 Route event names
 

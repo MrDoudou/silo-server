@@ -114,8 +114,9 @@ func TestProbeCommandDeadlineIsTransientAndNotCached(t *testing.T) {
 	}
 }
 
-// TestProbeSuccessfulCapabilitiesDoNotExpire verifies unchanged positive discovery remains cached.
-func TestProbeSuccessfulCapabilitiesDoNotExpire(t *testing.T) {
+// TestProbeSuccessfulCapabilitiesExpire verifies a positive-but-potentially-partial
+// discovery is periodically refreshed rather than pinned until process restart.
+func TestProbeSuccessfulCapabilitiesExpire(t *testing.T) {
 	resetProbeCache(t)
 	now := time.Unix(100, 0)
 	calls := 0
@@ -137,7 +138,7 @@ func TestProbeSuccessfulCapabilitiesDoNotExpire(t *testing.T) {
 		t.Fatalf("successful probe = %#v", got)
 	}
 	firstCalls := calls
-	now = now.Add(24 * time.Hour)
+	now = now.Add(probePositiveTTL - time.Second)
 	got, err = probeCached(context.Background(), "/ffmpeg-success", BackendSoftware, "", runner, func() time.Time { return now })
 	if err != nil {
 		t.Fatalf("cached successful probe error = %v", err)
@@ -146,7 +147,15 @@ func TestProbeSuccessfulCapabilitiesDoNotExpire(t *testing.T) {
 		t.Fatalf("cached successful probe = %#v", got)
 	}
 	if calls != firstCalls {
-		t.Fatalf("successful probe reran: calls = %d, want %d", calls, firstCalls)
+		t.Fatalf("unexpired successful probe reran: calls = %d, want %d", calls, firstCalls)
+	}
+	now = now.Add(2 * time.Second)
+	got, err = probeCached(context.Background(), "/ffmpeg-success", BackendSoftware, "", runner, func() time.Time { return now })
+	if err != nil || len(got) != 1 {
+		t.Fatalf("refreshed successful probe = %#v, error = %v", got, err)
+	}
+	if calls == firstCalls {
+		t.Fatal("expired successful probe was not refreshed")
 	}
 }
 

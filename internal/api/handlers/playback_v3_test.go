@@ -259,6 +259,72 @@ func TestHandleStartPlaybackV3TriesAlternateAfterHDRTerminal(t *testing.T) {
 	}
 }
 
+func TestHandleStartPlaybackV3DoesNotTryAlternateWhileToneMapCapabilitiesAreIncomplete(t *testing.T) {
+	source := v3HandlerFixtureFile(t)
+	source.CodecVideo = "hevc"
+	source.Resolution = "2160p"
+	source.Bitrate = 32_000
+	source.VideoTracks[0] = models.VideoTrack{
+		Codec: "hevc", Profile: "main 10", Level: 150, Width: 3840, Height: 2160,
+		FrameRate: "24000/1001", Bitrate: 32_000, BitDepth: 10,
+		VideoRange: "DolbyVision", VideoRangeType: "DOVIWithHDR10", DVProfile: 8, DVBLCompatID: 1,
+	}
+	alternateValue := *source
+	alternate := &alternateValue
+	alternate.ID = 84
+	alternate.CodecVideo = "h264"
+	alternate.Resolution = "1080p"
+	alternate.Bitrate = 8_000
+	alternate.VideoTracks = []models.VideoTrack{{
+		Codec: "h264", Profile: "high", Level: 41, Width: 1920, Height: 1080,
+		FrameRate: "24000/1001", Bitrate: 8_000, BitDepth: 8, VideoRange: "SDR", VideoRangeType: "SDR",
+	}}
+
+	handler := NewPlaybackHandler(playback.NewSessionManager(0, 0), testPlaybackFileResolver{file: source})
+	handler.FileVersionFetcher = testPlaybackFileVersionFetcher{byContent: map[string][]*models.MediaFile{
+		source.ContentID: {source, alternate},
+	}}
+	handler.SettingsRepo = &mutablePlaybackSettingsV3{values: map[string]string{
+		config.Allow4KTranscodeSettingKey:                 "true",
+		config.PlaybackTranscodeHardwareToneMapSettingKey: "true",
+		config.PlaybackTranscodeSoftwareToneMapSettingKey: "true",
+	}}
+	handler.PlaybackConfig = playbackTestConfig("", "none")
+	handler.ItemAccess = allowAllPlaybackItemAccess{}
+	handler.v3ToneMapProbe = func(context.Context, string, string, string) (tonemap.Capabilities, error) {
+		return nil, context.DeadlineExceeded
+	}
+	presetLocalRegistryV3(handler, playback.NewTransformationRegistryV3([]playback.TransformationSpecV3{
+		{Name: playback.TransformationVideoToH264V3, RecipeVersion: playback.TransformationVideoToH264RecipeVersionV3, Available: true},
+		{Name: playback.TransformationAudioToAACV3, RecipeVersion: "1", Available: true},
+		{Name: playback.TransformationHDRToSDRToneMapV3, RecipeVersion: playback.TransformationHDRToSDRToneMapRecipeVersionV3},
+	}))
+
+	start := v3HandlerStartRequest()
+	start.QualityPreference = "auto"
+	start.ClientPlaybackContext.Deliveries[playback.DeliveryClassHLSV3] = playback.DeliveryCapabilityV3{
+		Enabled: true, SupportedOnDevice: true, Containers: []string{"hls"},
+		VideoCodecs: []string{"h264"}, AudioDecodeCodecs: []string{"aac"},
+	}
+	recorder := httptest.NewRecorder()
+	handler.HandleStartPlayback(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/playback/start", strings.NewReader(marshalV3StartRequest(t, start))).WithContext(newAuthorizedPlaybackContext()))
+
+	var response playback.DecisionResponseV3
+	if recorder.Code != http.StatusCreated || json.Unmarshal(recorder.Body.Bytes(), &response) != nil || response.Terminal == nil {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if response.Terminal.Reason != "capability_warming" || !response.Terminal.Retryable || response.Terminal.RetryAfterMillis <= 0 {
+		t.Fatalf("terminal = %#v, want retryable capability_warming", response.Terminal)
+	}
+	record, err := handler.PlanStoreV3.GetAttemptByPlaybackAttemptID(context.Background(), start.PlaybackAttemptID)
+	if err != nil {
+		t.Fatalf("load playback attempt: %v", err)
+	}
+	if record.RequestedMediaFileID != source.ID || record.EffectiveMediaFileID != source.ID {
+		t.Fatalf("attempt files = requested %d effective %d, want source %d pinned", record.RequestedMediaFileID, record.EffectiveMediaFileID, source.ID)
+	}
+}
+
 func TestReplanAllowsAlternateFileV3PinsSeekOperations(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -3262,6 +3328,78 @@ func TestRemapSubtitleSelectionV3RejectsNegativeIndex(t *testing.T) {
 	handler := NewPlaybackHandler(playback.NewSessionManager(0, 0))
 	if err := handler.remapSubtitleSelectionV3(context.Background(), source, target, &request); err == nil {
 		t.Fatal("negative subtitle index was accepted")
+	}
+}
+
+func TestRemapSubtitleSelectionV3UsesTrackMetadataAndRejectsAmbiguity(t *testing.T) {
+	source := &models.MediaFile{ID: 1, SubtitleTracks: []models.SubtitleTrack{
+		{Index: 4, Codec: "hdmv_pgs_subtitle", Language: "eng", Title: "English SDH", HearingImpaired: true},
+		{Index: 5, Codec: "hdmv_pgs_subtitle", Language: "eng", Title: "English Commentary"},
+	}}
+	target := &models.MediaFile{ID: 2, SubtitleTracks: []models.SubtitleTrack{
+		{Index: 7, Codec: "hdmv_pgs_subtitle", Language: "eng", Title: "English SDH", HearingImpaired: true},
+		{Index: 8, Codec: "hdmv_pgs_subtitle", Language: "eng", Title: "English Commentary"},
+	}}
+	selected := 1
+	request := playback.StartRequestV3{SubtitleTrackIndex: &selected}
+	handler := NewPlaybackHandler(playback.NewSessionManager(0, 0))
+
+	if err := handler.remapSubtitleSelectionV3(context.Background(), source, target, &request); err != nil {
+		t.Fatalf("remap commentary subtitle: %v", err)
+	}
+	if request.SubtitleTrackIndex == nil || *request.SubtitleTrackIndex != 1 {
+		t.Fatalf("remapped subtitle index = %v, want commentary index 1", request.SubtitleTrackIndex)
+	}
+
+	target.SubtitleTracks[0] = models.SubtitleTrack{Index: 7, Codec: "hdmv_pgs_subtitle", Language: "eng"}
+	target.SubtitleTracks[1] = models.SubtitleTrack{Index: 8, Codec: "hdmv_pgs_subtitle", Language: "eng"}
+	request.SubtitleTrackIndex = &selected
+	request.SubtitleTrackID = ""
+	if err := handler.remapSubtitleSelectionV3(context.Background(), source, target, &request); err == nil {
+		t.Fatal("ambiguous embedded subtitle remap was accepted")
+	}
+}
+
+func TestRemapSubtitleSelectionV3UsesDownloadedMetadataAndRejectsAmbiguity(t *testing.T) {
+	source := &models.MediaFile{ID: 1}
+	target := &models.MediaFile{ID: 2}
+	selected := 0
+	wanted := subtitles.DownloadedSubtitle{
+		ID: 10, MediaFileID: source.ID, Language: "eng", Format: subtitles.FormatSRT,
+		ReleaseName: "Feature Commentary", Provider: "provider-a",
+	}
+
+	repo := newMockSubtitleRepoForHandler()
+	repo.listResults = [][]subtitles.DownloadedSubtitle{
+		{wanted},
+		{
+			{ID: 20, MediaFileID: target.ID, Language: "eng", Format: subtitles.FormatSRT, ReleaseName: "Main dialog", Provider: "provider-a"},
+			{ID: 21, MediaFileID: target.ID, Language: "eng", Format: subtitles.FormatSRT, ReleaseName: "Feature Commentary", Provider: "provider-a"},
+		},
+	}
+	handler := NewPlaybackHandler(playback.NewSessionManager(0, 0))
+	handler.SubtitleRepo = repo
+	request := playback.StartRequestV3{SubtitleTrackIndex: &selected}
+	if err := handler.remapSubtitleSelectionV3(context.Background(), source, target, &request); err != nil {
+		t.Fatalf("remap downloaded commentary subtitle: %v", err)
+	}
+	if request.SubtitleTrackIndex == nil || *request.SubtitleTrackIndex != 1 {
+		t.Fatalf("remapped downloaded subtitle index = %v, want commentary index 1", request.SubtitleTrackIndex)
+	}
+
+	repo = newMockSubtitleRepoForHandler()
+	repo.listResults = [][]subtitles.DownloadedSubtitle{
+		{wanted},
+		{
+			{ID: 22, MediaFileID: target.ID, Language: "eng", Format: subtitles.FormatSRT, ReleaseName: "Feature Commentary", Provider: "provider-a"},
+			{ID: 23, MediaFileID: target.ID, Language: "eng", Format: subtitles.FormatSRT, ReleaseName: "Feature Commentary", Provider: "provider-a"},
+		},
+	}
+	handler.SubtitleRepo = repo
+	request.SubtitleTrackIndex = &selected
+	request.SubtitleTrackID = ""
+	if err := handler.remapSubtitleSelectionV3(context.Background(), source, target, &request); err == nil {
+		t.Fatal("ambiguous downloaded subtitle remap was accepted")
 	}
 }
 

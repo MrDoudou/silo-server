@@ -806,9 +806,10 @@ type PlanV3 struct {
 }
 
 type TerminalV3 struct {
-	Reason    string `json:"reason"`
-	Message   string `json:"message"`
-	Retryable bool   `json:"retryable"`
+	Reason           string `json:"reason"`
+	Message          string `json:"message"`
+	Retryable        bool   `json:"retryable"`
+	RetryAfterMillis int64  `json:"retry_after_ms,omitempty"`
 }
 
 type DecisionResponseV3 struct {

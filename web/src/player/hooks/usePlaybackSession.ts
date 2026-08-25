@@ -38,6 +38,30 @@ import type {
   ResumeHints,
 } from "../types";
 
+const CAPABILITY_WARMING_REASON_V3 = "capability_warming";
+const CAPABILITY_WARMING_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000, 4_000] as const;
+
+function capabilityWarmingRetryDelayV3(
+  decision: DecisionResponseV3,
+  retryIndex: number,
+): number | null {
+  const terminal = decision.terminal;
+  if (
+    !terminal?.retryable ||
+    terminal.reason !== CAPABILITY_WARMING_REASON_V3 ||
+    retryIndex >= CAPABILITY_WARMING_RETRY_DELAYS_MS.length
+  ) {
+    return null;
+  }
+  if (Number.isFinite(terminal.retry_after_ms) && Number(terminal.retry_after_ms) >= 0) {
+    return Math.max(
+      CAPABILITY_WARMING_RETRY_DELAYS_MS[retryIndex] ?? 250,
+      Math.min(Number(terminal.retry_after_ms), 4_000),
+    );
+  }
+  return CAPABILITY_WARMING_RETRY_DELAYS_MS[retryIndex] ?? null;
+}
+
 interface PlaybackSessionState {
   /**
    * The server's plan, verbatim. It is the single source of truth for the
@@ -61,6 +85,7 @@ interface PlaybackSessionState {
   qualityPreference: string;
   shouldAutoPlay: boolean;
   loading: boolean;
+  loadingMessage: string | null;
   replacing: boolean;
   replanning: boolean;
   errorTitle: string | null;
@@ -191,6 +216,7 @@ function planToSessionState(
     qualityPreference,
     shouldAutoPlay,
     loading: false,
+    loadingMessage: null,
     replacing: false,
     replanning: false,
     errorTitle: null,
@@ -284,6 +310,7 @@ export function usePlaybackSession(
     qualityPreference: qualityPreference?.trim() || "auto",
     shouldAutoPlay: true,
     loading: true,
+    loadingMessage: null,
     replacing: false,
     replanning: false,
     errorTitle: null,
@@ -440,6 +467,7 @@ export function usePlaybackSession(
         setState((current) => ({
           ...current,
           loading: false,
+          loadingMessage: null,
           replacing: false,
           replanning: false,
           errorTitle: failure.title,
@@ -616,13 +644,14 @@ export function usePlaybackSession(
       setState((current) => ({
         ...current,
         loading: !hasExistingSession,
+        loadingMessage: null,
         replacing: hasExistingSession,
         errorTitle: hasExistingSession ? current.errorTitle : null,
         error: hasExistingSession ? current.error : null,
       }));
 
       // A start begins a new attempt chain: fresh attempt id, empty loop guard.
-      const playbackAttemptId = randomUUID();
+      let playbackAttemptId = randomUUID();
       playbackAttemptIdRef.current = playbackAttemptId;
       attemptedPlanKeysRef.current = [];
       attemptCountRef.current = 1;
@@ -648,6 +677,7 @@ export function usePlaybackSession(
           durationSeconds: null,
           subtitleUrls: [],
           loading: false,
+          loadingMessage: null,
           replacing: false,
           replanning: false,
           errorTitle: nextError?.title ?? current.errorTitle,
@@ -662,12 +692,45 @@ export function usePlaybackSession(
           throw new Error("No playable version found");
         }
 
-        const decision = await requestStart(
-          selectedFileId,
-          position,
-          forceStartPosition,
-          playbackAttemptId,
-        );
+        let decision: DecisionResponseV3;
+        for (let retryIndex = 0; ; retryIndex += 1) {
+          playbackAttemptIdRef.current = playbackAttemptId;
+          decision = await requestStart(
+            selectedFileId,
+            position,
+            forceStartPosition,
+            playbackAttemptId,
+          );
+
+          if (loadSequence !== loadSequenceRef.current) {
+            const staleSessionId = decision.playback_plan?.session_id ?? decision.session_id;
+            if (staleSessionId) {
+              await stopSession(staleSessionId).catch(() => {
+                // Best effort cleanup for stale session starts.
+              });
+            }
+            return;
+          }
+
+          const retryDelay = capabilityWarmingRetryDelayV3(decision, retryIndex);
+          if (retryDelay == null) break;
+          setState((current) => ({
+            ...current,
+            loading: !hasExistingSession,
+            replacing: hasExistingSession,
+            loadingMessage: "Preparing transcoder…",
+            errorTitle: hasExistingSession ? current.errorTitle : null,
+            error: hasExistingSession ? current.error : null,
+          }));
+          await new Promise<void>((resolve) => window.setTimeout(resolve, retryDelay));
+          if (loadSequence !== loadSequenceRef.current) return;
+
+          // Start decisions are idempotent by playback_attempt_id. A retry must
+          // mint a new identity or the server will correctly replay the warming
+          // terminal forever even after the shared probe completes.
+          playbackAttemptId = randomUUID();
+          playbackAttemptIdRef.current = playbackAttemptId;
+        }
 
         if (loadSequence !== loadSequenceRef.current) {
           const staleSessionId = decision.playback_plan?.session_id ?? decision.session_id;
@@ -685,6 +748,7 @@ export function usePlaybackSession(
           setState((current) => ({
             ...current,
             loading: false,
+            loadingMessage: null,
             replacing: false,
             errorTitle: previousState.errorTitle,
             error: previousState.error,
@@ -711,6 +775,7 @@ export function usePlaybackSession(
           setState((current) => ({
             ...current,
             loading: false,
+            loadingMessage: null,
             replacing: false,
           }));
           return;
@@ -765,6 +830,9 @@ export function usePlaybackSession(
   // Clean up session on unmount.
   useEffect(() => {
     return () => {
+      // Supersede an in-flight start or bounded warming retry before cleaning
+      // up the session it may otherwise try to replace after unmount.
+      loadSequenceRef.current += 1;
       const sid = sessionIdRef.current;
       if (!sid) return;
 
@@ -879,22 +947,23 @@ export function usePlaybackSession(
         : [];
       const attemptCount = isFailureRecovery ? attemptCountRef.current : 1;
 
-      const body = buildReplanRequestV3({
-        ...options,
-        extraClientFeatures: VIDEO_CLIENT_FEATURES_V3,
-        plan,
-        playbackAttemptId,
-        replanRequestId: randomUUID(),
-        planAttemptId: planAttemptIdRef.current,
-        qualityPreference: qualityRef.current,
-        attemptedPlanKeys,
-        attemptCount,
-        metered: detectMeteredV3(),
-        bandwidthEstimateKbps: detectBandwidthEstimateKbpsV3(),
-        bandwidthCapKbps: maxBitrateKbps,
-        clientCapabilities,
-        clientPlaybackContext,
-      });
+      const buildBody = () =>
+        buildReplanRequestV3({
+          ...options,
+          extraClientFeatures: VIDEO_CLIENT_FEATURES_V3,
+          plan,
+          playbackAttemptId,
+          replanRequestId: randomUUID(),
+          planAttemptId: planAttemptIdRef.current,
+          qualityPreference: qualityRef.current,
+          attemptedPlanKeys,
+          attemptCount,
+          metered: detectMeteredV3(),
+          bandwidthEstimateKbps: detectBandwidthEstimateKbpsV3(),
+          bandwidthCapKbps: maxBitrateKbps,
+          clientCapabilities,
+          clientPlaybackContext,
+        });
 
       const loadSequence = loadSequenceRef.current;
       replanInFlightRef.current = true;
@@ -907,11 +976,21 @@ export function usePlaybackSession(
       }));
 
       try {
-        const decision = await playerFetch<DecisionResponseV3>(
-          config,
-          `/playback/${sessionId}/replan`,
-          { method: "POST", body: JSON.stringify(body) },
-        );
+        let decision: DecisionResponseV3;
+        for (let retryIndex = 0; ; retryIndex += 1) {
+          decision = await playerFetch<DecisionResponseV3>(
+            config,
+            `/playback/${sessionId}/replan`,
+            { method: "POST", body: JSON.stringify(buildBody()) },
+          );
+
+          if (loadSequence !== loadSequenceRef.current) return false;
+
+          const retryDelay = capabilityWarmingRetryDelayV3(decision, retryIndex);
+          if (retryDelay == null) break;
+          await new Promise<void>((resolve) => window.setTimeout(resolve, retryDelay));
+          if (loadSequence !== loadSequenceRef.current) return false;
+        }
 
         // A version switch or a fresh start that landed while this was in
         // flight owns the session now; this plan is already superseded.

@@ -556,6 +556,7 @@ export interface TerminalV3 {
   reason: string;
   message: string;
   retryable: boolean;
+  retry_after_ms?: number;
 }
 
 export interface DecisionResponseV3 {
