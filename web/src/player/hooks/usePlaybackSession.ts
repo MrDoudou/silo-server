@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePlayerConfig } from "../context/PlayerConfigContext";
 import type { PlayerConfig } from "../context/PlayerConfigContext";
-import { playerFetch } from "../player-fetch";
+import { PlayerFetchError, playerFetch } from "../player-fetch";
 import { describePlanTerminal, describePlaybackTransportError } from "../playback-errors";
 import { useCodecDetection } from "./useCodecDetection";
 import {
@@ -60,6 +60,32 @@ function capabilityWarmingRetryDelayV3(
     );
   }
   return CAPABILITY_WARMING_RETRY_DELAYS_MS[retryIndex] ?? null;
+}
+
+function currentDecisionFromStalePlanErrorV3(error: unknown): DecisionResponseV3 | null {
+  if (
+    !(error instanceof PlayerFetchError) ||
+    error.status !== 409 ||
+    error.code !== "stale_playback_plan" ||
+    !error.rawBody
+  ) {
+    return null;
+  }
+  try {
+    const envelope = JSON.parse(error.rawBody) as { current_decision?: DecisionResponseV3 };
+    const decision = envelope.current_decision;
+    if (
+      decision?.protocol_version !== 3 ||
+      decision.outcome !== "playable" ||
+      !decision.session_id ||
+      !decision.playback_plan
+    ) {
+      return null;
+    }
+    return decision;
+  } catch {
+    return null;
+  }
 }
 
 interface PlaybackSessionState {
@@ -656,6 +682,7 @@ export function usePlaybackSession(
       const previousSessionId = sessionIdRef.current;
       const hasExistingSession = !!previousState.sessionId && !!previousState.streamUrl;
       const loadSequence = ++loadSequenceRef.current;
+      const warmingRetryEpoch = warmingRetryEpochRef.current;
       const previousAttempt = {
         playbackAttemptId: playbackAttemptIdRef.current,
         planAttemptId: planAttemptIdRef.current,
@@ -667,6 +694,16 @@ export function usePlaybackSession(
         planAttemptIdRef.current = previousAttempt.planAttemptId;
         attemptedPlanKeysRef.current = previousAttempt.attemptedPlanKeys;
         attemptCountRef.current = previousAttempt.attemptCount;
+      };
+      const restoreInterruptedReplacement = () => {
+        if (!hasExistingSession) return;
+        restorePreviousAttempt();
+        setState((current) => ({
+          ...current,
+          loading: false,
+          loadingMessage: null,
+          replacing: false,
+        }));
       };
 
       setState((current) => ({
@@ -750,7 +787,18 @@ export function usePlaybackSession(
             errorTitle: hasExistingSession ? current.errorTitle : null,
             error: hasExistingSession ? current.error : null,
           }));
-          await new Promise<void>((resolve) => window.setTimeout(resolve, retryDelay));
+          if (warmingRetryEpoch !== warmingRetryEpochRef.current) {
+            restoreInterruptedReplacement();
+            return;
+          }
+          const retryDelayElapsed = await waitForCapabilityWarmingRetry(
+            retryDelay,
+            warmingRetryEpoch,
+          );
+          if (!retryDelayElapsed) {
+            restoreInterruptedReplacement();
+            return;
+          }
           if (loadSequence !== loadSequenceRef.current) return;
 
           // Start decisions are idempotent by playback_attempt_id. A retry must
@@ -815,7 +863,15 @@ export function usePlaybackSession(
         endAdoption(loadSequence);
       }
     },
-    [adoptDecision, beginAdoption, endAdoption, requestStart, selectFileId, stopSession],
+    [
+      adoptDecision,
+      beginAdoption,
+      endAdoption,
+      requestStart,
+      selectFileId,
+      stopSession,
+      waitForCapabilityWarmingRetry,
+    ],
   );
 
   useEffect(() => {
@@ -1063,6 +1119,10 @@ export function usePlaybackSession(
         }
         return adopted;
       } catch (err) {
+        const currentDecision = currentDecisionFromStalePlanErrorV3(err);
+        if (currentDecision && loadSequence === loadSequenceRef.current) {
+          return adoptDecision(currentDecision);
+        }
         if (replanAbort.signal.aborted) return false;
         if (loadSequence !== loadSequenceRef.current) return false;
         if (retireSessionOnRefusal) {

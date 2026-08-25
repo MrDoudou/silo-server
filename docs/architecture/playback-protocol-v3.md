@@ -73,14 +73,19 @@ All paths are relative to `/api/v1`. Every endpoint requires an authenticated
 user. The mutation endpoints additionally require a profile, supplied as the
 `X-Profile-Id` header.
 
-Every non-2xx response body is the standard error envelope:
+Every non-2xx response body includes the standard error envelope:
 
 ```json
 {"error": "<machine_code>", "message": "<human sentence>"}
 ```
 
 The `error` code is the stable part; the `message` is for logs and is not
-contract.
+contract. An endpoint may add fields that help the client recover. In
+particular, a replan rejected after the server can prove `failed_plan_id` is no
+longer current includes `current_decision`, a complete playable
+`DecisionResponseV3` for the session's durably committed plan. A client can
+adopt that decision instead of stopping a session whose replacement completed
+while its response was in flight.
 
 ### 2.1 `GET /playback/capability`
 
@@ -236,7 +241,7 @@ body cap: 256 KiB. Body: `ReplanRequestV3`
 | `401` | `unauthorized` | No authenticated user, or no `X-Profile-Id` |
 | `403` | `forbidden` | The session belongs to another user or profile |
 | `404` | `playback_session_not_found` | No such session, or its session has ended |
-| `409` | `stale_playback_plan` | `failed_plan_id` is not the session's current plan, `playback_attempt_id` is not the session's attempt, or a newer replacement is already active |
+| `409` | `stale_playback_plan` | `failed_plan_id` is not the session's current plan, `playback_attempt_id` is not the session's attempt, or a newer replacement is already active. When the server rejects a superseded `failed_plan_id` or completed request against a known current plan, the body also carries its playable `current_decision`. |
 | `409` | `idempotency_key_reused` | This `replan_request_id` was used for a different replan |
 | `409` | `replan_in_progress` | A replan for this session holds the lease right now |
 | `503` | `replan_capacity_exhausted` | Server-wide concurrent replan limit (8) reached; retryable |

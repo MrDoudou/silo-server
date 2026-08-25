@@ -5,7 +5,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -119,9 +121,9 @@ func TestProbeCommandDeadlineIsTransientAndNotCached(t *testing.T) {
 func TestProbeSuccessfulCapabilitiesExpire(t *testing.T) {
 	resetProbeCache(t)
 	now := time.Unix(100, 0)
-	calls := 0
+	var calls atomic.Int32
 	runner := func(_ context.Context, _ string, args ...string) ([]byte, error) {
-		calls++
+		calls.Add(1)
 		if len(args) > 0 && args[len(args)-1] == "-filters" {
 			return []byte(" .S. zscale V->V\n .S. tonemapx V->V\n .S. sidedata V->V\n"), nil
 		}
@@ -137,7 +139,7 @@ func TestProbeSuccessfulCapabilitiesExpire(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("successful probe = %#v", got)
 	}
-	firstCalls := calls
+	firstCalls := calls.Load()
 	now = now.Add(probePositiveTTL - time.Second)
 	got, err = probeCached(context.Background(), "/ffmpeg-success", BackendSoftware, "", runner, func() time.Time { return now })
 	if err != nil {
@@ -146,16 +148,86 @@ func TestProbeSuccessfulCapabilitiesExpire(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("cached successful probe = %#v", got)
 	}
-	if calls != firstCalls {
-		t.Fatalf("unexpired successful probe reran: calls = %d, want %d", calls, firstCalls)
+	if calls.Load() != firstCalls {
+		t.Fatalf("unexpired successful probe reran: calls = %d, want %d", calls.Load(), firstCalls)
 	}
 	now = now.Add(2 * time.Second)
 	got, err = probeCached(context.Background(), "/ffmpeg-success", BackendSoftware, "", runner, func() time.Time { return now })
 	if err != nil || len(got) != 1 {
 		t.Fatalf("refreshed successful probe = %#v, error = %v", got, err)
 	}
-	if calls == firstCalls {
-		t.Fatal("expired successful probe was not refreshed")
+	refreshExpiry := now.Add(probePositiveTTL)
+	refreshDeadline := time.After(time.Second)
+	for {
+		probeCache.Lock()
+		refreshed := probeCache.entries[probeCacheKey("/ffmpeg-success", BackendSoftware, "")].expiresAt.Equal(refreshExpiry)
+		probeCache.Unlock()
+		if refreshed {
+			break
+		}
+		select {
+		case <-refreshDeadline:
+			t.Fatal("expired successful probe was not refreshed in the background")
+		default:
+			runtime.Gosched()
+		}
+	}
+}
+
+func TestProbeExpiredPositiveReturnsWhileRefreshIsRunning(t *testing.T) {
+	resetProbeCache(t)
+	var nowUnix atomic.Int64
+	nowUnix.Store(100)
+	now := func() time.Time { return time.Unix(nowUnix.Load(), 0) }
+	var blockRefresh atomic.Bool
+	refreshStarted := make(chan struct{})
+	releaseRefresh := make(chan struct{})
+	var startOnce sync.Once
+	runner := func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		if blockRefresh.Load() {
+			startOnce.Do(func() { close(refreshStarted) })
+			<-releaseRefresh
+		}
+		if len(args) > 0 && args[len(args)-1] == "-filters" {
+			return []byte(" .S. zscale V->V\n .S. tonemapx V->V\n .S. sidedata V->V\n"), nil
+		}
+		if len(args) > 0 && args[len(args)-1] == "-encoders" {
+			return []byte("libx264"), nil
+		}
+		return nil, nil
+	}
+	seed, err := probeCached(context.Background(), "/ffmpeg-stale", BackendSoftware, "", runner, now)
+	if err != nil || len(seed) != 1 {
+		t.Fatalf("seed probe = %#v, error = %v", seed, err)
+	}
+
+	nowUnix.Add(int64((probePositiveTTL + time.Second) / time.Second))
+	blockRefresh.Store(true)
+	stale, err := probeCached(context.Background(), "/ffmpeg-stale", BackendSoftware, "", runner, now)
+	if err != nil || len(stale) != 1 {
+		t.Fatalf("stale probe = %#v, error = %v", stale, err)
+	}
+	select {
+	case <-refreshStarted:
+	case <-time.After(time.Second):
+		t.Fatal("expired positive did not start a background refresh")
+	}
+	close(releaseRefresh)
+	wantExpiry := now().Add(probePositiveTTL)
+	refreshDeadline := time.After(time.Second)
+	for {
+		probeCache.Lock()
+		refreshed := probeCache.entries[probeCacheKey("/ffmpeg-stale", BackendSoftware, "")].expiresAt.Equal(wantExpiry)
+		probeCache.Unlock()
+		if refreshed {
+			break
+		}
+		select {
+		case <-refreshDeadline:
+			t.Fatal("background refresh did not replace the stale positive")
+		default:
+			runtime.Gosched()
+		}
 	}
 }
 

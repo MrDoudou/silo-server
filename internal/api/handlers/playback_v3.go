@@ -81,6 +81,12 @@ type v3NodeCapabilityCache struct {
 	probeRequestTimeout time.Duration
 }
 
+type stalePlaybackPlanResponseV3 struct {
+	Error           string                      `json:"error"`
+	Message         string                      `json:"message"`
+	CurrentDecision playback.DecisionResponseV3 `json:"current_decision"`
+}
+
 type preparedTransportV3 struct {
 	url                string
 	nodeURL            string
@@ -2935,6 +2941,25 @@ func downloadedSubtitleLabelV3(value subtitles.DownloadedSubtitle) string {
 	return value.ReleaseName + " (" + value.Provider + ")"
 }
 
+func writeStalePlaybackPlanV3(w http.ResponseWriter, record *playback.AttemptRecordV3) {
+	if record == nil || record.SessionID == "" || record.CurrentPlan.PlanID == "" {
+		writeError(w, http.StatusConflict, "stale_playback_plan", "The failed plan is no longer current")
+		return
+	}
+	plan := record.CurrentPlan
+	writeJSON(w, http.StatusConflict, stalePlaybackPlanResponseV3{
+		Error:   "stale_playback_plan",
+		Message: "The failed plan is no longer current",
+		CurrentDecision: playback.DecisionResponseV3{
+			ProtocolVersion: playback.ProtocolV3,
+			ServerFeatures:  playback.ServerFeaturesV3(),
+			Outcome:         playback.OutcomePlayableV3,
+			SessionID:       record.SessionID,
+			PlaybackPlan:    &plan,
+		},
+	})
+}
+
 // HandleReplanPlaybackV3 provides persistent idempotency and preserves the old
 // transport until a successor has entered its startup state and the new plan is
 // durably committed.
@@ -3056,7 +3081,7 @@ func (h *PlaybackHandler) HandleReplanPlaybackV3(w http.ResponseWriter, r *http.
 	}
 	if lease.State == playback.ReplanLeaseCompletedV3 {
 		if record.CurrentReplanRequestID != req.ReplanRequestID || !completedReplanResponseMatchesAttemptV3(lease.Response, record) {
-			writeError(w, http.StatusConflict, "stale_playback_plan", "A newer replacement plan is already active")
+			writeStalePlaybackPlanV3(w, record)
 			return
 		}
 		if _, err := h.sessionMgr.GetSession(sessionID); err != nil {
@@ -3080,7 +3105,7 @@ func (h *PlaybackHandler) HandleReplanPlaybackV3(w http.ResponseWriter, r *http.
 		}
 	}()
 	if record.CurrentPlanID != req.FailedPlanID {
-		writeError(w, http.StatusConflict, "stale_playback_plan", "The failed plan is no longer current")
+		writeStalePlaybackPlanV3(w, record)
 		return
 	}
 	response, updated, transport, replanErr := h.executeReplanV3(r, record, req)

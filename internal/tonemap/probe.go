@@ -60,11 +60,13 @@ func Probe(ctx context.Context, ffmpegPath, hardwareBackend, hardwareDevice stri
 func probeCached(ctx context.Context, ffmpegPath, hardwareBackend, hardwareDevice string, run CommandRunner, now func() time.Time) (Capabilities, error) {
 	key := probeCacheKey(ffmpegPath, hardwareBackend, hardwareDevice)
 	probeCache.Lock()
-	if cached, ok := probeCache.entries[key]; ok && probeCacheEntryCurrent(cached, now()) {
+	cached, cachedOK := probeCache.entries[key]
+	if cachedOK && probeCacheEntryCurrent(cached, now()) {
 		result := append(Capabilities(nil), cached.capabilities...)
 		probeCache.Unlock()
 		return result, nil
 	}
+	stalePositive := cachedOK && len(cached.capabilities) > 0
 	probeCache.Unlock()
 
 	resultCh := probeCache.group.DoChan(key, func() (any, error) {
@@ -92,6 +94,13 @@ func probeCached(ctx context.Context, ffmpegPath, hardwareBackend, hardwareDevic
 		probeCache.Unlock()
 		return result, nil
 	})
+	if stalePositive {
+		// A previously validated executor remains safer than turning one periodic
+		// refresh into a new playback outage. The singleflight refresh above runs
+		// in the background and atomically replaces this inventory only after a
+		// complete probe succeeds.
+		return append(Capabilities(nil), cached.capabilities...), nil
+	}
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()

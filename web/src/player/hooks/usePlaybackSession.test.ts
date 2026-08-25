@@ -1926,6 +1926,77 @@ describe("usePlaybackSession server-invalidated plans", () => {
     unmount();
   });
 
+  it("interrupts a warming replacement start before handling an invalidation", async () => {
+    let startCount = 0;
+    const replanBodies: Array<Record<string, unknown>> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/playback/start")) {
+        startCount += 1;
+        if (startCount === 1) {
+          return jsonResponse(playableDecision(fixturePlanV3()), { status: 201 });
+        }
+        return jsonResponse(
+          {
+            protocol_version: 3,
+            server_features: ["playback_plan_v3"],
+            outcome: "adaptation_unavailable",
+            terminal: {
+              reason: "capability_warming",
+              message: "Tone-map capability discovery is still warming.",
+              retryable: true,
+              retry_after_ms: 4_000,
+            },
+          },
+          { status: 201 },
+        );
+      }
+      if (url.endsWith("/playback/session-1/replan")) {
+        replanBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return jsonResponse(
+          playableDecision(
+            fixturePlanV3({
+              plan_id: "plan:replacement-invalidation",
+              plan_attempt_key: "v3:replacement-invalidation",
+              delivery: "server_transcode_hls",
+            }),
+          ),
+        );
+      }
+      if (url.endsWith("/playback/route-events")) return new Response(null, { status: 202 });
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, unmount } = renderHook(
+      () => usePlaybackSession("request-1", [], [], 7, 0, false, "auto"),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.plan?.plan_id).toBe("plan:0123456789abcdef"));
+
+    act(() => result.current.switchVersion(99, 100));
+    await waitFor(() => expect(startCount).toBe(2));
+
+    let outcome: boolean | undefined;
+    act(() => {
+      void result.current
+        .invalidatePlan("plan:0123456789abcdef", "video_copy_unsafe", 100)
+        .then((value) => {
+          outcome = value;
+        });
+    });
+
+    await waitFor(() => expect(replanBodies).toHaveLength(1), { timeout: 500 });
+    await waitFor(() => expect(outcome).toBe(true));
+    expect(replanBodies[0]).toMatchObject({
+      operation: "failure_recovery",
+      failed_plan_id: "plan:0123456789abcdef",
+    });
+    await waitFor(() => expect(result.current.plan?.plan_id).toBe("plan:replacement-invalidation"));
+    unmount();
+  });
+
   it("aborts an in-flight replan when the server invalidates the current plan", async () => {
     const replanBodies: Array<Record<string, unknown>> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1943,13 +2014,18 @@ describe("usePlaybackSession server-invalidated plans", () => {
           });
         }
         return jsonResponse(
-          playableDecision(
-            fixturePlanV3({
-              plan_id: "plan:4444444444444444",
-              plan_attempt_key: "v3:4444444444444444",
-              delivery: "server_transcode_hls",
-            }),
-          ),
+          {
+            error: "stale_playback_plan",
+            message: "The failed plan is no longer current",
+            current_decision: playableDecision(
+              fixturePlanV3({
+                plan_id: "plan:4444444444444444",
+                plan_attempt_key: "v3:4444444444444444",
+                delivery: "server_transcode_hls",
+              }),
+            ),
+          },
+          { status: 409 },
         );
       }
       if (url.endsWith("/playback/route-events")) return new Response(null, { status: 202 });

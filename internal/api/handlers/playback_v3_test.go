@@ -1418,6 +1418,10 @@ func TestHandleReplanPlaybackV3SeekReanchorKeepsCurrentRecipeEligible(t *testing
 	if newerRR.Code != http.StatusOK {
 		t.Fatalf("newer reanchor status = %d, body = %s", newerRR.Code, newerRR.Body.String())
 	}
+	var newerResponse playback.DecisionResponseV3
+	if err := json.Unmarshal(newerRR.Body.Bytes(), &newerResponse); err != nil {
+		t.Fatal(err)
+	}
 
 	staleRetryReq := httptest.NewRequest(http.MethodPost, "/api/v1/playback/"+started.SessionID+"/replan", strings.NewReader(string(body))).WithContext(newAuthorizedPlaybackContext())
 	staleRetryReq = withPlaybackRouteParam(staleRetryReq, "session_id", started.SessionID)
@@ -1425,6 +1429,13 @@ func TestHandleReplanPlaybackV3SeekReanchorKeepsCurrentRecipeEligible(t *testing
 	handler.HandleReplanPlaybackV3(staleRetryRR, staleRetryReq)
 	if staleRetryRR.Code != http.StatusConflict || !strings.Contains(staleRetryRR.Body.String(), "stale_playback_plan") {
 		t.Fatalf("stale reanchor replay status = %d, body = %s", staleRetryRR.Code, staleRetryRR.Body.String())
+	}
+	var staleResponse stalePlaybackPlanResponseV3
+	if err := json.Unmarshal(staleRetryRR.Body.Bytes(), &staleResponse); err != nil {
+		t.Fatal(err)
+	}
+	if staleResponse.CurrentDecision.PlaybackPlan == nil || newerResponse.PlaybackPlan == nil || staleResponse.CurrentDecision.PlaybackPlan.PlanID != newerResponse.PlaybackPlan.PlanID {
+		t.Fatalf("stale response current decision = %#v, want the latest plan", staleResponse.CurrentDecision)
 	}
 	latestRecord, err := handler.PlanStoreV3.GetAttempt(context.Background(), started.SessionID)
 	if err != nil {
