@@ -349,6 +349,72 @@ func (s *FilesystemStore) DeleteObjects(ctx context.Context, keys []string) (int
 	return deleted, errors.Join(errs...)
 }
 
+func (s *FilesystemStore) ListPage(ctx context.Context, prefix, cursor string, limit int) ([]ObjectInfo, string, bool, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 1000
+	}
+	root, err := s.openRoot()
+	if err != nil {
+		return nil, cursor, false, err
+	}
+	var objects []ObjectInfo
+	done := true
+	err = fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if entry.IsDir() || name == "." || strings.HasPrefix(path.Base(name), ".") || name <= cursor || !strings.HasPrefix(name, prefix) {
+			return nil
+		}
+		if len(objects) == limit {
+			done = false
+			return fs.SkipAll
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		objects = append(objects, objectInfo(name, info))
+		return nil
+	})
+	if err != nil {
+		return nil, cursor, false, err
+	}
+	next := cursor
+	if len(objects) > 0 {
+		next = objects[len(objects)-1].Key
+	}
+	return objects, next, done, nil
+}
+
+func (s *FilesystemStore) DeletePrefixMaintenance(ctx context.Context, prefix string) (int, error) {
+	if err := validateLegacyMaintenancePrefix(prefix); err != nil {
+		return 0, err
+	}
+	var keys []string
+	cursor := ""
+	for {
+		objects, next, done, err := s.ListPage(ctx, prefix, cursor, 500)
+		if err != nil {
+			return 0, err
+		}
+		for _, object := range objects {
+			keys = append(keys, object.Key)
+		}
+		cursor = next
+		if done {
+			break
+		}
+	}
+	return s.DeleteObjects(ctx, keys)
+}
+
 // CleanTempFiles removes abandoned temporary files older than olderThan, which
 // defaults to DefaultTempFileGrace. Crash debris is invisible to the catalog
 // but still occupies bytes, so startup and periodic maintenance sweep it.

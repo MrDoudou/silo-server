@@ -1,0 +1,691 @@
+package metadata
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/time/rate"
+
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
+)
+
+const (
+	artworkInventoryCheckpointVersion = 1
+	artworkInventoryBatchSize         = 50
+	artworkManifestReadLimit          = 2 * 1024 * 1024
+)
+
+type ArtworkInventoryStore interface {
+	Open(ctx context.Context, key string) (*artworkstore.Object, error)
+	Stat(ctx context.Context, key string) (artworkstore.ObjectInfo, error)
+	Probe(ctx context.Context) error
+	ListPage(ctx context.Context, prefix, cursor string, limit int) ([]artworkstore.ObjectInfo, string, bool, error)
+}
+
+type ArtworkStorageService struct {
+	pool                 *pgxpool.Pool
+	store                ArtworkInventoryStore
+	backend              string
+	generation           string
+	limiter              *rate.Limiter
+	untrackedUserArtwork bool
+}
+
+func NewArtworkStorageService(pool *pgxpool.Pool, store ArtworkInventoryStore, backend, generation string, untrackedUserArtwork ...bool) *ArtworkStorageService {
+	if pool == nil || store == nil {
+		return nil
+	}
+	service := &ArtworkStorageService{
+		pool:       pool,
+		store:      store,
+		backend:    strings.TrimSpace(backend),
+		generation: strings.TrimSpace(backend) + ":" + strings.TrimSpace(generation),
+	}
+	if len(untrackedUserArtwork) > 0 {
+		service.untrackedUserArtwork = untrackedUserArtwork[0]
+	}
+	if strings.EqualFold(strings.TrimSpace(backend), artworkstore.BackendS3) {
+		// Inventory reconciliation is maintenance work, not request-path work.
+		// Keep it below ordinary delivery/materialization traffic on remote
+		// stores and make cancellation observable through Wait.
+		service.limiter = rate.NewLimiter(rate.Limit(20), 5)
+	}
+	return service
+}
+
+type ArtworkInventoryCheckpoint struct {
+	Version        int    `json:"version"`
+	Cursor         string `json:"cursor,omitempty"`
+	KnownRevisions int64  `json:"known_revisions"`
+	MissingObjects int64  `json:"missing_objects"`
+	Failures       int64  `json:"failures"`
+	StoreCursor    string `json:"store_cursor,omitempty"`
+	OrphanObjects  int64  `json:"orphan_objects"`
+	Finished       bool   `json:"finished"`
+}
+
+type ArtworkInventoryRefreshResult struct {
+	SnapshotAt       time.Time `json:"snapshot_at"`
+	Complete         bool      `json:"complete"`
+	KnownRevisions   int64     `json:"known_revisions"`
+	MissingObjects   int64     `json:"missing_objects"`
+	Failures         int64     `json:"failures"`
+	MissingRevisions int64     `json:"missing_revisions"`
+	OrphanObjects    int64     `json:"orphan_objects"`
+}
+
+type artworkInventoryReference struct {
+	path       string
+	imageType  string
+	sourcePath string
+}
+
+func (s *ArtworkStorageService) Refresh(
+	ctx context.Context,
+	checkpoint *ArtworkInventoryCheckpoint,
+	save func(ArtworkInventoryCheckpoint) error,
+	progress func(current, total int, message string),
+) (ArtworkInventoryRefreshResult, error) {
+	if s == nil || s.pool == nil || s.store == nil {
+		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork storage refresh is not configured")
+	}
+	if err := s.store.Probe(ctx); err != nil {
+		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: probe store: %w", err)
+	}
+	cp := ArtworkInventoryCheckpoint{Version: artworkInventoryCheckpointVersion}
+	if checkpoint != nil && checkpoint.Version == artworkInventoryCheckpointVersion {
+		cp = *checkpoint
+	}
+	if cp.Finished {
+		return s.refreshResult(ctx, cp)
+	}
+
+	for {
+		references, err := s.nextInventoryReferences(ctx, cp.Cursor, artworkInventoryBatchSize)
+		if err != nil {
+			return ArtworkInventoryRefreshResult{}, err
+		}
+		if len(references) == 0 {
+			break
+		}
+		for _, reference := range references {
+			objects, complete, missing, err := s.inspectRevision(ctx, reference.path, reference.imageType)
+			if err != nil {
+				cp.Failures++
+				cp.Cursor = reference.path
+				continue
+			}
+			cp.MissingObjects += int64(missing)
+			if err := s.upsertInventory(ctx, reference, objects, complete); err != nil {
+				return ArtworkInventoryRefreshResult{}, err
+			}
+			cp.KnownRevisions++
+			cp.Cursor = reference.path
+		}
+		if progress != nil {
+			progress(int(cp.KnownRevisions), 0, fmt.Sprintf("Verified %d artwork revisions", cp.KnownRevisions))
+		}
+		if save != nil {
+			if err := save(cp); err != nil {
+				return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: save checkpoint: %w", err)
+			}
+		}
+	}
+	if err := s.discoverOrphans(ctx, &cp, save, progress); err != nil {
+		return ArtworkInventoryRefreshResult{}, err
+	}
+
+	cp.Finished = true
+	result, err := s.refreshResult(ctx, cp)
+	if err != nil {
+		return ArtworkInventoryRefreshResult{}, err
+	}
+	_, err = s.pool.Exec(ctx, artworkAccountingPublishSQL, result.SnapshotAt, result.Complete, result.KnownRevisions, result.MissingRevisions,
+		result.MissingObjects, result.OrphanObjects, result.Failures, s.untrackedUserArtwork,
+		map[bool]string{true: "user artwork is stored outside PostgreSQL inventory", false: ""}[s.untrackedUserArtwork])
+	if err != nil {
+		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: publish snapshot: %w", err)
+	}
+	if save != nil {
+		if err := save(cp); err != nil {
+			return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: save final checkpoint: %w", err)
+		}
+	}
+	if progress != nil {
+		progress(int(cp.KnownRevisions), int(cp.KnownRevisions), "Artwork storage accounting refreshed")
+	}
+	return result, nil
+}
+
+const artworkAccountingPublishSQL = `
+	UPDATE artwork_storage_accounting_state
+	SET snapshot_at = $1,
+		inventory_complete = $2,
+		known_revisions = $3,
+		missing_revisions = $4,
+		missing_objects = $5,
+		orphan_objects = $6,
+		failure_count = $7,
+		coverage_limited = $8,
+		coverage_limit_reason = $9,
+		last_error = CASE WHEN $7 > 0 THEN 'inventory refresh had failures' ELSE '' END,
+		updated_at = NOW()
+	WHERE singleton`
+
+func (s *ArtworkStorageService) refreshResult(ctx context.Context, cp ArtworkInventoryCheckpoint) (ArtworkInventoryRefreshResult, error) {
+	var liveMissing, lifecycleMissing int64
+	query := `SELECT count(*) FROM (` + artworkInventoryReferenceSQL() + `) refs
+		LEFT JOIN artwork_revision_gc_candidates inventory ON inventory.original_path = refs.path
+		WHERE inventory.id IS NULL OR NOT inventory.inventory_complete OR inventory.store_generation <> $1`
+	if err := s.pool.QueryRow(ctx, query, s.generation).Scan(&liveMissing); err != nil {
+		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: count incomplete references: %w", err)
+	}
+	if err := s.pool.QueryRow(ctx, `
+		SELECT count(*) FROM artwork_revision_gc_candidates
+		WHERE tombstoned_at IS NULL AND (NOT inventory_complete OR store_generation <> $1)`, s.generation).Scan(&lifecycleMissing); err != nil {
+		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: count incomplete lifecycle rows: %w", err)
+	}
+	return ArtworkInventoryRefreshResult{
+		SnapshotAt:       time.Now().UTC(),
+		Complete:         cp.Failures == 0 && cp.MissingObjects == 0 && liveMissing == 0 && lifecycleMissing == 0,
+		KnownRevisions:   cp.KnownRevisions,
+		MissingObjects:   cp.MissingObjects,
+		Failures:         cp.Failures,
+		MissingRevisions: liveMissing,
+		OrphanObjects:    cp.OrphanObjects,
+	}, nil
+}
+
+func (s *ArtworkStorageService) discoverOrphans(ctx context.Context, cp *ArtworkInventoryCheckpoint, save func(ArtworkInventoryCheckpoint) error, progress func(int, int, string)) error {
+	for {
+		if err := s.waitRateLimit(ctx); err != nil {
+			return err
+		}
+		objects, next, done, err := s.store.ListPage(ctx, "", cp.StoreCursor, 500)
+		if err != nil {
+			return fmt.Errorf("artwork inventory: list store: %w", err)
+		}
+		if len(objects) > 0 {
+			keys := make([]string, 0, len(objects))
+			for i := range objects {
+				if artworkstore.ValidateKey(objects[i].Key) == nil {
+					keys = append(keys, objects[i].Key)
+				}
+			}
+			var known int64
+			if len(keys) > 0 {
+				if err := s.pool.QueryRow(ctx, `SELECT count(DISTINCT key) FROM artwork_revision_gc_candidates c CROSS JOIN LATERAL unnest(c.object_keys) key WHERE c.tombstoned_at IS NULL AND key = ANY($1)`, keys).Scan(&known); err != nil {
+					return err
+				}
+			}
+			cp.OrphanObjects += int64(len(keys)) - known
+			cp.StoreCursor = next
+			if progress != nil {
+				progress(int(cp.KnownRevisions), 0, fmt.Sprintf("Verified inventory; found %d orphan objects", cp.OrphanObjects))
+			}
+			if save != nil {
+				if err := save(*cp); err != nil {
+					return err
+				}
+			}
+		}
+		if done {
+			return nil
+		}
+	}
+}
+
+func (s *ArtworkStorageService) nextInventoryReferences(ctx context.Context, cursor string, limit int) ([]artworkInventoryReference, error) {
+	rows, err := s.pool.Query(ctx, artworkInventoryEnumerationSQL(), cursor, limit)
+	if err != nil {
+		return nil, fmt.Errorf("artwork inventory: enumerate references: %w", err)
+	}
+	defer rows.Close()
+	var references []artworkInventoryReference
+	for rows.Next() {
+		var reference artworkInventoryReference
+		if err := rows.Scan(&reference.path, &reference.imageType, &reference.sourcePath); err != nil {
+			return nil, fmt.Errorf("artwork inventory: scan reference: %w", err)
+		}
+		references = append(references, reference)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("artwork inventory: references: %w", err)
+	}
+	return references, nil
+}
+
+func artworkInventoryEnumerationSQL() string {
+	return `SELECT path, max(image_type), max(source_path)
+		FROM (` + artworkInventoryReferenceSQL() + `
+			UNION ALL
+			SELECT original_path AS path, image_type, '' AS source_path
+			FROM artwork_revision_gc_candidates WHERE tombstoned_at IS NULL
+		) refs
+		WHERE path > $1
+		GROUP BY path
+		ORDER BY path
+		LIMIT $2`
+}
+
+func (s *ArtworkStorageService) inspectRevision(ctx context.Context, originalPath, imageType string) ([]artworkstore.ObjectInfo, bool, int, error) {
+	keys := artworkkey.ObjectKeys(originalPath, imageType)
+	if info, ok := artworkkey.ParsePortableKey(originalPath); ok {
+		if err := s.waitRateLimit(ctx); err != nil {
+			return nil, false, 0, err
+		}
+		object, err := s.store.Open(ctx, info.Directory+"/"+artworkkey.ManifestName)
+		if err != nil {
+			if errors.Is(err, artworkstore.ErrNotFound) {
+				return statArtworkKeys(ctx, s.store, keys, s.limiter)
+			}
+			return nil, false, 0, fmt.Errorf("artwork inventory: open manifest %s: %w", originalPath, err)
+		}
+		data, readErr := io.ReadAll(io.LimitReader(object.Body, artworkManifestReadLimit+1))
+		closeErr := object.Close()
+		if readErr != nil {
+			return nil, false, 0, fmt.Errorf("artwork inventory: read manifest %s: %w", originalPath, readErr)
+		}
+		if closeErr != nil {
+			return nil, false, 0, fmt.Errorf("artwork inventory: close manifest %s: %w", originalPath, closeErr)
+		}
+		if len(data) > artworkManifestReadLimit {
+			return nil, false, 0, fmt.Errorf("artwork inventory: manifest %s exceeds limit", originalPath)
+		}
+		manifest, err := artworkkey.ParseManifest(data)
+		if err != nil {
+			return nil, false, 0, fmt.Errorf("artwork inventory: parse manifest %s: %w", originalPath, err)
+		}
+		if manifest.Directory() != info.Directory {
+			return nil, false, 0, fmt.Errorf("artwork inventory: manifest directory mismatch for %s", originalPath)
+		}
+		keys = manifest.ObjectKeys()
+	}
+	return statArtworkKeys(ctx, s.store, keys, s.limiter)
+}
+
+func statArtworkKeys(ctx context.Context, store ArtworkInventoryStore, keys []string, limiter *rate.Limiter) ([]artworkstore.ObjectInfo, bool, int, error) {
+	objects := make([]artworkstore.ObjectInfo, 0, len(keys))
+	missing := 0
+	for _, key := range keys {
+		if limiter != nil {
+			if err := limiter.Wait(ctx); err != nil {
+				return nil, false, missing, err
+			}
+		}
+		info, err := store.Stat(ctx, key)
+		if errors.Is(err, artworkstore.ErrNotFound) {
+			objects = append(objects, artworkstore.ObjectInfo{Key: key})
+			missing++
+			continue
+		}
+		if err != nil {
+			return nil, false, missing, fmt.Errorf("artwork inventory: stat %s: %w", key, err)
+		}
+		info.Key = key
+		objects = append(objects, info)
+	}
+	return objects, len(keys) > 0 && missing == 0, missing, nil
+}
+
+func (s *ArtworkStorageService) waitRateLimit(ctx context.Context) error {
+	if s == nil || s.limiter == nil {
+		return nil
+	}
+	return s.limiter.Wait(ctx)
+}
+
+func (s *ArtworkStorageService) upsertInventory(ctx context.Context, reference artworkInventoryReference, objects []artworkstore.ObjectInfo, complete bool) error {
+	keys := make([]string, 0, len(objects))
+	sizes := make([]int64, 0, len(objects))
+	contentTypes := make([]string, 0, len(objects))
+	var total int64
+	for _, object := range objects {
+		keys = append(keys, object.Key)
+		sizes = append(sizes, object.SizeBytes)
+		contentTypes = append(contentTypes, object.MediaType)
+		total += object.SizeBytes
+	}
+	imageType := artworkkey.ImageTypeFromKey(reference.path)
+	if imageType == "" {
+		imageType = reference.imageType
+	}
+	_, err := s.pool.Exec(ctx, artworkInventoryUpsertSQL, reference.path, imageType, keys, sizes, contentTypes, total,
+		artworkSourceClassFromReference(reference.sourcePath), s.generation, complete)
+	if err != nil {
+		return fmt.Errorf("artwork inventory: persist %s: %w", reference.path, err)
+	}
+	return nil
+}
+
+const artworkInventoryUpsertSQL = `
+	INSERT INTO artwork_revision_gc_candidates (
+		original_path, image_type, object_keys, object_sizes_bytes, object_content_types,
+		total_physical_bytes, source_class, store_generation, inventory_complete,
+		not_before, next_attempt_at, last_reference_check_at, last_verified_at
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NULL, NOW(), NOW())
+	ON CONFLICT (original_path) DO UPDATE SET
+		image_type = EXCLUDED.image_type,
+		object_keys = EXCLUDED.object_keys,
+		object_sizes_bytes = EXCLUDED.object_sizes_bytes,
+		object_content_types = EXCLUDED.object_content_types,
+		total_physical_bytes = EXCLUDED.total_physical_bytes,
+		source_class = CASE
+			WHEN EXCLUDED.source_class = 'unknown' THEN artwork_revision_gc_candidates.source_class
+			ELSE EXCLUDED.source_class
+		END,
+		store_generation = EXCLUDED.store_generation,
+		inventory_complete = EXCLUDED.inventory_complete,
+		last_verified_at = NOW()`
+
+func artworkSourceClassFromReference(source string) string {
+	source = strings.ToLower(strings.TrimSpace(source))
+	switch {
+	case strings.HasPrefix(source, "file://"):
+		return "library_sidecar"
+	case strings.HasPrefix(source, "embedded://"):
+		return "embedded"
+	case strings.HasPrefix(source, "generated://"):
+		return "generated"
+	case strings.HasPrefix(source, "plugin://"):
+		return "plugin"
+	case strings.Contains(source, "://"):
+		return "provider"
+	case strings.HasPrefix(source, "/"):
+		return "bundled"
+	default:
+		return "unknown"
+	}
+}
+
+func artworkInventoryReferenceSQL() string {
+	parts := make([]string, 0, len(artworkSweepSurfaces())+1)
+	for _, surface := range artworkSweepSurfaces() {
+		source := "''"
+		if surface.sourceCol != "" {
+			source = "COALESCE(" + surface.sourceCol + ", '')"
+		}
+		parts = append(parts, fmt.Sprintf(
+			"SELECT %s AS path, '%s' AS image_type, %s AS source_path FROM %s WHERE %s",
+			surface.pathCol, surface.imageType, source, surface.table, surface.cachedPredicate(),
+		))
+	}
+	parts = append(parts, fmt.Sprintf(
+		"SELECT %s AS path, 'avatar' AS image_type, '' AS source_path FROM %s WHERE %s",
+		profileAvatarReferenceSurface().pathExpr,
+		profileAvatarReferenceSurface().table,
+		profileAvatarReferenceSurface().filter,
+	))
+	return strings.Join(parts, " UNION ALL ")
+}
+
+type ArtworkStorageAccounting struct {
+	SnapshotAt           *time.Time                 `json:"snapshot_at,omitempty"`
+	Backend              string                     `json:"backend"`
+	Complete             bool                       `json:"complete"`
+	KnownBytes           int64                      `json:"known_bytes"`
+	Total                ArtworkStorageTotal        `json:"total"`
+	Libraries            []ArtworkLibraryAccounting `json:"libraries"`
+	ServerScoped         ArtworkServerAccounting    `json:"server_scoped"`
+	InventoryDrift       ArtworkInventoryDrift      `json:"inventory_drift"`
+	UntrackedUserArtwork bool                       `json:"untracked_user_artwork"`
+	CoverageLimited      bool                       `json:"coverage_limited"`
+	CoverageLimitReason  string                     `json:"coverage_limit_reason,omitempty"`
+	FailureCount         int64                      `json:"failure_count"`
+}
+
+type ArtworkStorageTotal struct {
+	PhysicalBytes  int64 `json:"physical_bytes"`
+	PendingGCBytes int64 `json:"pending_gc_bytes"`
+	ProtectedBytes int64 `json:"protected_bytes"`
+	ObjectCount    int64 `json:"object_count"`
+	RevisionCount  int64 `json:"revision_count"`
+}
+
+type ArtworkLibraryAccounting struct {
+	LibraryID             int64            `json:"library_id"`
+	ReferencedBytes       int64            `json:"referenced_bytes"`
+	ExclusiveBytes        int64            `json:"exclusive_bytes"`
+	SharedBytes           int64            `json:"shared_bytes"`
+	ReclaimableBytes      int64            `json:"reclaimable_bytes"`
+	ReconstructibleBytes  int64            `json:"reconstructible_bytes"`
+	ProtectedBytes        int64            `json:"protected_bytes"`
+	ObjectCount           int64            `json:"object_count"`
+	RevisionCount         int64            `json:"revision_count"`
+	MaterializedRevisions int64            `json:"materialized_revisions"`
+	SourceClasses         map[string]int64 `json:"source_classes"`
+}
+
+type ArtworkServerAccounting struct {
+	ReferencedBytes int64 `json:"referenced_bytes"`
+	ObjectCount     int64 `json:"object_count"`
+	RevisionCount   int64 `json:"revision_count"`
+}
+
+type ArtworkInventoryDrift struct {
+	MissingRevisions int64 `json:"missing_revisions"`
+	MissingObjects   int64 `json:"missing_objects"`
+	OrphanObjects    int64 `json:"orphan_objects"`
+}
+
+func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageAccounting, error) {
+	if s == nil || s.pool == nil {
+		return ArtworkStorageAccounting{}, fmt.Errorf("artwork storage accounting is not configured")
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return ArtworkStorageAccounting{}, fmt.Errorf("artwork accounting: begin snapshot: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	result := ArtworkStorageAccounting{Backend: s.backend, UntrackedUserArtwork: s.untrackedUserArtwork}
+	if err := tx.QueryRow(ctx, artworkAccountingStateSQL).Scan(
+		&result.SnapshotAt, &result.Complete, &result.InventoryDrift.MissingRevisions,
+		&result.InventoryDrift.MissingObjects, &result.InventoryDrift.OrphanObjects,
+		&result.CoverageLimited, &result.CoverageLimitReason, &result.FailureCount,
+	); err != nil {
+		return result, fmt.Errorf("artwork accounting: load snapshot: %w", err)
+	}
+	var lifecycleIncomplete bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM artwork_revision_gc_candidates
+			WHERE tombstoned_at IS NULL AND (NOT inventory_complete OR store_generation <> $1)
+		)`, s.generation).Scan(&lifecycleIncomplete); err != nil {
+		return result, fmt.Errorf("artwork accounting: check inventory completeness: %w", err)
+	}
+	if lifecycleIncomplete {
+		result.Complete = false
+	}
+	if err := tx.QueryRow(ctx, artworkStorageTotalSQL()).Scan(
+		&result.Total.PhysicalBytes, &result.Total.PendingGCBytes, &result.Total.ProtectedBytes,
+		&result.Total.ObjectCount, &result.Total.RevisionCount,
+	); err != nil {
+		return result, fmt.Errorf("artwork accounting: total: %w", err)
+	}
+	result.KnownBytes = result.Total.PhysicalBytes
+
+	rows, err := tx.Query(ctx, artworkLibraryAccountingSQL())
+	if err != nil {
+		return result, fmt.Errorf("artwork accounting: libraries: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var library ArtworkLibraryAccounting
+		if err := rows.Scan(
+			&library.LibraryID, &library.ReferencedBytes, &library.ExclusiveBytes, &library.SharedBytes,
+			&library.ReclaimableBytes, &library.ReconstructibleBytes, &library.ProtectedBytes,
+			&library.ObjectCount, &library.RevisionCount, &library.MaterializedRevisions,
+		); err != nil {
+			return result, fmt.Errorf("artwork accounting: scan library: %w", err)
+		}
+		library.SourceClasses = make(map[string]int64)
+		result.Libraries = append(result.Libraries, library)
+	}
+	if err := rows.Err(); err != nil {
+		return result, fmt.Errorf("artwork accounting: library rows: %w", err)
+	}
+	rows.Close()
+
+	classRows, err := tx.Query(ctx, artworkLibrarySourceClassSQL())
+	if err != nil {
+		return result, fmt.Errorf("artwork accounting: source classes: %w", err)
+	}
+	defer classRows.Close()
+	byID := make(map[int64]*ArtworkLibraryAccounting, len(result.Libraries))
+	for i := range result.Libraries {
+		byID[result.Libraries[i].LibraryID] = &result.Libraries[i]
+	}
+	for classRows.Next() {
+		var libraryID int64
+		var sourceClass string
+		var bytes int64
+		if err := classRows.Scan(&libraryID, &sourceClass, &bytes); err != nil {
+			return result, fmt.Errorf("artwork accounting: scan source class: %w", err)
+		}
+		if library := byID[libraryID]; library != nil {
+			library.SourceClasses[sourceClass] = bytes
+		}
+	}
+	if err := classRows.Err(); err != nil {
+		return result, fmt.Errorf("artwork accounting: source class rows: %w", err)
+	}
+	classRows.Close()
+
+	if err := tx.QueryRow(ctx, artworkServerScopedAccountingSQL()).Scan(
+		&result.ServerScoped.ReferencedBytes, &result.ServerScoped.ObjectCount, &result.ServerScoped.RevisionCount,
+	); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return result, fmt.Errorf("artwork accounting: server scoped: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return result, fmt.Errorf("artwork accounting: commit snapshot: %w", err)
+	}
+	return result, nil
+}
+
+const artworkAccountingStateSQL = `
+	SELECT snapshot_at, inventory_complete, missing_revisions, missing_objects, orphan_objects,
+		coverage_limited, coverage_limit_reason, failure_count
+	FROM artwork_storage_accounting_state WHERE singleton`
+
+func artworkReconstructibleSQL(sourceExpr string) string {
+	return fmt.Sprintf(`(
+		lower(%[1]s) LIKE 'file://%%'
+		OR %[1]s LIKE '/%%'
+		OR (coalesce(%[1]s, '') LIKE '%%://%%' AND lower(%[1]s) NOT LIKE ALL (%[2]s))
+	)`, sourceExpr, nonProviderImageSchemesSQL)
+}
+
+func artworkLibraryReferencesSQL() string {
+	reconstructible := func(source string) string { return artworkReconstructibleSQL(source) }
+	surface := func(name string) artworkSweepSurface {
+		value, ok := artworkSweepSurfaceByName(name)
+		if !ok {
+			panic("missing artwork sweep surface " + name)
+		}
+		return value
+	}
+	return fmt.Sprintf(`
+		SELECT mil.media_folder_id AS library_id, mi.poster_path AS path, %s AS reconstructible FROM media_items mi JOIN media_item_libraries mil ON mil.content_id = mi.content_id WHERE %s
+		UNION ALL SELECT mil.media_folder_id, mi.backdrop_path, %s FROM media_items mi JOIN media_item_libraries mil ON mil.content_id = mi.content_id WHERE %s
+		UNION ALL SELECT mil.media_folder_id, mi.logo_path, %s FROM media_items mi JOIN media_item_libraries mil ON mil.content_id = mi.content_id WHERE %s
+		UNION ALL SELECT mil.media_folder_id, loc.poster_path, %s FROM media_item_localizations loc JOIN media_item_libraries mil ON mil.content_id = loc.content_id WHERE %s
+		UNION ALL SELECT mil.media_folder_id, loc.backdrop_path, %s FROM media_item_localizations loc JOIN media_item_libraries mil ON mil.content_id = loc.content_id WHERE %s
+		UNION ALL SELECT mil.media_folder_id, loc.logo_path, %s FROM media_item_localizations loc JOIN media_item_libraries mil ON mil.content_id = loc.content_id WHERE %s
+		UNION ALL SELECT mil.media_folder_id, se.poster_path, %s FROM seasons se JOIN media_item_libraries mil ON mil.content_id = se.series_id WHERE %s
+		UNION ALL SELECT mil.media_folder_id, loc.poster_path, %s FROM season_localizations loc JOIN seasons se ON se.content_id = loc.season_content_id JOIN media_item_libraries mil ON mil.content_id = se.series_id WHERE %s
+		UNION ALL SELECT mil.media_folder_id, ep.still_path, %s FROM episodes ep JOIN media_item_libraries mil ON mil.content_id = ep.series_id WHERE %s
+		UNION ALL SELECT mil.media_folder_id, p.photo_path, %s FROM people p JOIN item_people ip ON ip.person_id = p.id JOIN media_item_libraries mil ON mil.content_id = ip.content_id WHERE %s
+		UNION ALL SELECT mf.id, mf.poster_path, FALSE FROM media_folders mf WHERE %s
+		UNION ALL SELECT lc.library_id, lc.poster_url, FALSE FROM library_collections lc WHERE %s
+		UNION ALL SELECT lc.library_id, lc.backdrop_url, FALSE FROM library_collections lc WHERE %s`,
+		reconstructible("mi.poster_source_path"), surface("item posters").cachedPredicate(),
+		reconstructible("mi.backdrop_source_path"), surface("item backdrops").cachedPredicate(),
+		reconstructible("mi.logo_source_path"), surface("item logos").cachedPredicate(),
+		reconstructible("loc.poster_source_path"), strings.ReplaceAll(surface("localized item posters").cachedPredicate(), "poster_path", "loc.poster_path"),
+		reconstructible("loc.backdrop_source_path"), strings.ReplaceAll(surface("localized item backdrops").cachedPredicate(), "backdrop_path", "loc.backdrop_path"),
+		reconstructible("loc.logo_source_path"), strings.ReplaceAll(surface("localized item logos").cachedPredicate(), "logo_path", "loc.logo_path"),
+		reconstructible("se.poster_source_path"), strings.ReplaceAll(surface("season posters").cachedPredicate(), "poster_path", "se.poster_path"),
+		reconstructible("loc.poster_source_path"), strings.ReplaceAll(surface("localized season posters").cachedPredicate(), "poster_path", "loc.poster_path"),
+		reconstructible("ep.still_source_path"), strings.ReplaceAll(surface("episode stills").cachedPredicate(), "still_path", "ep.still_path"),
+		reconstructible("p.photo_source_path"), strings.ReplaceAll(surface("person photos").cachedPredicate(), "photo_path", "p.photo_path"),
+		strings.ReplaceAll(surface("library posters").cachedPredicate(), "poster_path", "mf.poster_path"),
+		strings.ReplaceAll(surface("collection posters").cachedPredicate(), "poster_url", "lc.poster_url"),
+		strings.ReplaceAll(surface("collection backdrops").cachedPredicate(), "backdrop_url", "lc.backdrop_url"),
+	)
+}
+
+func artworkStorageAccountingCTE() string {
+	return `WITH raw_refs AS (` + artworkLibraryReferencesSQL() + `),
+		library_refs AS (
+			SELECT library_id, path, bool_and(reconstructible) AS reconstructible
+			FROM raw_refs GROUP BY library_id, path
+		), server_refs AS (` + artworkServerReferencesSQL() + `), revision_scope AS (
+			SELECT lr.path, count(*) AS library_count,
+				EXISTS (SELECT 1 FROM server_refs sr WHERE sr.path = lr.path) AS server_shared
+			FROM library_refs lr GROUP BY lr.path
+		)`
+}
+
+func artworkServerReferencesSQL() string {
+	personal, ok := artworkSweepSurfaceByName("user collection posters")
+	if !ok {
+		panic("missing artwork sweep surface user collection posters")
+	}
+	avatar := profileAvatarReferenceSurface()
+	return fmt.Sprintf(`SELECT %s AS path FROM %s WHERE %s
+		UNION ALL SELECT %s AS path FROM %s WHERE %s`,
+		personal.pathCol, personal.table, personal.cachedPredicate(),
+		avatar.pathExpr, avatar.table, avatar.filter,
+	)
+}
+
+func artworkStorageTotalSQL() string {
+	return `WITH all_refs AS (` + artworkInventoryReferenceSQL() + `), protected_paths AS (
+		SELECT path FROM all_refs GROUP BY path
+		HAVING NOT bool_and(` + artworkReconstructibleSQL("source_path") + `)
+	) SELECT
+		COALESCE(sum(total_physical_bytes) FILTER (WHERE lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
+		COALESCE(sum(total_physical_bytes) FILTER (WHERE lifecycle_state IN ('pending_gc', 'deleting')), 0),
+		COALESCE(sum(total_physical_bytes) FILTER (WHERE original_path IN (SELECT path FROM protected_paths) AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
+		COALESCE(sum((SELECT count(*) FROM unnest(object_sizes_bytes) size WHERE size > 0)) FILTER (WHERE lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
+		count(*) FILTER (WHERE lifecycle_state IN ('parked', 'pending_gc', 'deleting'))
+		FROM artwork_revision_gc_candidates`
+}
+
+func artworkLibraryAccountingSQL() string {
+	return artworkStorageAccountingCTE() + ` SELECT
+		lr.library_id,
+		COALESCE(sum(i.total_physical_bytes), 0) AS referenced_bytes,
+		COALESCE(sum(i.total_physical_bytes) FILTER (WHERE rs.library_count = 1 AND NOT rs.server_shared), 0) AS exclusive_bytes,
+		COALESCE(sum(i.total_physical_bytes) FILTER (WHERE rs.library_count > 1 OR rs.server_shared), 0) AS shared_bytes,
+		COALESCE(sum(i.total_physical_bytes) FILTER (WHERE rs.library_count = 1 AND NOT rs.server_shared AND lr.reconstructible), 0) AS reclaimable_bytes,
+		COALESCE(sum(i.total_physical_bytes) FILTER (WHERE lr.reconstructible), 0) AS reconstructible_bytes,
+		COALESCE(sum(i.total_physical_bytes) FILTER (WHERE NOT lr.reconstructible), 0) AS protected_bytes,
+		COALESCE(sum((SELECT count(*) FROM unnest(i.object_sizes_bytes) size WHERE size > 0)), 0) AS object_count,
+		count(i.id) AS revision_count,
+		count(*) FILTER (WHERE i.inventory_complete) AS materialized_revisions
+	FROM library_refs lr
+	JOIN revision_scope rs ON rs.path = lr.path
+	LEFT JOIN artwork_revision_gc_candidates i ON i.original_path = lr.path AND i.lifecycle_state IN ('parked', 'pending_gc', 'deleting')
+	GROUP BY lr.library_id ORDER BY lr.library_id`
+}
+
+func artworkLibrarySourceClassSQL() string {
+	return artworkStorageAccountingCTE() + ` SELECT lr.library_id, COALESCE(i.source_class, 'unknown'), COALESCE(sum(i.total_physical_bytes), 0)
+		FROM library_refs lr LEFT JOIN artwork_revision_gc_candidates i ON i.original_path = lr.path AND i.lifecycle_state IN ('parked', 'pending_gc', 'deleting')
+		GROUP BY lr.library_id, COALESCE(i.source_class, 'unknown') ORDER BY lr.library_id`
+}
+
+func artworkServerScopedAccountingSQL() string {
+	return `WITH server_paths AS (SELECT DISTINCT path FROM (` + artworkServerReferencesSQL() + `) refs)
+	SELECT COALESCE(sum(i.total_physical_bytes), 0), COALESCE(sum((SELECT count(*) FROM unnest(i.object_sizes_bytes) size WHERE size > 0)), 0), count(i.id)
+	FROM server_paths sp LEFT JOIN artwork_revision_gc_candidates i ON i.original_path = sp.path AND i.lifecycle_state IN ('parked', 'pending_gc', 'deleting')`
+}

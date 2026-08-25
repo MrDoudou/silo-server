@@ -372,9 +372,10 @@ func (s *scriptedArtworkVerifySweeper) sweepChapterThumbnailsFrom(
 func TestArtworkReconcileStopsAtUnsafeBatchAndResumesFromLastCheckpoint(t *testing.T) {
 	surfaces := []artworkSweepSurface{{name: "posters"}, {name: "later surface"}}
 	checkpoint := ArtworkReconcileCheckpoint{
-		Version: artworkReconcileCheckpointVersion,
-		Totals:  []int{1001, 1},
-		Stats:   ArtworkReconcileStats{Mode: ArtworkReconcileModeVerify},
+		Version:     artworkReconcileCheckpointVersion,
+		Totals:      []int{1001, 1},
+		SurfaceName: "posters",
+		Stats:       ArtworkReconcileStats{Mode: ArtworkReconcileModeVerify},
 	}
 	firstRun := &scriptedArtworkVerifySweeper{batches: map[string][]scriptedArtworkBatch{
 		"posters": {
@@ -434,6 +435,7 @@ func TestArtworkReconcileStopsAndResumesChapterThumbnailsFromLastCheckpoint(t *t
 	checkpoint := ArtworkReconcileCheckpoint{
 		Version:      artworkReconcileCheckpointVersion,
 		ChapterTotal: 3,
+		SurfaceName:  artworkReconcileChapterSurface,
 		Stats:        ArtworkReconcileStats{Mode: ArtworkReconcileModeVerify},
 	}
 	firstRun := &scriptedArtworkVerifySweeper{chapterBatches: []scriptedArtworkChapterBatch{
@@ -491,6 +493,7 @@ func TestArtworkReconcileWithoutSaverContinuesAfterUnsafeBatches(t *testing.T) {
 		Version:      artworkReconcileCheckpointVersion,
 		Totals:       []int{1, 1},
 		ChapterTotal: 2,
+		SurfaceName:  "posters",
 		Stats:        ArtworkReconcileStats{Mode: ArtworkReconcileModeVerify},
 	}
 	sweeper := &scriptedArtworkVerifySweeper{
@@ -565,7 +568,7 @@ func TestArtworkReconcileLeavesRowsAloneOnStorageErrors(t *testing.T) {
 	if stats.Errors == 0 || stats.SweepErrors == 0 {
 		t.Fatal("expected the erroring key to be counted")
 	}
-	if saved.SurfaceIndex != 0 || len(saved.SurfaceCursor) != 0 || saved.Finished {
+	if saved.SurfaceName != "" || len(saved.SurfaceCursor) != 0 || saved.Finished {
 		t.Fatalf("checkpoint advanced past an errored batch: %#v", saved)
 	}
 

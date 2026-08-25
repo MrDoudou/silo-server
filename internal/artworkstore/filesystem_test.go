@@ -746,6 +746,36 @@ func TestClosedStoreFailsCleanly(t *testing.T) {
 	}
 }
 
+func TestFilesystemStoreListsBoundedPagesAndConfinesLegacyPrefixCleanup(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	legacy := []string{
+		"tmdb/movies/550/poster/original.old.webp",
+		"tmdb/movies/550/poster/w500.old.webp",
+	}
+	for _, key := range append(append([]string(nil), legacy...), testKey) {
+		mustWrite(t, store, key, []byte(key))
+	}
+	first, cursor, done, err := store.ListPage(ctx, "", "", 2)
+	if err != nil || done || len(first) != 2 || cursor != first[1].Key {
+		t.Fatalf("first page = %#v cursor=%q done=%v err=%v", first, cursor, done, err)
+	}
+	second, _, done, err := store.ListPage(ctx, "", cursor, 2)
+	if err != nil || !done || len(second) != 1 {
+		t.Fatalf("second page = %#v done=%v err=%v", second, done, err)
+	}
+	deleted, err := store.DeletePrefixMaintenance(ctx, "tmdb/movies/550/poster/")
+	if err != nil || deleted != len(legacy) {
+		t.Fatalf("legacy maintenance delete = (%d, %v)", deleted, err)
+	}
+	if _, err := store.Stat(ctx, testKey); err != nil {
+		t.Fatalf("portable object was removed: %v", err)
+	}
+	if _, err := store.DeletePrefixMaintenance(ctx, "artwork/v1/objects/"); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("portable prefix delete error = %v, want ErrInvalidKey", err)
+	}
+}
+
 func assertNoTempFiles(t *testing.T, store *FilesystemStore) {
 	t.Helper()
 	err := filepath.WalkDir(store.Root(), func(path string, entry os.DirEntry, err error) error {

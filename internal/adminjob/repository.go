@@ -52,6 +52,7 @@ type CreateJobInput struct {
 	JobType         string
 	CreatedByUserID int
 	RequestPayload  any
+	DryRun          bool
 	Message         string
 }
 
@@ -87,7 +88,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-const adminJobColumns = `id, job_type, status, created_by_user_id, request_payload,
+const adminJobColumns = `id, job_type, status, created_by_user_id, request_payload, dry_run, checkpoint,
 	result_payload, message, error_message, progress_current, progress_total,
 	artifact_bucket, artifact_key, artifact_size_bytes,
 	public_url, requested_at, started_at, completed_at, heartbeat_at, expires_at,
@@ -101,6 +102,8 @@ func scanAdminJob(row pgx.Row) (*models.AdminJob, error) {
 		&job.Status,
 		&job.CreatedByUserID,
 		&job.RequestPayload,
+		&job.DryRun,
+		&job.Checkpoint,
 		&job.ResultPayload,
 		&job.Message,
 		&job.ErrorMessage,
@@ -154,14 +157,15 @@ func (r *Repository) Create(ctx context.Context, input CreateJobInput) (*models.
 	}
 	job, err := scanAdminJob(r.pool.QueryRow(ctx, `
 		INSERT INTO admin_jobs (
-			id, job_type, status, created_by_user_id, request_payload, message
-		) VALUES ($1, $2, $3, $4, $5, $6)
+			id, job_type, status, created_by_user_id, request_payload, dry_run, message
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING `+adminJobColumns,
 		id,
 		input.JobType,
 		StatusQueued,
 		input.CreatedByUserID,
 		payload,
+		input.DryRun,
 		input.Message,
 	))
 	if err == nil {
@@ -170,7 +174,13 @@ func (r *Repository) Create(ctx context.Context, input CreateJobInput) (*models.
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		activeJob, lookupErr := r.GetActiveByType(ctx, input.JobType)
+		var activeJob *models.AdminJob
+		var lookupErr error
+		if input.JobType == JobTypeArtworkStorageRefresh || input.JobType == JobTypeArtworkPurge {
+			activeJob, lookupErr = r.GetActiveArtworkStorageJob(ctx)
+		} else {
+			activeJob, lookupErr = r.GetActiveByType(ctx, input.JobType)
+		}
 		if lookupErr != nil && !errors.Is(lookupErr, ErrJobNotFound) {
 			return nil, lookupErr
 		}
@@ -178,6 +188,17 @@ func (r *Repository) Create(ctx context.Context, input CreateJobInput) (*models.
 	}
 
 	return nil, fmt.Errorf("creating admin job: %w", err)
+}
+
+func (r *Repository) GetActiveArtworkStorageJob(ctx context.Context) (*models.AdminJob, error) {
+	return scanAdminJob(r.pool.QueryRow(ctx, `
+		SELECT `+adminJobColumns+`
+		FROM admin_jobs
+		WHERE job_type IN ($1, $2) AND status IN ($3, $4)
+		ORDER BY requested_at ASC
+		LIMIT 1`,
+		JobTypeArtworkStorageRefresh, JobTypeArtworkPurge, StatusQueued, StatusRunning,
+	))
 }
 
 func (r *Repository) CreateLibraryRefresh(
@@ -359,6 +380,30 @@ func (r *Repository) UpdateProgress(ctx context.Context, id string, current, tot
 	)
 	if err != nil {
 		return fmt.Errorf("updating admin job progress: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrJobNotFound
+	}
+	return nil
+}
+
+// UpdateCheckpoint durably records resumable, job-private state. It also
+// refreshes the heartbeat so a worker is not requeued while persisting a large
+// operation's boundary. Checkpoints are intentionally generic JSON: the job
+// executor owns their versioned schema.
+func (r *Repository) UpdateCheckpoint(ctx context.Context, id string, checkpoint any) error {
+	payload, err := marshalPayload(checkpoint)
+	if err != nil {
+		return fmt.Errorf("marshaling admin job checkpoint: %w", err)
+	}
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE admin_jobs
+		SET checkpoint = $2,
+			heartbeat_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $1 AND status = $3`, id, payload, StatusRunning)
+	if err != nil {
+		return fmt.Errorf("updating admin job checkpoint: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrJobNotFound

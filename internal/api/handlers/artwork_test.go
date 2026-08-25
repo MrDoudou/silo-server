@@ -283,6 +283,12 @@ func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
 	if got.RemoteMaterialization != "selected" {
 		t.Fatalf("remote_materialization = %q, want selected", got.RemoteMaterialization)
 	}
+	if got.LocalSourcePolicy != "materialize" {
+		t.Fatalf("local_source_policy = %q, want materialize", got.LocalSourcePolicy)
+	}
+	if !got.StorageManagement.Accounting || !got.StorageManagement.SafePurge || !got.StorageManagement.DirectLibraryFallback {
+		t.Fatalf("storage_management = %#v", got.StorageManagement)
+	}
 	if want := []string{"original", "w500", "w300"}; !equalStrings(got.Variants["poster"], want) {
 		t.Fatalf("poster variants = %v, want %v", got.Variants["poster"], want)
 	}

@@ -634,6 +634,53 @@ endpoint, with one deliberate difference: `/metrics` is unauthenticated, so its
 disk series are labeled `mount="scratch"` / `mount="library-N"` and the library
 paths themselves appear only here, behind admin auth.
 
+## Artwork storage
+
+`GET /api/v1/admin/artwork/storage` returns the latest indexed artwork-storage
+snapshot. It never enumerates the filesystem or object store on the request
+path. `snapshot_at` identifies the completed refresh represented by the
+response; `complete: false` means `known_bytes` is exact for inventoried
+revisions but is not yet a complete store total. `inventory_drift` reports
+known missing revisions, missing objects, and orphans; `failure_count` reports
+refresh errors separately. `coverage_limited` and `coverage_limit_reason`
+identify installations whose user artwork is intentionally outside the
+PostgreSQL-backed inventory. That limitation does not force `complete` false
+or cause the startup backfill to repeat: `snapshot_at: null` alone means the
+initial refresh has never completed.
+
+`total` contains unique physical bytes, pending-GC and protected bytes, and
+unique object/revision counts. Each `libraries` entry contains
+`referenced_bytes`, `exclusive_bytes`, `shared_bytes`, `reclaimable_bytes`,
+protected/reconstructible totals, counts, and source-class totals. Shared bytes
+are attribution, not additive usage: do not sum library rows to calculate the
+server total. Artwork outside a media-folder ownership graph is reported in
+`server_scoped` instead.
+
+`POST /api/v1/admin/artwork/storage/refresh` returns `202 Accepted` with an
+admin job. The job walks live catalog references asynchronously, resumes from
+its job-row checkpoint after interruption, validates manifests and stored
+objects, and publishes a new snapshot.
+
+`POST /api/v1/admin/artwork/purge` accepts:
+
+```json
+{
+  "scope": { "library_id": 42 },
+  "mode": "safe_materialized",
+  "dry_run": true
+}
+```
+
+Use `{"scope":{"server":true}}` for server scope. `mode` is `edge_only` or
+`safe_materialized`. The route returns `202 Accepted`; progress, checkpoint,
+and the final result are exposed through the ordinary admin-job API. A dry run
+uses one consistent catalog snapshot and reports predicted transitions,
+queued revisions, reclaimable/pending bytes, shared revisions retained, and
+protected revisions without changing the catalog or storage. A real safe purge
+commits reconstructible catalog fallbacks before reference-aware garbage
+collection can delete objects. Uploads and sources without a verified fallback
+remain protected.
+
 ## `GET /api/v1/admin/stream-telemetry/parity`
 
 Returns the merged stream-telemetry view beside the two legacy live-session

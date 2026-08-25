@@ -3938,7 +3938,8 @@ func isNonProviderImageScheme(lowerPath string) bool {
 		strings.HasPrefix(lowerPath, "file://") ||
 		strings.HasPrefix(lowerPath, "local://") ||
 		strings.HasPrefix(lowerPath, "upload://") ||
-		strings.HasPrefix(lowerPath, "generated://")
+		strings.HasPrefix(lowerPath, "generated://") ||
+		strings.HasPrefix(lowerPath, "library-artwork://")
 }
 
 func providerImageSourcePath(path string) string {
@@ -6227,8 +6228,16 @@ func (s *MetadataService) deleteCreatedSkeleton(ctx context.Context, contentID s
 		return nil
 	}
 	if repo, ok := s.itemRepo.(metadataItemDeleteRepo); ok {
-		if _, err := repo.Delete(ctx, contentID); err != nil && !errors.Is(err, catalog.ErrItemNotFound) {
+		dirs, err := repo.Delete(ctx, contentID)
+		if err != nil && !errors.Is(err, catalog.ErrItemNotFound) {
 			return err
+		}
+		if s.dbPool != nil {
+			for _, prefix := range dirs {
+				if _, err := s.dbPool.Exec(ctx, `INSERT INTO artwork_legacy_prefix_gc_candidates (prefix) VALUES ($1) ON CONFLICT (prefix) DO UPDATE SET not_before = EXCLUDED.not_before, updated_at = NOW()`, prefix); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}

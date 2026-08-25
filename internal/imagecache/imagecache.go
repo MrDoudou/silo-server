@@ -46,6 +46,7 @@ type ObjectStore interface {
 // revision before any object is uploaded.
 type ArtworkRevisionTracker interface {
 	TrackArtworkRevision(ctx context.Context, originalPath, imageType string, objectKeys []string) error
+	RecordArtworkRevision(ctx context.Context, originalPath, sourceClass string, objects []artworkstore.ObjectInfo) error
 }
 
 // ImageURLResolver resolves plugin:// paths to HTTP URLs.
@@ -140,6 +141,7 @@ func (c *Cacher) CacheImage(ctx context.Context, req metadata.CacheImageRequest)
 // by the image cache processor for file:// sources that it reads itself.
 func (c *Cacher) CacheImageBytes(ctx context.Context, data []byte, req metadata.CacheImageRequest) (*metadata.CacheImageResult, error) {
 	result, err := c.CacheBytes(ctx, data, CacheRequest{
+		SourceURL:        req.SourceURL,
 		ProviderID:       req.ProviderID,
 		ContentType:      req.ContentType,
 		ContentID:        req.ContentID,
@@ -270,6 +272,9 @@ func (c *Cacher) CacheBytes(ctx context.Context, data []byte, req CacheRequest) 
 	if err := c.writeObject(ctx, revision.ManifestKey, revision.ManifestJSON, manifestMediaType); err != nil {
 		return nil, err
 	}
+	if err := c.recordRevision(ctx, revision, result, artworkSourceClass(req)); err != nil {
+		return nil, err
+	}
 	return &CacheResult{
 		BasePath:         revision.Directory,
 		OriginalPath:     revision.OriginalKey,
@@ -386,6 +391,52 @@ func (c *Cacher) trackRevision(ctx context.Context, imageType string, revision *
 		return fmt.Errorf("imagecache: track artwork revision: %w", err)
 	}
 	return nil
+}
+
+func (c *Cacher) recordRevision(
+	ctx context.Context,
+	revision *artworkkey.PortableRevision,
+	result *imageutil.VariantResult,
+	sourceClass string,
+) error {
+	if c == nil || c.revisionTracker == nil {
+		return nil
+	}
+	objects := make([]artworkstore.ObjectInfo, 0, len(result.Variants)+1)
+	for _, variant := range result.Variants {
+		objects = append(objects, artworkstore.ObjectInfo{
+			Key:       revision.VariantKeys[variant.Key],
+			SizeBytes: int64(len(variant.Data)),
+			MediaType: revision.MediaType,
+		})
+	}
+	objects = append(objects, artworkstore.ObjectInfo{
+		Key:       revision.ManifestKey,
+		SizeBytes: int64(len(revision.ManifestJSON)),
+		MediaType: artworkstore.MediaTypeForKey(revision.ManifestKey),
+	})
+	if err := c.revisionTracker.RecordArtworkRevision(ctx, revision.OriginalKey, sourceClass, objects); err != nil {
+		return fmt.Errorf("imagecache: record artwork inventory: %w", err)
+	}
+	return nil
+}
+
+func artworkSourceClass(req CacheRequest) string {
+	source := strings.ToLower(strings.TrimSpace(req.SourceURL))
+	switch {
+	case strings.HasPrefix(source, "file://"):
+		return "library_sidecar"
+	case strings.HasPrefix(source, "embedded://") || strings.EqualFold(req.ProviderID, "local"):
+		return "embedded"
+	case strings.HasPrefix(source, "generated://"):
+		return "generated"
+	case strings.HasPrefix(source, "plugin://"):
+		return "plugin"
+	case source != "":
+		return "provider"
+	default:
+		return "unknown"
+	}
 }
 
 // writeObject stores one immutable object, retrying transient backend

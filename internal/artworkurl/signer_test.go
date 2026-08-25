@@ -1,6 +1,7 @@
 package artworkurl
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/url"
 	"strconv"
@@ -23,6 +24,19 @@ func testSigner(t *testing.T, ttl time.Duration) *Signer {
 		t.Fatalf("NewSigner: %v", err)
 	}
 	return signer
+}
+
+func TestDirectLibraryReferenceRejectsUnknownAndNonCanonicalPayloads(t *testing.T) {
+	signer := testSigner(t, time.Hour)
+	for _, payload := range []string{
+		`{"surface":"item posters","keys":["movie-1"],"fingerprint":"abc","unknown":true}`,
+		`{ "surface":"item posters","keys":["movie-1"],"fingerprint":"abc"}`,
+	} {
+		reference := LibraryReferencePrefix + base64.RawURLEncoding.EncodeToString([]byte(payload))
+		if _, err := signer.ParseLibraryReference(reference); !errors.Is(err, ErrInvalidSignature) {
+			t.Fatalf("ParseLibraryReference(%s) = %v, want ErrInvalidSignature", payload, err)
+		}
+	}
 }
 
 // parseSigned splits a minted URL back into the parts the route receives.
@@ -61,6 +75,56 @@ func TestSignMintsRootRelativeURL(t *testing.T) {
 	// The key is carried in the URL, never a filesystem path.
 	if strings.Contains(signed.URL, testKey) {
 		t.Fatalf("URL = %q, want the key encoded rather than embedded", signed.URL)
+	}
+}
+
+func TestDirectLibraryReferenceIsOpaquePathFreeAndRevisionBound(t *testing.T) {
+	signer := testSigner(t, time.Hour)
+	identity := LibraryIdentity{Surface: "item posters", Keys: []string{"movie-1"}, Fingerprint: strings.Repeat("a", 64)}
+	reference, err := signer.LibraryReference(identity)
+	if err != nil {
+		t.Fatalf("LibraryReference: %v", err)
+	}
+	if strings.Contains(reference, "/media/") || strings.Contains(reference, "file://") {
+		t.Fatalf("reference exposes a source path: %q", reference)
+	}
+	if strings.Contains(strings.TrimPrefix(reference, LibraryReferencePrefix), ".") {
+		t.Fatalf("stored reference contains a secret-bound inner signature: %q", reference)
+	}
+	rotated, err := NewSigner("rotated-or-restored-cluster-secret", func() time.Duration { return time.Hour })
+	if err != nil {
+		t.Fatalf("NewSigner(rotated): %v", err)
+	}
+	if got, err := rotated.ParseLibraryReference(reference); err != nil || got.Surface != identity.Surface {
+		t.Fatalf("stored reference did not survive secret rotation: %#v, %v", got, err)
+	}
+	if _, err := signer.ParseLibraryReference(reference + ".legacy-inner-hmac"); !errors.Is(err, ErrInvalidSignature) {
+		t.Fatalf("legacy signed stored reference error = %v, want ErrInvalidSignature", err)
+	}
+	signed, err := signer.SignLibraryReference(reference, time.Now())
+	if err != nil {
+		t.Fatalf("SignLibraryReference: %v", err)
+	}
+	parsed, err := url.Parse(signed.URL)
+	if err != nil {
+		t.Fatalf("parse signed URL: %v", err)
+	}
+	gotReference, gotIdentity, _, err := signer.VerifyLibraryURL(
+		strings.TrimPrefix(parsed.Path, LibraryRoutePrefix),
+		parsed.Query().Get(ExpiresParam),
+		parsed.Query().Get(SignatureParam),
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatalf("VerifyLibraryURL: %v", err)
+	}
+	if gotReference != reference || gotIdentity.Fingerprint != identity.Fingerprint || gotIdentity.Keys[0] != "movie-1" {
+		t.Fatalf("verified reference = %#v, %#v", gotReference, gotIdentity)
+	}
+
+	tampered := reference[:len(reference)-1] + "A"
+	if _, err := signer.ParseLibraryReference(tampered); !errors.Is(err, ErrInvalidSignature) {
+		t.Fatalf("tampered identity error = %v", err)
 	}
 }
 

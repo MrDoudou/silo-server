@@ -27,8 +27,10 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -42,7 +44,9 @@ const (
 	// reached through (LAN address, tunnel, reverse proxy), which a single
 	// configured public origin would not be, and they stay cacheable by the
 	// resolver across those origins.
-	RoutePrefix = "/api/v1/artwork/"
+	RoutePrefix            = "/api/v1/artwork/"
+	LibraryRoutePrefix     = "/api/v1/artwork-library/"
+	LibraryReferencePrefix = "library-artwork://"
 
 	// ExpiresParam carries the signed expiry as a Unix timestamp in seconds.
 	ExpiresParam = "expires"
@@ -57,7 +61,8 @@ const (
 	// routeVersion is covered by the signature, so a future change to the URL
 	// grammar invalidates outstanding URLs instead of letting an old signature
 	// authenticate a new meaning.
-	routeVersion = "v1"
+	routeVersion        = "v1"
+	libraryRouteVersion = "library-v1"
 
 	// DefaultTTL is the artwork URL lifetime used when none is configured. It
 	// mirrors the default S3 presign lifetime.
@@ -91,6 +96,110 @@ func DeriveSecret(jwtSecret []byte) []byte {
 	mac := hmac.New(sha256.New, jwtSecret)
 	_, _ = mac.Write([]byte(secretContext))
 	return mac.Sum(nil)
+}
+
+// LibraryIdentity names a catalog artwork target without containing its
+// source path. Keys are the target table's stable primary-key values and the
+// source fingerprint binds the identity to the exact sidecar revision.
+type LibraryIdentity struct {
+	Surface     string   `json:"surface"`
+	Keys        []string `json:"keys"`
+	Fingerprint string   `json:"fingerprint"`
+}
+
+func (s *Signer) LibraryReference(identity LibraryIdentity) (string, error) {
+	return EncodeLibraryReference(identity)
+}
+
+func EncodeLibraryReference(identity LibraryIdentity) (string, error) {
+	if strings.TrimSpace(identity.Surface) == "" || len(identity.Keys) == 0 || strings.TrimSpace(identity.Fingerprint) == "" {
+		return "", errors.New("artworkurl: invalid direct-library identity")
+	}
+	payload, err := json.Marshal(identity)
+	if err != nil {
+		return "", fmt.Errorf("artworkurl: encode direct-library identity: %w", err)
+	}
+	encoded := base64.RawURLEncoding.EncodeToString(payload)
+	return LibraryReferencePrefix + encoded, nil
+}
+
+func (s *Signer) ParseLibraryReference(reference string) (LibraryIdentity, error) {
+	var identity LibraryIdentity
+	if !strings.HasPrefix(reference, LibraryReferencePrefix) {
+		return identity, ErrInvalidSignature
+	}
+	encoded := strings.TrimPrefix(reference, LibraryReferencePrefix)
+	if encoded == "" || strings.Contains(encoded, ".") {
+		return identity, ErrInvalidSignature
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil || base64.RawURLEncoding.EncodeToString(payload) != encoded {
+		return identity, ErrInvalidSignature
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(payload)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&identity); err != nil || strings.TrimSpace(identity.Surface) == "" || len(identity.Keys) == 0 || identity.Fingerprint == "" {
+		return LibraryIdentity{}, ErrInvalidSignature
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return LibraryIdentity{}, ErrInvalidSignature
+	}
+	canonical, err := json.Marshal(identity)
+	if err != nil || subtle.ConstantTimeCompare(canonical, payload) != 1 {
+		return LibraryIdentity{}, ErrInvalidSignature
+	}
+	return identity, nil
+}
+
+func (s *Signer) SignLibraryReference(reference string, now time.Time) (artworkstore.ResolvedURL, error) {
+	if _, err := s.ParseLibraryReference(reference); err != nil {
+		return artworkstore.ResolvedURL{}, err
+	}
+	expiresAt := quantizedExpiry(now, s.TTL())
+	unix := expiresAt.Unix()
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(reference))
+	url := LibraryRoutePrefix + encoded + "?" + ExpiresParam + "=" + strconv.FormatInt(unix, 10) +
+		"&" + SignatureParam + "=" + s.libraryURLSignature(reference, unix)
+	return artworkstore.ResolvedURL{URL: url, ExpiresAt: &expiresAt}, nil
+}
+
+func (s *Signer) VerifyLibraryURL(encodedReference, expires, signature string, now time.Time) (string, LibraryIdentity, time.Time, error) {
+	var identity LibraryIdentity
+	if s == nil || encodedReference == "" || expires == "" || signature == "" {
+		return "", identity, time.Time{}, ErrInvalidSignature
+	}
+	data, err := base64.RawURLEncoding.DecodeString(encodedReference)
+	if err != nil || base64.RawURLEncoding.EncodeToString(data) != encodedReference {
+		return "", identity, time.Time{}, ErrInvalidSignature
+	}
+	reference := string(data)
+	identity, err = s.ParseLibraryReference(reference)
+	if err != nil {
+		return "", LibraryIdentity{}, time.Time{}, err
+	}
+	unix, err := strconv.ParseInt(expires, 10, 64)
+	if err != nil || unix <= 0 {
+		return "", LibraryIdentity{}, time.Time{}, ErrInvalidSignature
+	}
+	expected := s.libraryURLSignature(reference, unix)
+	if len(expected) != len(signature) || subtle.ConstantTimeCompare([]byte(expected), []byte(signature)) != 1 {
+		return "", LibraryIdentity{}, time.Time{}, ErrInvalidSignature
+	}
+	expiresAt := time.Unix(unix, 0).UTC()
+	if now.After(expiresAt) {
+		return reference, identity, expiresAt, ErrExpired
+	}
+	return reference, identity, expiresAt, nil
+}
+
+func (s *Signer) libraryURLSignature(reference string, expiresUnix int64) string {
+	mac := hmac.New(sha256.New, s.secret)
+	_, _ = mac.Write([]byte(libraryRouteVersion))
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write([]byte(reference))
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write([]byte(strconv.FormatInt(expiresUnix, 10)))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
 // Signer mints and verifies signed artwork URLs. It holds no per-URL state:

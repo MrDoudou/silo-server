@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -43,6 +44,44 @@ func newFakeS3() *fakeS3 {
 }
 
 func (f *fakeS3) Bucket() string { return f.bucket }
+
+func (f *fakeS3) ListObjectInfosPage(_ context.Context, bucket, prefix, cursor string, limit int) ([]s3client.ObjectInfo, string, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.note(bucket)
+	keys := make([]string, 0, len(f.objects))
+	for key := range f.objects {
+		if strings.HasPrefix(key, prefix) && key > cursor {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	done := len(keys) <= limit
+	if !done {
+		keys = keys[:limit]
+	}
+	objects := make([]s3client.ObjectInfo, len(keys))
+	next := cursor
+	for i, key := range keys {
+		objects[i] = s3client.ObjectInfo{Key: key, SizeBytes: int64(len(f.objects[key]))}
+		next = key
+	}
+	return objects, next, done, nil
+}
+
+func (f *fakeS3) DeletePrefix(ctx context.Context, bucket, prefix string) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.note(bucket)
+	deleted := 0
+	for key := range f.objects {
+		if strings.HasPrefix(key, prefix) {
+			delete(f.objects, key)
+			deleted++
+		}
+	}
+	return deleted, ctx.Err()
+}
 
 func (f *fakeS3) note(bucket string) {
 	f.bucketsSeen[bucket]++
@@ -415,5 +454,21 @@ func TestS3StoreImplementsDirectURLProvider(t *testing.T) {
 	// artwork route, never a URL a client fetches from somewhere else.
 	if _, ok := any(newTestStore(t)).(DirectURLProvider); ok {
 		t.Fatal("FilesystemStore implements DirectURLProvider")
+	}
+}
+
+func TestS3StoreMaintenancePrefixDeleteIsLegacyOnly(t *testing.T) {
+	store, client := newTestS3Store(t)
+	client.objects["tmdb/movies/550/poster/original.old.webp"] = []byte("old")
+	client.objects[testKey] = []byte("portable")
+	deleted, err := store.DeletePrefixMaintenance(context.Background(), "tmdb/movies/550/poster/")
+	if err != nil || deleted != 1 {
+		t.Fatalf("maintenance delete = (%d, %v)", deleted, err)
+	}
+	if _, ok := client.objects[testKey]; !ok {
+		t.Fatal("maintenance delete removed portable artwork")
+	}
+	if _, err := store.DeletePrefixMaintenance(context.Background(), "artwork/v1/"); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("portable prefix delete error = %v, want ErrInvalidKey", err)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/cache"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 
@@ -201,6 +202,13 @@ func (r *PluginImageResolver) ResolveImageURLsWithExpiry(ctx context.Context, pa
 			continue
 		}
 		pluginID, barePath := parsePluginPrefix(path)
+		if strings.HasPrefix(path, artworkurl.LibraryReferencePrefix) {
+			// A direct-library reference is Silo-owned, not a metadata
+			// plugin scheme. Resolve it through the artwork URL service so it
+			// becomes a short-lived route capability.
+			pluginID = ""
+			barePath = path
+		}
 		if pluginID == "" {
 			barePath = path
 		}

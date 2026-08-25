@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"path"
 	"strconv"
@@ -60,6 +61,15 @@ type Store interface {
 	// call it; a failure is an operational error, never a reason to fall back
 	// to another backend.
 	Probe(ctx context.Context) error
+
+	// ListPage returns at most limit objects after cursor in lexical key order.
+	// The opaque cursor is the last logical key returned; done reports EOF.
+	ListPage(ctx context.Context, prefix, cursor string, limit int) ([]ObjectInfo, string, bool, error)
+
+	// DeletePrefixMaintenance is reserved for inventory-proven cleanup of
+	// legacy per-item directories. It rejects portable artwork/v1 prefixes;
+	// ordinary lifecycle code must use DeleteObjects with exact keys.
+	DeletePrefixMaintenance(ctx context.Context, prefix string) (int, error)
 }
 
 // DirectURLProvider is implemented by stores that can hand a client a URL it
@@ -203,6 +213,13 @@ func hashReader(r io.Reader) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+func validateLegacyMaintenancePrefix(prefix string) error {
+	if prefix == "" || !strings.HasSuffix(prefix, "/") || strings.HasPrefix(prefix, "artwork/v1/") {
+		return fmt.Errorf("%w: invalid legacy maintenance prefix %q", ErrInvalidKey, prefix)
+	}
+	return ValidateKey(prefix + "maintenance-probe.webp")
 }
 
 // entityTag builds a strong HTTP entity tag, quotes included. Stored objects

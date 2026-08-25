@@ -1240,6 +1240,7 @@ func NewRouter(deps Dependencies) chi.Router {
 	var accessGroupHandler *handlers.AccessGroupHandler
 	var catalogSeedHandler *handlers.CatalogSeedHandler
 	var adminJobsHandler *handlers.AdminJobsHandler
+	var adminArtworkStorageHandler *handlers.AdminArtworkStorageHandler
 	if userRepo != nil {
 		adminHandler = handlers.NewAdminHandler(userRepo, deps.DB, deps.UserStoreProvider)
 		adminHandler.SessionsLoader = playbackSessionsLoader
@@ -1294,6 +1295,15 @@ func NewRouter(deps Dependencies) chi.Router {
 		adminJobsHandler = handlers.NewAdminJobsHandler(jobRepo, privateStore)
 		adminJobsHandler.CancelRegistry = deps.AdminJobCancelRegistry
 		adminJobsHandler.RealtimeHub = deps.RealtimeHub
+		if deps.ArtworkStore != nil {
+			adminArtworkStorageHandler = handlers.NewAdminArtworkStorageHandler(
+				metadata.NewArtworkStorageService(
+					deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.Generation,
+					!deps.UserArtworkTracked,
+				),
+				jobRepo,
+			)
+		}
 		if adminHandler != nil && deps.FolderRepo != nil && deps.FileRepo != nil && itemRepo != nil && episodeRepo != nil {
 			adminHandler.JobRepo = jobRepo
 			adminHandler.ItemRefreshResolver = adminjob.NewItemRefreshResolver(
@@ -1906,6 +1916,18 @@ func NewRouter(deps Dependencies) chi.Router {
 			if artworkHandler := handlers.NewArtworkHandler(deps.ArtworkStore.Store, deps.ArtworkURLSigner); artworkHandler != nil {
 				r.Get("/artwork/{"+handlers.ArtworkKeyParam+"}", artworkHandler.ServeHTTP)
 				r.Head("/artwork/{"+handlers.ArtworkKeyParam+"}", artworkHandler.ServeHTTP)
+			}
+		}
+		// Direct-library fallbacks always traverse Silo, even when canonical
+		// objects normally use S3 direct delivery. The opaque signed identity is
+		// revalidated against the catalog and library roots on every request.
+		if deps.DB != nil && deps.ArtworkURLSigner != nil {
+			directLibraryHandler := handlers.NewDirectLibraryArtworkHandler(
+				metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.ArtworkURLSigner,
+			)
+			if directLibraryHandler != nil {
+				r.Get("/artwork-library/{"+handlers.DirectLibraryArtworkParam+"}", directLibraryHandler.ServeHTTP)
+				r.Head("/artwork-library/{"+handlers.DirectLibraryArtworkParam+"}", directLibraryHandler.ServeHTTP)
 			}
 		}
 
@@ -3196,6 +3218,14 @@ func NewRouter(deps Dependencies) chi.Router {
 								r.Route("/jobs", func(r chi.Router) {
 									r.Get("/", adminJobsHandler.HandleList)
 									r.Post("/{id}/cancel", adminJobsHandler.HandleCancel)
+								})
+							}
+
+							if adminArtworkStorageHandler != nil {
+								r.Route("/artwork", func(r chi.Router) {
+									r.Get("/storage", adminArtworkStorageHandler.HandleStorage)
+									r.Post("/storage/refresh", adminArtworkStorageHandler.HandleRefresh)
+									r.Post("/purge", adminArtworkStorageHandler.HandlePurge)
 								})
 							}
 

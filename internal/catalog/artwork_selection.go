@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
 const (
@@ -39,15 +42,20 @@ var ErrUnsupportedArtworkSelection = errors.New("catalog: unsupported artwork se
 // never published. Confirmed live revisions remain dormant in the registry so
 // database triggers can later reactivate them.
 type ArtworkRevisionTracker struct {
-	pool        *pgxpool.Pool
-	gracePeriod time.Duration
+	pool         *pgxpool.Pool
+	gracePeriod  time.Duration
+	storeBinding string
 }
 
-func NewArtworkRevisionTracker(pool *pgxpool.Pool) *ArtworkRevisionTracker {
+func NewArtworkRevisionTracker(pool *pgxpool.Pool, storeBinding ...string) *ArtworkRevisionTracker {
 	if pool == nil {
 		return nil
 	}
-	return &ArtworkRevisionTracker{pool: pool, gracePeriod: defaultArtworkGCGracePeriod}
+	binding := ""
+	if len(storeBinding) > 0 {
+		binding = strings.TrimSpace(storeBinding[0])
+	}
+	return &ArtworkRevisionTracker{pool: pool, gracePeriod: defaultArtworkGCGracePeriod, storeBinding: binding}
 }
 
 // TrackArtworkRevision records an immutable revision's object manifest. Image
@@ -90,6 +98,8 @@ func (t *ArtworkRevisionTracker) TrackArtworkRevision(ctx context.Context, origi
 				ELSE EXCLUDED.next_attempt_at
 			END,
 			deleted_at = NULL,
+			deletion_started_at = NULL,
+			tombstoned_at = NULL,
 			attempt_count = 0,
 			locked_at = NULL,
 			locked_by = '',
@@ -99,6 +109,73 @@ func (t *ArtworkRevisionTracker) TrackArtworkRevision(ctx context.Context, origi
 		return fmt.Errorf("catalog: track artwork revision: %w", err)
 	}
 	return nil
+}
+
+// RecordArtworkRevision marks a tracked revision complete after every object,
+// including manifest.json, is durable. Sizes are the exact encoded bytes or
+// store-confirmed metadata supplied by the writer; this method never derives
+// estimates from dimensions.
+func (t *ArtworkRevisionTracker) RecordArtworkRevision(
+	ctx context.Context,
+	originalPath string,
+	sourceClass string,
+	objects []artworkstore.ObjectInfo,
+) error {
+	if t == nil || t.pool == nil {
+		return fmt.Errorf("catalog: artwork revision tracking is not configured")
+	}
+	originalPath = strings.TrimSpace(originalPath)
+	if originalPath == "" || strings.Contains(originalPath, "://") || len(objects) == 0 {
+		return nil
+	}
+	sourceClass = normalizeArtworkSourceClass(sourceClass)
+	objects = append([]artworkstore.ObjectInfo(nil), objects...)
+	sort.Slice(objects, func(i, j int) bool { return objects[i].Key < objects[j].Key })
+	keys := make([]string, 0, len(objects))
+	sizes := make([]int64, 0, len(objects))
+	contentTypes := make([]string, 0, len(objects))
+	var total int64
+	for _, object := range objects {
+		key := strings.TrimSpace(object.Key)
+		if key == "" || object.SizeBytes < 0 {
+			return fmt.Errorf("catalog: invalid artwork inventory object %q", object.Key)
+		}
+		keys = append(keys, key)
+		sizes = append(sizes, object.SizeBytes)
+		contentTypes = append(contentTypes, strings.TrimSpace(object.MediaType))
+		total += object.SizeBytes
+	}
+	tag, err := t.pool.Exec(ctx, `
+		UPDATE artwork_revision_gc_candidates
+		SET object_keys = $2,
+			object_sizes_bytes = $3,
+			object_content_types = $4,
+			total_physical_bytes = $5,
+			source_class = $6,
+			store_generation = $7,
+			inventory_complete = TRUE,
+			last_verified_at = NOW(),
+			deleted_at = NULL,
+			deletion_started_at = NULL,
+			tombstoned_at = NULL,
+			updated_at = NOW()
+		WHERE original_path = $1`, originalPath, keys, sizes, contentTypes, total, sourceClass, t.storeBinding)
+	if err != nil {
+		return fmt.Errorf("catalog: record artwork revision inventory: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("catalog: artwork revision %q was not tracked before completion", originalPath)
+	}
+	return nil
+}
+
+func normalizeArtworkSourceClass(sourceClass string) string {
+	switch strings.ToLower(strings.TrimSpace(sourceClass)) {
+	case "provider", "plugin", "library_sidecar", "embedded", "generated", "upload", "bundled":
+		return strings.ToLower(strings.TrimSpace(sourceClass))
+	default:
+		return "unknown"
+	}
 }
 
 // ArtworkSelection describes a manually selected, already-cached artwork
@@ -271,6 +348,9 @@ func upsertArtworkRevision(
 			locked_at = NULL,
 			locked_by = '',
 			last_error = '',
+			deleted_at = NULL,
+			deletion_started_at = NULL,
+			tombstoned_at = NULL,
 			updated_at = NOW()`, originalPath, imageType, notBefore, dormant)
 	if err != nil {
 		return fmt.Errorf("catalog: queue artwork revision cleanup: %w", err)

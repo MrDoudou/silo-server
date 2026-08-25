@@ -84,7 +84,15 @@ type ArtworkObjectChecker interface {
 
 // nonProviderImageSchemesSQL mirrors isNonProviderImageScheme for use inside
 // SQL predicates: source paths with these schemes cannot be re-downloaded.
-const nonProviderImageSchemesSQL = `ARRAY['s3://%', 'file://%', 'local://%', 'upload://%', 'generated://%']`
+var nonReconstructibleArtworkSchemes = []string{"s3", "file", "local", "upload", "generated", "embedded", "library-artwork"}
+
+var nonProviderImageSchemesSQL = func() string {
+	patterns := make([]string, len(nonReconstructibleArtworkSchemes))
+	for i, scheme := range nonReconstructibleArtworkSchemes {
+		patterns[i] = "'" + scheme + "://%'"
+	}
+	return "ARRAY[" + strings.Join(patterns, ", ") + "]"
+}()
 
 const (
 	artworkReconcileSampleTarget = 200
@@ -127,6 +135,8 @@ const (
 	ArtworkReconcileModeBulkReset = "bulk_reset"
 
 	artworkReconcileCheckpointVersion = 1
+	artworkReconcileChapterSurface    = "chapter thumbnails"
+	artworkReconcileCompleteSurface   = "complete"
 )
 
 // ArtworkReconcileCheckpoint is the durable position of a verify-mode sweep.
@@ -137,7 +147,7 @@ type ArtworkReconcileCheckpoint struct {
 	Version       int                   `json:"version"`
 	Totals        []int                 `json:"totals"`
 	ChapterTotal  int                   `json:"chapter_total"`
-	SurfaceIndex  int                   `json:"surface_index"`
+	SurfaceName   string                `json:"surface_name,omitempty"`
 	SurfaceCursor []string              `json:"surface_cursor,omitempty"`
 	SurfaceDone   int                   `json:"surface_done"`
 	Done          int                   `json:"done"`
@@ -151,7 +161,17 @@ func (c *ArtworkReconcileCheckpoint) valid(surfaceCount int) bool {
 	if c == nil || c.Version != artworkReconcileCheckpointVersion || c.Stats.Mode != ArtworkReconcileModeVerify {
 		return false
 	}
-	if len(c.Totals) != surfaceCount || c.SurfaceIndex < 0 || c.SurfaceIndex > surfaceCount+1 {
+	if len(c.Totals) != surfaceCount {
+		return false
+	}
+	surfaces := artworkSweepSurfaces()
+	position, found := artworkSweepSurfacePosition(surfaces, c.SurfaceName)
+	if c.SurfaceName == artworkReconcileChapterSurface {
+		position, found = surfaceCount, true
+	} else if c.SurfaceName == artworkReconcileCompleteSurface {
+		position, found = surfaceCount+1, true
+	}
+	if !found {
 		return false
 	}
 	for _, total := range c.Totals {
@@ -162,10 +182,10 @@ func (c *ArtworkReconcileCheckpoint) valid(surfaceCount int) bool {
 	if c.Done < 0 || c.SurfaceDone < 0 || c.ChapterDone < 0 || c.ChapterTotal < 0 || c.ChapterCursor < 0 {
 		return false
 	}
-	if c.Finished != (c.SurfaceIndex == surfaceCount+1) {
+	if c.Finished != (c.SurfaceName == artworkReconcileCompleteSurface) {
 		return false
 	}
-	if c.SurfaceIndex < surfaceCount && len(c.SurfaceCursor) > 0 && len(c.SurfaceCursor) != len(artworkSweepSurfaces()[c.SurfaceIndex].keyCols) {
+	if position < surfaceCount && len(c.SurfaceCursor) > 0 && len(c.SurfaceCursor) != len(surfaces[position].keyCols) {
 		return false
 	}
 	return true
@@ -216,13 +236,16 @@ func (k artworkSweepKey) parse(raw string) (any, error) {
 }
 
 type artworkSweepSurface struct {
-	name    string
-	table   string
-	keyCols []artworkSweepKey // native indexed columns; must form a unique order
-	pathCol string
+	name      string
+	table     string
+	keyCols   []artworkSweepKey // native indexed columns; must form a unique order
+	pathCol   string
+	imageType string
 	// sourceCol holds the original source the row can be reset to. Empty for
 	// surfaces without a re-downloadable source; their rows are always cleared.
-	sourceCol string
+	sourceCol    string
+	thumbhashCol string
+	noUpdatedAt  bool
 	// clearSet is the SQL SET fragment applied when a row has no usable
 	// source: it must clear pathCol and whatever companion state the owning
 	// pipeline needs to refill the image.
@@ -231,6 +254,24 @@ type artworkSweepSurface struct {
 	// Used for small tables holding admin/user uploads, where a blind reset
 	// would discard the last pointer to an object that survived migration.
 	alwaysVerify bool
+}
+
+func artworkSweepSurfaceByName(name string) (artworkSweepSurface, bool) {
+	for _, surface := range artworkSweepSurfaces() {
+		if surface.name == name {
+			return surface, true
+		}
+	}
+	return artworkSweepSurface{}, false
+}
+
+func artworkSweepSurfacePosition(surfaces []artworkSweepSurface, name string) (int, bool) {
+	for i, surface := range surfaces {
+		if surface.name == name {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 func (s artworkSweepSurface) keyColumnNames() []string {
@@ -322,26 +363,26 @@ func artworkSweepSurfaces() []artworkSweepSurface {
 		return fmt.Sprintf(`%s = '', updated_at = NOW()`, pathCol)
 	}
 	return []artworkSweepSurface{
-		{name: "item posters", table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: posterPathColumn, sourceCol: posterSourcePathColumn, clearSet: itemClear(posterPathColumn)},
-		{name: "item backdrops", table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: "backdrop_path", sourceCol: backdropSourcePathColumn, clearSet: itemClear("backdrop_path")},
-		{name: "item logos", table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: "logo_path", sourceCol: logoSourcePathColumn, clearSet: itemClear("logo_path")},
-		{name: "localized item posters", table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey("content_id"), textSweepKey("language")}, pathCol: posterPathColumn, sourceCol: posterSourcePathColumn, clearSet: plainClear(posterPathColumn)},
-		{name: "localized item backdrops", table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey("content_id"), textSweepKey("language")}, pathCol: "backdrop_path", sourceCol: backdropSourcePathColumn, clearSet: plainClear("backdrop_path")},
-		{name: "localized item logos", table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey("content_id"), textSweepKey("language")}, pathCol: "logo_path", sourceCol: logoSourcePathColumn, clearSet: plainClear("logo_path")},
-		{name: "season posters", table: "seasons", keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: posterPathColumn, sourceCol: posterSourcePathColumn, clearSet: plainClear(posterPathColumn)},
-		{name: "localized season posters", table: "season_localizations", keyCols: []artworkSweepKey{textSweepKey("season_content_id"), textSweepKey("language")}, pathCol: posterPathColumn, sourceCol: posterSourcePathColumn, clearSet: plainClear(posterPathColumn)},
-		{name: "episode stills", table: "episodes", keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: "still_path", sourceCol: "still_source_path", clearSet: plainClear("still_path")},
-		{name: "person photos", table: peopleTable, keyCols: []artworkSweepKey{int64SweepKey("id")}, pathCol: "photo_path", sourceCol: "photo_source_path", clearSet: plainClear("photo_path")},
+		{name: "item posters", table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: posterPathColumn, imageType: "poster", sourceCol: posterSourcePathColumn, thumbhashCol: "poster_thumbhash", clearSet: itemClear(posterPathColumn)},
+		{name: "item backdrops", table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: "backdrop_path", imageType: "backdrop", sourceCol: backdropSourcePathColumn, thumbhashCol: "backdrop_thumbhash", clearSet: itemClear("backdrop_path")},
+		{name: "item logos", table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: "logo_path", imageType: "logo", sourceCol: logoSourcePathColumn, clearSet: itemClear("logo_path")},
+		{name: "localized item posters", table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey("content_id"), textSweepKey("language")}, pathCol: posterPathColumn, imageType: "poster", sourceCol: posterSourcePathColumn, thumbhashCol: "poster_thumbhash", clearSet: plainClear(posterPathColumn)},
+		{name: "localized item backdrops", table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey("content_id"), textSweepKey("language")}, pathCol: "backdrop_path", imageType: "backdrop", sourceCol: backdropSourcePathColumn, thumbhashCol: "backdrop_thumbhash", clearSet: plainClear("backdrop_path")},
+		{name: "localized item logos", table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey("content_id"), textSweepKey("language")}, pathCol: "logo_path", imageType: "logo", sourceCol: logoSourcePathColumn, clearSet: plainClear("logo_path")},
+		{name: "season posters", table: "seasons", keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: posterPathColumn, imageType: "poster", sourceCol: posterSourcePathColumn, thumbhashCol: "poster_thumbhash", clearSet: plainClear(posterPathColumn)},
+		{name: "localized season posters", table: "season_localizations", keyCols: []artworkSweepKey{textSweepKey("season_content_id"), textSweepKey("language")}, pathCol: posterPathColumn, imageType: "poster", sourceCol: posterSourcePathColumn, thumbhashCol: "poster_thumbhash", clearSet: plainClear(posterPathColumn)},
+		{name: "episode stills", table: "episodes", keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: "still_path", imageType: "still", sourceCol: "still_source_path", thumbhashCol: "still_thumbhash", clearSet: plainClear("still_path")},
+		{name: "person photos", table: peopleTable, keyCols: []artworkSweepKey{int64SweepKey("id")}, pathCol: "photo_path", imageType: "profile", sourceCol: "photo_source_path", thumbhashCol: "photo_thumbhash", clearSet: plainClear("photo_path")},
 
 		// Admin/user uploads: no re-downloadable source. Clearing falls back
 		// to the generated collage (admin collections), the generated poster
 		// (user collections), or the default tile (library posters); admins
 		// re-upload anything they want back. alwaysVerify protects surviving
 		// uploads from blind bulk resets.
-		{name: "collection posters", table: "library_collections", keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: "poster_url", clearSet: `poster_url = '', poster_thumbhash = '', poster_auto_generated = FALSE, poster_from_template = FALSE, updated_at = NOW()`, alwaysVerify: true},
-		{name: "collection backdrops", table: "library_collections", keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: "backdrop_url", clearSet: `backdrop_url = '', backdrop_thumbhash = '', updated_at = NOW()`, alwaysVerify: true},
-		{name: "user collection posters", table: "user_personal_collections", keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: "poster_url", clearSet: `poster_url = '', poster_thumbhash = '', updated_at = NOW()`, alwaysVerify: true},
-		{name: "library posters", table: "media_folders", keyCols: []artworkSweepKey{int32SweepKey("id")}, pathCol: posterPathColumn, clearSet: `poster_path = ''`, alwaysVerify: true},
+		{name: "collection posters", table: "library_collections", keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: "poster_url", imageType: "collection-poster", thumbhashCol: "poster_thumbhash", clearSet: `poster_url = '', poster_thumbhash = '', poster_auto_generated = FALSE, poster_from_template = FALSE, updated_at = NOW()`, alwaysVerify: true},
+		{name: "collection backdrops", table: "library_collections", keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: "backdrop_url", imageType: "collection-backdrop", thumbhashCol: "backdrop_thumbhash", clearSet: `backdrop_url = '', backdrop_thumbhash = '', updated_at = NOW()`, alwaysVerify: true},
+		{name: "user collection posters", table: "user_personal_collections", keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: "poster_url", imageType: "collection-poster", thumbhashCol: "poster_thumbhash", clearSet: `poster_url = '', poster_thumbhash = '', updated_at = NOW()`, alwaysVerify: true},
+		{name: "library posters", table: "media_folders", keyCols: []artworkSweepKey{int32SweepKey("id")}, pathCol: posterPathColumn, imageType: "library-poster", noUpdatedAt: true, clearSet: `poster_path = ''`, alwaysVerify: true},
 	}
 }
 
@@ -490,6 +531,7 @@ func (r *ArtworkCacheReconciler) RunResumable(
 		Version:      artworkReconcileCheckpointVersion,
 		Totals:       totals,
 		ChapterTotal: chapterTotal,
+		SurfaceName:  nextArtworkSurfaceName(surfaces, 0),
 		Stats:        stats,
 	}
 	if err := saveArtworkReconcileCheckpoint(save, *checkpoint); err != nil {
@@ -548,7 +590,13 @@ func runArtworkVerifySweep(
 	}
 
 	runtimeDone := checkpoint.Done
-	startSurface := checkpoint.SurfaceIndex
+	startSurface, found := artworkSweepSurfacePosition(surfaces, checkpoint.SurfaceName)
+	if checkpoint.SurfaceName == artworkReconcileChapterSurface {
+		startSurface, found = len(surfaces), true
+	}
+	if !found {
+		return stats, fmt.Errorf("artwork reconcile: unknown checkpoint surface %q", checkpoint.SurfaceName)
+	}
 	for i := startSurface; i < len(surfaces); i++ {
 		s := surfaces[i]
 		cursor := []string(nil)
@@ -559,7 +607,7 @@ func runArtworkVerifySweep(
 		}
 		if checkpoint.Totals[i] == 0 {
 			runtimeDone += checkpoint.Totals[i]
-			checkpoint.SurfaceIndex = i + 1
+			checkpoint.SurfaceName = nextArtworkSurfaceName(surfaces, i+1)
 			checkpoint.SurfaceCursor = nil
 			checkpoint.SurfaceDone = 0
 			checkpoint.Done = runtimeDone
@@ -581,7 +629,7 @@ func runArtworkVerifySweep(
 				if !batchCheckpointable && save != nil {
 					return fmt.Errorf("storage errors in %s batch; stopping at the last saved checkpoint", s.name)
 				}
-				checkpoint.SurfaceIndex = i
+				checkpoint.SurfaceName = s.name
 				checkpoint.SurfaceCursor = append([]string(nil), batchCursor...)
 				checkpoint.SurfaceDone = batchDone
 				checkpoint.Done = runtimeDone
@@ -594,7 +642,7 @@ func runArtworkVerifySweep(
 			return stats, err
 		}
 		runtimeDone += checkpoint.Totals[i]
-		checkpoint.SurfaceIndex = i + 1
+		checkpoint.SurfaceName = nextArtworkSurfaceName(surfaces, i+1)
 		checkpoint.SurfaceCursor = nil
 		checkpoint.SurfaceDone = 0
 		checkpoint.Done = runtimeDone
@@ -622,7 +670,7 @@ func runArtworkVerifySweep(
 				if !batchCheckpointable && save != nil {
 					return fmt.Errorf("storage errors in chapter-thumbnail batch; stopping at the last saved checkpoint")
 				}
-				checkpoint.SurfaceIndex = len(surfaces)
+				checkpoint.SurfaceName = artworkReconcileChapterSurface
 				checkpoint.SurfaceCursor = nil
 				checkpoint.SurfaceDone = 0
 				checkpoint.Done = runtimeDone
@@ -637,7 +685,7 @@ func runArtworkVerifySweep(
 			return stats, err
 		}
 	}
-	checkpoint.SurfaceIndex = len(surfaces) + 1
+	checkpoint.SurfaceName = artworkReconcileCompleteSurface
 	checkpoint.Done = runtimeDone
 	checkpoint.Finished = true
 	checkpoint.Stats = stats
@@ -645,6 +693,13 @@ func runArtworkVerifySweep(
 		return stats, fmt.Errorf("artwork reconcile: saving completed checkpoint: %w", err)
 	}
 	return stats, nil
+}
+
+func nextArtworkSurfaceName(surfaces []artworkSweepSurface, position int) string {
+	if position >= len(surfaces) {
+		return artworkReconcileChapterSurface
+	}
+	return surfaces[position].name
 }
 
 func cloneArtworkReconcileCheckpoint(checkpoint ArtworkReconcileCheckpoint) ArtworkReconcileCheckpoint {

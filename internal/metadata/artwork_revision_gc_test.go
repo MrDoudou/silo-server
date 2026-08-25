@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 )
 
@@ -23,6 +24,13 @@ type blockingArtworkRevisionDeleter struct {
 
 	mu      sync.Mutex
 	deleted [][]string
+}
+
+func (d *blockingArtworkRevisionDeleter) ListPage(context.Context, string, string, int) ([]artworkstore.ObjectInfo, string, bool, error) {
+	return nil, "", true, nil
+}
+func (d *blockingArtworkRevisionDeleter) DeletePrefixMaintenance(context.Context, string) (int, error) {
+	return 0, nil
 }
 
 func (d *blockingArtworkRevisionDeleter) DeleteObjects(ctx context.Context, keys []string) (int, error) {
@@ -469,13 +477,13 @@ func TestArtworkRevisionGCHealsBrokenReferenceAfterObjectDeletion(t *testing.T) 
 	if posterPath == originalPath {
 		t.Fatalf("poster_path still references deleted revision %q", posterPath)
 	}
-	var remaining int
+	var tombstoned bool
 	if err := pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM artwork_revision_gc_candidates WHERE original_path = $1`, originalPath).Scan(&remaining); err != nil {
-		t.Fatalf("count candidates: %v", err)
+		SELECT tombstoned_at IS NOT NULL FROM artwork_revision_gc_candidates WHERE original_path = $1`, originalPath).Scan(&tombstoned); err != nil {
+		t.Fatalf("load candidate tombstone: %v", err)
 	}
-	if remaining != 0 {
-		t.Fatalf("candidate rows remaining = %d, want 0 after successful heal", remaining)
+	if !tombstoned {
+		t.Fatal("candidate was not tombstoned after successful heal")
 	}
 }
 

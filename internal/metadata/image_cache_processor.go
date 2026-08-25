@@ -9,6 +9,8 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"mime"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -88,13 +90,6 @@ type targetImageCacheJobStore interface {
 	targetHasRunningJobs(ctx context.Context, targetContentID string) (bool, error)
 }
 
-// imageCacheTargetCachedPathReader is optionally implemented by the job store
-// (ImageCacheJobRepository does) to expose the target's currently stored
-// cached path for the local-artwork unchanged-skip and stale-prefix cleanup.
-type imageCacheTargetCachedPathReader interface {
-	CurrentTargetCachedPath(ctx context.Context, job *models.MetadataImageCacheJob) (string, error)
-}
-
 // imageCacheBacklogReader is optional so lightweight processor fakes and
 // alternate stores do not need a database-backed count implementation.
 type imageCacheBacklogReader interface {
@@ -106,13 +101,6 @@ type imageCacheBacklogReader interface {
 // confines local file:// sources to these roots before reading them.
 type LibraryRootResolver interface {
 	LibraryRootsForContent(ctx context.Context, contentID string) ([]string, error)
-}
-
-// ImagePrefixDeleter deletes cached image objects under a key prefix; used to
-// sweep the previous hashed local/ prefix after a successful re-cache.
-type ImagePrefixDeleter interface {
-	DeletePrefix(ctx context.Context, bucket, prefix string) (int, error)
-	Bucket() string
 }
 
 type SeasonArtworkUpdater interface {
@@ -158,10 +146,9 @@ type ImageCacheProcessor struct {
 	logger  *slog.Logger
 
 	// Local file:// artwork support. libraryRoots confines reads to the
-	// owning library's roots; prefixDeleter sweeps stale hashed prefixes.
+	// owning library's roots.
 	// The processor host must mount the libraries, like the metadata worker.
-	libraryRoots  LibraryRootResolver
-	prefixDeleter ImagePrefixDeleter
+	libraryRoots LibraryRootResolver
 
 	enabled atomic.Bool
 
@@ -184,16 +171,6 @@ func (p *ImageCacheProcessor) SetLibraryRootResolver(resolver LibraryRootResolve
 		return
 	}
 	p.libraryRoots = resolver
-}
-
-// SetImagePrefixDeleter wires the object store used to delete the previous
-// hashed local/ prefix after a successful local re-cache. Optional: without
-// it, stale prefixes are left behind (item deletion still sweeps them).
-func (p *ImageCacheProcessor) SetImagePrefixDeleter(deleter ImagePrefixDeleter) {
-	if p == nil {
-		return
-	}
-	p.prefixDeleter = deleter
 }
 
 // SetEnabled toggles background caching. When disabled the processor begins no
@@ -879,46 +856,18 @@ func (p *ImageCacheProcessor) processLocalOne(ctx context.Context, job *models.M
 		return imageCacheProcessResult{outcome: "failed"}
 	}
 
-	localPath := filepath.Clean(strings.TrimSpace(job.SourcePath)[len("file://"):])
 	rootsContentID := firstNonEmpty(job.SeriesID, job.TargetContentID)
 	roots, err := p.libraryRoots.LibraryRootsForContent(ctx, rootsContentID)
 	if err != nil {
 		p.markFailed(ctx, job, fmt.Sprintf("resolving library roots: %v", err))
 		return imageCacheProcessResult{outcome: "failed"}
 	}
-	if !localImagePathWithinRoots(localPath, roots) {
-		p.markFailed(ctx, job, "local image path outside library roots: "+localPath)
-		return imageCacheProcessResult{outcome: "failed"}
-	}
-	// The lexical check above cannot see through symlinks. Resolve the path and
-	// roots and re-confine so an intermediate directory symlink planted inside a
-	// root (e.g. a link pointing out of the library) cannot pull an out-of-root
-	// file into the cache. EvalSymlinks resolves both sides, so a legitimately
-	// symlinked root still matches. This is a confinement GATE only: the read
-	// below still uses the logical path so readLocalImageFile's Lstat keeps
-	// rejecting a symlinked leaf. A not-yet-existent path (ErrNotExist) falls
-	// through to the reader, which classifies it as the stable "missing" failure.
-	if _, err := localImagePathResolvedWithinRoots(localPath, roots); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		p.markFailed(ctx, job, "local image path outside library roots: "+localPath)
-		return imageCacheProcessResult{outcome: "failed"}
-	}
-
-	data, err := readLocalImageFile(localPath)
+	localSource, err := ReadConfinedLocalArtwork(job.SourcePath, roots)
 	if err != nil {
 		p.markFailed(ctx, job, err.Error())
 		return imageCacheProcessResult{outcome: "failed"}
 	}
-
-	// The target's current cached path drives the unchanged-skip (same hash →
-	// same key → nothing to sweep) and the stale-prefix cleanup below.
-	previousCachedPath := ""
-	if reader, ok := p.jobs.(imageCacheTargetCachedPathReader); ok {
-		previousCachedPath, err = reader.CurrentTargetCachedPath(ctx, job)
-		if err != nil {
-			p.logger.WarnContext(ctx, "metadata image cache: failed to read current cached path", "job_id", job.ID, "error", err)
-			previousCachedPath = ""
-		}
-	}
+	data := localSource.Data
 
 	digest := sha256.Sum256(data)
 	result, err := byteCacher.CacheImageBytes(ctx, data, CacheImageRequest{
@@ -951,33 +900,7 @@ func (p *ImageCacheProcessor) processLocalOne(ctx context.Context, job *models.M
 		return processResult
 	}
 	p.finishJobWithTargetUpdate(ctx, job, cachedPath, result.Thumbhash, &processResult)
-	if processResult.outcome == "succeeded" {
-		p.deleteStaleLocalPrefix(ctx, previousCachedPath, cachedPath)
-	}
 	return processResult
-}
-
-// deleteStaleLocalPrefix removes the previous hashed local/ image prefix
-// after a re-cache stored the artwork under a different key.
-func (p *ImageCacheProcessor) deleteStaleLocalPrefix(ctx context.Context, previousCachedPath, cachedPath string) {
-	previousCachedPath = strings.TrimSpace(previousCachedPath)
-	if p.prefixDeleter == nil ||
-		previousCachedPath == "" ||
-		previousCachedPath == cachedPath ||
-		!strings.HasPrefix(previousCachedPath, "local/") {
-		return
-	}
-	lastSlash := strings.LastIndex(previousCachedPath, "/")
-	if lastSlash <= 0 {
-		return
-	}
-	prefix := previousCachedPath[:lastSlash+1]
-	if strings.HasPrefix(cachedPath, prefix) {
-		return
-	}
-	if _, err := p.prefixDeleter.DeletePrefix(ctx, p.prefixDeleter.Bucket(), prefix); err != nil {
-		p.logger.WarnContext(ctx, "metadata image cache: failed to delete stale local image prefix", "prefix", prefix, "error", err)
-	}
 }
 
 // errLocalImageOutsideRoots is returned by localImagePathResolvedWithinRoots
@@ -1091,6 +1014,87 @@ func readLocalImageFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("local image read failed: empty file %s", path)
 	}
 	return data, nil
+}
+
+// ConfinedLocalArtwork is a sidecar read through the canonical confinement
+// gate. Fingerprint is a content identity used by the direct-library route;
+// changing the file necessarily rotates both its ETag and signed URL identity.
+type ConfinedLocalArtwork struct {
+	Data        []byte
+	Fingerprint string
+	MediaType   string
+}
+
+type ConfinedLocalArtworkFile struct {
+	File      *os.File
+	Path      string
+	Info      fs.FileInfo
+	MediaType string
+}
+
+func StatConfinedLocalArtwork(source string, roots []string) (ConfinedLocalArtworkFile, error) {
+	source = strings.TrimSpace(source)
+	if !strings.HasPrefix(strings.ToLower(source), "file://") {
+		return ConfinedLocalArtworkFile{}, fmt.Errorf("local artwork source is not file://")
+	}
+	localPath := filepath.Clean(source[len("file://"):])
+	if !localImagePathWithinRoots(localPath, roots) {
+		return ConfinedLocalArtworkFile{}, fmt.Errorf("local image path outside library roots")
+	}
+	if _, err := localImagePathResolvedWithinRoots(localPath, roots); err != nil {
+		return ConfinedLocalArtworkFile{}, fmt.Errorf("local image path outside library roots")
+	}
+	info, err := os.Lstat(localPath)
+	if err != nil {
+		return ConfinedLocalArtworkFile{}, err
+	}
+	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxLocalImageSourceBytes {
+		return ConfinedLocalArtworkFile{}, fmt.Errorf("local image is not an allowed regular file: %s", localPath)
+	}
+	return ConfinedLocalArtworkFile{
+		Path: localPath, Info: info, MediaType: mime.TypeByExtension(strings.ToLower(filepath.Ext(localPath))),
+	}, nil
+}
+
+func OpenConfinedLocalArtwork(source string, roots []string) (ConfinedLocalArtworkFile, error) {
+	confined, err := StatConfinedLocalArtwork(source, roots)
+	if err != nil {
+		return ConfinedLocalArtworkFile{}, err
+	}
+	localPath := confined.Path
+	file, err := os.Open(localPath)
+	if err != nil {
+		return ConfinedLocalArtworkFile{}, err
+	}
+	stat, err := file.Stat()
+	if err != nil || !os.SameFile(confined.Info, stat) || !stat.Mode().IsRegular() || stat.Size() <= 0 || stat.Size() > maxLocalImageSourceBytes {
+		_ = file.Close()
+		return ConfinedLocalArtworkFile{}, fmt.Errorf("local image changed during confinement check: %s", localPath)
+	}
+	return ConfinedLocalArtworkFile{
+		File: file, Path: localPath, Info: stat, MediaType: confined.MediaType,
+	}, nil
+}
+
+// ReadConfinedLocalArtwork applies the exact same lexical, symlink-resolved,
+// leaf-type, opened-handle, and byte-size checks used by materialization. The
+// source must be file:// but its absolute path is never returned to callers.
+func ReadConfinedLocalArtwork(source string, roots []string) (ConfinedLocalArtwork, error) {
+	opened, err := OpenConfinedLocalArtwork(source, roots)
+	if err != nil {
+		return ConfinedLocalArtwork{}, err
+	}
+	defer func() { _ = opened.File.Close() }()
+	data, err := io.ReadAll(io.LimitReader(opened.File, maxLocalImageSourceBytes+1))
+	if err != nil || len(data) == 0 || len(data) > maxLocalImageSourceBytes {
+		return ConfinedLocalArtwork{}, fmt.Errorf("local image read failed")
+	}
+	digest := sha256.Sum256(data)
+	return ConfinedLocalArtwork{
+		Data:        data,
+		Fingerprint: hex.EncodeToString(digest[:]),
+		MediaType:   firstNonEmpty(opened.MediaType, http.DetectContentType(data)),
+	}, nil
 }
 
 func imageCacheJobImageType(value string) (ImageType, error) {

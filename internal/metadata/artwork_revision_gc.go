@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
 const (
@@ -32,6 +33,8 @@ const (
 // both, which is what makes the strict count check below meaningful.
 type ArtworkRevisionDeleter interface {
 	DeleteObjects(ctx context.Context, keys []string) (int, error)
+	ListPage(ctx context.Context, prefix, cursor string, limit int) ([]artworkstore.ObjectInfo, string, bool, error)
+	DeletePrefixMaintenance(ctx context.Context, prefix string) (int, error)
 }
 
 // ArtworkRevisionGCStats summarizes one bounded cleanup pass.
@@ -43,6 +46,7 @@ type ArtworkRevisionGCStats struct {
 	DormantChecked  int `json:"dormant_checked"`
 	DormantRequeued int `json:"dormant_requeued"`
 	Healed          int `json:"healed"`
+	LegacyPrefixes  int `json:"legacy_prefixes"`
 }
 
 // ArtworkRevisionGarbageCollector deletes unpublished or displaced immutable
@@ -126,7 +130,58 @@ func (g *ArtworkRevisionGarbageCollector) Run(ctx context.Context) (ArtworkRevis
 	if err == nil {
 		err = sweepErr
 	}
+	legacy, legacyErr := g.sweepLegacyPrefixes(ctx, 20)
+	stats.LegacyPrefixes = legacy
+	if err == nil {
+		err = legacyErr
+	}
 	return stats, err
+}
+
+func (g *ArtworkRevisionGarbageCollector) sweepLegacyPrefixes(ctx context.Context, limit int) (int, error) {
+	rows, err := g.pool.Query(ctx, `SELECT prefix FROM artwork_legacy_prefix_gc_candidates WHERE not_before <= NOW() ORDER BY not_before LIMIT $1`, limit)
+	if err != nil {
+		return 0, err
+	}
+	var prefixes []string
+	for rows.Next() {
+		var prefix string
+		if err := rows.Scan(&prefix); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		prefixes = append(prefixes, prefix)
+	}
+	rows.Close()
+	completed := 0
+	for _, prefix := range prefixes {
+		var referenced bool
+		if err := g.pool.QueryRow(ctx, artworkLegacyPrefixReferencedSQL(), prefix).Scan(&referenced); err != nil {
+			return completed, err
+		}
+		if referenced {
+			_, err = g.pool.Exec(ctx, `UPDATE artwork_legacy_prefix_gc_candidates SET not_before = NOW() + interval '24 hours', last_error = '', updated_at = NOW() WHERE prefix = $1`, prefix)
+			if err != nil {
+				return completed, err
+			}
+			continue
+		}
+		_, err = g.store.DeletePrefixMaintenance(ctx, prefix)
+		if err != nil {
+			_, _ = g.pool.Exec(ctx, `UPDATE artwork_legacy_prefix_gc_candidates SET attempt_count = attempt_count + 1, last_error = $2, not_before = NOW() + interval '1 hour', updated_at = NOW() WHERE prefix = $1`, prefix, err.Error())
+			continue
+		}
+		_, err = g.pool.Exec(ctx, `DELETE FROM artwork_legacy_prefix_gc_candidates WHERE prefix = $1`, prefix)
+		if err != nil {
+			return completed, err
+		}
+		completed++
+	}
+	return completed, nil
+}
+
+func artworkLegacyPrefixReferencedSQL() string {
+	return `WITH refs AS (` + artworkInventoryReferenceSQL() + `) SELECT EXISTS (SELECT 1 FROM refs WHERE path LIKE $1 || '%')`
 }
 
 func processArtworkRevisionGCBatch(
@@ -227,6 +282,8 @@ func (g *ArtworkRevisionGarbageCollector) parkClaimed(ctx context.Context, ids [
 	_, err := g.pool.Exec(ctx, `
 		UPDATE artwork_revision_gc_candidates
 		SET next_attempt_at = NULL,
+			last_reference_check_at = NOW(),
+			deletion_started_at = NULL,
 			attempt_count = 0,
 			locked_at = NULL,
 			locked_by = '',
@@ -280,6 +337,8 @@ func (g *ArtworkRevisionGarbageCollector) processCandidate(
 			if _, err := tx.Exec(ctx, `
 				UPDATE artwork_revision_gc_candidates
 				SET next_attempt_at = NULL,
+					last_reference_check_at = NOW(),
+					deletion_started_at = NULL,
 					attempt_count = 0,
 					locked_at = NULL,
 					locked_by = '',
@@ -292,6 +351,12 @@ func (g *ArtworkRevisionGarbageCollector) processCandidate(
 				return artworkRevisionGCSuperseded, fmt.Errorf("artwork revision GC: commit referenced revision: %w", err)
 			}
 			return artworkRevisionGCReferenced, nil
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE artwork_revision_gc_candidates
+			SET last_reference_check_at = NOW(), deletion_started_at = COALESCE(deletion_started_at, NOW()), updated_at = NOW()
+			WHERE id = $1 AND locked_by = $2`, candidate.id, workerID); err != nil {
+			return artworkRevisionGCSuperseded, fmt.Errorf("artwork revision GC: mark deleting: %w", err)
 		}
 	}
 
@@ -338,8 +403,14 @@ func (g *ArtworkRevisionGarbageCollector) processCandidate(
 	// re-registration clears deleted_at and must survive; anything else with
 	// deleted_at set is a finished deletion.
 	if _, err := g.pool.Exec(ctx, `
-		DELETE FROM artwork_revision_gc_candidates
-		WHERE id = $1 AND deleted_at IS NOT NULL`, candidate.id); err != nil {
+		UPDATE artwork_revision_gc_candidates
+		SET tombstoned_at = NOW(),
+			next_attempt_at = NULL,
+			locked_at = NULL,
+			locked_by = '',
+			last_error = '',
+			updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NOT NULL AND tombstoned_at IS NULL`, candidate.id); err != nil {
 		return artworkRevisionGCSuperseded, fmt.Errorf("artwork revision GC: finish: %w", err)
 	}
 	if healed {
@@ -500,6 +571,7 @@ func (g *ArtworkRevisionGarbageCollector) sweepDormant(ctx context.Context, limi
 		SELECT id, original_path
 		FROM artwork_revision_gc_candidates
 		WHERE next_attempt_at IS NULL
+		  AND tombstoned_at IS NULL
 		  AND updated_at < NOW() - ($2 * interval '1 second')
 		ORDER BY updated_at, id
 		LIMIT $1`, limit, int64(artworkRevisionDormantRecheck/time.Second))
@@ -545,6 +617,7 @@ func (g *ArtworkRevisionGarbageCollector) sweepDormant(ctx context.Context, limi
 		if _, err := g.pool.Exec(ctx, `
 			UPDATE artwork_revision_gc_candidates
 			SET next_attempt_at = GREATEST(not_before, NOW()),
+				last_reference_check_at = NOW(),
 				updated_at = NOW()
 			WHERE id = ANY($1) AND next_attempt_at IS NULL`, requeue); err != nil {
 			return checked, 0, fmt.Errorf("artwork revision GC: requeue dormant revisions: %w", err)
@@ -554,7 +627,7 @@ func (g *ArtworkRevisionGarbageCollector) sweepDormant(ctx context.Context, limi
 	if len(touch) > 0 {
 		if _, err := g.pool.Exec(ctx, `
 			UPDATE artwork_revision_gc_candidates
-			SET updated_at = NOW()
+			SET last_reference_check_at = NOW(), updated_at = NOW()
 			WHERE id = ANY($1) AND next_attempt_at IS NULL`, touch); err != nil {
 			return checked, requeued, fmt.Errorf("artwork revision GC: touch dormant revisions: %w", err)
 		}

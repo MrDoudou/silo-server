@@ -373,6 +373,22 @@ func TestPluginImageResolverStoredArtworkURLsCarryExpiry(t *testing.T) {
 	}
 }
 
+func TestPluginImageResolverRoutesDirectLibraryIdentityThroughArtworkService(t *testing.T) {
+	artwork := &fakeArtworkURLResolver{ttl: 10 * time.Minute}
+	resolver := NewPluginImageResolver()
+	defer resolver.Close()
+	resolver.SetArtworkURLResolver(artwork)
+
+	const reference = "library-artwork://opaque_unsigned_identity"
+	resolved := resolver.ResolveImageURLWithExpiry(context.Background(), reference, "original")
+	if resolved.URL == "" {
+		t.Fatal("direct-library reference did not resolve")
+	}
+	if artwork.calls != 1 {
+		t.Fatalf("artwork resolver calls = %d, want 1", artwork.calls)
+	}
+}
+
 // Without a store URL minter a bare key is not a URL, and inventing one would
 // publish a reference no client can fetch.
 func TestPluginImageResolverWithoutArtworkResolverReturnsNoURL(t *testing.T) {

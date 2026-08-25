@@ -24,6 +24,8 @@ type S3Client interface {
 	PresignGetURL(ctx context.Context, bucket, key string, expiry time.Duration) (string, error)
 	EffectivePresignTTL(requested time.Duration) time.Duration
 	ReadURLExpires() bool
+	ListObjectInfosPage(ctx context.Context, bucket, prefix, cursor string, limit int) ([]s3client.ObjectInfo, string, bool, error)
+	DeletePrefix(ctx context.Context, bucket, prefix string) (int, error)
 }
 
 // S3Store is the canonical artwork store backed by an S3-compatible bucket.
@@ -156,6 +158,29 @@ func (s *S3Store) Probe(ctx context.Context) error {
 		return fmt.Errorf("artworkstore: probing s3 bucket: %w", err)
 	}
 	return nil
+}
+
+func (s *S3Store) ListPage(ctx context.Context, prefix, cursor string, limit int) ([]ObjectInfo, string, bool, error) {
+	objects, next, done, err := s.client.ListObjectInfosPage(ctx, s.bucket, prefix, cursor, limit)
+	if err != nil {
+		return nil, cursor, false, err
+	}
+	result := make([]ObjectInfo, 0, len(objects))
+	for _, object := range objects {
+		info := ObjectInfo{Key: object.Key, SizeBytes: object.SizeBytes}
+		if object.LastModified != nil {
+			info.ModTime = *object.LastModified
+		}
+		result = append(result, info)
+	}
+	return result, next, done, nil
+}
+
+func (s *S3Store) DeletePrefixMaintenance(ctx context.Context, prefix string) (int, error) {
+	if err := validateLegacyMaintenancePrefix(prefix); err != nil {
+		return 0, err
+	}
+	return s.client.DeletePrefix(ctx, s.bucket, prefix)
 }
 
 // ReadURL mints a URL the client fetches straight from the bucket or CDN,

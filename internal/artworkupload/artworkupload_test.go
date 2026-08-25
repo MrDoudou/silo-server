@@ -72,6 +72,10 @@ type recordingTracker struct {
 	objectsAtCall   int
 	countObjectsNow func() int
 	err             error
+	recordCalls     int
+	recordedPath    string
+	sourceClass     string
+	objects         []artworkstore.ObjectInfo
 }
 
 func (t *recordingTracker) TrackArtworkRevision(_ context.Context, originalPath, imageType string, objectKeys []string) error {
@@ -82,6 +86,14 @@ func (t *recordingTracker) TrackArtworkRevision(_ context.Context, originalPath,
 	if t.countObjectsNow != nil {
 		t.objectsAtCall = t.countObjectsNow()
 	}
+	return t.err
+}
+
+func (t *recordingTracker) RecordArtworkRevision(_ context.Context, originalPath, sourceClass string, objects []artworkstore.ObjectInfo) error {
+	t.recordCalls++
+	t.recordedPath = originalPath
+	t.sourceClass = sourceClass
+	t.objects = append([]artworkstore.ObjectInfo(nil), objects...)
 	return t.err
 }
 
@@ -259,6 +271,17 @@ func TestTrackingRegistersEveryObjectBeforeTheFirstWrite(t *testing.T) {
 	for i := range tracked {
 		if tracked[i] != stored[i] {
 			t.Fatalf("tracked %#v, stored %#v", tracked, stored)
+		}
+	}
+	if tracker.recordCalls != 1 || tracker.recordedPath != result.OriginalKey || tracker.sourceClass != "upload" {
+		t.Fatalf("inventory completion = calls:%d path:%q source:%q", tracker.recordCalls, tracker.recordedPath, tracker.sourceClass)
+	}
+	if len(tracker.objects) != len(stored) {
+		t.Fatalf("inventory objects = %d, stored objects = %d", len(tracker.objects), len(stored))
+	}
+	for _, object := range tracker.objects {
+		if object.SizeBytes != int64(len(store.objects[object.Key])) {
+			t.Fatalf("inventory size for %s = %d, stored %d", object.Key, object.SizeBytes, len(store.objects[object.Key]))
 		}
 	}
 }

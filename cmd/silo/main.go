@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -1391,7 +1392,9 @@ func main() {
 		// like provider artwork.
 		uploads := artworkupload.NewMaterializer(deps.ArtworkStore.Store)
 		if deps.DB != nil {
-			uploads.SetRevisionTracker(catalog.NewArtworkRevisionTracker(deps.DB))
+			uploads.SetRevisionTracker(catalog.NewArtworkRevisionTracker(
+				deps.DB, deps.ArtworkStore.Backend+":"+deps.ArtworkStore.Generation,
+			))
 		}
 		deps.ArtworkUploads = uploads
 	}
@@ -1831,7 +1834,9 @@ func main() {
 		// logical key and never learns which backend it is writing to.
 		if deps.ArtworkStore != nil {
 			imageCacher := imagecache.New(deps.ArtworkStore.Store)
-			imageCacher.SetArtworkRevisionTracker(catalog.NewArtworkRevisionTracker(deps.DB))
+			imageCacher.SetArtworkRevisionTracker(catalog.NewArtworkRevisionTracker(
+				deps.DB, deps.ArtworkStore.Backend+":"+deps.ArtworkStore.Generation,
+			))
 			metadataService.SetImageCacher(imageCacher)
 			imageCacheJobs := metadata.NewImageCacheJobRepository(deps.DB)
 			metadataService.SetImageCacheJobEnqueuer(imageCacheJobs)
@@ -1856,9 +1861,6 @@ func main() {
 			// Portable revisions are content-addressed and shared between rows,
 			// so they are never prefix-deleted; the reference-aware revision GC
 			// owns their lifecycle on every backend.
-			if deps.S3Public != nil {
-				metadataImageCacheProcessor.SetImagePrefixDeleter(deps.S3Public)
-			}
 			metadataService.SetAutoCacheImages(cfg.Metadata.CacheImages)
 			metadataImageCacheProcessor.SetEnabled(cfg.Metadata.CacheImages)
 			configWatcher.OnChange(func(_, updated *config.Config) {
@@ -3027,19 +3029,52 @@ func main() {
 			templateBundleApplyExecutor = collectionHandler
 		}
 
+		var artworkGC *metadata.ArtworkRevisionGarbageCollector
+		if deps.ArtworkStore != nil {
+			artworkGC = metadata.NewArtworkRevisionGarbageCollector(deps.DB, deps.ArtworkStore.Store)
+		}
+		adminJobRepo := adminjob.NewRepository(deps.DB)
 		adminJobRunner = adminjob.NewRunner(
-			adminjob.NewRepository(deps.DB),
+			adminJobRepo,
 			catalogseed.NewService(deps.DB, catalog.NewPersonRepository(deps.DB), recommendations.NewRepo(deps.DB)),
 			deps.S3Private,
 			itemRefreshExecutor,
 			libraryRefreshExecutor,
 			adminjob.NewLibraryDeleteExecutor(deps.FolderRepo, sectionRepo,
 				librarySettingsCleaner(deps.DB, userStoreProvider)),
-			adminjob.NewImageCacheCleanupExecutor(deps.S3Public),
+			adminjob.NewImageCacheCleanupExecutor(artworkGC),
 			templateBundleApplyExecutor,
 			deps.RealtimeHub,
 		)
+		var artworkStorageService *metadata.ArtworkStorageService
+		if deps.ArtworkStore != nil && artworkURLSigner != nil {
+			artworkStorageService = metadata.NewArtworkStorageService(
+				deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.Generation,
+				!deps.UserArtworkTracked,
+			)
+			directLibraryArtwork := metadata.NewDirectLibraryArtworkResolver(deps.DB)
+			adminJobRunner.SetArtworkStorageExecutors(
+				artworkStorageService,
+				metadata.NewArtworkPurgeExecutor(
+					deps.DB, directLibraryArtwork, artworkStorageService,
+				),
+			)
+		}
 		adminJobRunner.SetCancelRegistry(adminJobCancelRegistry)
+		if artworkStorageService != nil {
+			var snapshotAt *time.Time
+			if err := deps.DB.QueryRow(appCtx, `
+				SELECT snapshot_at FROM artwork_storage_accounting_state WHERE singleton
+			`).Scan(&snapshotAt); err == nil && snapshotAt == nil {
+				if _, err := adminJobRepo.Create(appCtx, adminjob.CreateJobInput{
+					JobType:        adminjob.JobTypeArtworkStorageRefresh,
+					RequestPayload: map[string]any{},
+					Message:        "Queued initial artwork inventory backfill",
+				}); err != nil && !errors.Is(err, adminjob.ErrActiveJobConflict) {
+					slog.Warn("failed to queue initial artwork inventory backfill", "error", err)
+				}
+			}
+		}
 		adminJobRunner.Start()
 		defer adminJobRunner.Stop()
 

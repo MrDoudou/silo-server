@@ -37,6 +37,7 @@ type Store interface {
 // rather than orphans. It is satisfied by catalog.ArtworkRevisionTracker.
 type RevisionTracker interface {
 	TrackArtworkRevision(ctx context.Context, originalPath, imageType string, objectKeys []string) error
+	RecordArtworkRevision(ctx context.Context, originalPath, sourceClass string, objects []artworkstore.ObjectInfo) error
 }
 
 var (
@@ -208,6 +209,11 @@ func (m *Materializer) Materialize(ctx context.Context, req Request) (*Result, e
 		artworkstore.MediaTypeForKey(artworkkey.ManifestName)); err != nil {
 		return nil, err
 	}
+	if req.Track {
+		if err := m.record(ctx, revision, variants); err != nil {
+			return nil, err
+		}
+	}
 	return result, nil
 }
 
@@ -259,6 +265,29 @@ func (m *Materializer) track(ctx context.Context, revision *artworkkey.PortableR
 	}
 	if err := m.tracker.TrackArtworkRevision(ctx, revision.OriginalKey, revision.ImageType, revision.ObjectKeys()); err != nil {
 		return fmt.Errorf("artworkupload: track artwork revision: %w", err)
+	}
+	return nil
+}
+
+func (m *Materializer) record(ctx context.Context, revision *artworkkey.PortableRevision, variants *imageutil.VariantResult) error {
+	if m.tracker == nil {
+		return nil
+	}
+	objects := make([]artworkstore.ObjectInfo, 0, len(variants.Variants)+1)
+	for _, variant := range variants.Variants {
+		objects = append(objects, artworkstore.ObjectInfo{
+			Key:       revision.VariantKeys[variant.Key],
+			SizeBytes: int64(len(variant.Data)),
+			MediaType: revision.MediaType,
+		})
+	}
+	objects = append(objects, artworkstore.ObjectInfo{
+		Key:       revision.ManifestKey,
+		SizeBytes: int64(len(revision.ManifestJSON)),
+		MediaType: artworkstore.MediaTypeForKey(revision.ManifestKey),
+	})
+	if err := m.tracker.RecordArtworkRevision(ctx, revision.OriginalKey, "upload", objects); err != nil {
+		return fmt.Errorf("artworkupload: record artwork inventory: %w", err)
 	}
 	return nil
 }

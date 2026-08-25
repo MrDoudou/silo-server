@@ -624,6 +624,38 @@ func (c *Client) ListObjectInfos(ctx context.Context, bucket, prefix string) ([]
 	return objects, nil
 }
 
+func (c *Client) ListObjectInfosPage(ctx context.Context, bucket, prefix, cursor string, limit int) ([]ObjectInfo, string, bool, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 1000
+	}
+	input := &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(c.prefixedKey(prefix)), MaxKeys: aws.Int32(int32(limit))}
+	if cursor != "" {
+		input.StartAfter = aws.String(c.prefixedKey(cursor))
+	}
+	page, err := c.s3Client.ListObjectsV2(ctx, input)
+	if err != nil {
+		return nil, cursor, false, fmt.Errorf("s3 ListObjectsV2 %s prefix=%s: %w", bucket, prefix, err)
+	}
+	objects := make([]ObjectInfo, 0, len(page.Contents))
+	next := cursor
+	for _, obj := range page.Contents {
+		if obj.Key == nil {
+			continue
+		}
+		logical, ok := c.stripKeyPrefix(*obj.Key)
+		if !ok {
+			continue
+		}
+		var size int64
+		if obj.Size != nil {
+			size = *obj.Size
+		}
+		objects = append(objects, ObjectInfo{Key: logical, SizeBytes: size, LastModified: obj.LastModified})
+		next = logical
+	}
+	return objects, next, !aws.ToBool(page.IsTruncated), nil
+}
+
 // isNotFoundErr checks whether an error indicates that the object was not found.
 func isNotFoundErr(err error) bool {
 	var noSuchKey *s3types.NoSuchKey

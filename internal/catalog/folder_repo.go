@@ -129,11 +129,10 @@ type FolderRepository struct {
 }
 
 type DeleteFolderStats struct {
-	LibraryName       string
-	MediaFiles        int
-	MediaItemLinks    int
-	OrphanedItems     int
-	OrphanedImageDirs []string // S3 base paths (directories) for orphaned images needing cleanup
+	LibraryName    string
+	MediaFiles     int
+	MediaItemLinks int
+	OrphanedItems  int
 }
 
 // NewFolderRepository creates a new FolderRepository backed by the given pool.
@@ -582,7 +581,7 @@ func (r *FolderRepository) DeleteWithStats(
 	if progress != nil {
 		progress(0, orphanTotal, "Deleting orphaned items")
 	}
-	rawDirs := make(map[string]struct{})
+	legacyDirs := make(map[string]struct{})
 	for {
 		ids, err := r.collectOrphanBatch(ctx, id, orphanDeleteBatch)
 		if err != nil {
@@ -595,8 +594,8 @@ func (r *FolderRepository) DeleteWithStats(
 		if err != nil {
 			return nil, err
 		}
-		for _, d := range dirs {
-			rawDirs[d] = struct{}{}
+		for _, dir := range dirs {
+			legacyDirs[dir] = struct{}{}
 		}
 		var deletedContentIDs []string
 		if err := retryOnDeadlock(ctx, func() error {
@@ -669,30 +668,32 @@ func (r *FolderRepository) DeleteWithStats(
 	if progress != nil {
 		progress(orphanTotal, orphanTotal, "Removing library memberships")
 	}
-	lateOrphans, lateImageDirs, err := r.deleteFolderMemberships(ctx, id)
+	lateOrphans, lateDirs, err := r.deleteFolderMemberships(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("deleting media item links: %w", err)
 	}
 	stats.OrphanedItems += lateOrphans
-	for _, d := range lateImageDirs {
-		rawDirs[d] = struct{}{}
+	for _, dir := range lateDirs {
+		legacyDirs[dir] = struct{}{}
 	}
 
-	// Filter accumulated image dirs once, now that all item orphans are gone,
-	// against any surviving content. Empty deleting-set means "exclude nothing".
-	if len(rawDirs) > 0 {
-		filtered, err := filterUnreferencedImageDirs(ctx, r.pool, dirSetToSlice(rawDirs), []string{})
-		if err != nil {
-			return nil, err
-		}
-		stats.OrphanedImageDirs = filtered
-	}
-
-	// Phase 4: delete the now-lightweight folder row. Tolerate 0 rows so a
-	// resumed run that already removed it still succeeds.
+	// Phase 4: durably enqueue legacy sibling cleanup in the same transaction
+	// that removes the folder. If the process dies at either boundary, live
+	// reference proof protects an early candidate and a committed delete can
+	// never lose its cleanup record.
 	if err := retryOnDeadlock(ctx, func() error {
-		_, e := r.pool.Exec(ctx, `DELETE FROM media_folders WHERE id = $1`, id)
-		return e
+		tx, err := r.pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		if err := queueLegacyArtworkPrefixes(ctx, tx, dirSetToSlice(legacyDirs)); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM media_folders WHERE id = $1`, id); err != nil {
+			return err
+		}
+		return tx.Commit(ctx)
 	}); err != nil {
 		return nil, fmt.Errorf("deleting folder: %w", err)
 	}
@@ -701,6 +702,15 @@ func (r *FolderRepository) DeleteWithStats(
 		progress(orphanTotal, orphanTotal, "Library deletion completed")
 	}
 	return stats, nil
+}
+
+func queueLegacyArtworkPrefixes(ctx context.Context, tx pgx.Tx, prefixes []string) error {
+	for _, prefix := range prefixes {
+		if _, err := tx.Exec(ctx, `INSERT INTO artwork_legacy_prefix_gc_candidates (prefix) VALUES ($1) ON CONFLICT (prefix) DO UPDATE SET not_before = EXCLUDED.not_before, updated_at = NOW()`, prefix); err != nil {
+			return fmt.Errorf("queueing legacy artwork prefix cleanup: %w", err)
+		}
+	}
+	return nil
 }
 
 // collectOrphanBatch returns up to limit content IDs whose only library

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
@@ -51,6 +52,12 @@ func (r *Resolver) DirectDelivery() bool {
 func (r *Resolver) ResolveArtworkURL(ctx context.Context, key string) (artworkstore.ResolvedURL, error) {
 	if r == nil {
 		return artworkstore.ResolvedURL{}, errors.New("artworkurl: artwork url resolution is not configured")
+	}
+	if strings.HasPrefix(key, LibraryReferencePrefix) {
+		if r.signer == nil {
+			return artworkstore.ResolvedURL{}, errors.New("artworkurl: signer is required for direct-library artwork")
+		}
+		return r.signer.SignLibraryReference(key, time.Now())
 	}
 	if err := artworkstore.ValidateKey(key); err != nil {
 		return artworkstore.ResolvedURL{}, err

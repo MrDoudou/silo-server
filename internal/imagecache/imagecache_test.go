@@ -179,9 +179,13 @@ type trackedRevision struct {
 }
 
 type recordingRevisionTracker struct {
-	mu    sync.Mutex
-	calls []trackedRevision
-	err   error
+	mu           sync.Mutex
+	calls        []trackedRevision
+	recordedPath string
+	sourceClass  string
+	objects      []artworkstore.ObjectInfo
+	recordCalls  int
+	err          error
 }
 
 func (t *recordingRevisionTracker) TrackArtworkRevision(_ context.Context, originalPath, imageType string, objectKeys []string) error {
@@ -192,6 +196,16 @@ func (t *recordingRevisionTracker) TrackArtworkRevision(_ context.Context, origi
 		imageType:    imageType,
 		objectKeys:   slices.Clone(objectKeys),
 	})
+	return t.err
+}
+
+func (t *recordingRevisionTracker) RecordArtworkRevision(_ context.Context, originalPath, sourceClass string, objects []artworkstore.ObjectInfo) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.recordCalls++
+	t.recordedPath = originalPath
+	t.sourceClass = sourceClass
+	t.objects = append([]artworkstore.ObjectInfo(nil), objects...)
 	return t.err
 }
 
@@ -242,6 +256,7 @@ func TestCacheBytesTracksExactRevisionBeforeUpload(t *testing.T) {
 	cacher.SetArtworkRevisionTracker(tracker)
 
 	result, err := cacher.CacheBytes(context.Background(), makeTestJPEG(t), CacheRequest{
+		SourceURL:   "https://images.example/poster.jpg",
 		ProviderID:  testTMDBProviderID,
 		ContentType: testMoviesContentType,
 		ContentID:   "335984",
@@ -278,6 +293,21 @@ func TestCacheBytesTracksExactRevisionBeforeUpload(t *testing.T) {
 		}
 		if strings.Contains(key, "://") {
 			t.Fatalf("tracked key %q carries a scheme; revision tracking rejects those", key)
+		}
+	}
+	if tracker.recordCalls != 1 || tracker.recordedPath != result.OriginalPath || tracker.sourceClass != "provider" {
+		t.Fatalf("inventory completion = calls:%d path:%q source:%q", tracker.recordCalls, tracker.recordedPath, tracker.sourceClass)
+	}
+	if len(tracker.objects) != len(calls[0].objectKeys) {
+		t.Fatalf("inventory objects = %d, want %d", len(tracker.objects), len(calls[0].objectKeys))
+	}
+	for _, object := range tracker.objects {
+		stored := store.objectData(object.Key)
+		if object.SizeBytes != int64(len(stored)) {
+			t.Fatalf("inventory size for %s = %d, stored %d", object.Key, object.SizeBytes, len(stored))
+		}
+		if object.MediaType == "" {
+			t.Fatalf("inventory content type for %s is empty", object.Key)
 		}
 	}
 }
