@@ -312,7 +312,7 @@ describe("routeEventPlanIdentityV3", () => {
 });
 
 describe("usePlaybackSession capability warming", () => {
-  it("retries a warming start with a fresh attempt id while keeping the requested file", async () => {
+  it("retries warming beyond the initial backoff sequence while keeping the requested file", async () => {
     const startBodies: Array<{ file_id: number; playback_attempt_id: string }> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -320,7 +320,7 @@ describe("usePlaybackSession capability warming", () => {
         startBodies.push(
           JSON.parse(String(init?.body)) as { file_id: number; playback_attempt_id: string },
         );
-        if (startBodies.length === 1) {
+        if (startBodies.length <= 7) {
           return jsonResponse(
             {
               protocol_version: 3,
@@ -367,9 +367,9 @@ describe("usePlaybackSession capability warming", () => {
     );
 
     await waitFor(() => expect(result.current.sessionId).toBe("session-warmed"));
-    expect(startBodies).toHaveLength(2);
-    expect(startBodies.map((body) => body.file_id)).toEqual([7, 7]);
-    expect(startBodies[1]!.playback_attempt_id).not.toBe(startBodies[0]!.playback_attempt_id);
+    expect(startBodies).toHaveLength(8);
+    expect(startBodies.map((body) => body.file_id)).toEqual(Array(8).fill(7));
+    expect(new Set(startBodies.map((body) => body.playback_attempt_id)).size).toBe(8);
     expect(result.current.error).toBeNull();
 
     unmount();

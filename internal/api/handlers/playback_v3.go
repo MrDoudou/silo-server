@@ -4502,8 +4502,35 @@ func sameEmbeddedSubtitleMetadataV3(left, right models.SubtitleTrack) bool {
 		left.External == right.External
 }
 
-func sameExternalSubtitleMetadataV3(left, right models.ExternalSubtitle) bool {
-	return strings.EqualFold(strings.TrimSpace(left.Title), strings.TrimSpace(right.Title)) &&
+func externalSubtitleStableSuffixV3(file *models.MediaFile, subtitle models.ExternalSubtitle) (string, bool) {
+	if file == nil {
+		return "", false
+	}
+	mediaName := filepath.Base(strings.TrimSpace(file.FilePath))
+	mediaStem := strings.TrimSuffix(mediaName, filepath.Ext(mediaName))
+	subtitleName := filepath.Base(strings.TrimSpace(subtitle.Title))
+	if subtitleName == "." || subtitleName == "" {
+		subtitleName = filepath.Base(strings.TrimSpace(subtitle.Path))
+	}
+	subtitleStem := strings.TrimSuffix(subtitleName, filepath.Ext(subtitleName))
+	if mediaStem == "" || len(subtitleStem) < len(mediaStem) || !strings.EqualFold(subtitleStem[:len(mediaStem)], mediaStem) {
+		return "", false
+	}
+	suffix := subtitleStem[len(mediaStem):]
+	if suffix != "" && !strings.HasPrefix(suffix, ".") {
+		return "", false
+	}
+	return strings.ToLower(strings.TrimPrefix(suffix, ".")), true
+}
+
+func sameExternalSubtitleMetadataV3(leftFile *models.MediaFile, left models.ExternalSubtitle, rightFile *models.MediaFile, right models.ExternalSubtitle) bool {
+	leftSuffix, leftHasSuffix := externalSubtitleStableSuffixV3(leftFile, left)
+	rightSuffix, rightHasSuffix := externalSubtitleStableSuffixV3(rightFile, right)
+	titleMatches := strings.EqualFold(strings.TrimSpace(left.Title), strings.TrimSpace(right.Title))
+	if leftHasSuffix && rightHasSuffix {
+		titleMatches = leftSuffix == rightSuffix
+	}
+	return titleMatches &&
 		strings.EqualFold(strings.TrimSpace(left.EmbeddedTitle), strings.TrimSpace(right.EmbeddedTitle)) &&
 		strings.EqualFold(strings.TrimSpace(left.Resolution), strings.TrimSpace(right.Resolution)) &&
 		left.Default == right.Default &&
@@ -4547,7 +4574,7 @@ func (h *PlaybackHandler) remapSubtitleSelectionV3(ctx context.Context, source, 
 		for candidateIndex, candidate := range target.ExternalSubtitles {
 			if strings.EqualFold(candidate.Language, wanted.Language) && strings.EqualFold(candidate.Format, wanted.Format) && candidate.Forced == wanted.Forced {
 				baseMatches = append(baseMatches, candidateIndex)
-				if sameExternalSubtitleMetadataV3(candidate, wanted) {
+				if sameExternalSubtitleMetadataV3(target, candidate, source, wanted) {
 					exactMatches = append(exactMatches, candidateIndex)
 				}
 			}

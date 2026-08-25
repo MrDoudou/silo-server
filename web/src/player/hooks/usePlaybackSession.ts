@@ -40,26 +40,33 @@ import type {
 
 const CAPABILITY_WARMING_REASON_V3 = "capability_warming";
 const CAPABILITY_WARMING_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000, 4_000] as const;
+// Remote nodes may advertise a probe request budget of up to five minutes.
+// Keep the client retry window aligned with that server-side bound so a cold,
+// healthy executor is not abandoned before its shared probe can finish.
+const CAPABILITY_WARMING_RETRY_BUDGET_MS = 5 * 60_000;
 
 function capabilityWarmingRetryDelayV3(
   decision: DecisionResponseV3,
   retryIndex: number,
+  elapsedMs: number,
 ): number | null {
   const terminal = decision.terminal;
   if (
     !terminal?.retryable ||
     terminal.reason !== CAPABILITY_WARMING_REASON_V3 ||
-    retryIndex >= CAPABILITY_WARMING_RETRY_DELAYS_MS.length
+    elapsedMs >= CAPABILITY_WARMING_RETRY_BUDGET_MS
   ) {
     return null;
   }
+  const fallbackDelay =
+    CAPABILITY_WARMING_RETRY_DELAYS_MS[
+      Math.min(retryIndex, CAPABILITY_WARMING_RETRY_DELAYS_MS.length - 1)
+    ] ?? 4_000;
+  let delay: number = fallbackDelay;
   if (Number.isFinite(terminal.retry_after_ms) && Number(terminal.retry_after_ms) >= 0) {
-    return Math.max(
-      CAPABILITY_WARMING_RETRY_DELAYS_MS[retryIndex] ?? 250,
-      Math.min(Number(terminal.retry_after_ms), 4_000),
-    );
+    delay = Math.max(50, Math.min(Number(terminal.retry_after_ms), 4_000));
   }
-  return CAPABILITY_WARMING_RETRY_DELAYS_MS[retryIndex] ?? null;
+  return Math.min(delay, CAPABILITY_WARMING_RETRY_BUDGET_MS - elapsedMs);
 }
 
 function currentDecisionFromStalePlanErrorV3(error: unknown): DecisionResponseV3 | null {
@@ -759,6 +766,7 @@ export function usePlaybackSession(
 
         let retryPosition = position;
         let decision: DecisionResponseV3;
+        const warmingRetryStartedAt = Date.now();
         for (let retryIndex = 0; ; retryIndex += 1) {
           playbackAttemptIdRef.current = playbackAttemptId;
           decision = await requestStart(
@@ -778,7 +786,11 @@ export function usePlaybackSession(
             return;
           }
 
-          const retryDelay = capabilityWarmingRetryDelayV3(decision, retryIndex);
+          const retryDelay = capabilityWarmingRetryDelayV3(
+            decision,
+            retryIndex,
+            Date.now() - warmingRetryStartedAt,
+          );
           if (retryDelay == null) break;
           setState((current) => ({
             ...current,
@@ -1070,6 +1082,7 @@ export function usePlaybackSession(
 
       try {
         let decision: DecisionResponseV3;
+        const warmingRetryStartedAt = Date.now();
         for (let retryIndex = 0; ; retryIndex += 1) {
           decision = await playerFetch<DecisionResponseV3>(
             config,
@@ -1079,7 +1092,11 @@ export function usePlaybackSession(
 
           if (loadSequence !== loadSequenceRef.current) return false;
 
-          const retryDelay = capabilityWarmingRetryDelayV3(decision, retryIndex);
+          const retryDelay = capabilityWarmingRetryDelayV3(
+            decision,
+            retryIndex,
+            Date.now() - warmingRetryStartedAt,
+          );
           if (retryDelay == null) break;
           if (warmingRetryEpoch !== warmingRetryEpochRef.current) return false;
           const retryDelayElapsed = await waitForCapabilityWarmingRetry(

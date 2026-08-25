@@ -3405,6 +3405,43 @@ func TestRemapSubtitleSelectionV3UsesTrackMetadataAndRejectsAmbiguity(t *testing
 	}
 }
 
+func TestRemapSubtitleSelectionV3MatchesExternalSidecarSuffixAcrossVersions(t *testing.T) {
+	source := &models.MediaFile{
+		ID:       1,
+		FilePath: "/media/Movie.2160p.mkv",
+		ExternalSubtitles: []models.ExternalSubtitle{
+			{Path: "/media/Movie.2160p.commentary.en.srt", Title: "Movie.2160p.commentary.en.srt", Language: "eng", Format: "srt"},
+			{Path: "/media/Movie.2160p.sdh.en.srt", Title: "Movie.2160p.sdh.en.srt", Language: "eng", Format: "srt"},
+		},
+	}
+	target := &models.MediaFile{
+		ID:       2,
+		FilePath: "/media/Movie.1080p.mkv",
+		ExternalSubtitles: []models.ExternalSubtitle{
+			{Path: "/media/Movie.1080p.sdh.en.srt", Title: "Movie.1080p.sdh.en.srt", Language: "eng", Format: "srt"},
+			{Path: "/media/Movie.1080p.commentary.en.srt", Title: "Movie.1080p.commentary.en.srt", Language: "eng", Format: "srt"},
+		},
+	}
+	selected := 0
+	request := playback.StartRequestV3{SubtitleTrackIndex: &selected}
+	handler := NewPlaybackHandler(playback.NewSessionManager(0, 0))
+
+	if err := handler.remapSubtitleSelectionV3(context.Background(), source, target, &request); err != nil {
+		t.Fatalf("remap commentary sidecar: %v", err)
+	}
+	if request.SubtitleTrackIndex == nil || *request.SubtitleTrackIndex != 1 {
+		t.Fatalf("remapped subtitle index = %v, want commentary index 1", request.SubtitleTrackIndex)
+	}
+
+	target.ExternalSubtitles[0].Title = "Movie.1080p.commentary.en.srt"
+	target.ExternalSubtitles[0].Path = "/media/Movie.1080p.commentary.en.srt"
+	request.SubtitleTrackIndex = &selected
+	request.SubtitleTrackID = ""
+	if err := handler.remapSubtitleSelectionV3(context.Background(), source, target, &request); err == nil {
+		t.Fatal("ambiguous external sidecar remap was accepted")
+	}
+}
+
 func TestRemapSubtitleSelectionV3UsesDownloadedMetadataAndRejectsAmbiguity(t *testing.T) {
 	source := &models.MediaFile{ID: 1}
 	target := &models.MediaFile{ID: 2}
