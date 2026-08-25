@@ -374,6 +374,80 @@ describe("usePlaybackSession capability warming", () => {
 
     unmount();
   });
+
+  it("refreshes a replacement start position while capability warming", async () => {
+    const startBodies: Array<{
+      file_id: number;
+      playback_attempt_id: string;
+      start_position?: number;
+    }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/playback/start")) {
+        startBodies.push(
+          JSON.parse(String(init?.body)) as {
+            file_id: number;
+            playback_attempt_id: string;
+            start_position?: number;
+          },
+        );
+        if (startBodies.length === 2) {
+          return jsonResponse(
+            {
+              protocol_version: 3,
+              server_features: ["playback_plan_v3"],
+              outcome: "adaptation_unavailable",
+              terminal: {
+                reason: "capability_warming",
+                message: "Tone-map capability discovery is still warming.",
+                retryable: true,
+                retry_after_ms: 50,
+              },
+            },
+            { status: 201 },
+          );
+        }
+        const replacement = startBodies.length === 3;
+        return jsonResponse(
+          {
+            protocol_version: 3,
+            server_features: ["playback_plan_v3"],
+            outcome: "playable",
+            session_id: replacement ? "session-replacement" : "session-initial",
+            playback_plan: fixturePlanV3({
+              session_id: replacement ? "session-replacement" : "session-initial",
+              requested_media_file_id: replacement ? 99 : 7,
+              effective_media_file_id: replacement ? 99 : 7,
+            }),
+          },
+          { status: 201 },
+        );
+      }
+      if (url.endsWith("/playback/route-events")) return new Response(null, { status: 202 });
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, unmount } = renderHook(
+      () => usePlaybackSession("request-warming-replacement", [], [], 7, 0, false, "auto"),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.sessionId).toBe("session-initial"));
+
+    act(() => {
+      result.current.updatePlaybackState(10, true);
+      result.current.switchVersion(99, 10);
+    });
+    await waitFor(() => expect(startBodies).toHaveLength(2));
+    act(() => result.current.updatePlaybackState(17, true));
+    await waitFor(() => expect(result.current.sessionId).toBe("session-replacement"));
+
+    expect(startBodies[1]).toMatchObject({ file_id: 99, start_position: 10 });
+    expect(startBodies[2]).toMatchObject({ file_id: 99, start_position: 17 });
+    expect(startBodies[2]!.playback_attempt_id).not.toBe(startBodies[1]!.playback_attempt_id);
+    unmount();
+  });
 });
 
 describe("usePlaybackSession quality changes", () => {

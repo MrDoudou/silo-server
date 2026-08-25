@@ -757,12 +757,13 @@ export function usePlaybackSession(
           throw new Error("No playable version found");
         }
 
+        let retryPosition = position;
         let decision: DecisionResponseV3;
         for (let retryIndex = 0; ; retryIndex += 1) {
           playbackAttemptIdRef.current = playbackAttemptId;
           decision = await requestStart(
             selectedFileId,
-            position,
+            retryPosition,
             forceStartPosition,
             playbackAttemptId,
           );
@@ -800,6 +801,7 @@ export function usePlaybackSession(
             return;
           }
           if (loadSequence !== loadSequenceRef.current) return;
+          retryPosition = playbackPositionRef.current;
 
           // Start decisions are idempotent by playback_attempt_id. A retry must
           // mint a new identity or the server will correctly replay the warming
