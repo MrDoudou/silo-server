@@ -231,6 +231,75 @@ func TestProbeExpiredPositiveReturnsWhileRefreshIsRunning(t *testing.T) {
 	}
 }
 
+func TestProbeExpiredPositiveBacksOffAfterRefreshDeadline(t *testing.T) {
+	resetProbeCache(t)
+	var nowUnix atomic.Int64
+	nowUnix.Store(100)
+	now := func() time.Time { return time.Unix(nowUnix.Load(), 0) }
+	var failRefresh atomic.Bool
+	var refreshCalls atomic.Int32
+	runner := func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		if failRefresh.Load() {
+			refreshCalls.Add(1)
+			return nil, context.DeadlineExceeded
+		}
+		if len(args) > 0 && args[len(args)-1] == "-filters" {
+			return []byte(" .S. zscale V->V\n .S. tonemapx V->V\n .S. sidedata V->V\n"), nil
+		}
+		if len(args) > 0 && args[len(args)-1] == "-encoders" {
+			return []byte("libx264"), nil
+		}
+		return nil, nil
+	}
+	seed, err := probeCached(context.Background(), "/ffmpeg-refresh-backoff", BackendSoftware, "", runner, now)
+	if err != nil || len(seed) != 1 {
+		t.Fatalf("seed probe = %#v, error = %v", seed, err)
+	}
+
+	nowUnix.Add(int64((probePositiveTTL + time.Second) / time.Second))
+	failRefresh.Store(true)
+	stale, err := probeCached(context.Background(), "/ffmpeg-refresh-backoff", BackendSoftware, "", runner, now)
+	if err != nil || len(stale) != 1 {
+		t.Fatalf("stale probe = %#v, error = %v", stale, err)
+	}
+	wantBackoff := now().Add(probeNegativeTTL)
+	deadline := time.After(time.Second)
+	for {
+		probeCache.Lock()
+		backedOff := probeCache.entries[probeCacheKey("/ffmpeg-refresh-backoff", BackendSoftware, "")].expiresAt.Equal(wantBackoff)
+		probeCache.Unlock()
+		if backedOff {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("failed background refresh did not advance its retry deadline")
+		default:
+			runtime.Gosched()
+		}
+	}
+	failedCalls := refreshCalls.Load()
+	stale, err = probeCached(context.Background(), "/ffmpeg-refresh-backoff", BackendSoftware, "", runner, now)
+	if err != nil || len(stale) != 1 {
+		t.Fatalf("backed-off stale probe = %#v, error = %v", stale, err)
+	}
+	if refreshCalls.Load() != failedCalls {
+		t.Fatal("stale positive retried before the refresh backoff expired")
+	}
+
+	nowUnix.Add(int64((probeNegativeTTL + time.Second) / time.Second))
+	_, _ = probeCached(context.Background(), "/ffmpeg-refresh-backoff", BackendSoftware, "", runner, now)
+	deadline = time.After(time.Second)
+	for refreshCalls.Load() == failedCalls {
+		select {
+		case <-deadline:
+			t.Fatal("stale positive did not retry after the refresh backoff expired")
+		default:
+			runtime.Gosched()
+		}
+	}
+}
+
 // TestProbeCacheInvalidatesWhenFFmpegBinaryChangesInPlace verifies that a
 // positive result is rechecked after the configured executable is replaced.
 func TestProbeCacheInvalidatesWhenFFmpegBinaryChangesInPlace(t *testing.T) {

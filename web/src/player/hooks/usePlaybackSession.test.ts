@@ -1320,7 +1320,7 @@ describe("usePlaybackSession version switches", () => {
 
 describe("usePlaybackSession replans", () => {
   it("retries a warming replan with a fresh replan request id", async () => {
-    const replanBodies: Array<{ replan_request_id: string }> = [];
+    const replanBodies: Array<{ replan_request_id: string; position_seconds: number }> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/playback/start")) {
@@ -1336,7 +1336,12 @@ describe("usePlaybackSession replans", () => {
         );
       }
       if (url.endsWith("/playback/session-warming-replan/replan")) {
-        replanBodies.push(JSON.parse(String(init?.body)) as { replan_request_id: string });
+        replanBodies.push(
+          JSON.parse(String(init?.body)) as {
+            replan_request_id: string;
+            position_seconds: number;
+          },
+        );
         if (replanBodies.length === 1) {
           return jsonResponse({
             protocol_version: 3,
@@ -1346,7 +1351,7 @@ describe("usePlaybackSession replans", () => {
               reason: "capability_warming",
               message: "Tone-map capability discovery is still warming.",
               retryable: true,
-              retry_after_ms: 1,
+              retry_after_ms: 50,
             },
           });
         }
@@ -1375,11 +1380,81 @@ describe("usePlaybackSession replans", () => {
     await waitFor(() => expect(result.current.plan).not.toBeNull());
 
     act(() => result.current.changeQuality("720p", 30));
+    await waitFor(() => expect(replanBodies).toHaveLength(1));
+    act(() => result.current.updatePlaybackState(37, true));
     await waitFor(() => expect(result.current.plan?.plan_id).toBe("plan:warmed-replan-0001"));
 
     expect(replanBodies).toHaveLength(2);
     expect(replanBodies[1]!.replan_request_id).not.toBe(replanBodies[0]!.replan_request_id);
+    expect(replanBodies[0]!.position_seconds).toBe(30);
+    expect(replanBodies[1]!.position_seconds).toBe(37);
     expect(result.current.error).toBeNull();
+    unmount();
+  });
+
+  it("replays a user intent after adopting a stale plan reconciliation", async () => {
+    const replanBodies: Array<Record<string, unknown>> = [];
+    const decision = (plan: ReturnType<typeof fixturePlanV3>) => ({
+      protocol_version: 3,
+      server_features: ["playback_plan_v3"],
+      outcome: "playable",
+      session_id: "session-1",
+      playback_plan: plan,
+    });
+    const reconciledPlan = fixturePlanV3({
+      plan_id: "plan:reconciled0001",
+      plan_attempt_key: "v3:reconciled0001",
+    });
+    const requestedPlan = fixturePlanV3({
+      plan_id: "plan:requested000001",
+      plan_attempt_key: "v3:requested000001",
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/playback/start")) {
+        return jsonResponse(decision(fixturePlanV3()), { status: 201 });
+      }
+      if (url.endsWith("/playback/session-1/replan")) {
+        replanBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        if (replanBodies.length === 1) {
+          return jsonResponse(
+            {
+              error: "stale_playback_plan",
+              message: "The failed plan is no longer current",
+              current_decision: decision(reconciledPlan),
+            },
+            { status: 409 },
+          );
+        }
+        return jsonResponse(decision(requestedPlan));
+      }
+      if (url.endsWith("/playback/route-events")) return new Response(null, { status: 202 });
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, unmount } = renderHook(
+      () => usePlaybackSession("request-reconcile-intent", [], [], 7, 0, false, "auto"),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.plan?.plan_id).toBe("plan:0123456789abcdef"));
+
+    act(() => result.current.changeQuality("720p", 30));
+    await waitFor(() => expect(result.current.plan?.plan_id).toBe("plan:requested000001"));
+
+    expect(replanBodies).toHaveLength(2);
+    expect(replanBodies[0]).toMatchObject({
+      operation: "quality_change",
+      failed_plan_id: "plan:0123456789abcdef",
+      quality_preference: "720p",
+    });
+    expect(replanBodies[1]).toMatchObject({
+      operation: "quality_change",
+      failed_plan_id: "plan:reconciled0001",
+      quality_preference: "720p",
+    });
+    expect(result.current.qualityPreference).toBe("720p");
     unmount();
   });
 

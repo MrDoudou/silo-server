@@ -48,6 +48,7 @@ const (
 	capabilityWarmingReasonV3    = "capability_warming"
 	capabilityWarmRetryAfterV3   = 250 * time.Millisecond
 	probePositiveTTLForHWAccelV3 = 5 * time.Minute
+	probeNegativeTTLForHWAccelV3 = 15 * time.Second
 	seekRestorationPlayerV3      = "player_position"
 	// Failed capability fetches are memoized briefly so an unreachable node
 	// costs one timeout per window instead of one per planning request.
@@ -272,10 +273,17 @@ func (h *PlaybackHandler) resolveLocalHWAccelV3(ctx context.Context, cfg config.
 	if ctx.Err() != nil {
 		return resolved
 	}
+	ttl := probePositiveTTLForHWAccelV3
+	if strings.EqualFold(strings.TrimSpace(cfg.HWAccel), "auto") && resolved == playback.HWAccelNone {
+		// Auto-detection can return none after a transient driver/encoder probe
+		// failure. Match the detector's own short negative cache instead of
+		// promoting that result to a five-minute positive.
+		ttl = probeNegativeTTLForHWAccelV3
+	}
 	h.v3HWAccelMu.Lock()
 	h.v3HWAccelKey = key
 	h.v3HWAccelResolved = resolved
-	h.v3HWAccelExpiresAt = now.Add(probePositiveTTLForHWAccelV3)
+	h.v3HWAccelExpiresAt = now.Add(ttl)
 	h.v3HWAccelMu.Unlock()
 	return resolved
 }

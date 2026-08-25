@@ -80,6 +80,16 @@ func probeCached(ctx context.Context, ffmpegPath, hardwareBackend, hardwareDevic
 		defer cancel()
 		result, err := probeWithRunner(probeCtx, ffmpegPath, hardwareBackend, hardwareDevice, run)
 		if err != nil {
+			// Keep a known-good inventory available, but do not let steady
+			// playback traffic turn one slow executor into a continuous probe
+			// loop. A failed refresh gets the same short retry backoff as a
+			// completed empty inventory.
+			probeCache.Lock()
+			if stale, ok := probeCache.entries[key]; ok && len(stale.capabilities) > 0 {
+				stale.expiresAt = now().Add(probeNegativeTTL)
+				probeCache.entries[key] = stale
+			}
+			probeCache.Unlock()
 			return nil, err
 		}
 		entry := probeCacheEntry{

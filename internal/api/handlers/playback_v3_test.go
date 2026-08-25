@@ -40,6 +40,39 @@ type mutablePlaybackSettingsV3 struct {
 	getErrors map[string]error
 }
 
+func TestResolveLocalHWAccelV3CachesFailedAutoDetectionBriefly(t *testing.T) {
+	handler := &PlaybackHandler{}
+	var calls int
+	handler.v3HWAccelResolver = func(context.Context, string, string) string {
+		calls++
+		if calls == 1 {
+			return playback.HWAccelNone
+		}
+		return tonemap.BackendNVENC
+	}
+	cfg := config.PlaybackConfig{HWAccel: "auto"}
+
+	if got := handler.resolveLocalHWAccelV3(context.Background(), cfg, "/ffmpeg"); got != playback.HWAccelNone {
+		t.Fatalf("first resolution = %q, want none", got)
+	}
+	handler.v3HWAccelMu.Lock()
+	negativeTTL := time.Until(handler.v3HWAccelExpiresAt)
+	handler.v3HWAccelMu.Unlock()
+	if negativeTTL <= 0 || negativeTTL > probeNegativeTTLForHWAccelV3+time.Second {
+		t.Fatalf("negative auto-detection TTL = %s, want about %s", negativeTTL, probeNegativeTTLForHWAccelV3)
+	}
+	if got := handler.resolveLocalHWAccelV3(context.Background(), cfg, "/ffmpeg"); got != playback.HWAccelNone || calls != 1 {
+		t.Fatalf("cached resolution = %q after %d calls, want none after one call", got, calls)
+	}
+
+	handler.v3HWAccelMu.Lock()
+	handler.v3HWAccelExpiresAt = time.Now().Add(-time.Second)
+	handler.v3HWAccelMu.Unlock()
+	if got := handler.resolveLocalHWAccelV3(context.Background(), cfg, "/ffmpeg"); got != tonemap.BackendNVENC || calls != 2 {
+		t.Fatalf("refreshed resolution = %q after %d calls, want nvenc after two calls", got, calls)
+	}
+}
+
 type failingAudioPreferenceStoreV3 struct {
 	userstore.UserStore
 	err error

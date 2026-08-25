@@ -1011,6 +1011,8 @@ export function usePlaybackSession(
 
       const isFailureRecovery =
         options.operation === "failure_recovery" || options.operation === "seek_failure_recovery";
+      const isUserIntent =
+        options.operation === "track_change" || options.operation === "quality_change";
       if (isFailureRecovery && attemptCountRef.current > MAX_ATTEMPT_COUNT_V3) {
         setState((current) => ({
           ...current,
@@ -1031,9 +1033,11 @@ export function usePlaybackSession(
         : [];
       const attemptCount = isFailureRecovery ? attemptCountRef.current : 1;
 
+      let retryPositionSeconds = options.positionSeconds;
       const buildBody = () =>
         buildReplanRequestV3({
           ...options,
+          positionSeconds: retryPositionSeconds,
           extraClientFeatures: VIDEO_CLIENT_FEATURES_V3,
           plan,
           playbackAttemptId,
@@ -1082,6 +1086,7 @@ export function usePlaybackSession(
           );
           if (!retryDelayElapsed) return false;
           if (loadSequence !== loadSequenceRef.current) return false;
+          retryPositionSeconds = playbackPositionRef.current;
         }
 
         // A version switch or a fresh start that landed while this was in
@@ -1121,7 +1126,22 @@ export function usePlaybackSession(
       } catch (err) {
         const currentDecision = currentDecisionFromStalePlanErrorV3(err);
         if (currentDecision && loadSequence === loadSequenceRef.current) {
-          return adoptDecision(currentDecision);
+          const adopted = adoptDecision(currentDecision);
+          if (!adopted || !isUserIntent) return adopted;
+          if (pendingReplanRef.current) return false;
+          // The stale response only reconciles what the server already
+          // committed; it does not fulfill this track/quality request. Queue
+          // the outstanding intent so finally dispatches it against the newly
+          // adopted durable plan after the in-flight guard is released.
+          return new Promise<boolean>((resolve) => {
+            pendingReplanRef.current = {
+              options: { ...options, positionSeconds: playbackPositionRef.current },
+              loadSequence,
+              retireSessionOnRefusal,
+              resolve,
+              planId: currentDecision.playback_plan!.plan_id,
+            };
+          });
         }
         if (replanAbort.signal.aborted) return false;
         if (loadSequence !== loadSequenceRef.current) return false;
