@@ -82,7 +82,7 @@ func TestImageAndArtworkCapabilitiesAdvertiseTheSameLadder(t *testing.T) {
 	}
 
 	artworkRec := httptest.NewRecorder()
-	NewArtworkCapabilityHandler("local", false, nil).HandleCapability(artworkRec, httptest.NewRequest(http.MethodGet, "/api/v1/artwork/capability", nil))
+	NewArtworkCapabilityHandler("local", func() bool { return false }, nil).HandleCapability(artworkRec, httptest.NewRequest(http.MethodGet, "/api/v1/artwork/capability", nil))
 	var artwork artworkCapabilityResponse
 	if err := json.Unmarshal(artworkRec.Body.Bytes(), &artwork); err != nil {
 		t.Fatal(err)

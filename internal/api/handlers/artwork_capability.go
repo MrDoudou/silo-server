@@ -76,7 +76,7 @@ type artworkPortabilityCapability struct {
 // ArtworkCapabilityHandler answers the artwork capability probe.
 type ArtworkCapabilityHandler struct {
 	backend         string
-	directDelivery  bool
+	directDelivery  func() bool
 	materialization func() string
 	deliveryPolicy  func() string
 	storeHealth     func() string
@@ -91,11 +91,10 @@ func (h *ArtworkCapabilityHandler) SetResilientStatus(deliveryPolicy, storeHealt
 }
 
 // NewArtworkCapabilityHandler builds the capability handler. backend is the
-// pinned store backend and directDelivery reports whether clients fetch from
-// that backend themselves; both are fixed for the process lifetime because the
-// store is opened once at startup. materialization is read per request since
-// the policy is hot-reloadable.
-func NewArtworkCapabilityHandler(backend string, directDelivery bool, materialization func() string) *ArtworkCapabilityHandler {
+// pinned store backend and directDelivery reports whether clients currently
+// fetch from that backend themselves. Delivery and materialization are read per
+// request because both policies are hot-reloadable.
+func NewArtworkCapabilityHandler(backend string, directDelivery func() bool, materialization func() string) *ArtworkCapabilityHandler {
 	return &ArtworkCapabilityHandler{
 		backend:         backend,
 		directDelivery:  directDelivery,
@@ -114,7 +113,7 @@ func (h *ArtworkCapabilityHandler) HandleCapability(w http.ResponseWriter, r *ht
 		deliveryPolicy = artworkDeliveryDirect
 	}
 	deliveryMode := artworkDeliveryAPI
-	if deliveryPolicy == artworkDeliveryDirect && h.directDelivery {
+	if deliveryPolicy == artworkDeliveryDirect && h.directDelivery != nil && h.directDelivery() {
 		deliveryMode = artworkDeliveryDirect
 	}
 	storeHealth := "healthy"

@@ -70,7 +70,13 @@ func TestDirectLibraryArtworkHandlerServesOnlySignedOpaqueIdentity(t *testing.T)
 		t.Fatalf("route exposed target/source details: %q", parsed.Path)
 	}
 
-	tampered := signed.URL[:len(signed.URL)-1] + "A"
+	// Substitute a character guaranteed to differ from the original so the
+	// tamper is real even when the signature already ends with the substitute.
+	flipped := "A"
+	if strings.HasSuffix(signed.URL, "A") {
+		flipped = "B"
+	}
+	tampered := signed.URL[:len(signed.URL)-1] + flipped
 	recorder = httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, tampered, nil))
 	if recorder.Code != http.StatusNotFound {

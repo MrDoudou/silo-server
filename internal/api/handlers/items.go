@@ -433,6 +433,30 @@ type episodeResponse struct {
 type episodeImageFallback struct {
 	Path      string
 	Thumbhash string
+	Target    artworkurl.Target
+}
+
+func episodeImageFallbackForSeries(series *models.MediaItem) (episodeImageFallback, bool) {
+	if series == nil {
+		return episodeImageFallback{}, false
+	}
+	path := strings.TrimSpace(series.BackdropPath)
+	thumbhash := series.BackdropThumbhash
+	target := artworkurl.Target{
+		Surface: artworkurl.SurfaceItemBackdrops,
+		Keys:    []string{series.ContentID},
+		Slot:    artworkImageBackdrop,
+	}
+	if path == "" {
+		path = strings.TrimSpace(series.PosterPath)
+		thumbhash = series.PosterThumbhash
+		target.Surface = artworkurl.SurfaceItemPosters
+		target.Slot = artworkImagePoster
+	}
+	if path == "" {
+		return episodeImageFallback{}, false
+	}
+	return episodeImageFallback{Path: path, Thumbhash: thumbhash, Target: target}, true
 }
 
 type watchedStateResponse struct {
@@ -1312,13 +1336,19 @@ func (h *ItemsHandler) listItemUserStates(r *http.Request, items []*models.Media
 }
 
 // episodeResponseShell maps an already-localized episode onto the response
-// shape, returning the card-variant still path for the caller to presign.
-func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback, size imagesize.Size) (episodeResponse, string) {
+// shape, returning the owning artwork target for the caller to presign.
+func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback) (episodeResponse, artworkurl.Target) {
 	stillPath := ep.StillPath
 	stillThumbhash := ep.StillThumbhash
+	stillTarget := artworkurl.Target{
+		Surface: artworkurl.SurfaceEpisodeStills,
+		Keys:    []string{ep.ContentID},
+		Slot:    artworkImageStill,
+	}
 	if strings.TrimSpace(stillPath) == "" && strings.TrimSpace(fallback.Path) != "" {
 		stillPath = fallback.Path
 		stillThumbhash = fallback.Thumbhash
+		stillTarget = fallback.Target
 	}
 	resp := episodeResponse{
 		ContentID:      ep.ContentID,
@@ -1337,7 +1367,7 @@ func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback, siz
 		resp.AirDate = ep.AirDate.Format("2006-01-02")
 	}
 
-	return resp, stillPath
+	return resp, stillTarget.WithReference(stillPath)
 }
 
 // buildEpisodeResponses converts episodes to API responses using batched
@@ -1366,37 +1396,26 @@ func (h *ItemsHandler) buildEpisodeResponses(r *http.Request, episodes []*models
 	userData := h.listLeafUserData(r, episodeIDs)
 
 	resp := make([]episodeResponse, 0, len(episodes))
-	stillPaths := make([]string, 0, len(episodes))
+	stillRequests := make([]artworkurl.TargetRequest, 0, len(episodes))
 	for _, ep := range episodes {
 		if ep == nil {
 			continue
 		}
-		shell, stillPath := episodeResponseShell(ep, fallbacks[ep.SeriesID], size)
+		shell, stillTarget := episodeResponseShell(ep, fallbacks[ep.SeriesID])
 		resp = append(resp, shell)
-		stillPaths = append(stillPaths, stillPath)
+		variant := artworkkey.VariantW300
+		if size != imagesize.Unset {
+			variant = imagesize.Variant(stillTarget.Slot, size)
+		}
+		stillRequests = append(stillRequests, artworkurl.TargetRequest{Target: stillTarget, Variant: variant})
 	}
 
 	stillURLs := map[string]catalog.ResolvedImageURL{}
 	if h.detailSvc != nil {
-		targets := make([]artworkurl.Target, 0, len(resp))
-		for i := range resp {
-			targets = append(targets, artworkurl.Target{
-				Surface: artworkurl.SurfaceEpisodeStills,
-				Keys:    []string{resp[i].ContentID},
-				Slot:    artworkImageStill,
-			}.WithReference(stillPaths[i]))
-		}
-		variant := artworkkey.VariantW300
-		if size != imagesize.Unset {
-			variant = imagesize.Variant(artworkkey.ImageTypeStill, size)
-		}
-		stillURLs = h.detailSvc.PresignArtworkTargetsWithExpiry(ctx, targets, variant)
-		for i := range resp {
-			stillPaths[i] = targets[i].CacheKey()
-		}
+		stillURLs = h.detailSvc.PresignArtworkTargetRequestsWithExpiry(ctx, stillRequests)
 	}
 	for i := range resp {
-		resp[i].StillURL = stillURLs[stillPaths[i]].URL
+		resp[i].StillURL = stillURLs[stillRequests[i].CacheKey()].URL
 		files := catalog.FilterMediaFilesByAccess(filesByEpisode[resp[i].ContentID], filter)
 		resp[i].Files = episodeFileResponses(files, filter)
 		resp[i].UserData = userData[resp[i].ContentID]
@@ -1472,19 +1491,11 @@ func (h *ItemsHandler) episodeImageFallbacks(ctx context.Context, episodes []*mo
 	}
 	fallbacks := make(map[string]episodeImageFallback, len(seriesItems))
 	for _, series := range seriesItems {
-		if series == nil {
+		fallback, ok := episodeImageFallbackForSeries(series)
+		if !ok {
 			continue
 		}
-		path := strings.TrimSpace(series.BackdropPath)
-		thumbhash := series.BackdropThumbhash
-		if path == "" {
-			path = strings.TrimSpace(series.PosterPath)
-			thumbhash = series.PosterThumbhash
-		}
-		if path == "" {
-			continue
-		}
-		fallbacks[series.ContentID] = episodeImageFallback{Path: path, Thumbhash: thumbhash}
+		fallbacks[series.ContentID] = fallback
 	}
 	return fallbacks
 }

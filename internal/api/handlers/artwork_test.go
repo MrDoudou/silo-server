@@ -46,6 +46,12 @@ var artworkTestTarget = artworkurl.Target{
 	Slot:    "poster",
 }.WithReference(artworkTestKey)
 
+type capabilityDirectURLProvider struct{}
+
+func (capabilityDirectURLProvider) ReadURL(context.Context, string, time.Duration) (artworkstore.ResolvedURL, error) {
+	return artworkstore.ResolvedURL{URL: "https://objects.example/artwork"}, nil
+}
+
 type fakeArtworkTargets struct {
 	state       metadata.ArtworkTargetState
 	signals     int
@@ -636,7 +642,7 @@ func TestServeArtworkURLServesOnlyArtworkRouteURLs(t *testing.T) {
 }
 
 func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
-	handler := NewArtworkCapabilityHandler("local", false, func() string { return "selected" })
+	handler := NewArtworkCapabilityHandler("local", func() bool { return false }, func() string { return "selected" })
 	handler.SetResilientStatus(func() string { return "resilient" }, func() string { return "degraded" })
 
 	rec := httptest.NewRecorder()
@@ -684,8 +690,25 @@ func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
 
 	// A bucket-backed store keeps delivering directly; the capability has to
 	// say so, because that is the difference clients and operators observe.
-	direct := NewArtworkCapabilityHandler("s3", true, nil)
-	direct.SetResilientStatus(func() string { return "direct" }, func() string { return "healthy" })
+	policy := artworkurl.DeliveryPolicyResilient
+	resolver, err := artworkurl.NewResolver(capabilityDirectURLProvider{}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewResolver: %v", err)
+	}
+	resolver.SetDeliveryPolicy(func() string { return policy })
+	direct := NewArtworkCapabilityHandler("s3", resolver.DirectDelivery, nil)
+	direct.SetResilientStatus(resolver.DeliveryPolicy, func() string { return "healthy" })
+	rec = httptest.NewRecorder()
+	direct.HandleCapability(rec, httptest.NewRequest(http.MethodGet, "/api/v1/artwork/capability", nil))
+	var startupResponse artworkCapabilityResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &startupResponse); err != nil {
+		t.Fatalf("decoding startup capability %q: %v", rec.Body.String(), err)
+	}
+	if len(startupResponse.DeliveryModes) != 1 || startupResponse.DeliveryModes[0] != artworkDeliveryAPI {
+		t.Fatalf("startup delivery_modes = %v, want [%s]", startupResponse.DeliveryModes, artworkDeliveryAPI)
+	}
+
+	policy = artworkurl.DeliveryPolicyDirect
 	rec = httptest.NewRecorder()
 	direct.HandleCapability(rec, httptest.NewRequest(http.MethodGet, "/api/v1/artwork/capability", nil))
 	var directResponse artworkCapabilityResponse

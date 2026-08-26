@@ -2942,7 +2942,7 @@ func NewRouter(deps Dependencies) chi.Router {
 				if deps.ArtworkStore != nil {
 					artworkCapabilityHandler := handlers.NewArtworkCapabilityHandler(
 						deps.ArtworkStore.Backend,
-						deps.ArtworkURLs.DirectDelivery(),
+						deps.ArtworkURLs.DirectDelivery,
 						func() string { return deps.CurrentConfig().Artwork.RemoteMaterialization },
 					)
 					artworkCapabilityHandler.SetResilientStatus(

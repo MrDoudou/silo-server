@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"path"
@@ -130,9 +131,9 @@ func (s *Service) DeleteAsset(ctx context.Context, kind AssetKind) error {
 }
 
 // GetAsset fetches the bytes of the current custom asset of the given kind.
-// Returns ErrAssetNotConfigured when none is set, ErrStorageUnavailable when no
-// artwork store is available, and ErrAssetNotConfigured when the object is
-// missing from the store.
+// Returns ErrAssetNotConfigured when none is set or the stored object is
+// missing or invalid, and ErrStorageUnavailable when no artwork store is
+// available.
 func (s *Service) GetAsset(ctx context.Context, kind AssetKind) (data []byte, contentType, ref string, err error) {
 	spec, ok := assetSpecs[kind]
 	if !ok {
@@ -153,11 +154,23 @@ func (s *Service) GetAsset(ctx context.Context, kind AssetKind) (data []byte, co
 		return nil, "", "", err
 	}
 	defer func() { _ = object.Close() }()
+	if object.Info.SizeBytes > spec.maxBytes {
+		return nil, "", "", fmt.Errorf(
+			"%w: stored %s asset is %d bytes (limit %d)",
+			ErrAssetNotConfigured, kind, object.Info.SizeBytes, spec.maxBytes,
+		)
+	}
 	// Bound the read at the kind's own upload limit: a stored object larger
 	// than that was not written by this service.
-	data, err = io.ReadAll(io.LimitReader(object.Body, spec.maxBytes))
+	data, err = io.ReadAll(io.LimitReader(object.Body, spec.maxBytes+1))
 	if err != nil {
 		return nil, "", "", err
+	}
+	if int64(len(data)) > spec.maxBytes {
+		return nil, "", "", fmt.Errorf(
+			"%w: stored %s asset exceeds the %d-byte limit",
+			ErrAssetNotConfigured, kind, spec.maxBytes,
+		)
 	}
 	// The served content type comes from the ref's extension rather than from
 	// the store: it is what the upload path decided, and it must not vary with
