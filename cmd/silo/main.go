@@ -1861,16 +1861,23 @@ func main() {
 			// Portable revisions are content-addressed and shared between rows,
 			// so they are never prefix-deleted; the reference-aware revision GC
 			// owns their lifecycle on every backend.
-			metadataService.SetAutoCacheImages(cfg.Metadata.CacheImages)
-			metadataImageCacheProcessor.SetEnabled(cfg.Metadata.CacheImages)
+			// The pipeline gate is the derived artwork.remote_materialization
+			// policy, not metadata.cache_images directly: the legacy flag is one
+			// input to that derivation (an explicitly stored false maps to
+			// passthrough; the absent default maps to selected), so fresh
+			// installations materialize without any setting.
+			materializeRemote := cfg.Artwork.RemoteMaterialization == config.ArtworkMaterializationSelected
+			metadataService.SetAutoCacheImages(materializeRemote)
+			metadataImageCacheProcessor.SetEnabled(materializeRemote)
 			configWatcher.OnChange(func(_, updated *config.Config) {
-				metadataService.SetAutoCacheImages(updated.Metadata.CacheImages)
-				metadataImageCacheProcessor.SetEnabled(updated.Metadata.CacheImages)
+				updatedMaterialize := updated.Artwork.RemoteMaterialization == config.ArtworkMaterializationSelected
+				metadataService.SetAutoCacheImages(updatedMaterialize)
+				metadataImageCacheProcessor.SetEnabled(updatedMaterialize)
 			})
 			if deps.Scanner != nil {
 				deps.Scanner.SetImageCacher(imageCacher)
 			}
-			if cfg.Metadata.CacheImages {
+			if materializeRemote {
 				personRefreshService.SetImageCacher(imageCacher)
 				personRefreshService.SetImageCacheJobEnqueuer(imageCacheJobs)
 				slog.Info("metadata image caching enabled")
