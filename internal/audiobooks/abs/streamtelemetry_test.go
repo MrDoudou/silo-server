@@ -218,8 +218,19 @@ func TestMountedABSRouterPublicTrackEdgeCases(t *testing.T) {
 		if !bytes.Equal(got.body, large[1000:3000]) {
 			t.Fatalf("range body mismatch: %d bytes", len(got.body))
 		}
-		if snapshot := registry.Sweep(); len(snapshot.Sessions) != 1 || snapshot.Sessions[0].BytesAccepted != 2000 {
-			t.Fatalf("range accounting = %+v", snapshot.Sessions)
+		// The handler posts its byte accounting when the server-side copy
+		// finishes, which can trail the client's final read. Wait on the
+		// observable accounting state rather than asserting immediately.
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			snapshot := registry.Sweep()
+			if len(snapshot.Sessions) == 1 && snapshot.Sessions[0].BytesAccepted == 2000 {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("range accounting = %+v", snapshot.Sessions)
+			}
+			time.Sleep(10 * time.Millisecond)
 		}
 	})
 
