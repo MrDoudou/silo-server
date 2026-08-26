@@ -67,11 +67,14 @@ type pluginImageResolverSourceEntry struct {
 // by parsing the prefix, routing to the correct plugin, and returning resolved URLs.
 // It implements catalog.ImageResolver and the catalog expiry-aware resolver extension.
 type PluginImageResolver struct {
-	mu       sync.RWMutex
-	sources  map[string][]pluginImageResolverSourceEntry
-	artwork  artworkURLResolver
-	urlCache *cache.TTLCache[catalog.ResolvedImageURL]
-	group    singleflight.Group
+	mu      sync.RWMutex
+	sources map[string][]pluginImageResolverSourceEntry
+	artwork artworkURLResolver
+	// resolverConfigVersion prevents an in-flight resolution from repopulating
+	// the URL cache after the artwork resolver has been replaced.
+	resolverConfigVersion uint64
+	urlCache              *cache.TTLCache[catalog.ResolvedImageURL]
+	group                 singleflight.Group
 }
 
 // NewPluginImageResolver creates a new resolver with no registered sources.
@@ -155,10 +158,11 @@ func ValidImageResolverScheme(scheme string) bool {
 func (r *PluginImageResolver) SetArtworkURLResolver(resolver artworkURLResolver) {
 	r.mu.Lock()
 	r.artwork = resolver
-	r.mu.Unlock()
+	r.resolverConfigVersion++
 	// Cached URLs were minted by the previous backend, so drop them rather
 	// than keep serving URLs the new one cannot honor.
 	r.urlCache.InvalidatePrefix("")
+	r.mu.Unlock()
 }
 
 // Close stops the resolver cache sweeper.
@@ -234,6 +238,7 @@ func (r *PluginImageResolver) ResolveImageURLsWithExpiry(ctx context.Context, pa
 
 	r.mu.RLock()
 	artwork := r.artwork
+	resolverConfigVersion := r.resolverConfigVersion
 	sourcesSnapshot := make(map[string][]pluginImageResolverSourceEntry, len(grouped))
 	for pluginID := range grouped {
 		if pluginID == "" {
@@ -272,7 +277,11 @@ func (r *PluginImageResolver) ResolveImageURLsWithExpiry(ctx context.Context, pa
 		for path, resolvedURL := range resolvedBatch {
 			result[path] = resolvedURL
 			if ttl := cacheTTLForResolvedURL(resolvedURL, now); ttl > 0 {
-				r.urlCache.Set(resolvedImageCacheKey(variant, path), resolvedURL, ttl)
+				r.mu.RLock()
+				if r.resolverConfigVersion == resolverConfigVersion {
+					r.urlCache.Set(resolvedImageCacheKey(variant, path), resolvedURL, ttl)
+				}
+				r.mu.RUnlock()
 			}
 		}
 	}

@@ -49,11 +49,12 @@ func (e *ActiveJobConflictError) Unwrap() error {
 }
 
 type CreateJobInput struct {
-	JobType         string
-	CreatedByUserID int
-	RequestPayload  any
-	DryRun          bool
-	Message         string
+	JobType          string
+	CreatedByUserID  int
+	RequestPayload   any
+	DryRun           bool
+	Message          string
+	ResumeCheckpoint bool
 }
 
 type CompleteJobInput struct {
@@ -156,9 +157,40 @@ func (r *Repository) Create(ctx context.Context, input CreateJobInput) (*models.
 		return nil, fmt.Errorf("generate job id: %w", err)
 	}
 	job, err := scanAdminJob(r.pool.QueryRow(ctx, `
+		WITH latest_matching_job AS (
+			SELECT status, error_message, checkpoint
+			FROM admin_jobs
+			WHERE job_type = $2
+			  AND (
+				$2 <> $8
+				OR (
+					request_payload->'scope' IS NOT DISTINCT FROM $5::jsonb->'scope'
+					AND request_payload->>'mode' IS NOT DISTINCT FROM $5::jsonb->>'mode'
+					AND dry_run = $6
+				)
+			  )
+			ORDER BY requested_at DESC
+			LIMIT 1
+		), resumable_checkpoint AS (
+			SELECT checkpoint
+			FROM latest_matching_job
+			WHERE $12
+			  AND $2 IN ($8, $10, $11)
+			  AND checkpoint <> '{}'::jsonb
+			  AND (checkpoint->>'finished') IS DISTINCT FROM 'true'
+			  AND (
+				(status = $9 AND (
+					error_message LIKE 'timed out after %'
+					OR error_message LIKE '%context deadline exceeded%'
+					OR error_message LIKE '%context canceled%'
+				))
+				OR status = $13
+			  )
+		)
 		INSERT INTO admin_jobs (
-			id, job_type, status, created_by_user_id, request_payload, dry_run, message
-		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+			id, job_type, status, created_by_user_id, request_payload, dry_run, message, checkpoint
+		) VALUES ($1, $2, $3, $4, $5, $6, $7,
+			COALESCE((SELECT checkpoint FROM resumable_checkpoint), '{}'::jsonb))
 		RETURNING `+adminJobColumns,
 		id,
 		input.JobType,
@@ -167,6 +199,12 @@ func (r *Repository) Create(ctx context.Context, input CreateJobInput) (*models.
 		payload,
 		input.DryRun,
 		input.Message,
+		JobTypeArtworkPurge,
+		StatusFailed,
+		JobTypeArtworkStorageRefresh,
+		JobTypeArtworkStorageImport,
+		input.ResumeCheckpoint,
+		StatusCancelled,
 	))
 	if err == nil {
 		return job, nil

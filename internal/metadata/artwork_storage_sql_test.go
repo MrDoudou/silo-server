@@ -212,6 +212,8 @@ func TestArtworkSeedAdoptionMigrationPinsLifecycleAndSerialization(t *testing.T)
 	for _, want := range []string{
 		"seed_imported_at timestamptz", "seed_expires_at timestamptz", "source_class IN",
 		"'seed'", "adoption_index_bytes bigint", "last_seed_import_at timestamptz",
+		"branding_bytes bigint", "branding_objects bigint",
+		"legacy_upload_bytes bigint", "legacy_upload_objects bigint",
 		"'artwork_storage_import'", "artwork_revision_seed_expiry_idx",
 	} {
 		if !strings.Contains(sql, want) {

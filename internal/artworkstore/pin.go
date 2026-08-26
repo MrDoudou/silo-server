@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // StorePinSettingKey is the server_settings key holding the artwork store pin.
@@ -173,7 +174,7 @@ func VerifyPin(recorded, resolved Pin) error {
 // the very first stored object bind the catalog to a backend for good.
 type pinningStore struct {
 	Store
-	pin      Pin
+	pin      func() Pin
 	settings SettingsStore
 	pinned   atomic.Bool
 	// pinOnce serializes the pin attempt so concurrent variant writes make
@@ -183,8 +184,8 @@ type pinningStore struct {
 
 // newPinningStore wraps store so writes pin it. A nil settings store or an
 // already-verified pin returns the store unchanged.
-func newPinningStore(store Store, pin Pin, settings SettingsStore, alreadyPinned bool) Store {
-	if store == nil || settings == nil {
+func newPinningStore(store Store, pin func() Pin, settings SettingsStore, alreadyPinned bool) Store {
+	if store == nil || pin == nil || settings == nil {
 		return store
 	}
 	wrapped := &pinningStore{Store: store, pin: pin, settings: settings}
@@ -213,7 +214,8 @@ func (s *pinningStore) ensurePinned(ctx context.Context) error {
 		return nil
 	}
 
-	encoded, err := encodePin(s.pin)
+	pin := s.pin()
+	encoded, err := encodePin(pin)
 	if err != nil {
 		return err
 	}
@@ -227,7 +229,7 @@ func (s *pinningStore) ensurePinned(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := VerifyPin(recorded, s.pin); err != nil {
+	if err := VerifyPin(recorded, pin); err != nil {
 		return err
 	}
 	s.pinned.Store(true)
@@ -246,4 +248,14 @@ func (s *pinningStore) FreeSpaceBytes(ctx context.Context) (int64, error) {
 		return capacity.FreeSpaceBytes(ctx)
 	}
 	return 0, ErrNotFound
+}
+
+func (s *pinningStore) CleanTempFiles(ctx context.Context, olderThan time.Duration) (int, error) {
+	cleaner, ok := s.Store.(interface {
+		CleanTempFiles(context.Context, time.Duration) (int, error)
+	})
+	if !ok {
+		return 0, ErrNotFound
+	}
+	return cleaner.CleanTempFiles(ctx, olderThan)
 }

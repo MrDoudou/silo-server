@@ -80,3 +80,13 @@ func (s *observedStore) FreeSpaceBytes(ctx context.Context) (int64, error) {
 	}
 	return 0, ErrNotFound
 }
+
+func (s *observedStore) CleanTempFiles(ctx context.Context, olderThan time.Duration) (int, error) {
+	cleaner, ok := s.Store.(interface {
+		CleanTempFiles(context.Context, time.Duration) (int, error)
+	})
+	if !ok {
+		return 0, ErrNotFound
+	}
+	return cleaner.CleanTempFiles(ctx, olderThan)
+}

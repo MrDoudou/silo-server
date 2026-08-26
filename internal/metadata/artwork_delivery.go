@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -167,6 +169,12 @@ func (c *ArtworkDeliveryCoordinator) SetStoreHealth(handle *artworkstore.Handle)
 	}
 }
 
+func (c *ArtworkDeliveryCoordinator) SetUserStoreProvider(users userstore.UserStoreProvider) {
+	if c != nil {
+		c.users = users
+	}
+}
+
 func NewArtworkDeliveryCoordinator(pool *pgxpool.Pool, direct *DirectLibraryArtworkResolver, users ...userstore.UserStoreProvider) *ArtworkDeliveryCoordinator {
 	if pool == nil {
 		return nil
@@ -178,6 +186,117 @@ func NewArtworkDeliveryCoordinator(pool *pgxpool.Pool, direct *DirectLibraryArtw
 		coordinator.users = users[0]
 	}
 	return coordinator
+}
+
+type artworkRecoveryState struct {
+	storeHealth       string
+	rebuildGeneration string
+	enqueueComplete   bool
+}
+
+func (c *ArtworkDeliveryCoordinator) loadRecoveryState(ctx context.Context) (artworkRecoveryState, error) {
+	var state artworkRecoveryState
+	err := c.pool.QueryRow(ctx, `SELECT store_health, rebuild_generation,
+		rebuild_enqueued_at IS NOT NULL FROM artwork_storage_accounting_state WHERE singleton`).Scan(
+		&state.storeHealth, &state.rebuildGeneration, &state.enqueueComplete,
+	)
+	if err != nil {
+		return artworkRecoveryState{}, fmt.Errorf("load artwork recovery state: %w", err)
+	}
+	return state, nil
+}
+
+func (c *ArtworkDeliveryCoordinator) beginRecoveryGeneration(ctx context.Context, generation string) error {
+	_, err := c.pool.Exec(ctx, `UPDATE artwork_storage_accounting_state SET
+		store_health = 'empty_rebuilding', health_changed_at = NOW(),
+		rebuild_generation = $1, rebuild_surface_name = '', rebuild_enqueued_at = NULL
+		WHERE singleton`, generation)
+	if err != nil {
+		return fmt.Errorf("begin artwork recovery generation: %w", err)
+	}
+	return nil
+}
+
+func (c *ArtworkDeliveryCoordinator) completeRecoveryGeneration(ctx context.Context, health artworkstore.HealthState) error {
+	_, err := c.pool.Exec(ctx, `UPDATE artwork_storage_accounting_state SET
+		store_health = $1, health_changed_at = NOW() WHERE singleton`, string(health))
+	if err != nil {
+		return fmt.Errorf("complete artwork recovery generation: %w", err)
+	}
+	return nil
+}
+
+// RunRecovery coordinates authoritative-empty store recovery until ctx is
+// cancelled. Durable generation/checkpoint state makes restart re-entry and
+// enqueue idempotence converge through the ordinary image-cache queue.
+func (c *ArtworkDeliveryCoordinator) RunRecovery(ctx context.Context) {
+	if c == nil || c.pool == nil || c.health == nil {
+		return
+	}
+	backoff := 5 * time.Second
+	for {
+		state, _ := c.health.Health()
+		persisted, err := c.loadRecoveryState(ctx)
+		generation := c.health.GenerationID()
+		if err == nil && persisted.storeHealth == string(artworkstore.HealthEmptyRebuilding) &&
+			persisted.rebuildGeneration == generation && state != artworkstore.HealthEmptyRebuilding &&
+			state != artworkstore.HealthUnavailable && state != artworkstore.HealthWrongMount {
+			if probeErr := c.health.ProbeNow(ctx); probeErr == nil {
+				c.health.BeginRebuild()
+				state = artworkstore.HealthEmptyRebuilding
+			}
+		}
+		if err == nil && state == artworkstore.HealthEmptyRebuilding {
+			if persisted.rebuildGeneration != generation {
+				err = c.beginRecoveryGeneration(ctx, generation)
+				persisted.enqueueComplete = false
+			}
+			if err == nil && !persisted.enqueueComplete {
+				queued, enqueueErr := c.EnqueueBulkRecovery(ctx)
+				if enqueueErr != nil {
+					err = enqueueErr
+				} else {
+					persisted.enqueueComplete = true
+					slog.Info("artwork bulk recovery queued", "targets", queued, "generation", generation)
+				}
+			}
+			if err == nil && persisted.enqueueComplete {
+				var rebuildStatus ArtworkRebuildStatus
+				rebuildStatus, err = c.RebuildStatus(ctx)
+				if err == nil && rebuildStatus.OutstandingJobs == 0 {
+					degraded := rebuildStatus.ProtectedLosses > 0 || rebuildStatus.MissingReferences > 0
+					c.health.CompleteRebuild(degraded)
+					finalHealth := artworkstore.HealthHealthy
+					if degraded {
+						finalHealth = artworkstore.HealthDegraded
+					}
+					err = c.completeRecoveryGeneration(ctx, finalHealth)
+				}
+			}
+		}
+		if err != nil {
+			slog.Warn("artwork recovery coordinator iteration failed", "error", err)
+		} else {
+			backoff = 5 * time.Second
+		}
+		wait := 30 * time.Second
+		if state == artworkstore.HealthEmptyRebuilding || err != nil {
+			wait = backoff
+			if backoff < 5*time.Minute {
+				backoff *= 2
+				if backoff > 5*time.Minute {
+					backoff = 5 * time.Minute
+				}
+			}
+		}
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
 }
 
 // ArtworkRebuildStatus is the durable completion gate for an authoritative
@@ -567,10 +686,62 @@ func (c *ArtworkDeliveryCoordinator) EnqueueBulkRecovery(ctx context.Context) (i
 	if checkpoint != "" && !resume {
 		return total, fmt.Errorf("artwork rebuild checkpoint names unknown surface %q", checkpoint)
 	}
+	if err := c.markBulkProtectedProfileAvatars(ctx); err != nil {
+		return total, err
+	}
 	if _, err := c.pool.Exec(ctx, `UPDATE artwork_storage_accounting_state SET rebuild_enqueued_at = NOW() WHERE singleton`); err != nil {
 		return total, fmt.Errorf("finish artwork rebuild enqueue: %w", err)
 	}
 	return total, nil
+}
+
+// markBulkProtectedProfileAvatars covers the upload-only reference surface that
+// deliberately stays out of artworkSweepSurfaces: an uploaded avatar has no
+// source from which a repair job could reconstruct it. Legacy avatar bucket
+// keys share the upload: prefix but are not canonical portable revisions, so
+// only portable keys participate in canonical-store loss accounting.
+func (c *ArtworkDeliveryCoordinator) markBulkProtectedProfileAvatars(ctx context.Context) error {
+	surface := profileAvatarReferenceSurface()
+	rows, err := c.pool.Query(ctx, fmt.Sprintf(`
+		SELECT user_id::text, id, %s
+		FROM %s WHERE %s
+		ORDER BY updated_at DESC, user_id, id`, surface.pathExpr, surface.table, surface.filter))
+	if err != nil {
+		return fmt.Errorf("scan profile avatar recovery targets: %w", err)
+	}
+	defer rows.Close()
+
+	protected := make([]ArtworkTargetState, 0, 250)
+	for rows.Next() {
+		var userID, profileID, selected string
+		if err := rows.Scan(&userID, &profileID, &selected); err != nil {
+			return fmt.Errorf("read profile avatar recovery target: %w", err)
+		}
+		selected = strings.TrimSpace(selected)
+		if !artworkkey.IsPortableKey(selected) {
+			continue
+		}
+		protected = append(protected, ArtworkTargetState{
+			Target: artworkurl.Target{
+				Surface: artworkurl.SurfaceProfileAvatars,
+				Keys:    []string{userID, profileID},
+				Slot:    artworkkey.ImageTypeAvatar,
+			},
+			SelectedPath: selected,
+			ImageType:    artworkkey.ImageTypeAvatar,
+			Protected:    true,
+		})
+		if len(protected) == cap(protected) {
+			if err := c.markBulkProtected(ctx, protected); err != nil {
+				return err
+			}
+			protected = protected[:0]
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate profile avatar recovery targets: %w", err)
+	}
+	return c.markBulkProtected(ctx, protected)
 }
 
 func (c *ArtworkDeliveryCoordinator) markBulkProtected(ctx context.Context, states []ArtworkTargetState) error {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -300,9 +301,23 @@ func (s *System) discordPosterURL(ctx context.Context, posterPath, posterSourceP
 	if !ok {
 		return ""
 	}
-	return targeted.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
+	return s.outboundArtworkURL(ctx, targeted.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
 		Surface: artworkurl.SurfaceItemPosters, Keys: []string{targetID}, Slot: artworkkey.ImageTypePoster,
-	}, posterPath, artworkkey.ImageTypePoster, "")
+	}, posterPath, artworkkey.ImageTypePoster, ""))
+}
+
+// outboundArtworkURL makes server-relative artwork capabilities usable by
+// external notification consumers. Provider/CDN and direct-storage URLs are
+// already absolute and pass through unchanged.
+func (s *System) outboundArtworkURL(ctx context.Context, resolved string) string {
+	if !strings.HasPrefix(resolved, "/") {
+		return resolved
+	}
+	base := s.emailLinkBase(ctx)
+	if base == "" {
+		return ""
+	}
+	return strings.TrimRight(base, "/") + resolved
 }
 
 // PayloadForRow converts a row to its wire shape, attaching a presigned
@@ -311,6 +326,10 @@ func (s *System) PayloadForRow(ctx context.Context, row DeliveryRow) DeliveryRow
 	payload := PayloadForRow(row)
 	if s != nil && s.images != nil && row.PosterPath != "" {
 		if targeted, ok := s.images.(targetImageURLResolver); ok && row.SeriesID != nil && *row.SeriesID != "" {
+			// Served to same-origin consumers (in-app API, websocket, web
+			// push service worker), where a root-relative capability resolves
+			// correctly without a configured public URL. Only outbound
+			// integrations (Discord, webhooks) need outboundArtworkURL.
 			payload.PosterURL = targeted.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
 				Surface: artworkurl.SurfaceItemPosters, Keys: []string{*row.SeriesID}, Slot: "poster",
 			}, row.PosterPath, "poster", "")

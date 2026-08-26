@@ -50,12 +50,12 @@ func TestAdminArtworkStorageEndpointsReadSnapshotAndQueueAsyncJobs(t *testing.T)
 
 	recorder = httptest.NewRecorder()
 	handler.HandleRefresh(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/admin/artwork/storage/refresh", nil))
-	if recorder.Code != http.StatusAccepted || jobs.input.JobType != adminjob.JobTypeArtworkStorageRefresh {
+	if recorder.Code != http.StatusAccepted || jobs.input.JobType != adminjob.JobTypeArtworkStorageRefresh || !jobs.input.ResumeCheckpoint {
 		t.Fatalf("refresh response = %d %s, job = %#v", recorder.Code, recorder.Body.String(), jobs.input)
 	}
 	recorder = httptest.NewRecorder()
 	handler.HandleImport(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/admin/artwork/storage/import", nil))
-	if recorder.Code != http.StatusAccepted || jobs.input.JobType != adminjob.JobTypeArtworkStorageImport {
+	if recorder.Code != http.StatusAccepted || jobs.input.JobType != adminjob.JobTypeArtworkStorageImport || !jobs.input.ResumeCheckpoint {
 		t.Fatalf("import response = %d %s, job = %#v", recorder.Code, recorder.Body.String(), jobs.input)
 	}
 
@@ -64,7 +64,7 @@ func TestAdminArtworkStorageEndpointsReadSnapshotAndQueueAsyncJobs(t *testing.T)
 		`{"scope":{"library_id":12},"mode":"safe_materialized","dry_run":true}`,
 	))
 	handler.HandlePurge(recorder, request)
-	if recorder.Code != http.StatusAccepted || jobs.input.JobType != adminjob.JobTypeArtworkPurge || !jobs.input.DryRun {
+	if recorder.Code != http.StatusAccepted || jobs.input.JobType != adminjob.JobTypeArtworkPurge || !jobs.input.DryRun || !jobs.input.ResumeCheckpoint {
 		t.Fatalf("purge response = %d %s, job = %#v", recorder.Code, recorder.Body.String(), jobs.input)
 	}
 }

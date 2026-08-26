@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sort"
 	"strings"
@@ -31,6 +32,29 @@ type fakeS3 struct {
 	presignedTTL time.Duration
 	presignedKey string
 	bucketsSeen  map[string]int
+	listCalls    int
+}
+
+type longArtworkListingS3 struct {
+	*fakeS3
+	pagesBeforeArtwork int
+	calls              int
+	nonAdvancing       bool
+}
+
+func (f *longArtworkListingS3) ListObjectInfosPage(_ context.Context, _, _, cursor string, limit int) ([]s3client.ObjectInfo, string, bool, error) {
+	f.calls++
+	if f.nonAdvancing {
+		return nil, cursor, false, nil
+	}
+	if f.calls <= f.pagesBeforeArtwork {
+		objects := make([]s3client.ObjectInfo, limit)
+		for i := range objects {
+			objects[i].Key = fmt.Sprintf("unrelated/%06d/%03d", f.calls, i)
+		}
+		return objects, fmt.Sprintf("cursor-%d", f.calls), false, nil
+	}
+	return []s3client.ObjectInfo{{Key: testKey}}, "done", true, nil
 }
 
 func newFakeS3() *fakeS3 {
@@ -43,12 +67,43 @@ func newFakeS3() *fakeS3 {
 	}
 }
 
+func TestS3ArtworkEmptinessProofScansPastFormerBudget(t *testing.T) {
+	client := &longArtworkListingS3{fakeS3: newFakeS3(), pagesBeforeArtwork: 65}
+	store, err := NewS3Store(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, err := store.hasArtworkObjects(t.Context())
+	if err != nil {
+		t.Fatalf("hasArtworkObjects: %v", err)
+	}
+	if !found {
+		t.Fatal("artwork after the former 16,384-object budget was not found")
+	}
+	if client.calls != 66 {
+		t.Fatalf("listing calls = %d, want 66", client.calls)
+	}
+}
+
+func TestS3ArtworkEmptinessProofRejectsNonAdvancingCursor(t *testing.T) {
+	client := &longArtworkListingS3{fakeS3: newFakeS3(), nonAdvancing: true}
+	store, err := NewS3Store(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.hasArtworkObjects(t.Context())
+	if err == nil || !strings.Contains(err.Error(), "listing did not advance") {
+		t.Fatalf("hasArtworkObjects = %v, want non-advancing cursor error", err)
+	}
+}
+
 func (f *fakeS3) Bucket() string { return f.bucket }
 
 func (f *fakeS3) ListObjectInfosPage(_ context.Context, bucket, prefix, cursor string, limit int) ([]s3client.ObjectInfo, string, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.note(bucket)
+	f.listCalls++
 	keys := make([]string, 0, len(f.objects))
 	for key := range f.objects {
 		if strings.HasPrefix(key, prefix) && key > cursor {
@@ -67,6 +122,32 @@ func (f *fakeS3) ListObjectInfosPage(_ context.Context, bucket, prefix, cursor s
 		next = key
 	}
 	return objects, next, done, nil
+}
+
+func TestCheckMemoizesZeroPinArtworkEmptinessProof(t *testing.T) {
+	client := newFakeS3()
+	handle, err := Open(t.Context(), Options{Backend: BackendS3, S3: client, Settings: newFakeSettings()})
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = handle.Close() })
+
+	client.mu.Lock()
+	client.listCalls = 0
+	client.mu.Unlock()
+	if err := handle.Check(t.Context()); err != nil {
+		t.Fatalf("first Check: %v", err)
+	}
+	handle.expireCheckCacheForTest()
+	if err := handle.Check(t.Context()); err != nil {
+		t.Fatalf("second Check: %v", err)
+	}
+	client.mu.Lock()
+	listCalls := client.listCalls
+	client.mu.Unlock()
+	if listCalls != 1 {
+		t.Fatalf("zero-pin artwork listing calls = %d, want 1", listCalls)
+	}
 }
 
 func (f *fakeS3) DeletePrefix(ctx context.Context, bucket, prefix string) (int, error) {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/models"
@@ -132,14 +133,20 @@ func TestBulkRecoverySeasonJobUsesNaturalTargetAndPublishes(t *testing.T) {
 	})
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO media_items (content_id, type, title, status, genres)
-		VALUES ($1, 'series', 'Repair Season', 'matched', '{}'::text[]);
+		VALUES ($1, 'series', 'Repair Season', 'matched', '{}'::text[])`, seriesID); err != nil {
+		t.Fatalf("seed season recovery item: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
 		INSERT INTO seasons (
 			content_id, series_id, season_number, title, poster_path, poster_source_path
-		) VALUES ($2, $1, 0, 'Specials', $3, $4);
+		) VALUES ($2, $1, 0, 'Specials', $3, $4)`, seriesID, seasonID, selectedPath, sourcePath); err != nil {
+		t.Fatalf("seed season recovery target: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
 		UPDATE artwork_storage_accounting_state
 		SET rebuild_surface_name = '', rebuild_enqueued_at = NULL WHERE singleton
-	`, seriesID, seasonID, selectedPath, sourcePath); err != nil {
-		t.Fatalf("seed season recovery target: %v", err)
+	`); err != nil {
+		t.Fatalf("reset season recovery accounting: %v", err)
 	}
 
 	coordinator := NewArtworkDeliveryCoordinator(pool, nil)
@@ -186,6 +193,81 @@ func TestBulkRecoverySeasonJobUsesNaturalTargetAndPublishes(t *testing.T) {
 	wantPath := strings.TrimSuffix(publishedPath, "/repaired.webp") + "/original.webp"
 	if storedPath != wantPath {
 		t.Fatalf("published season path = %q, want %q", storedPath, wantPath)
+	}
+}
+
+func TestArtworkBulkRecoveryMarksUploadedProfileAvatarAsProtectedLoss(t *testing.T) {
+	pool := localArtworkTestPool(t)
+	ctx := context.Background()
+	suffix := time.Now().UnixNano()
+	username := fmt.Sprintf("artwork-avatar-loss-%d", suffix)
+	profileID := fmt.Sprintf("avatar-loss-profile-%d", suffix)
+	revision := fmt.Sprintf("%064x", suffix)
+	avatarPath := artworkkey.PortableKey(artworkkey.ImageTypeAvatar, revision, artworkkey.OriginalVariant, ".webp")
+	if avatarPath == "" {
+		t.Fatal("build portable avatar key")
+	}
+
+	var userID int
+	if err := pool.QueryRow(ctx, `INSERT INTO users (username, role) VALUES ($1, 'user') RETURNING id`, username).Scan(&userID); err != nil {
+		t.Fatalf("seed avatar owner: %v", err)
+	}
+	targetKeys := []string{fmt.Sprint(userID), profileID}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM artwork_storage_alerts WHERE surface_name = $1 AND target_keys = $2`, artworkurl.SurfaceProfileAvatars, targetKeys)
+		_, _ = pool.Exec(ctx, `DELETE FROM artwork_revision_gc_candidates WHERE original_path = $1`, avatarPath)
+		_, _ = pool.Exec(ctx, `DELETE FROM user_profiles WHERE id = $1 AND user_id = $2`, profileID, userID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = pool.Exec(ctx, `UPDATE artwork_storage_accounting_state
+			SET rebuild_surface_name = '', rebuild_enqueued_at = NULL WHERE singleton`)
+	})
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO user_profiles (id, user_id, name, avatar)
+		VALUES ($1, $2, 'Avatar loss profile', $3)`, profileID, userID, profileAvatarUploadPrefix+avatarPath); err != nil {
+		t.Fatalf("seed uploaded avatar owner: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO artwork_revision_gc_candidates (original_path, object_keys)
+		VALUES ($1, ARRAY[$1])`, avatarPath); err != nil {
+		t.Fatalf("seed uploaded avatar inventory: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		UPDATE artwork_storage_accounting_state
+		SET rebuild_surface_name = $1, rebuild_enqueued_at = NULL WHERE singleton`,
+		artworkSweepSurfaces()[len(artworkSweepSurfaces())-1].name); err != nil {
+		t.Fatalf("reset uploaded avatar recovery accounting: %v", err)
+	}
+
+	coordinator := NewArtworkDeliveryCoordinator(pool, nil)
+	if _, err := coordinator.EnqueueBulkRecovery(ctx); err != nil {
+		t.Fatalf("enqueue bulk recovery: %v", err)
+	}
+
+	var repairState string
+	var protectedAt bool
+	if err := pool.QueryRow(ctx, `SELECT repair_state, protected_loss_at IS NOT NULL
+		FROM artwork_revision_gc_candidates WHERE original_path = $1`, avatarPath).Scan(&repairState, &protectedAt); err != nil {
+		t.Fatalf("read avatar inventory loss state: %v", err)
+	}
+	if repairState != "protected_loss" || !protectedAt {
+		t.Fatalf("avatar loss state = %q protected_at=%v", repairState, protectedAt)
+	}
+	var alerts int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM artwork_storage_alerts
+		WHERE kind = 'protected_data_loss' AND surface_name = $1 AND target_keys = $2
+		  AND image_slot = $3 AND original_path = $4 AND resolved_at IS NULL`,
+		artworkurl.SurfaceProfileAvatars, targetKeys, artworkkey.ImageTypeAvatar, avatarPath).Scan(&alerts); err != nil {
+		t.Fatalf("read avatar loss alert: %v", err)
+	}
+	if alerts != 1 {
+		t.Fatalf("avatar protected-loss alerts = %d, want one", alerts)
+	}
+	status, err := coordinator.RebuildStatus(ctx)
+	if err != nil {
+		t.Fatalf("load rebuild status: %v", err)
+	}
+	if status.ProtectedLosses < 1 {
+		t.Fatalf("rebuild protected losses = %d, want uploaded avatar included", status.ProtectedLosses)
 	}
 }
 

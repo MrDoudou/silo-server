@@ -1115,7 +1115,7 @@ func StatConfinedLocalArtwork(source string, roots []string) (ConfinedLocalArtwo
 		return ConfinedLocalArtworkFile{}, err
 	}
 	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxLocalImageSourceBytes {
-		return ConfinedLocalArtworkFile{}, fmt.Errorf("local image is not an allowed regular file: %s", localPath)
+		return ConfinedLocalArtworkFile{}, fmt.Errorf("local image is not a regular file allowed for artwork: %s", localPath)
 	}
 	return ConfinedLocalArtworkFile{
 		Path: localPath, Info: info, MediaType: mime.TypeByExtension(strings.ToLower(filepath.Ext(localPath))),
@@ -1135,6 +1135,8 @@ func OpenConfinedLocalArtwork(source string, roots []string) (ConfinedLocalArtwo
 	stat, err := file.Stat()
 	if err != nil || !os.SameFile(confined.Info, stat) || !stat.Mode().IsRegular() || stat.Size() <= 0 || stat.Size() > maxLocalImageSourceBytes {
 		_ = file.Close()
+		// A concurrent file replacement can settle before the next attempt, so
+		// this confinement failure is intentionally transient and retryable.
 		return ConfinedLocalArtworkFile{}, fmt.Errorf("local image changed during confinement check: %s", localPath)
 	}
 	return ConfinedLocalArtworkFile{

@@ -9,12 +9,27 @@ import (
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 )
 
 // stubArtworkURLs resolves any valid logical key to a recognizable URL.
 type stubArtworkURLs struct {
 	err  error
 	seen []string
+}
+
+type stubTargetArtworkURLs struct {
+	stubArtworkURLs
+	target  artworkurl.Target
+	path    string
+	variant string
+}
+
+func (s *stubTargetArtworkURLs) ResolveTargetURL(_ context.Context, target artworkurl.Target, variant string) (artworkstore.ResolvedURL, error) {
+	s.target = target
+	s.path = target.Reference
+	s.variant = variant
+	return artworkstore.ResolvedURL{URL: "https://target.example/" + variant}, nil
 }
 
 func (s *stubArtworkURLs) ResolveArtworkURL(_ context.Context, key string) (artworkstore.ResolvedURL, error) {
@@ -143,6 +158,27 @@ func TestResolveProfileAvatarUsesTheArtworkStoreForNewUploads(t *testing.T) {
 	}
 	if !containsString(artworkkey.VariantNames(artworkkey.ImageTypeAvatar), avatarDisplayVariant) {
 		t.Fatalf("the avatar ladder no longer generates %s", avatarDisplayVariant)
+	}
+}
+
+func TestResolveProfileAvatarTargetRequestsDisplayVariantFromOriginal(t *testing.T) {
+	original := portableUploadKey(t, artworkkey.ImageTypeAvatar, artworkkey.OriginalVariant)
+	resolver := &stubTargetArtworkURLs{}
+
+	source, url := resolveProfileAvatarTarget(context.Background(), resolver, nil, time.Minute,
+		7, "main", profileAvatarUploadPrefix+original)
+
+	if source != avatarSourceUpload || url != "https://target.example/"+avatarDisplayVariant {
+		t.Fatalf("resolved avatar = (%q, %q)", source, url)
+	}
+	if resolver.path != original {
+		t.Fatalf("target reference = %q, want stored original %q", resolver.path, original)
+	}
+	if resolver.variant != avatarDisplayVariant {
+		t.Fatalf("target variant = %q, want %q", resolver.variant, avatarDisplayVariant)
+	}
+	if resolver.target.Surface != artworkurl.SurfaceProfileAvatars || resolver.target.Keys[0] != "7" || resolver.target.Keys[1] != "main" {
+		t.Fatalf("target identity = %#v", resolver.target)
 	}
 }
 

@@ -118,3 +118,22 @@ func TestCollectionImageType(t *testing.T) {
 		}
 	}
 }
+
+func TestAuxiliaryArtworkKeyClassification(t *testing.T) {
+	if !IsBrandingKey("branding/wordmark/revision.webp") || IsBrandingKey("artwork/v1/objects/poster/aa/revision/original.webp") {
+		t.Fatal("branding key classification is incorrect")
+	}
+	for _, key := range []string{
+		"library-posters/7.jpg",
+		"collection-images/admin/poster/original.webp",
+		"user-collection-images/personal/poster/original.webp",
+		"profile-avatars/12/main/original.webp",
+	} {
+		if !IsLegacyUploadKey(key) {
+			t.Fatalf("legacy upload key %q was not recognized", key)
+		}
+	}
+	if IsLegacyUploadKey("branding/favicon/revision.ico") {
+		t.Fatal("branding key was classified as a legacy upload")
+	}
+}

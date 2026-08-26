@@ -69,6 +69,31 @@ func IsUploadImageType(imageType string) bool {
 	}
 }
 
+// IsBrandingKey reports whether key belongs to the immutable custom-branding
+// namespace. Branding objects are canonical-store bytes, but they are not
+// artwork revisions and therefore never appear in revision GC inventory.
+func IsBrandingKey(key string) bool {
+	return strings.HasPrefix(strings.TrimSpace(key), "branding/")
+}
+
+// IsLegacyUploadKey reports whether key belongs to one of the mutable upload
+// namespaces retained for rows that have not yet been replaced by portable
+// artwork revisions.
+func IsLegacyUploadKey(key string) bool {
+	key = strings.TrimSpace(key)
+	for _, prefix := range []string{
+		"library-posters/",
+		"collection-images/",
+		"user-collection-images/",
+		"profile-avatars/",
+	} {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // CollectionImageType maps a collection artwork slot ("poster" or "backdrop")
 // onto its upload image type. It reports false for anything else so a handler
 // rejects an unsupported slot before reading an upload body.

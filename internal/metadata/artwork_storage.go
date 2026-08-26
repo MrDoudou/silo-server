@@ -62,22 +62,26 @@ func NewArtworkStorageService(pool *pgxpool.Pool, store ArtworkInventoryStore, b
 }
 
 type ArtworkInventoryCheckpoint struct {
-	Version        int    `json:"version"`
-	Cursor         string `json:"cursor,omitempty"`
-	KnownRevisions int64  `json:"known_revisions"`
-	MissingObjects int64  `json:"missing_objects"`
-	Failures       int64  `json:"failures"`
-	StoreCursor    string `json:"store_cursor,omitempty"`
-	OrphanObjects  int64  `json:"orphan_objects"`
-	IndexBytes     int64  `json:"index_bytes"`
-	IndexObjects   int64  `json:"index_objects"`
-	ImportCursor   string `json:"import_cursor,omitempty"`
-	ImportedSeeds  int64  `json:"imported_seeds"`
-	AdoptedSeeds   int64  `json:"adopted_seeds"`
-	RetainedSeeds  int64  `json:"retained_unverifiable_seeds"`
-	ImportSkipped  int64  `json:"import_skipped"`
-	ImportFinished bool   `json:"import_finished"`
-	Finished       bool   `json:"finished"`
+	Version             int    `json:"version"`
+	Cursor              string `json:"cursor,omitempty"`
+	KnownRevisions      int64  `json:"known_revisions"`
+	MissingObjects      int64  `json:"missing_objects"`
+	Failures            int64  `json:"failures"`
+	StoreCursor         string `json:"store_cursor,omitempty"`
+	OrphanObjects       int64  `json:"orphan_objects"`
+	IndexBytes          int64  `json:"index_bytes"`
+	IndexObjects        int64  `json:"index_objects"`
+	BrandingBytes       int64  `json:"branding_bytes"`
+	BrandingObjects     int64  `json:"branding_objects"`
+	LegacyUploadBytes   int64  `json:"legacy_upload_bytes"`
+	LegacyUploadObjects int64  `json:"legacy_upload_objects"`
+	ImportCursor        string `json:"import_cursor,omitempty"`
+	ImportedSeeds       int64  `json:"imported_seeds"`
+	AdoptedSeeds        int64  `json:"adopted_seeds"`
+	RetainedSeeds       int64  `json:"retained_unverifiable_seeds"`
+	ImportSkipped       int64  `json:"import_skipped"`
+	ImportFinished      bool   `json:"import_finished"`
+	Finished            bool   `json:"finished"`
 }
 
 type ArtworkInventoryRefreshResult struct {
@@ -161,7 +165,8 @@ func (s *ArtworkStorageService) Refresh(
 	}
 	_, err = s.pool.Exec(ctx, artworkAccountingPublishSQL, result.SnapshotAt, result.Complete, result.KnownRevisions, result.MissingRevisions,
 		result.MissingObjects, result.OrphanObjects, result.Failures, s.untrackedUserArtwork,
-		map[bool]string{true: "user artwork is stored outside PostgreSQL inventory", false: ""}[s.untrackedUserArtwork], cp.IndexBytes, cp.IndexObjects)
+		map[bool]string{true: "user artwork is stored outside PostgreSQL inventory", false: ""}[s.untrackedUserArtwork],
+		cp.IndexBytes, cp.IndexObjects, cp.BrandingBytes, cp.BrandingObjects, cp.LegacyUploadBytes, cp.LegacyUploadObjects)
 	if err != nil {
 		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: publish snapshot: %w", err)
 	}
@@ -202,6 +207,10 @@ const artworkAccountingPublishSQL = `
 		coverage_limit_reason = $9,
 		adoption_index_bytes = $10,
 		adoption_index_objects = $11,
+		branding_bytes = $12,
+		branding_objects = $13,
+		legacy_upload_bytes = $14,
+		legacy_upload_objects = $15,
 		last_error = CASE WHEN $7::bigint > 0 THEN 'inventory refresh had failures' ELSE '' END,
 		updated_at = NOW()
 	WHERE singleton`
@@ -235,9 +244,13 @@ func (s *ArtworkStorageService) discoverOrphans(ctx context.Context, cp *Artwork
 		if err := s.waitRateLimit(ctx); err != nil {
 			return err
 		}
-		objects, next, done, err := s.store.ListPage(ctx, "", cp.StoreCursor, 500)
+		previous := cp.StoreCursor
+		objects, next, done, err := s.store.ListPage(ctx, "", previous, 500)
 		if err != nil {
 			return fmt.Errorf("artwork inventory: list store: %w", err)
+		}
+		if err := validateArtworkListCursor("artwork inventory: store", previous, next, done); err != nil {
+			return err
 		}
 		if len(objects) > 0 {
 			keys := make([]string, 0, len(objects))
@@ -245,6 +258,16 @@ func (s *ArtworkStorageService) discoverOrphans(ctx context.Context, cp *Artwork
 				if artworkkey.IsAdoptionIndexKey(objects[i].Key) {
 					cp.IndexObjects++
 					cp.IndexBytes += objects[i].SizeBytes
+					continue
+				}
+				if artworkkey.IsBrandingKey(objects[i].Key) {
+					cp.BrandingObjects++
+					cp.BrandingBytes += objects[i].SizeBytes
+					continue
+				}
+				if artworkkey.IsLegacyUploadKey(objects[i].Key) {
+					cp.LegacyUploadObjects++
+					cp.LegacyUploadBytes += objects[i].SizeBytes
 					continue
 				}
 				if artworkstore.ValidateKey(objects[i].Key) == nil {
@@ -258,20 +281,27 @@ func (s *ArtworkStorageService) discoverOrphans(ctx context.Context, cp *Artwork
 				}
 			}
 			cp.OrphanObjects += int64(len(keys)) - known
-			cp.StoreCursor = next
-			if progress != nil {
-				progress(int(cp.KnownRevisions), 0, fmt.Sprintf("Verified inventory; found %d orphan objects", cp.OrphanObjects))
-			}
-			if save != nil {
-				if err := save(*cp); err != nil {
-					return err
-				}
+		}
+		cp.StoreCursor = next
+		if progress != nil {
+			progress(int(cp.KnownRevisions), 0, fmt.Sprintf("Verified inventory; found %d orphan objects", cp.OrphanObjects))
+		}
+		if save != nil {
+			if err := save(*cp); err != nil {
+				return err
 			}
 		}
 		if done {
 			return nil
 		}
 	}
+}
+
+func validateArtworkListCursor(operation, previous, next string, done bool) error {
+	if !done && (next == "" || next == previous) {
+		return fmt.Errorf("%s listing did not advance", operation)
+	}
+	return nil
 }
 
 func (s *ArtworkStorageService) nextInventoryReferences(ctx context.Context, cursor string, limit int) ([]artworkInventoryReference, error) {
@@ -478,6 +508,10 @@ type ArtworkStorageAccounting struct {
 	Seed                 ArtworkSeedAccounting      `json:"seed"`
 	AdoptionIndexBytes   int64                      `json:"adoption_index_bytes"`
 	AdoptionIndexObjects int64                      `json:"adoption_index_objects"`
+	BrandingBytes        int64                      `json:"branding_bytes"`
+	BrandingObjects      int64                      `json:"branding_objects"`
+	LegacyUploadBytes    int64                      `json:"legacy_upload_bytes"`
+	LegacyUploadObjects  int64                      `json:"legacy_upload_objects"`
 	ResolvedPath         string                     `json:"resolved_path,omitempty"`
 	StoreHealth          string                     `json:"store_health"`
 	StoreHealthChangedAt *time.Time                 `json:"store_health_changed_at,omitempty"`
@@ -581,7 +615,10 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 		&result.SnapshotAt, &result.Complete, &result.InventoryDrift.MissingRevisions,
 		&result.InventoryDrift.MissingObjects, &result.InventoryDrift.OrphanObjects,
 		&result.CoverageLimited, &result.CoverageLimitReason, &result.FailureCount,
-		&result.AdoptionIndexBytes, &result.AdoptionIndexObjects, &result.Seed.LastImportAt,
+		&result.AdoptionIndexBytes, &result.AdoptionIndexObjects,
+		&result.BrandingBytes, &result.BrandingObjects,
+		&result.LegacyUploadBytes, &result.LegacyUploadObjects,
+		&result.Seed.LastImportAt,
 	); err != nil {
 		return result, fmt.Errorf("artwork accounting: load snapshot: %w", err)
 	}
@@ -608,6 +645,8 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 	}
 	result.Total.PhysicalBytes += result.AdoptionIndexBytes
 	result.Total.ObjectCount += result.AdoptionIndexObjects
+	result.Total.PhysicalBytes += result.BrandingBytes + result.LegacyUploadBytes
+	result.Total.ObjectCount += result.BrandingObjects + result.LegacyUploadObjects
 	result.KnownBytes = result.Total.PhysicalBytes
 	artworkmetrics.SeedExpiredBytes(result.Seed.ExpiredBytes)
 	artworkmetrics.RepairPending(result.Total.RepairingRevisionCount, result.Total.ProtectedLossCount)
@@ -675,7 +714,9 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 const artworkAccountingStateSQL = `
 	SELECT snapshot_at, inventory_complete, missing_revisions, missing_objects, orphan_objects,
 		coverage_limited, coverage_limit_reason, failure_count,
-		adoption_index_bytes, adoption_index_objects, last_seed_import_at
+		adoption_index_bytes, adoption_index_objects,
+		branding_bytes, branding_objects, legacy_upload_bytes, legacy_upload_objects,
+		last_seed_import_at
 	FROM artwork_storage_accounting_state WHERE singleton`
 
 func artworkReconstructibleSQL(sourceExpr string) string {

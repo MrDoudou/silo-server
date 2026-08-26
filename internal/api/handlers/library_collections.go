@@ -219,12 +219,6 @@ func (h *LibraryCollectionHandler) GenerateCollectionPoster(ctx context.Context,
 		return err
 	}
 
-	// Remove any legacy mutable objects this collection still owns; the
-	// content-addressed revision it may be replacing is collected by reference.
-	if err := h.deleteCollectionImages(ctx, collectionID, "poster"); err != nil {
-		slog.WarnContext(ctx, "collage: failed to clean up old poster images", "component", "api", "collection_id", collectionID, "error", err)
-	}
-
 	// Process through the standard image pipeline (generates WebP variants + thumbhash).
 	s3Path, thumbhash, err := h.processCollectionImage(ctx, collectionID, "poster", composited)
 	if err != nil {
@@ -241,6 +235,12 @@ func (h *LibraryCollectionHandler) GenerateCollectionPoster(ctx context.Context,
 		PosterFromTemplate:  &notFromTemplate,
 	}); err != nil {
 		return fmt.Errorf("updating collection poster: %w", err)
+	}
+
+	// The row now points at durable content-addressed artwork. Legacy mutable
+	// objects are cleanup only and must not make the successful update fail.
+	if err := h.deleteCollectionImages(ctx, collectionID, "poster"); err != nil {
+		slog.WarnContext(ctx, "collage: failed to clean up old poster images", "component", "api", "collection_id", collectionID, "error", err)
 	}
 
 	slog.InfoContext(ctx, "collage: poster generated successfully", "component", "api", "collection_id", collectionID, "s3_path", s3Path)
@@ -3774,10 +3774,6 @@ func (h *LibraryCollectionHandler) processArtworkInputs(r *http.Request, collect
 			return fmt.Errorf("%s: %w", imageType, err)
 		}
 
-		if err := h.deleteCollectionImages(r.Context(), collectionID, imageType); err != nil {
-			return fmt.Errorf("deleting %s images: %w", imageType, err)
-		}
-
 		s3Path, thumbhash, err := h.processCollectionImage(r.Context(), collectionID, imageType, fileData)
 		if err != nil {
 			return fmt.Errorf("%s: %w", imageType, err)
@@ -3808,6 +3804,10 @@ func (h *LibraryCollectionHandler) processArtworkInputs(r *http.Request, collect
 		}
 		if err := h.repo.Update(r.Context(), update); err != nil {
 			return fmt.Errorf("updating %s: %w", imageType, err)
+		}
+		if err := h.deleteCollectionImages(r.Context(), collectionID, imageType); err != nil {
+			slog.WarnContext(r.Context(), "failed to clean up legacy collection artwork", "component", "api",
+				"collection_id", collectionID, "image_type", imageType, "error", err)
 		}
 	}
 	return nil

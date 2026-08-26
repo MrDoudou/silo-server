@@ -308,6 +308,17 @@ func NewRouter(deps Dependencies) chi.Router {
 		coordinator := metadata.NewArtworkDeliveryCoordinator(deps.DB, metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.UserStoreProvider)
 		coordinator.SetStoreHealth(deps.ArtworkStore)
 		deps.ArtworkDelivery = handlers.NewArtworkHandler(deps.ArtworkStore.Store, deps.ArtworkURLSigner)
+		if deps.S3Public != nil {
+			var chapterStore handlers.ArtworkObjectStore
+			if deps.ArtworkStore.Backend == artworkstore.BackendS3 {
+				chapterStore = deps.ArtworkStore.Store
+			} else if store, err := artworkstore.NewS3Store(deps.S3Public); err != nil {
+				slog.Warn("chapter thumbnail delivery unavailable", "error", err)
+			} else {
+				chapterStore = store
+			}
+			deps.ArtworkDelivery.SetChapterThumbnailStore(chapterStore)
+		}
 		deps.ArtworkDelivery.SetResilientDependencies(coordinator, deps.ArtworkSourceResolver, deps.ArtworkStore.ReportFailure)
 	}
 

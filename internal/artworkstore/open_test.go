@@ -366,6 +366,64 @@ func TestRunningOwnedLocalStoreRecreatesDeletedRootAndRotatesGeneration(t *testi
 	}
 }
 
+func TestUnpinnedRunningLocalStoreWritesAfterGenerationRotation(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "artwork")
+	settings := newFakeSettings()
+	handle := openLocal(t, root, settings)
+	oldGeneration := handle.GenerationID()
+	if pin := settings.pin(t); !pin.IsZero() {
+		t.Fatalf("pin before first write = %+v, want zero", pin)
+	}
+
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	handle.expireCheckCacheForTest()
+	if err := handle.Check(t.Context()); err != nil {
+		t.Fatalf("Check after root deletion: %v", err)
+	}
+	newGeneration := handle.GenerationID()
+	if newGeneration == "" || newGeneration == oldGeneration {
+		t.Fatalf("generation = %q, want rotation from %q", newGeneration, oldGeneration)
+	}
+	if pin := settings.pin(t); pin.Generation != newGeneration {
+		t.Fatalf("pin after recovery = %+v, want local/%s", pin, newGeneration)
+	}
+	if err := handle.Store.WriteImmutable(t.Context(), testKey, []byte("rebuilt"), ObjectMetadata{}); err != nil {
+		t.Fatalf("first write after generation rotation: %v", err)
+	}
+}
+
+func TestCleanTempFilesReachesFilesystemThroughHandleWrappers(t *testing.T) {
+	root := t.TempDir()
+	handle := openLocal(t, root, newFakeSettings())
+	stale := filepath.Join(root, tempFilePrefix+"abandoned")
+	if err := os.WriteFile(stale, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	cleaner, ok := handle.Store.(interface {
+		CleanTempFiles(context.Context, time.Duration) (int, error)
+	})
+	if !ok {
+		t.Fatal("wrapped filesystem store does not expose temp cleanup")
+	}
+	removed, err := cleaner.CleanTempFiles(t.Context(), time.Hour)
+	if err != nil {
+		t.Fatalf("CleanTempFiles through handle: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("removed = %d, want 1", removed)
+	}
+	if _, err := os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("stale temp file remains: %v", err)
+	}
+}
+
 func TestPinnedLocalStoreRefusesAReachableDifferentCopy(t *testing.T) {
 	settings := newFakeSettings()
 	first := openLocal(t, t.TempDir(), settings)

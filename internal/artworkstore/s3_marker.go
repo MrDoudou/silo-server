@@ -80,12 +80,9 @@ func (s *S3Store) ensureSentinels(ctx context.Context, allowLegacyNonEmpty bool)
 }
 
 func (s *S3Store) hasArtworkObjects(ctx context.Context) (bool, error) {
-	const (
-		pageSize = 256
-		maxPages = 64
-	)
+	const pageSize = 256
 	cursor := ""
-	for page := 0; page < maxPages; page++ {
+	for {
 		objects, next, done, err := s.client.ListObjectInfosPage(ctx, s.bucket, "", cursor, pageSize)
 		if err != nil {
 			return false, err
@@ -106,7 +103,6 @@ func (s *S3Store) hasArtworkObjects(ctx context.Context) (bool, error) {
 		}
 		cursor = next
 	}
-	return false, errors.New("artworkstore: s3 emptiness proof exceeded the bounded listing budget")
 }
 
 func (s *S3Store) readSentinel(ctx context.Context, key string) ([]byte, error) {

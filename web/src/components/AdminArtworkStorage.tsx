@@ -42,6 +42,11 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function formatSnapshotAge(snapshotAt: string | undefined): string {
+  if (!snapshotAt) return "Never refreshed";
+  return `${Math.max(0, Math.round((Date.now() - Date.parse(snapshotAt)) / 60_000))} minutes ago`;
+}
+
 function purgeResult(job?: AdminJob) {
   if (!job || job.status !== "completed") return null;
   return job.result_payload as Record<string, number>;
@@ -80,9 +85,7 @@ export default function AdminArtworkStorage() {
   const data = storage.data;
   const storeHealth = data.store_health ?? "unknown";
   const libraryNames = new Map(libraries.map((library) => [library.id, library.name]));
-  const snapshotAge = data.snapshot_at
-    ? `${Math.max(0, Math.round((Date.now() - Date.parse(data.snapshot_at)) / 60_000))} minutes ago`
-    : "Never refreshed";
+  const snapshotAge = formatSnapshotAge(data.snapshot_at);
 
   return (
     <section

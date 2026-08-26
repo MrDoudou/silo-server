@@ -236,7 +236,7 @@ func (r *Runner) executeArtworkStorageImport(job *models.AdminJob) {
 		return r.repo.UpdateCheckpoint(ctx, job.ID, next)
 	}, progress)
 	if err != nil {
-		r.failJob(job.ID, 0, 0, "Artwork store import failed", err.Error())
+		r.failJob(job.ID, 0, 0, "Artwork store import failed", artworkStorageErrorMessage(ctx, err))
 		return
 	}
 	if err := r.repo.Complete(ctx, job.ID, CompleteJobInput{
@@ -274,7 +274,7 @@ func (r *Runner) executeArtworkStorageRefresh(job *models.AdminJob) {
 		return r.repo.UpdateCheckpoint(ctx, job.ID, next)
 	}, progress)
 	if err != nil {
-		r.failJob(job.ID, 0, 0, "Artwork storage refresh failed", err.Error())
+		r.failJob(job.ID, 0, 0, "Artwork storage refresh failed", artworkStorageErrorMessage(ctx, err))
 		return
 	}
 	if err := r.repo.Complete(ctx, job.ID, CompleteJobInput{
@@ -321,7 +321,7 @@ func (r *Runner) executeArtworkPurge(job *models.AdminJob) {
 	}, progress)
 	if err != nil {
 		artworkmetrics.Purge(req.DryRun, "failed", 0, 0)
-		r.failJob(job.ID, 0, 0, "Artwork purge failed", err.Error())
+		r.failJob(job.ID, 0, 0, "Artwork purge failed", artworkStorageErrorMessage(ctx, err))
 		return
 	}
 	artworkmetrics.Purge(req.DryRun, "completed", result.PendingBytes, result.ReclaimableBytes)
@@ -340,6 +340,16 @@ func (r *Runner) executeArtworkPurge(job *models.AdminJob) {
 		}
 	}
 	r.publishJobByID(ctx, notifications.TypeJobCompleted, job.ID)
+}
+
+func artworkStorageErrorMessage(ctx context.Context, err error) string {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Sprintf("timed out after %s: %v", artworkStorageTimeout, err)
+	}
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return fmt.Sprintf("context canceled: %v", err)
+	}
+	return err.Error()
 }
 
 func (r *Runner) executeDeleteLibrary(job *models.AdminJob) {

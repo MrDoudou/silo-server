@@ -24,6 +24,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/artworkvariant"
+	"github.com/Silo-Server/silo-server/internal/imagesize"
 	"github.com/Silo-Server/silo-server/internal/imageutil"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 )
@@ -79,6 +80,7 @@ type artworkSourceResolver interface {
 
 type ArtworkHandler struct {
 	store             ArtworkObjectStore
+	chapterStore      ArtworkObjectStore
 	signer            *artworkurl.Signer
 	targets           artworkTargetCoordinator
 	sources           artworkSourceResolver
@@ -90,10 +92,21 @@ type ArtworkHandler struct {
 	sourceSlots       chan struct{}
 	verified          *verifiedArtworkCache
 	variants          *artworkvariant.Selector
+	chapterVariants   *artworkvariant.Selector
 	repairSignals     chan metadata.ArtworkTargetState
 	repairSignalOnce  sync.Once
 	repairSignalMu    sync.Mutex
 	repairSignalUntil map[string]time.Time
+}
+
+// SetChapterThumbnailStore wires the public S3 bucket that owns chapter
+// thumbnails. It may be the canonical store itself when canonical artwork also
+// lives in that bucket.
+func (h *ArtworkHandler) SetChapterThumbnailStore(store ArtworkObjectStore) {
+	if h != nil {
+		h.chapterStore = store
+		h.chapterVariants = artworkvariant.New(store)
+	}
 }
 
 func NewArtworkHandler(store ArtworkObjectStore, signer *artworkurl.Signer) *ArtworkHandler {
@@ -165,20 +178,21 @@ func (h *ArtworkHandler) serve(w http.ResponseWriter, r *http.Request, encodedCa
 		artworkNotFound(w)
 		return
 	}
+	store, variants, usingChapterStore := h.readStoreForTarget(target)
 	storedKey := state.StoredVariant(variant)
-	if h.variants != nil && storedKey != "" {
-		if selected, selectErr := h.variants.Select(r.Context(), state.SelectedPath, state.ImageType, variant); selectErr == nil {
+	if variants != nil && storedKey != "" {
+		if selected, selectErr := variants.Select(r.Context(), state.SelectedPath, state.ImageType, variant); selectErr == nil {
 			storedKey = selected
 		}
 	}
 	backendReadable := true
 	authoritativeMiss := false
-	if health, ok := h.store.(artworkStoreHealth); ok {
+	if health, ok := store.(artworkStoreHealth); ok {
 		storeState, _ := health.Health()
 		backendReadable = storeState != artworkstore.HealthUnavailable && storeState != artworkstore.HealthWrongMount
 	}
-	if key := storedKey; key != "" && backendReadable {
-		object, openErr := h.openVerified(r.Context(), key)
+	if key := storedKey; key != "" && store != nil && backendReadable {
+		object, openErr := h.openVerifiedFrom(r.Context(), store, key)
 		if openErr == nil {
 			defer func() { _ = object.Close() }()
 			w.Header().Set("X-Silo-Artwork", "stored")
@@ -188,7 +202,7 @@ func (h *ArtworkHandler) serve(w http.ResponseWriter, r *http.Request, encodedCa
 		}
 		if errors.Is(openErr, artworkstore.ErrNotFound) || errors.Is(openErr, artworkstore.ErrContentMismatch) || errors.Is(openErr, artworkstore.ErrNotRegularFile) {
 			authoritativeMiss = true
-			if h.healthError != nil {
+			if h.healthError != nil && !usingChapterStore {
 				h.healthError(artworkstore.ErrRevisionMissing)
 			}
 		}
@@ -209,6 +223,13 @@ func (h *ArtworkHandler) serve(w http.ResponseWriter, r *http.Request, encodedCa
 	}
 	artworkmetrics.ObserveDeliveryLatency("placeholder", started)
 	h.writePlaceholder(w, r, state.ImageType)
+}
+
+func (h *ArtworkHandler) readStoreForTarget(target artworkurl.Target) (ArtworkObjectStore, *artworkvariant.Selector, bool) {
+	if target.Surface == artworkurl.SurfaceChapterThumbnails && h.chapterStore != nil {
+		return h.chapterStore, h.chapterVariants, true
+	}
+	return h.store, h.variants, false
 }
 
 func (h *ArtworkHandler) queueMissingSignal(state metadata.ArtworkTargetState) {
@@ -262,7 +283,11 @@ func (h *ArtworkHandler) runRepairSignals() {
 }
 
 func (h *ArtworkHandler) openVerified(ctx context.Context, key string) (*artworkstore.Object, error) {
-	object, err := h.store.Open(ctx, key)
+	return h.openVerifiedFrom(ctx, h.store, key)
+}
+
+func (h *ArtworkHandler) openVerifiedFrom(ctx context.Context, store ArtworkObjectStore, key string) (*artworkstore.Object, error) {
+	object, err := store.Open(ctx, key)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +300,7 @@ func (h *ArtworkHandler) openVerified(ctx context.Context, key string) (*artwork
 		object.Info.ETag = etag
 		return object, nil
 	}
-	manifestObject, err := h.store.Open(ctx, info.Directory+"/"+artworkkey.ManifestName)
+	manifestObject, err := store.Open(ctx, info.Directory+"/"+artworkkey.ManifestName)
 	if err != nil {
 		_ = object.Close()
 		return nil, err
@@ -315,7 +340,7 @@ func (h *ArtworkHandler) openVerified(ctx context.Context, key string) (*artwork
 	if written != expectedSize || hex.EncodeToString(digest.Sum(nil)) != expectedDigest {
 		return nil, artworkstore.ErrContentMismatch
 	}
-	object, err = h.store.Open(ctx, key)
+	object, err = store.Open(ctx, key)
 	if err != nil {
 		return nil, err
 	}
@@ -394,6 +419,7 @@ func (h *ArtworkHandler) resolveFallback(ctx context.Context, state metadata.Art
 			}
 			data, mediaType = verified.Data, verified.MediaType
 		}
+		data, mediaType = fallbackVariant(data, mediaType, state.ImageType, variant)
 		digest := sha256.Sum256(data)
 		fallback := fallbackArtwork{data: data, mediaType: mediaType, etag: `"source-` + hex.EncodeToString(digest[:]) + `"`}
 		h.emergency.put(cacheKey, fallback)
@@ -410,6 +436,33 @@ func (h *ArtworkHandler) resolveFallback(ctx context.Context, state metadata.Art
 		return fallbackArtwork{}, errors.New("artwork fallback has an unexpected type")
 	}
 	return fallback, nil
+}
+
+func fallbackVariant(data []byte, mediaType, imageType, variant string) ([]byte, string) {
+	if variant == artworkkey.OriginalVariant {
+		return data, mediaType
+	}
+	width, ok := imagesize.VariantWidthPx(variant)
+	if !ok {
+		return data, mediaType
+	}
+	generate := imageutil.GenerateVariants
+	if imageType == artworkkey.ImageTypeAvatar {
+		generate = imageutil.GenerateSquareVariants
+	}
+	generated, err := generate(data, []int{width})
+	if err != nil {
+		// Request-time recovery must remain resilient to images the background
+		// pipeline cannot resize. The already validated/capped original is safer
+		// than replacing usable artwork with a placeholder.
+		return data, mediaType
+	}
+	for _, candidate := range generated.Variants {
+		if candidate.Key == variant {
+			return candidate.Data, "image/webp"
+		}
+	}
+	return data, mediaType
 }
 
 func (h *ArtworkHandler) writeFallback(w http.ResponseWriter, r *http.Request, fallback fallbackArtwork, expiresAt, now time.Time) {

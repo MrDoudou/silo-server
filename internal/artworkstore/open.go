@@ -64,6 +64,10 @@ type Handle struct {
 	checkMu   sync.Mutex
 	checkedAt time.Time
 	checkErr  error
+
+	zeroPinCheckMu      sync.Mutex
+	zeroPinCheckAt      time.Time
+	zeroPinCheckArtwork bool
 }
 
 func (h *Handle) GenerationID() string {
@@ -81,10 +85,59 @@ func (h *Handle) setGeneration(generation string) {
 	h.generationMu.Unlock()
 }
 
+func (h *Handle) resolvedPin() Pin {
+	if h == nil {
+		return Pin{}
+	}
+	h.generationMu.RLock()
+	defer h.generationMu.RUnlock()
+	return Pin{Backend: h.Backend, Generation: h.Generation}
+}
+
+// replaceGenerationPin keeps the durable generation and the live generation
+// observed by write pinning on the same side of the generation lock. A writer
+// therefore sees either the old pair or the new pair, never a durable pin that
+// disagrees with the handle solely because recovery is between the two writes.
+func (h *Handle) replaceGenerationPin(ctx context.Context, generation string) error {
+	h.generationMu.Lock()
+	defer h.generationMu.Unlock()
+	if err := replacePin(ctx, h.settings, Pin{Backend: h.Backend, Generation: generation}); err != nil {
+		return err
+	}
+	h.Generation = generation
+	return nil
+}
+
+func (h *Handle) recordGenerationPinIfAbsent(ctx context.Context, generation string) (Pin, error) {
+	h.generationMu.Lock()
+	defer h.generationMu.Unlock()
+	resolved := Pin{Backend: h.Backend, Generation: generation}
+	encoded, err := encodePin(resolved)
+	if err != nil {
+		return Pin{}, err
+	}
+	if _, err := h.settings.SetIfAbsent(ctx, StorePinSettingKey, encoded); err != nil {
+		return Pin{}, err
+	}
+	recorded, err := ReadPin(ctx, h.settings)
+	if err != nil {
+		return Pin{}, err
+	}
+	if err := VerifyPin(recorded, resolved); err != nil {
+		return Pin{}, err
+	}
+	h.Generation = generation
+	return recorded, nil
+}
+
 // checkCacheTTL bounds how often Check re-probes the backing store. Readiness
 // consumers tolerate staleness of this order; a swapped mount or unwritable
 // root still surfaces within seconds.
 const checkCacheTTL = 10 * time.Second
+
+// zeroPinArtworkCheckTTL bounds the full-bucket emptiness proof used only by
+// readiness checks before a store is pinned. Open always performs a fresh proof.
+const zeroPinArtworkCheckTTL = 5 * time.Minute
 
 // Open selects the artwork backend, proves it is usable, and verifies it
 // against the recorded pin.
@@ -155,27 +208,15 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 			handle.health.force(HealthUnavailable)
 			break
 		}
-		handle.setGeneration(generation)
 		if recorded.IsZero() && zeroPinArtwork {
-			resolved := Pin{Backend: BackendS3, Generation: generation}
-			encoded, encodeErr := encodePin(resolved)
-			if encodeErr != nil {
-				return nil, encodeErr
-			}
-			if _, err := opts.Settings.SetIfAbsent(ctx, StorePinSettingKey, encoded); err != nil {
-				return nil, fmt.Errorf("artworkstore: adopt existing s3 artwork store: %w", err)
-			}
-			recorded, err = ReadPin(ctx, opts.Settings)
+			recorded, err = handle.recordGenerationPinIfAbsent(ctx, generation)
 			if err != nil {
-				return nil, err
-			}
-			if err := VerifyPin(recorded, resolved); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("artworkstore: adopt existing s3 artwork store: %w", err)
 			}
 		} else if !recorded.IsZero() && recorded.Generation == "" {
 			// Upgrade the phase-1 backend-only S3 pin once the reachable bucket
 			// has acquired its copy marker.
-			if err := replacePin(ctx, opts.Settings, Pin{Backend: BackendS3, Generation: generation}); err != nil {
+			if err := handle.replaceGenerationPin(ctx, generation); err != nil {
 				return nil, err
 			}
 			recorded = Pin{Backend: BackendS3, Generation: generation}
@@ -183,11 +224,13 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 			// A reachable bucket with no logical artwork objects is
 			// authoritatively empty. Rebind its newly initialized generation and
 			// let the repair coordinator rebuild it.
-			if err := replacePin(ctx, opts.Settings, Pin{Backend: BackendS3, Generation: generation}); err != nil {
+			if err := handle.replaceGenerationPin(ctx, generation); err != nil {
 				return nil, err
 			}
 			recorded = Pin{Backend: BackendS3, Generation: generation}
 			handle.health.force(HealthEmptyRebuilding)
+		} else {
+			handle.setGeneration(generation)
 		}
 
 	case BackendLocal:
@@ -255,14 +298,15 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 				handle.health.force(HealthUnavailable)
 				break
 			}
-			handle.setGeneration(marker.ID)
 			if !recorded.IsZero() {
 				handle.health.force(HealthEmptyRebuilding)
-				if err := replacePin(ctx, opts.Settings, Pin{Backend: BackendLocal, Generation: marker.ID}); err != nil {
+				if err := handle.replaceGenerationPin(ctx, marker.ID); err != nil {
 					_ = store.Close()
 					return nil, err
 				}
 				recorded = Pin{Backend: BackendLocal, Generation: marker.ID}
+			} else {
+				handle.setGeneration(marker.ID)
 			}
 		default:
 			handle.setGeneration(recorded.Generation)
@@ -270,7 +314,7 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 		}
 	}
 
-	resolved := Pin{Backend: handle.Backend, Generation: handle.GenerationID()}
+	resolved := handle.resolvedPin()
 	state, _ := handle.Health()
 	if state != HealthUnavailable && state != HealthWrongMount {
 		if err := VerifyPin(recorded, resolved); err != nil {
@@ -283,7 +327,7 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 	}
 
 	handle.Store = &healthStore{
-		Store:  observeStore(newPinningStore(handle.Store, resolved, opts.Settings, !recorded.IsZero()), handle.Backend),
+		Store:  observeStore(newPinningStore(handle.Store, handle.resolvedPin, opts.Settings, !recorded.IsZero()), handle.Backend),
 		handle: handle,
 	}
 	return handle, nil
@@ -466,9 +510,8 @@ func (h *Handle) check(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			h.setGeneration(marker.ID)
 			h.health.force(HealthEmptyRebuilding)
-			if err := replacePin(ctx, h.settings, Pin{Backend: h.Backend, Generation: marker.ID}); err != nil {
+			if err := h.replaceGenerationPin(ctx, marker.ID); err != nil {
 				return err
 			}
 			recorded = Pin{Backend: h.Backend, Generation: marker.ID}
@@ -492,7 +535,7 @@ func (h *Handle) check(ctx context.Context) error {
 		}
 		zeroPinArtwork := false
 		if recorded.IsZero() {
-			zeroPinArtwork, err = h.s3.hasArtworkObjects(ctx)
+			zeroPinArtwork, err = h.checkZeroPinArtwork(ctx)
 			if err != nil {
 				return err
 			}
@@ -503,20 +546,13 @@ func (h *Handle) check(ctx context.Context) error {
 		}
 		resolved := Pin{Backend: h.Backend, Generation: generation}
 		if recorded.IsZero() && zeroPinArtwork {
-			encoded, encodeErr := encodePin(resolved)
-			if encodeErr != nil {
-				return encodeErr
-			}
-			if _, err := h.settings.SetIfAbsent(ctx, StorePinSettingKey, encoded); err != nil {
-				return err
-			}
-			recorded, err = ReadPin(ctx, h.settings)
+			recorded, err = h.recordGenerationPinIfAbsent(ctx, generation)
 			if err != nil {
 				return err
 			}
 		}
 		if !recorded.IsZero() && recorded.Generation == "" {
-			if err := replacePin(ctx, h.settings, resolved); err != nil {
+			if err := h.replaceGenerationPin(ctx, generation); err != nil {
 				return err
 			}
 			recorded = resolved
@@ -527,10 +563,9 @@ func (h *Handle) check(ctx context.Context) error {
 			h.setGeneration(currentGeneration)
 		}
 		if initialized && generation != currentGeneration {
-			if err := replacePin(ctx, h.settings, Pin{Backend: h.Backend, Generation: generation}); err != nil {
+			if err := h.replaceGenerationPin(ctx, generation); err != nil {
 				return err
 			}
-			h.setGeneration(generation)
 			h.health.force(HealthEmptyRebuilding)
 			return nil
 		}
@@ -543,6 +578,21 @@ func (h *Handle) check(ctx context.Context) error {
 		return nil
 	}
 	return errors.New("artworkstore: artwork storage is not configured")
+}
+
+func (h *Handle) checkZeroPinArtwork(ctx context.Context) (bool, error) {
+	h.zeroPinCheckMu.Lock()
+	defer h.zeroPinCheckMu.Unlock()
+	if !h.zeroPinCheckAt.IsZero() && time.Since(h.zeroPinCheckAt) < zeroPinArtworkCheckTTL {
+		return h.zeroPinCheckArtwork, nil
+	}
+	hasArtwork, err := h.s3.hasArtworkObjects(ctx)
+	if err != nil {
+		return false, err
+	}
+	h.zeroPinCheckArtwork = hasArtwork
+	h.zeroPinCheckAt = time.Now()
+	return hasArtwork, nil
 }
 
 // Close releases backend resources.

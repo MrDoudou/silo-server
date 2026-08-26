@@ -348,6 +348,27 @@ func (r *fakeArtworkURLResolver) ResolveArtworkURLs(_ context.Context, keys []st
 	return resolved
 }
 
+type blockingArtworkURLResolver struct {
+	url     string
+	ttl     time.Duration
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+	calls   atomic.Int32
+}
+
+func (r *blockingArtworkURLResolver) ResolveArtworkURLs(_ context.Context, keys []string) map[string]artworkstore.ResolvedURL {
+	r.calls.Add(1)
+	r.once.Do(func() { close(r.started) })
+	<-r.release
+	expiresAt := time.Now().Add(r.ttl)
+	resolved := make(map[string]artworkstore.ResolvedURL, len(keys))
+	for _, key := range keys {
+		resolved[key] = artworkstore.ResolvedURL{URL: r.url, ExpiresAt: &expiresAt}
+	}
+	return resolved
+}
+
 func TestPluginImageResolverStoredArtworkURLsCarryExpiry(t *testing.T) {
 	artwork := &fakeArtworkURLResolver{ttl: 10 * time.Minute}
 	resolver := NewPluginImageResolver()
@@ -370,6 +391,41 @@ func TestPluginImageResolverStoredArtworkURLsCarryExpiry(t *testing.T) {
 	}
 	if first.ExpiresAt.Before(before.Add(9*time.Minute)) || first.ExpiresAt.After(before.Add(11*time.Minute)) {
 		t.Fatalf("artwork expiry = %s, want about 10m from now", first.ExpiresAt.Sub(before))
+	}
+}
+
+func TestPluginImageResolverDoesNotCacheInFlightResultAfterArtworkResolverSwap(t *testing.T) {
+	old := &blockingArtworkURLResolver{
+		url: "https://old.example/artwork", ttl: time.Hour,
+		started: make(chan struct{}), release: make(chan struct{}),
+	}
+	current := &fakeArtworkURLResolver{ttl: time.Hour}
+	resolver := NewPluginImageResolver()
+	defer resolver.Close()
+	resolver.SetArtworkURLResolver(old)
+
+	const key = "artwork/v1/objects/poster/ab/abcd/original.webp"
+	firstResult := make(chan catalog.ResolvedImageURL, 1)
+	go func() {
+		firstResult <- resolver.ResolveImageURLWithExpiry(context.Background(), key, "featured")
+	}()
+	<-old.started
+	resolver.SetArtworkURLResolver(current)
+	close(old.release)
+	if got := <-firstResult; got.URL != old.url {
+		t.Fatalf("in-flight caller URL = %q, want old resolver result %q", got.URL, old.url)
+	}
+
+	second := resolver.ResolveImageURLWithExpiry(context.Background(), key, "featured")
+	third := resolver.ResolveImageURLWithExpiry(context.Background(), key, "featured")
+	if second.URL == old.url || third.URL != second.URL {
+		t.Fatalf("post-swap URLs = second %q third %q", second.URL, third.URL)
+	}
+	if current.calls != 1 {
+		t.Fatalf("new resolver calls = %d, want one resolution followed by a cache hit", current.calls)
+	}
+	if old.calls.Load() != 1 {
+		t.Fatalf("old resolver calls = %d, want one", old.calls.Load())
 	}
 }
 

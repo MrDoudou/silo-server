@@ -144,6 +144,7 @@ func TestArtworkRestartClassification(t *testing.T) {
 	restartRequired := map[string]bool{
 		ArtworkStorageBackendKey:        true,
 		ArtworkLocalPathKey:             true,
+		ArtworkLocalOwnershipKey:        true,
 		ArtworkURLTTLKey:                false,
 		ArtworkRemoteMaterializationKey: false,
 	}

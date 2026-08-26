@@ -59,12 +59,14 @@ var restartRequiredKeys = map[string]bool{
 
 	// Canonical artwork store. The backend is selected, verified against the
 	// store pin, and opened once at startup — the filesystem root becomes a
-	// confined handle held for the process lifetime — so both are frozen.
+	// confined handle held for the process lifetime, and local ownership fixes
+	// mount-recovery semantics on that handle — so all three are frozen.
 	// artwork.url_ttl and artwork.remote_materialization are read live and
 	// stay out of this registry; note that "artwork." is deliberately NOT a
 	// restart-required prefix.
 	ArtworkStorageBackendKey: true,
 	ArtworkLocalPathKey:      true,
+	ArtworkLocalOwnershipKey: true,
 
 	// Scanner / matcher toggles captured at construction. Worker counts,
 	// batch size, metadata.cache_images, and mdblist.api_key hot-reload via

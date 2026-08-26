@@ -82,15 +82,17 @@ func TestClassifyImageCacheFailureParksExhaustedTransientErrorRecoverably(t *tes
 }
 
 func TestClassifyImageCacheFailureTombstonesExhaustedStableFailure(t *testing.T) {
-	got := classifyImageCacheFailure(
-		imageCacheMaxAttempts-1,
+	for _, errText := range []string{
 		"imagecache: download https://example.invalid/missing.jpg: unexpected status 404",
-	)
-	if got.status != ImageCacheStatusFailed {
-		t.Fatalf("status = %q, want %q", got.status, ImageCacheStatusFailed)
-	}
-	if got.retryDelay != imageCachePermanentPark {
-		t.Fatalf("retry delay = %s, want the permanent park %s", got.retryDelay, imageCachePermanentPark)
+		"local image is not a regular file allowed for artwork: /media/movie/poster.jpg",
+	} {
+		got := classifyImageCacheFailure(imageCacheMaxAttempts-1, errText)
+		if got.status != ImageCacheStatusFailed {
+			t.Fatalf("status for %q = %q, want %q", errText, got.status, ImageCacheStatusFailed)
+		}
+		if got.retryDelay != imageCachePermanentPark {
+			t.Fatalf("retry delay for %q = %s, want the permanent park %s", errText, got.retryDelay, imageCachePermanentPark)
+		}
 	}
 }
 

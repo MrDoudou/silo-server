@@ -3539,6 +3539,12 @@ export interface ArtworkStorageAccounting {
   coverage_limit_reason?: string;
   failure_count: number;
   untracked_user_artwork: boolean;
+  adoption_index_bytes: number;
+  adoption_index_objects: number;
+  branding_bytes: number;
+  branding_objects: number;
+  legacy_upload_bytes: number;
+  legacy_upload_objects: number;
   seed: {
     bytes: number;
     expired_bytes: number;

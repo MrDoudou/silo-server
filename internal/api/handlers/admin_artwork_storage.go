@@ -46,17 +46,18 @@ func (h *AdminArtworkStorageHandler) HandleStorage(w http.ResponseWriter, r *htt
 
 func (h *AdminArtworkStorageHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 	h.createJob(w, r, adminjob.CreateJobInput{
-		JobType:         adminjob.JobTypeArtworkStorageRefresh,
-		CreatedByUserID: currentAdminUserID(r),
-		RequestPayload:  map[string]any{},
-		Message:         "Queued artwork storage refresh",
+		JobType:          adminjob.JobTypeArtworkStorageRefresh,
+		CreatedByUserID:  currentAdminUserID(r),
+		RequestPayload:   map[string]any{},
+		Message:          "Queued artwork storage refresh",
+		ResumeCheckpoint: true,
 	}, "An artwork storage refresh or purge is already queued or running")
 }
 
 func (h *AdminArtworkStorageHandler) HandleImport(w http.ResponseWriter, r *http.Request) {
 	h.createJob(w, r, adminjob.CreateJobInput{
 		JobType: adminjob.JobTypeArtworkStorageImport, CreatedByUserID: currentAdminUserID(r),
-		RequestPayload: map[string]any{}, Message: "Queued portable artwork store import",
+		RequestPayload: map[string]any{}, Message: "Queued portable artwork store import", ResumeCheckpoint: true,
 	}, "An artwork storage job is already queued or running")
 }
 
@@ -73,11 +74,12 @@ func (h *AdminArtworkStorageHandler) HandlePurge(w http.ResponseWriter, r *http.
 		return
 	}
 	h.createJob(w, r, adminjob.CreateJobInput{
-		JobType:         adminjob.JobTypeArtworkPurge,
-		CreatedByUserID: currentAdminUserID(r),
-		RequestPayload:  req,
-		DryRun:          req.DryRun,
-		Message:         "Queued artwork storage purge",
+		JobType:          adminjob.JobTypeArtworkPurge,
+		CreatedByUserID:  currentAdminUserID(r),
+		RequestPayload:   req,
+		DryRun:           req.DryRun,
+		Message:          "Queued artwork storage purge",
+		ResumeCheckpoint: true,
 	}, "An artwork storage refresh or purge is already queued or running")
 }
 

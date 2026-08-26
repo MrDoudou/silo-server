@@ -272,6 +272,16 @@ func (fakePresigner) PresignArtworkTargetImageURL(_ context.Context, _ artworkur
 	return "https://s3.example.com/" + path + "?sig=abc"
 }
 
+type rootRelativePresigner struct{}
+
+func (rootRelativePresigner) PresignImageURL(context.Context, string, string, string) string {
+	return "/api/v1/artwork/legacy"
+}
+
+func (rootRelativePresigner) PresignArtworkTargetImageURL(context.Context, artworkurl.Target, string, string, string) string {
+	return "/api/v1/artwork/item-posters/series-1/poster/w300?token=abc"
+}
+
 func TestDiscordPosterURLModes(t *testing.T) {
 	const cachedKey = "tmdb/series/95396/poster/original.jpg"
 	system := func(mode string, images ImageURLResolver) *System {
@@ -303,6 +313,45 @@ func TestDiscordPosterURLModes(t *testing.T) {
 	// Server without a wired resolver degrades to no image.
 	if got := system("server", nil).discordPosterURL(ctx, cachedKey, "", "series-1"); got != "" {
 		t.Fatalf("server mode without resolver must render no image, got %q", got)
+	}
+}
+
+func TestOutboundServerPosterRequiresExternalOrigin(t *testing.T) {
+	const cachedKey = "tmdb/series/95396/poster/original.jpg"
+	ctx := context.Background()
+	makeSystem := func(settings mapSettingReader, publicURL string) *System {
+		system := &System{Settings: NewSettings(settings), images: rootRelativePresigner{}}
+		system.SetPublicURL(publicURL)
+		return system
+	}
+
+	withoutOrigin := makeSystem(mapSettingReader{SettingDiscordPosterMode: "server"}, "")
+	if got := withoutOrigin.discordPosterURL(ctx, cachedKey, "", "series-1"); got != "" {
+		t.Fatalf("server poster without external origin = %q, want empty", got)
+	}
+
+	withPublicURL := makeSystem(mapSettingReader{SettingDiscordPosterMode: "server"}, "https://silo.example/")
+	if got := withPublicURL.discordPosterURL(ctx, cachedKey, "", "series-1"); got != "https://silo.example/api/v1/artwork/item-posters/series-1/poster/w300?token=abc" {
+		t.Fatalf("server poster with public URL = %q", got)
+	}
+
+	withEmailOverride := makeSystem(mapSettingReader{
+		SettingDiscordPosterMode: "server",
+		SettingEmailExternalURL:  "https://notifications.example/base/",
+	}, "https://silo.example")
+	if got := withEmailOverride.discordPosterURL(ctx, cachedKey, "", "series-1"); got != "https://notifications.example/base/api/v1/artwork/item-posters/series-1/poster/w300?token=abc" {
+		t.Fatalf("server poster with email external URL = %q", got)
+	}
+
+	// Same-origin consumers (in-app API, websocket, web push service worker)
+	// keep the root-relative capability: it resolves against the client's own
+	// origin and must not require a configured public URL.
+	seriesID := "series-1"
+	payload := withPublicURL.PayloadForRow(ctx, DeliveryRow{
+		Delivery: Delivery{SeriesID: &seriesID}, PosterPath: cachedKey,
+	})
+	if payload.PosterURL != "/api/v1/artwork/item-posters/series-1/poster/w300?token=abc" {
+		t.Fatalf("in-app poster URL = %q, want root-relative capability", payload.PosterURL)
 	}
 }
 

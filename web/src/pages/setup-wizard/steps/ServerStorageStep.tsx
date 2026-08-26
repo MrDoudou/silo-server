@@ -563,15 +563,15 @@ export function ServerStorageStep() {
       </Section>
 
       <Section
-        label="Local artwork storage"
-        description="Automatic default for posters, backdrops, logos, and generated variants. No value is required."
+        label="Artwork storage"
+        description="Automatic mode uses your public S3 bucket when one is configured; otherwise it uses local disk."
       >
         <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
           <div>
-            <p className="text-sm font-medium">Ready automatically</p>
+            <p className="text-sm font-medium">Automatic backend ready</p>
             <p className="text-muted-foreground mt-1 text-xs">
-              Resolved path:{" "}
+              Local fallback path:{" "}
               {form.getValue("artwork.local_path") || "Silo application data/artwork"}
             </p>
           </div>
@@ -586,13 +586,12 @@ export function ServerStorageStep() {
             value={form.getValue("artwork.storage_backend") || "auto"}
             onChange={(event) => form.setValue("artwork.storage_backend", event.target.value)}
           >
-            <option value="auto">Automatic local storage (Recommended)</option>
+            <option value="auto">Automatic (Recommended)</option>
             <option value="local">Local storage</option>
             <option value="s3">Shared S3 storage</option>
           </select>
           <p className="text-muted-foreground text-xs">
-            Shared S3 is intended for clustered deployments whose API nodes do not share a
-            filesystem.
+            Uses your public S3 bucket when one is configured; otherwise local disk.
           </p>
         </div>
         <div className="space-y-1.5">

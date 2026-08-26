@@ -110,7 +110,9 @@ func (s *FilesystemStore) FreeSpaceBytes(_ context.Context) (int64, error) {
 	if err := syscall.Statfs(s.rootPath, &stat); err != nil {
 		return 0, fmt.Errorf("artworkstore: stat filesystem capacity: %w", err)
 	}
-	return int64(stat.Bavail) * int64(stat.Bsize), nil
+	// stat.Bsize is int64 on linux but uint32 on darwin; the conversion is
+	// required for the narrower platforms.
+	return int64(stat.Bavail) * int64(stat.Bsize), nil //nolint:unconvert
 }
 
 // Close releases the store root handle. Later calls reopen it.

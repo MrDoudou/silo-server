@@ -1695,6 +1695,13 @@ func main() {
 	var audiobookEnricher *audiobooks.Enricher
 	var ebookEnricher *ebooks.Enricher
 	var mangaEnricher *manga.Enricher
+	var artworkDeliveryCoordinator *metadata.ArtworkDeliveryCoordinator
+	if deps.ArtworkStore != nil && deps.DB != nil {
+		artworkDeliveryCoordinator = metadata.NewArtworkDeliveryCoordinator(
+			deps.DB, metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.UserStoreProvider,
+		)
+		artworkDeliveryCoordinator.SetStoreHealth(deps.ArtworkStore)
+	}
 	if needsWorkers && deps.DB != nil && deps.FileRepo != nil {
 		chainRepo := metadata.NewChainRepository(deps.DB)
 		// Make every existing library chain aware of the built-in providers
@@ -1869,9 +1876,7 @@ func main() {
 			// library's roots and sweep stale hashed local/ prefixes on re-cache.
 			// The processor host must mount the libraries, like the metadata worker.
 			metadataImageCacheProcessor.SetLibraryRootResolver(deps.FolderRepo)
-			publicationCoordinator := metadata.NewArtworkDeliveryCoordinator(deps.DB, metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.UserStoreProvider)
-			publicationCoordinator.SetStoreHealth(deps.ArtworkStore)
-			metadataImageCacheProcessor.SetArtworkPublicationObserver(publicationCoordinator)
+			metadataImageCacheProcessor.SetArtworkPublicationObserver(artworkDeliveryCoordinator)
 			// Prefix sweeps only ever apply to the legacy S3 local/ key scheme.
 			// Portable revisions are content-addressed and shared between rows,
 			// so they are never prefix-deleted; the reference-aware revision GC
@@ -2180,6 +2185,9 @@ func main() {
 	if userStoreProvider != nil {
 		deps.UserStoreProvider = userStoreProvider
 		deps.UserArtworkTracked = userArtworkTracked
+		if artworkDeliveryCoordinator != nil {
+			artworkDeliveryCoordinator.SetUserStoreProvider(userStoreProvider)
+		}
 	}
 	if watchProviderService != nil {
 		historyRepo := historyimport.NewRepository(deps.DB, deps.SecretCipher)
@@ -2546,11 +2554,13 @@ func main() {
 		taskMgr.Register(tasks.NewCleanupOrphanedMediaItemsTask(catalog.NewOrphanedProvisionalCleaner(deps.DB)))
 		taskMgr.Register(tasks.NewBackfillMediaItemAliasesTask(catalog.NewItemAliasRepository(deps.DB)))
 		if deps.ArtworkStore != nil {
-			// The temp-file sweeper only exists on the filesystem backend; the
-			// nil check avoids handing the task a typed-nil interface.
+			// The store wrappers forward temp-file sweeps, but only the filesystem
+			// backend implements them. Keep the sweeper nil for S3 so the task skips it.
 			var artworkTempSweeper tasks.ArtworkTempFileSweeper
-			if sweeper, ok := deps.ArtworkStore.Store.(tasks.ArtworkTempFileSweeper); ok {
-				artworkTempSweeper = sweeper
+			if deps.ArtworkStore.Backend == artworkstore.BackendLocal {
+				if sweeper, ok := deps.ArtworkStore.Store.(tasks.ArtworkTempFileSweeper); ok {
+					artworkTempSweeper = sweeper
+				}
 			}
 			taskMgr.Register(tasks.NewCleanupArtworkRevisionsTask(
 				metadata.NewArtworkRevisionGarbageCollector(deps.DB, deps.ArtworkStore.Store),
@@ -2792,82 +2802,8 @@ func main() {
 		defer taskMgr.Stop()
 		deps.TaskManager = taskMgr
 		slog.Info("task manager started")
-		if deps.ArtworkStore != nil {
-			coordinator := metadata.NewArtworkDeliveryCoordinator(deps.DB, metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.UserStoreProvider)
-			coordinator.SetStoreHealth(deps.ArtworkStore)
-			go func() {
-				backoff := 5 * time.Second
-				for {
-					state, _ := deps.ArtworkStore.Health()
-					var persistedHealth, rebuildGeneration string
-					var enqueueComplete bool
-					err := deps.DB.QueryRow(appCtx, `SELECT store_health, rebuild_generation,
-						rebuild_enqueued_at IS NOT NULL FROM artwork_storage_accounting_state WHERE singleton`).Scan(
-						&persistedHealth, &rebuildGeneration, &enqueueComplete,
-					)
-					generation := deps.ArtworkStore.GenerationID()
-					if err == nil && persistedHealth == string(artworkstore.HealthEmptyRebuilding) && rebuildGeneration == generation && state != artworkstore.HealthEmptyRebuilding && state != artworkstore.HealthUnavailable && state != artworkstore.HealthWrongMount {
-						if probeErr := deps.ArtworkStore.ProbeNow(appCtx); probeErr == nil {
-							deps.ArtworkStore.BeginRebuild()
-							state = artworkstore.HealthEmptyRebuilding
-						}
-					}
-					if state == artworkstore.HealthEmptyRebuilding {
-						if rebuildGeneration != generation {
-							_, err = deps.DB.Exec(appCtx, `UPDATE artwork_storage_accounting_state SET
-								store_health = 'empty_rebuilding', health_changed_at = NOW(),
-								rebuild_generation = $1, rebuild_surface_name = '', rebuild_enqueued_at = NULL
-								WHERE singleton`, generation)
-							enqueueComplete = false
-						}
-						if err == nil && !enqueueComplete {
-							queued, enqueueErr := coordinator.EnqueueBulkRecovery(appCtx)
-							if enqueueErr != nil {
-								err = enqueueErr
-							} else {
-								enqueueComplete = true
-								slog.Info("artwork bulk recovery queued", "targets", queued, "generation", generation)
-							}
-						}
-						if err == nil && enqueueComplete {
-							var rebuildStatus metadata.ArtworkRebuildStatus
-							rebuildStatus, err = coordinator.RebuildStatus(appCtx)
-							if err == nil && rebuildStatus.OutstandingJobs == 0 {
-								degraded := rebuildStatus.ProtectedLosses > 0 || rebuildStatus.MissingReferences > 0
-								deps.ArtworkStore.CompleteRebuild(degraded)
-								finalHealth := artworkstore.HealthHealthy
-								if degraded {
-									finalHealth = artworkstore.HealthDegraded
-								}
-								_, err = deps.DB.Exec(appCtx, `UPDATE artwork_storage_accounting_state SET
-									store_health = $1, health_changed_at = NOW() WHERE singleton`, string(finalHealth))
-							}
-						}
-					}
-					if err != nil {
-						slog.Warn("artwork recovery coordinator iteration failed", "error", err)
-					} else {
-						backoff = 5 * time.Second
-					}
-					wait := 30 * time.Second
-					if state == artworkstore.HealthEmptyRebuilding || err != nil {
-						wait = backoff
-						if backoff < 5*time.Minute {
-							backoff *= 2
-							if backoff > 5*time.Minute {
-								backoff = 5 * time.Minute
-							}
-						}
-					}
-					timer := time.NewTimer(wait)
-					select {
-					case <-appCtx.Done():
-						timer.Stop()
-						return
-					case <-timer.C:
-					}
-				}
-			}()
+		if artworkDeliveryCoordinator != nil {
+			go artworkDeliveryCoordinator.RunRecovery(appCtx)
 		}
 	}
 
@@ -3059,9 +2995,20 @@ func main() {
 	if deps.ArtworkStore != nil && artworkURLSigner != nil && deps.DB != nil {
 		deps.ArtworkDelivery = handlers.NewArtworkHandler(deps.ArtworkStore.Store, artworkURLSigner)
 		if deps.ArtworkDelivery != nil {
-			coordinator := metadata.NewArtworkDeliveryCoordinator(deps.DB, metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.UserStoreProvider)
-			coordinator.SetStoreHealth(deps.ArtworkStore)
-			deps.ArtworkDelivery.SetResilientDependencies(coordinator, deps.ArtworkSourceResolver, deps.ArtworkStore.ReportFailure)
+			if deps.S3Public != nil {
+				var chapterStore handlers.ArtworkObjectStore
+				if deps.ArtworkStore.Backend == artworkstore.BackendS3 {
+					// Canonical artwork already uses the public bucket, so reuse its
+					// reader rather than constructing a second path to the same bytes.
+					chapterStore = deps.ArtworkStore.Store
+				} else if store, err := artworkstore.NewS3Store(deps.S3Public); err != nil {
+					slog.Warn("chapter thumbnail delivery unavailable", "error", err)
+				} else {
+					chapterStore = store
+				}
+				deps.ArtworkDelivery.SetChapterThumbnailStore(chapterStore)
+			}
+			deps.ArtworkDelivery.SetResilientDependencies(artworkDeliveryCoordinator, deps.ArtworkSourceResolver, deps.ArtworkStore.ReportFailure)
 		}
 	}
 	router := api.NewRouter(deps)

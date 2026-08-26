@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/artworkupload"
-	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/collections/templates"
 	"github.com/Silo-Server/silo-server/internal/collectionutil"
@@ -338,11 +336,7 @@ func (h *UserCollectionImportHandler) toCollectionResponse(r *http.Request, c us
 }
 
 func (h *UserCollectionImportHandler) presignCollectionPoster(ctx context.Context, userID int, collectionID, path string) string {
-	return resolveTargetStoredImageURL(ctx, h.artworkURLs, artworkurl.Target{
-		Surface: artworkurl.SurfaceUserCollectionPosters,
-		Keys:    []string{strconv.Itoa(userID), collectionID},
-		Slot:    "collection-poster",
-	}, path, "w300")
+	return resolveTargetStoredImageURL(ctx, h.artworkURLs, userCollectionPosterTarget(userID, collectionID), path, "w300")
 }
 
 func (h *UserCollectionImportHandler) HandleSync(w http.ResponseWriter, r *http.Request) {

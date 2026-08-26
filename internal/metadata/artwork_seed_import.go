@@ -61,9 +61,13 @@ func (s *ArtworkStorageService) ImportPortable(
 		if err := s.waitRateLimit(ctx); err != nil {
 			return ArtworkSeedImportResult{}, err
 		}
-		objects, next, done, err := s.store.ListPage(ctx, artworkkey.PortableObjectsPrefix+"/", cp.ImportCursor, 250)
+		previous := cp.ImportCursor
+		objects, next, done, err := s.store.ListPage(ctx, artworkkey.PortableObjectsPrefix+"/", previous, 250)
 		if err != nil {
 			return ArtworkSeedImportResult{}, fmt.Errorf("artwork seed import: list portable tree: %w", err)
+		}
+		if err := validateArtworkListCursor("artwork seed import: portable tree", previous, next, done); err != nil {
+			return ArtworkSeedImportResult{}, err
 		}
 		var page seedImportPageCounts
 		for _, object := range objects {

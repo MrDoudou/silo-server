@@ -170,13 +170,13 @@ func resolveProfileAvatarTarget(
 ) (source string, url string) {
 	trimmed := strings.TrimSpace(ref)
 	if strings.HasPrefix(trimmed, profileAvatarUploadPrefix) {
-		displayKey := uploadedAvatarDisplayKey(strings.TrimPrefix(trimmed, profileAvatarUploadPrefix))
-		if artworkkey.IsPortableKey(displayKey) {
+		originalKey := strings.TrimPrefix(trimmed, profileAvatarUploadPrefix)
+		if artworkkey.IsPortableKey(originalKey) {
 			return avatarSourceUpload, resolveTargetStoredImageURL(ctx, resolver, artworkurl.Target{
 				Surface: artworkurl.SurfaceProfileAvatars,
 				Keys:    []string{strconv.Itoa(userID), profileID},
 				Slot:    "avatar",
-			}, displayKey, "original")
+			}, originalKey, avatarDisplayVariant)
 		}
 	}
 	return resolveProfileAvatar(ctx, resolver, legacy, ttl, ref)

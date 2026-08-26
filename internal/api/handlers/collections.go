@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +16,6 @@ import (
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkupload"
-	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/collectionutil"
 	"github.com/Silo-Server/silo-server/internal/s3client"
@@ -1072,9 +1071,6 @@ func (h *CollectionHandler) processCollectionPoster(
 	if !h.ArtworkUploads.Available() {
 		return fmt.Errorf("poster upload requires configured artwork storage")
 	}
-	if err := removeLegacyCollectionImageVariants(r.Context(), h.S3GP, userCollectionImagePrefix, collectionID, "poster"); err != nil {
-		return fmt.Errorf("clearing previous poster: %w", err)
-	}
 	storedPath, thumbhash, err := materializeCollectionImage(r.Context(), h.ArtworkUploads, artworkkey.ImageTypePoster, fileData, h.TrackArtworkRevisions)
 	if err != nil {
 		return fmt.Errorf("poster: %w", err)
@@ -1091,17 +1087,17 @@ func (h *CollectionHandler) processCollectionPoster(
 		}
 		return fmt.Errorf("persisting poster: %w", err)
 	}
+	if err := removeLegacyCollectionImageVariants(r.Context(), h.S3GP, userCollectionImagePrefix, collectionID, "poster"); err != nil {
+		slog.WarnContext(r.Context(), "failed to clean up legacy personal collection poster", "component", "api",
+			"collection_id", collectionID, "error", err)
+	}
 	return nil
 }
 
 // userCollectionPosterURL resolves the card-sized variant of a stored user
 // collection poster, mirroring the admin pipeline. Empty paths return "".
 func (h *CollectionHandler) userCollectionPosterURL(ctx context.Context, userID int, collectionID, path string) string {
-	return resolveTargetStoredImageURL(ctx, h.ArtworkURLs, artworkurl.Target{
-		Surface: artworkurl.SurfaceUserCollectionPosters,
-		Keys:    []string{strconv.Itoa(userID), collectionID},
-		Slot:    "collection-poster",
-	}, path, "w300")
+	return resolveTargetStoredImageURL(ctx, h.ArtworkURLs, userCollectionPosterTarget(userID, collectionID), path, "w300")
 }
 
 // toCollectionResponse mirrors the package-level helper but presigns artwork

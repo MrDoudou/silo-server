@@ -7,10 +7,12 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkupload"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/s3client"
 )
 
@@ -31,6 +33,14 @@ const (
 
 	collectionImageMaxBytes = 10 << 20 // 10 MB
 )
+
+func userCollectionPosterTarget(userID int, collectionID string) artworkurl.Target {
+	return artworkurl.Target{
+		Surface: artworkurl.SurfaceUserCollectionPosters,
+		Keys:    []string{strconv.Itoa(userID), collectionID},
+		Slot:    artworkkey.ImageTypeCollectionPoster,
+	}
+}
 
 // storeBundledCollectionPoster materializes a built-in collection template
 // poster into the artwork store, so the collection keeps its artwork if the

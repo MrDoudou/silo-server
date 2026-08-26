@@ -303,8 +303,8 @@ export default function StorageSettings() {
 
           <TabsContent value="artwork" className="space-y-1 pt-4">
             <p className="text-muted-foreground mb-4 text-sm">
-              Local artwork storage is the automatic default. Shared S3 is an advanced option for
-              clustered deployments.
+              Automatic mode uses your public S3 bucket when one is configured; otherwise it uses
+              local disk.
             </p>
             <SettingField
               label="Artwork Backend"
@@ -312,7 +312,7 @@ export default function StorageSettings() {
               value={form.getValue("artwork.storage_backend") || "auto"}
               onChange={(v) => form.setValue("artwork.storage_backend", v)}
               options={[
-                { value: "auto", label: "Automatic local storage (Recommended)" },
+                { value: "auto", label: "Automatic (Recommended)" },
                 { value: "local", label: "Local storage" },
                 { value: "s3", label: "Shared S3 storage" },
               ]}
@@ -321,7 +321,7 @@ export default function StorageSettings() {
               label="Resolved Local Path"
               value={form.getValue("artwork.local_path")}
               onChange={(v) => form.setValue("artwork.local_path", v)}
-              hint="Used by automatic and local modes. A restart is required after changing the path."
+              hint="Used when automatic mode resolves to local disk and by explicit local mode. A restart is required after changing the path."
             />
             <SettingField
               label="Artwork delivery"

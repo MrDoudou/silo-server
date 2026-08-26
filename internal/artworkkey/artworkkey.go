@@ -141,13 +141,11 @@ func ImageTypes() []string {
 // directory is one of the fixed image types.
 func IsStoredArtworkKey(key string) bool {
 	key = strings.TrimSpace(key)
-	if _, ok := ParsePortableKey(key); ok || IsAdoptionIndexKey(key) {
+	if _, ok := ParsePortableKey(key); ok || IsAdoptionIndexKey(key) || IsBrandingKey(key) {
 		return true
 	}
-	for _, prefix := range []string{"library-posters/", "collection-images/", "user-collection-images/", "profile-avatars/"} {
-		if strings.HasPrefix(key, prefix) {
-			return true
-		}
+	if IsLegacyUploadKey(key) {
+		return true
 	}
 	dir, filename := path.Dir(key), path.Base(key)
 	if dir == "." || filename == "." || filename == "" {

@@ -13,6 +13,10 @@ ALTER TABLE public.artwork_storage_accounting_state
     ADD COLUMN seed_revisions bigint NOT NULL DEFAULT 0,
     ADD COLUMN adoption_index_bytes bigint NOT NULL DEFAULT 0,
     ADD COLUMN adoption_index_objects bigint NOT NULL DEFAULT 0,
+    ADD COLUMN branding_bytes bigint NOT NULL DEFAULT 0,
+    ADD COLUMN branding_objects bigint NOT NULL DEFAULT 0,
+    ADD COLUMN legacy_upload_bytes bigint NOT NULL DEFAULT 0,
+    ADD COLUMN legacy_upload_objects bigint NOT NULL DEFAULT 0,
     ADD COLUMN last_seed_import_at timestamptz;
 
 DROP INDEX IF EXISTS public.admin_jobs_active_artwork_storage_idx;
@@ -35,6 +39,10 @@ CREATE UNIQUE INDEX admin_jobs_active_artwork_storage_idx
 
 ALTER TABLE public.artwork_storage_accounting_state
     DROP COLUMN IF EXISTS last_seed_import_at,
+    DROP COLUMN IF EXISTS legacy_upload_objects,
+    DROP COLUMN IF EXISTS legacy_upload_bytes,
+    DROP COLUMN IF EXISTS branding_objects,
+    DROP COLUMN IF EXISTS branding_bytes,
     DROP COLUMN IF EXISTS adoption_index_objects,
     DROP COLUMN IF EXISTS adoption_index_bytes,
     DROP COLUMN IF EXISTS seed_revisions,
