@@ -101,7 +101,7 @@ export default function AdminArtworkStorage() {
         </div>
         <div className="flex gap-2">
           <Badge variant={storeHealth === "healthy" ? "secondary" : "destructive"}>
-            {storeHealth.replaceAll("_", " ")}
+            {storeHealth.replace(/_/g, " ")}
           </Badge>
           <Badge variant={data.complete ? "secondary" : "outline"}>
             {data.complete ? "Complete" : "Incomplete"}
