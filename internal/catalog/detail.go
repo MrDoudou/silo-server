@@ -16,6 +16,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/access"
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
+	"github.com/Silo-Server/silo-server/internal/imagesize"
 	"github.com/Silo-Server/silo-server/internal/lang"
 	"github.com/Silo-Server/silo-server/internal/models"
 	"github.com/Silo-Server/silo-server/internal/overlays"
@@ -1457,7 +1458,7 @@ func (s *DetailService) buildSeriesDetailContext(ctx context.Context, seriesID s
 	if err != nil {
 		return nil, fmt.Errorf("localizing episode series detail: %w", err)
 	}
-	castCredits, crewCredits := s.fetchCredits(ctx, seriesID)
+	castCredits, crewCredits := s.fetchCredits(ctx, seriesID, filter)
 	backdropTarget := artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{seriesID}}
 	if series.BackdropPath != baseSeries.BackdropPath {
 		if language, resolveErr := s.resolvePresentationLanguage(ctx, filter, baseSeries.OriginalLanguage); resolveErr == nil && language != "" {
@@ -1469,7 +1470,7 @@ func (s *DetailService) buildSeriesDetailContext(ctx context.Context, seriesID s
 		castCredits: castCredits,
 		crewCredits: crewCredits,
 		versionPref: s.effectiveVersionDefaults(ctx, filter, seriesID),
-		backdropURL: s.PresignArtworkTargetImageURL(ctx, backdropTarget, series.BackdropPath, "backdrop", ""),
+		backdropURL: s.PresignArtworkTargetImageURL(ctx, backdropTarget, series.BackdropPath, artworkkey.ImageTypeBackdrop, string(filter.ImageSize)),
 	}, nil
 }
 
@@ -1675,7 +1676,7 @@ func (s *DetailService) GetItemDetailsByIDs(ctx context.Context, contentIDs []st
 			haveCredits:        s.personRepo != nil,
 		}
 		if s.personRepo != nil {
-			pf.castCredits, pf.crewCredits = splitCastCrew(s.personCredits(ctx, creditsByID[id]))
+			pf.castCredits, pf.crewCredits = splitCastCrew(s.personCredits(ctx, creditsByID[id], filter))
 		}
 		if item.Type != "series" && haveFileBatch {
 			pf.haveFiles = true
@@ -1769,7 +1770,7 @@ func (s *DetailService) fetchItemExtras(ctx context.Context, contentID string, p
 }
 
 // fetchCredits returns cast and crew credits for the given content ID.
-func (s *DetailService) fetchCredits(ctx context.Context, contentID string) ([]CastCredit, []CrewCredit) {
+func (s *DetailService) fetchCredits(ctx context.Context, contentID string, filter AccessFilter) ([]CastCredit, []CrewCredit) {
 	if s.personRepo == nil {
 		return []CastCredit{}, []CrewCredit{}
 	}
@@ -1777,7 +1778,7 @@ func (s *DetailService) fetchCredits(ctx context.Context, contentID string) ([]C
 	if err != nil {
 		people = nil
 	}
-	credits := s.personCredits(ctx, people)
+	credits := s.personCredits(ctx, people, filter)
 	return splitCastCrew(credits)
 }
 
@@ -1823,7 +1824,7 @@ func (s *DetailService) buildMediaItemDetail(ctx context.Context, item *models.M
 	if pf != nil && pf.haveCredits {
 		castCredits, crewCredits = pf.castCredits, pf.crewCredits
 	} else {
-		castCredits, crewCredits = s.fetchCredits(ctx, contentID)
+		castCredits, crewCredits = s.fetchCredits(ctx, contentID, filter)
 	}
 	detail := &ItemDetail{
 		ContentID:                  item.ContentID,
@@ -1876,9 +1877,9 @@ func (s *DetailService) buildMediaItemDetail(ctx context.Context, item *models.M
 			logoTarget = artworkurl.Target{Surface: artworkurl.SurfaceLocalizedItemLogos, Keys: keys}
 		}
 	}
-	detail.PosterURL = s.PresignArtworkTargetImageURL(ctx, posterTarget, item.PosterPath, "poster", "")
-	detail.BackdropURL = s.PresignArtworkTargetImageURL(ctx, backdropTarget, item.BackdropPath, "backdrop", "")
-	detail.LogoURL = s.PresignArtworkTargetImageURL(ctx, logoTarget, item.LogoPath, "logo", "")
+	detail.PosterURL = s.PresignArtworkTargetImageURL(ctx, posterTarget, item.PosterPath, artworkkey.ImageTypePoster, string(filter.ImageSize))
+	detail.BackdropURL = s.PresignArtworkTargetImageURL(ctx, backdropTarget, item.BackdropPath, artworkkey.ImageTypeBackdrop, string(filter.ImageSize))
+	detail.LogoURL = s.PresignArtworkTargetImageURL(ctx, logoTarget, item.LogoPath, artworkkey.ImageTypeLogo, string(filter.ImageSize))
 
 	// File versions and subtitle aggregation only apply to movies.
 	// For series, each episode file shares the series content_id, so
@@ -2009,7 +2010,7 @@ func applyWorkSummaryValue(detail *ItemDetail, summary *WorkSummary) {
 }
 
 // personCredits converts ItemPerson slice to PersonCredit slice with presigned URLs.
-func (s *DetailService) personCredits(ctx context.Context, people []models.ItemPerson) []PersonCredit {
+func (s *DetailService) personCredits(ctx context.Context, people []models.ItemPerson, filter AccessFilter) []PersonCredit {
 	credits := make([]PersonCredit, 0, len(people))
 	for _, p := range people {
 		pc := PersonCredit{
@@ -2026,7 +2027,7 @@ func (s *DetailService) personCredits(ctx context.Context, people []models.ItemP
 		if p.PhotoPath != "" && p.PhotoPath != "-" {
 			pc.PhotoURL = s.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
 				Surface: artworkurl.SurfacePersonPhotos, Keys: []string{strconv.FormatInt(p.ID, 10)},
-			}, p.PhotoPath, "profile", "")
+			}, p.PhotoPath, artworkkey.ImageTypeProfile, string(filter.ImageSize))
 		}
 		if p.PhotoThumbhash != "" && p.PhotoThumbhash != "-" {
 			pc.PhotoThumbhash = p.PhotoThumbhash
@@ -2239,7 +2240,8 @@ func (s *DetailService) fetchMangaChapters(ctx context.Context, seriesContentID 
 	}
 	// Presign every chapter poster in one batch rather than per chapter — a
 	// long-running series has hundreds of chapters.
-	resolved := s.PresignArtworkTargetsWithExpiry(ctx, posterTargets, "w500")
+	variant := cachedImageVariantKey(artworkkey.ImageTypePoster, string(filter.ImageSize))
+	resolved := s.PresignArtworkTargetsWithExpiry(ctx, posterTargets, variant)
 	for i := range chapters {
 		chapters[i].PosterURL = resolved[posterTargets[i].CacheKey()].URL
 	}
@@ -2271,17 +2273,17 @@ func firstNonEmptyString(values []string) string {
 	return ""
 }
 
-func (s *DetailService) presignAudiobookPosterTargetURL(ctx context.Context, contentID, posterPath string) string {
+func (s *DetailService) presignAudiobookPosterTargetURL(ctx context.Context, contentID, posterPath string, filter AccessFilter) string {
 	return s.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
 		Surface: artworkurl.SurfaceItemPosters, Keys: []string{contentID}, Slot: artworkImagePoster,
-	}, posterPath, "poster", "")
+	}, posterPath, artworkkey.ImageTypePoster, string(filter.ImageSize))
 }
 
 // presignAudiobookPosterURL remains as the targetless compatibility seam used
 // by older isolated tests. Production audiobook rows always carry contentID
 // and use presignAudiobookPosterTargetURL.
-func (s *DetailService) presignAudiobookPosterURL(ctx context.Context, posterPath string) string {
-	return s.PresignImageURL(ctx, posterPath, "poster", "")
+func (s *DetailService) presignAudiobookPosterURL(ctx context.Context, posterPath string, filter AccessFilter) string {
+	return s.PresignImageURL(ctx, posterPath, artworkkey.ImageTypePoster, string(filter.ImageSize))
 }
 
 func appendAudiobookItemAccessConditions(
@@ -2377,7 +2379,7 @@ func (s *DetailService) fetchBookAlsoByAuthor(ctx context.Context, contentID str
 			continue
 		}
 		seen[item.ContentID] = struct{}{}
-		item.PosterURL = s.presignAudiobookPosterTargetURL(ctx, item.ContentID, posterPath)
+		item.PosterURL = s.presignAudiobookPosterTargetURL(ctx, item.ContentID, posterPath, filter)
 		out = append(out, item)
 	}
 	return out
@@ -2444,7 +2446,7 @@ func (s *DetailService) fetchBookSimilarByGenres(ctx context.Context, contentID 
 		if err := rows.Scan(&item.ContentID, &item.Title, &item.Year, &posterPath); err != nil {
 			return []AudiobookRelatedItem{}
 		}
-		item.PosterURL = s.presignAudiobookPosterTargetURL(ctx, item.ContentID, posterPath)
+		item.PosterURL = s.presignAudiobookPosterTargetURL(ctx, item.ContentID, posterPath, filter)
 		out = append(out, item)
 	}
 	return out
@@ -2518,7 +2520,7 @@ func (s *DetailService) fetchBookSeries(ctx context.Context, contentID string, m
 				item.SeriesIndex = &n
 			}
 		}
-		item.PosterURL = s.presignAudiobookPosterTargetURL(ctx, item.ContentID, poster)
+		item.PosterURL = s.presignAudiobookPosterTargetURL(ctx, item.ContentID, poster, filter)
 		entries = append(entries, item)
 	}
 	if len(entries) < 2 {
@@ -2679,7 +2681,7 @@ func (s *DetailService) buildSeasonDetail(ctx context.Context, season *models.Se
 
 	episodeCount := len(episodes)
 	seasonNumber := season.SeasonNumber
-	castCredits, crewCredits := s.fetchCredits(ctx, season.SeriesID)
+	castCredits, crewCredits := s.fetchCredits(ctx, season.SeriesID, filter)
 	detail := &ItemDetail{
 		ContentID:                  season.ContentID,
 		Type:                       "season",
@@ -2710,10 +2712,10 @@ func (s *DetailService) buildSeasonDetail(ctx context.Context, season *models.Se
 			seasonTarget = artworkurl.Target{Surface: artworkurl.SurfaceLocalizedSeasonPosters, Keys: []string{season.ContentID, language}}
 		}
 	}
-	detail.PosterURL = s.PresignArtworkTargetImageURL(ctx, seasonTarget, season.PosterPath, "poster", "")
+	detail.PosterURL = s.PresignArtworkTargetImageURL(ctx, seasonTarget, season.PosterPath, artworkkey.ImageTypePoster, string(filter.ImageSize))
 	detail.BackdropURL = s.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
 		Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{series.ContentID},
-	}, series.BackdropPath, "backdrop", "")
+	}, series.BackdropPath, artworkkey.ImageTypeBackdrop, string(filter.ImageSize))
 	return detail, nil
 }
 
@@ -2764,7 +2766,7 @@ func (s *DetailService) buildEpisodeDetail(ctx context.Context, episode *models.
 
 	detail.PosterURL = s.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
 		Surface: artworkurl.SurfaceEpisodeStills, Keys: []string{episode.ContentID},
-	}, episode.StillPath, "still", "")
+	}, episode.StillPath, artworkkey.ImageTypeStill, string(filter.ImageSize))
 	detail.BackdropURL = seriesCtx.backdropURL
 
 	files, err := s.fileFetcher.GetByEpisodeID(ctx, episode.ContentID)
@@ -3974,11 +3976,21 @@ func (s *DetailService) PresignArtworkTargetImageURLWithExpiry(
 	}
 	resolver, ok := s.imageResolver.(targetImageResolver)
 	if !ok {
+		// Cast photos were historically presigned exactly as stored with the
+		// provider's featured hint. Preserve that byte-for-byte URL behavior
+		// when image_size is absent; target-aware delivery still binds the
+		// original variant below.
+		if imageType == artworkkey.ImageTypeProfile && strings.TrimSpace(size) == "" {
+			return s.PresignURLWithExpiry(ctx, path, artworkProviderVariantFeatured)
+		}
 		return s.PresignImageURLWithExpiry(ctx, path, imageType, size)
 	}
 	target.Slot = imageType
 	target = target.WithReference(path)
 	variant := cachedImageVariantKey(imageType, size)
+	if imageType == artworkkey.ImageTypeProfile && strings.TrimSpace(size) == "" {
+		variant = artworkkey.OriginalVariant
+	}
 	if variant == "" {
 		variant = artworkkey.OriginalVariant
 	}
@@ -3997,41 +4009,15 @@ func (s *DetailService) PresignArtworkTargetsWithExpiry(
 	if resolver, ok := s.imageResolver.(targetImageResolver); ok {
 		return resolver.ResolveArtworkTargetsWithExpiry(ctx, targets, variant)
 	}
-	paths := make([]string, 0, len(targets))
-	normalizedByTarget := make(map[string]string, len(targets))
-	seenPaths := make(map[string]struct{}, len(targets))
+	requests := make([]artworkurl.TargetRequest, 0, len(targets))
 	for _, target := range targets {
-		path := target.Reference
-		if path == "" || path == "-" {
-			continue
-		}
-		// Compatibility resolvers predate target capabilities and deliberately
-		// pass provider HTTP URLs through without a signing round trip. The
-		// production resolver implements targetImageResolver and never takes
-		// this branch: resilient policy still mints a target-bound URL for these
-		// sources.
-		if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-			normalizedByTarget[target.CacheKey()] = path
-			continue
-		}
-		if !strings.Contains(path, "://") {
-			path = artworkkey.Variant(path, variant)
-		}
-		if _, seen := seenPaths[path]; !seen {
-			seenPaths[path] = struct{}{}
-			paths = append(paths, path)
-		}
-		normalizedByTarget[target.CacheKey()] = path
+		requests = append(requests, artworkurl.TargetRequest{Target: target, Variant: variant})
 	}
-	resolvedPaths := s.PresignURLsWithExpiry(ctx, paths, providerVariantForArtworkVariant(variant))
+	fallback := s.presignArtworkTargetRequestsFallback(ctx, requests)
 	result := make(map[string]ResolvedImageURL, len(targets))
 	for _, target := range targets {
-		path := normalizedByTarget[target.CacheKey()]
-		if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-			result[target.CacheKey()] = ResolvedImageURL{URL: path}
-			continue
-		}
-		result[target.CacheKey()] = resolvedPaths[path]
+		request := artworkurl.TargetRequest{Target: target, Variant: variant}
+		result[target.CacheKey()] = fallback[request.CacheKey()]
 	}
 	return result
 }
@@ -4042,10 +4028,14 @@ func (s *DetailService) PresignArtworkTargetRequestsWithExpiry(ctx context.Conte
 	if resolver, ok := s.imageResolver.(targetImageResolver); ok {
 		return resolver.ResolveArtworkTargetRequestsWithExpiry(ctx, requests)
 	}
-	paths := make([]string, 0, len(requests))
+	return s.presignArtworkTargetRequestsFallback(ctx, requests)
+}
+
+func (s *DetailService) presignArtworkTargetRequestsFallback(ctx context.Context, requests []artworkurl.TargetRequest) map[string]ResolvedImageURL {
 	pathByTarget := make(map[string]string, len(requests))
-	seen := make(map[string]struct{}, len(requests))
-	providerVariant := artworkProviderVariantFeatured
+	providerVariantByTarget := make(map[string]string, len(requests))
+	pathsByProviderVariant := make(map[string][]string)
+	seenByProviderVariant := make(map[string]map[string]struct{})
 	for _, request := range requests {
 		path := request.Target.Reference
 		if path == "" || path == "-" {
@@ -4054,34 +4044,51 @@ func (s *DetailService) PresignArtworkTargetRequestsWithExpiry(ctx context.Conte
 		if !strings.Contains(path, "://") {
 			path = artworkkey.Variant(path, request.Variant)
 		}
-		pathByTarget[request.CacheKey()] = path
+		key := request.CacheKey()
+		pathByTarget[key] = path
+		providerVariant := providerVariantForTargetVariant(request.Target.Slot, request.Variant)
+		providerVariantByTarget[key] = providerVariant
+		seen := seenByProviderVariant[providerVariant]
+		if seen == nil {
+			seen = make(map[string]struct{})
+			seenByProviderVariant[providerVariant] = seen
+		}
 		if _, ok := seen[path]; !ok {
 			seen[path] = struct{}{}
-			paths = append(paths, path)
+			pathsByProviderVariant[providerVariant] = append(pathsByProviderVariant[providerVariant], path)
 		}
 	}
-	resolvedPaths := s.PresignURLsWithExpiry(ctx, paths, providerVariant)
+	resolvedPaths := make(map[string]map[string]ResolvedImageURL, len(pathsByProviderVariant))
+	for providerVariant, variantPaths := range pathsByProviderVariant {
+		resolvedPaths[providerVariant] = s.PresignURLsWithExpiry(ctx, variantPaths, providerVariant)
+	}
 	result := make(map[string]ResolvedImageURL, len(requests))
 	for _, request := range requests {
-		path := pathByTarget[request.CacheKey()]
+		key := request.CacheKey()
+		path := pathByTarget[key]
 		if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-			result[request.CacheKey()] = ResolvedImageURL{URL: path}
+			result[key] = ResolvedImageURL{URL: path}
 		} else {
-			result[request.CacheKey()] = resolvedPaths[path]
+			result[key] = resolvedPaths[providerVariantByTarget[key]][path]
 		}
 	}
 	return result
 }
 
-func providerVariantForArtworkVariant(variant string) string {
-	switch variant {
-	case artworkkey.OriginalVariant:
-		return artworkkey.OriginalVariant
-	case artworkkey.VariantW300:
-		return "card"
-	default:
-		return artworkProviderVariantFeatured
+func providerVariantForTargetVariant(imageType, variant string) string {
+	if variant == artworkkey.OriginalVariant {
+		return imagesize.PluginVariantOriginal
 	}
+	large := imagesize.Variant(imageType, imagesize.Large)
+	medium := imagesize.Variant(imageType, imagesize.Medium)
+	if variant == large && large != medium {
+		return imagesize.PluginVariantLarge
+	}
+	small := imagesize.Variant(imageType, imagesize.Small)
+	if variant == small && small != medium {
+		return imagesize.PluginVariantCard
+	}
+	return imagesize.PluginVariantFeatured
 }
 
 // PresignURLWithExpiry resolves an image path and returns expiry metadata when
@@ -4207,6 +4214,9 @@ func (s *DetailService) PresignURLsWithExpiry(ctx context.Context, paths []strin
 // sizeToVariant maps the existing S3 size hints used by the frontend to
 // semantic variant names understood by plugins.
 func sizeToVariant(size string) string {
+	if parsed, err := imagesize.Parse(size); err == nil && parsed != imagesize.Unset {
+		return imagesize.PluginVariant(parsed)
+	}
 	switch size {
 	case "small":
 		return "card"
@@ -4266,6 +4276,13 @@ func imageTypeFromCachedPath(path string) string {
 	return artworkkey.ImageTypeFromKey(path)
 }
 
+// ImageTypeFromCachedPath reports the ladder encoded by a stored artwork key.
+// Response builders use it when an episode still occupies a backdrop slot, so
+// an explicit image_size cannot accidentally request a backdrop-only rung.
+func ImageTypeFromCachedPath(path string) string {
+	return imageTypeFromCachedPath(path)
+}
+
 // BackdropVariantPath rewrites a cached "/original." image path to the
 // requested backdrop variant (e.g. "w1280" or "w1920"). Episode "backdrops"
 // are frequently the episode still, which the cache only generates at
@@ -4288,29 +4305,10 @@ func BackdropVariantPath(path, desiredVariant string) string {
 }
 
 func cachedImageVariantKey(imageType, size string) string {
-	if size == "original" {
-		return "original"
+	if parsed, err := imagesize.Parse(size); err == nil && parsed != imagesize.Unset {
+		return imagesize.Variant(imageType, parsed)
 	}
-
-	switch imageType {
-	case "backdrop":
-		if size == "small" {
-			return "w300"
-		}
-		return "w1920"
-	case "logo":
-		return "w500"
-	case "poster", "still":
-		if size == "small" {
-			return "w300"
-		}
-		return "w500"
-	default:
-		if size == "small" {
-			return "w300"
-		}
-		return "w500"
-	}
+	return imagesize.Variant(imageType, imagesize.Medium)
 }
 
 // ArtworkVariantForSize exposes the same bounded variant normalization to

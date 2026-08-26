@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -49,6 +50,46 @@ type ManifestVariant struct {
 	Name string `json:"name"`
 	// SizeBytes is the exact stored length.
 	SizeBytes int64 `json:"size_bytes"`
+}
+
+// SelectVariant returns the manifest entry to serve for requested. A manifest
+// that predates LadderVersion may omit the newly-added wide rung; in that one
+// case selection walks down the live ladder to the nearest variant the
+// manifest actually contains, ending at original. Other omissions are not
+// silently healed here because they are not explained by the ladder change.
+func (m Manifest) SelectVariant(requested string) (ManifestVariant, bool) {
+	byName := make(map[string]ManifestVariant, len(m.Variants))
+	for _, variant := range m.Variants {
+		byName[variant.Name] = variant
+	}
+	if variant, ok := byName[requested]; ok {
+		return variant, true
+	}
+	if !IsLadderExtensionVariant(m.ImageType, requested) {
+		return ManifestVariant{}, false
+	}
+	wantedWidth, ok := variantWidth(requested)
+	if !ok {
+		return ManifestVariant{}, false
+	}
+	for _, width := range VariantWidths(m.ImageType) {
+		if width >= wantedWidth {
+			continue
+		}
+		if variant, exists := byName["w"+strconv.Itoa(width)]; exists {
+			return variant, true
+		}
+	}
+	variant, ok := byName[OriginalVariant]
+	return variant, ok
+}
+
+func variantWidth(variant string) (int, bool) {
+	if !strings.HasPrefix(variant, "w") {
+		return 0, false
+	}
+	width, err := strconv.Atoi(strings.TrimPrefix(variant, "w"))
+	return width, err == nil && width > 0
 }
 
 // EncodeManifest returns the canonical encoding of m: UTF-8 JSON, object keys

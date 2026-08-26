@@ -16,6 +16,8 @@ Native clients should treat artwork URLs returned by catalog responses as opaque
 - the variant names supported for each image type.
 
 Clients should capability-detect these fields rather than infer behavior from a URL shape.
+The companion `GET /api/v1/images/capability` endpoint maps the client-facing
+`image_size=small|medium|large|original` values onto these same live variants.
 
 ## Resilient delivery
 
@@ -42,6 +44,14 @@ bounded by the signed expiry. An invalid or malformed capability is a
 non-enumerable `404`; an expired valid capability returns `401` so the client
 can refresh its catalog response.
 
+The requested `image_size` is mapped to the capability's variant when the URL
+is minted. Portable revisions created before the current ladder may lack the
+new `w780` poster/still or `w1280` logo object. The delivery handler reads that
+revision's manifest and serves its nearest smaller listed rung instead. This is
+compatibility selection, not object loss: it does not mark inventory missing,
+enqueue repair, or return a placeholder. Legacy revisions without manifests use
+bounded object-existence checks for the same walk-down behavior.
+
 ## Direct policy
 
 `artwork.delivery_policy=direct` opts out of automatic request-time recovery.
@@ -54,5 +64,8 @@ unsigned, and served with `public, max-age=31536000, immutable`. Any percent
 escape in this route is rejected before decoding; the logical-key grammar is
 the path gate. Unsigned requests return `404` unless public mode is active,
 while previously minted signed URLs remain valid across mode changes.
+The direct URL is minted for the `image_size` variant selected by the portable
+manifest (or by the bounded legacy walk-down), so it never points at a
+newly-added rung an older revision does not contain.
 
 After safe purge transitions an accessible sidecar out of canonical storage, catalog responses may instead contain a signed direct-library artwork URL. It has the same opaque-client contract and conditional/range support. Silo revalidates the current catalog reference, owning library root, confinement, file type, and size on every cache miss. Clients must never persist or interpret its embedded identity.

@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/auth"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/models"
@@ -370,10 +372,11 @@ func TestBuildSectionsResponseKeepsExistingEpisodeMeta(t *testing.T) {
 }
 
 type countingSectionImageResolver struct {
-	batchCalls  int
-	singleCalls int
-	variant     string
-	paths       []string
+	batchCalls       int
+	targetBatchCalls int
+	singleCalls      int
+	variant          string
+	paths            []string
 }
 
 func (r *countingSectionImageResolver) ResolveImageURL(_ context.Context, path string, variant string) string {
@@ -402,6 +405,29 @@ func (r *countingSectionImageResolver) ResolveImageURLsWithExpiry(_ context.Cont
 	resolved := make(map[string]catalog.ResolvedImageURL, len(paths))
 	for _, path := range paths {
 		resolved[path] = catalog.ResolvedImageURL{URL: "resolved:" + path}
+	}
+	return resolved
+}
+
+func (r *countingSectionImageResolver) ResolveArtworkTargetsWithExpiry(_ context.Context, targets []artworkurl.Target, variant string) map[string]catalog.ResolvedImageURL {
+	requests := make([]artworkurl.TargetRequest, 0, len(targets))
+	for _, target := range targets {
+		requests = append(requests, artworkurl.TargetRequest{Target: target, Variant: variant})
+	}
+	return r.ResolveArtworkTargetRequestsWithExpiry(context.Background(), requests)
+}
+
+func (r *countingSectionImageResolver) ResolveArtworkTargetRequestsWithExpiry(_ context.Context, requests []artworkurl.TargetRequest) map[string]catalog.ResolvedImageURL {
+	r.targetBatchCalls++
+	resolved := make(map[string]catalog.ResolvedImageURL, len(requests))
+	seen := make(map[string]struct{})
+	for _, request := range requests {
+		path := artworkkey.Variant(request.Target.Reference, request.Variant)
+		resolved[request.CacheKey()] = catalog.ResolvedImageURL{URL: "resolved:" + path}
+		if _, ok := seen[path]; !ok {
+			seen[path] = struct{}{}
+			r.paths = append(r.paths, path)
+		}
 	}
 	return resolved
 }
@@ -444,14 +470,14 @@ func TestBuildSectionsResponseBatchResolvesImageURLs(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/sections", nil)
 	resp := h.buildSectionsResponse(req, withItems, nil)
 
-	if resolver.batchCalls != 1 {
-		t.Fatalf("batch calls = %d, want 1", resolver.batchCalls)
+	if resolver.targetBatchCalls != 1 {
+		t.Fatalf("target batch calls = %d, want 1", resolver.targetBatchCalls)
+	}
+	if resolver.batchCalls != 0 {
+		t.Fatalf("path-only batch calls = %d, want 0", resolver.batchCalls)
 	}
 	if resolver.singleCalls != 0 {
 		t.Fatalf("single calls = %d, want 0", resolver.singleCalls)
-	}
-	if resolver.variant != "featured" {
-		t.Fatalf("variant = %q, want featured", resolver.variant)
 	}
 	sort.Strings(resolver.paths)
 	wantPaths := []string{"/backdrop/w1280.jpg", "/logo/original.png", "/poster/w500.jpg"}

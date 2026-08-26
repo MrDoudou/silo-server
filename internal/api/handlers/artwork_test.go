@@ -253,6 +253,70 @@ func TestArtworkHandlerServesSignedObject(t *testing.T) {
 	}
 }
 
+func TestArtworkHandlerServesPreLadderPortableRevisionFromManifest(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	oldVariantData := map[string][]byte{
+		artworkkey.OriginalVariant: []byte("old original"),
+		artworkkey.VariantW500:     []byte("old medium"),
+		artworkkey.VariantW300:     []byte("old small"),
+	}
+	oldRevision, err := artworkkey.BuildPortableRevision(artworkkey.RevisionInput{
+		ImageType: artworkkey.ImageTypePoster,
+		MediaType: "image/webp",
+		Ext:       ".webp",
+		Variants: []artworkkey.VariantBytes{
+			{Name: artworkkey.OriginalVariant, Data: oldVariantData[artworkkey.OriginalVariant]},
+			{Name: artworkkey.VariantW500, Data: oldVariantData[artworkkey.VariantW500]},
+			{Name: artworkkey.VariantW300, Data: oldVariantData[artworkkey.VariantW300]},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for variant, key := range oldRevision.VariantKeys {
+		if err := store.WriteImmutable(t.Context(), key, oldVariantData[variant], artworkstore.ObjectMetadata{}); err != nil {
+			t.Fatalf("write %s: %v", variant, err)
+		}
+	}
+	if err := store.WriteImmutable(t.Context(), oldRevision.ManifestKey, oldRevision.ManifestJSON, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+
+	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return artworkTestTTL })
+	if err != nil {
+		t.Fatal(err)
+	}
+	targets := &fakeArtworkTargets{state: metadata.ArtworkTargetState{
+		SelectedPath: oldRevision.OriginalKey,
+		ImageType:    artworkkey.ImageTypePoster,
+		Recoverable:  true,
+	}}
+	handler := NewArtworkHandler(store, signer)
+	handler.SetResilientDependencies(targets, nil, nil)
+	target := artworkTestTarget.WithReference(oldRevision.OriginalKey)
+	signed, err := signer.SignTarget(target, artworkkey.VariantW780, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	handler.ServeArtworkURL(rec, httptest.NewRequest(http.MethodGet, signed.URL, nil), signed.URL)
+
+	if rec.Code != http.StatusOK || rec.Body.String() != "old medium" {
+		t.Fatalf("response = %d %q, want the manifest-selected w500 bytes", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("X-Silo-Artwork"); got != "stored" {
+		t.Fatalf("X-Silo-Artwork = %q, want stored", got)
+	}
+	if targets.signals != 0 || len(handler.repairSignals) != 0 {
+		t.Fatalf("pre-ladder fallback queued repair: signals=%d queued=%d", targets.signals, len(handler.repairSignals))
+	}
+}
+
 func TestArtworkHandlerHonorsHeadAndConditionalRequests(t *testing.T) {
 	router, _, signer, _ := newArtworkTestRig(t)
 	signedURL := signArtworkURL(t, signer, time.Now())
@@ -607,7 +671,7 @@ func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
 	if !got.StorageManagement.Accounting || !got.StorageManagement.SafePurge || !got.StorageManagement.DirectLibraryFallback {
 		t.Fatalf("storage_management = %#v", got.StorageManagement)
 	}
-	if want := []string{"original", "w500", "w300"}; !equalStrings(got.Variants["poster"], want) {
+	if want := []string{"original", "w780", "w500", "w300"}; !equalStrings(got.Variants["poster"], want) {
 		t.Fatalf("poster variants = %v, want %v", got.Variants["poster"], want)
 	}
 	if want := []string{"original", "w1920", "w1280", "w300"}; !equalStrings(got.Variants["backdrop"], want) {

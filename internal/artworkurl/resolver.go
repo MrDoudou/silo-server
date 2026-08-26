@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
+	"github.com/Silo-Server/silo-server/internal/artworkvariant"
 )
 
 // Resolver turns a logical artwork key into a URL a client can fetch, hiding
@@ -23,11 +25,12 @@ import (
 // catalog image resolver, jellycompat, admin responses — ask for a URL and get
 // one that works, rather than each testing for a configured bucket.
 type Resolver struct {
-	direct  artworkstore.DirectURLProvider
-	signer  *Signer
-	ttl     func() time.Duration
-	policy  func() string
-	urlAuth func() string
+	direct   artworkstore.DirectURLProvider
+	signer   *Signer
+	ttl      func() time.Duration
+	policy   func() string
+	urlAuth  func() string
+	variants *artworkvariant.Selector
 }
 
 const (
@@ -63,6 +66,16 @@ func (r *Resolver) SetLocalURLAuth(urlAuth func() string) {
 	}
 }
 
+// SetStore enables manifest-aware direct-policy variant selection. Resilient
+// URLs carry the requested variant and perform the same selection in the
+// delivery handler; direct URLs must choose the actual stored key while they
+// are minted because the client bypasses that handler.
+func (r *Resolver) SetStore(store artworkstore.Store) {
+	if r != nil {
+		r.variants = artworkvariant.New(store)
+	}
+}
+
 func (r *Resolver) DeliveryPolicy() string {
 	if r != nil && r.policy != nil && strings.EqualFold(strings.TrimSpace(r.policy()), DeliveryPolicyDirect) {
 		return DeliveryPolicyDirect
@@ -94,20 +107,28 @@ func (r *Resolver) ResolveTargetURL(ctx context.Context, target Target, variant 
 		}
 		return r.signer.SignTarget(target, variant, time.Now())
 	}
-	if err := artworkstore.ValidateKey(target.Reference); err != nil {
+	key := artworkkey.Variant(target.Reference, variant)
+	if r.variants != nil {
+		selected, err := r.variants.Select(ctx, target.Reference, target.Slot, variant)
+		if err != nil {
+			return artworkstore.ResolvedURL{}, err
+		}
+		key = selected
+	}
+	if err := artworkstore.ValidateKey(key); err != nil {
 		return artworkstore.ResolvedURL{}, err
 	}
 	if r.direct == nil {
 		if r.urlAuth != nil && strings.EqualFold(strings.TrimSpace(r.urlAuth()), "public") {
-			directPath, err := DirectPathFromKey(target.Reference)
+			directPath, err := DirectPathFromKey(key)
 			if err != nil {
 				return artworkstore.ResolvedURL{}, err
 			}
 			return artworkstore.ResolvedURL{URL: DirectRoutePrefix + directPath}, nil
 		}
-		return r.signer.SignDirectKey(target.Reference, time.Now())
+		return r.signer.SignDirectKey(key, time.Now())
 	}
-	resolved, err := r.direct.ReadURL(ctx, target.Reference, r.directTTL())
+	resolved, err := r.direct.ReadURL(ctx, key, r.directTTL())
 	if err == nil {
 		artworkmetrics.DirectURLMinted()
 	}

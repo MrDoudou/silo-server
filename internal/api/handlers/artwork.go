@@ -23,6 +23,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/artworksource"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
+	"github.com/Silo-Server/silo-server/internal/artworkvariant"
 	"github.com/Silo-Server/silo-server/internal/imageutil"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 )
@@ -88,6 +89,7 @@ type ArtworkHandler struct {
 	sourceBytes       *rate.Limiter
 	sourceSlots       chan struct{}
 	verified          *verifiedArtworkCache
+	variants          *artworkvariant.Selector
 	repairSignals     chan metadata.ArtworkTargetState
 	repairSignalOnce  sync.Once
 	repairSignalMu    sync.Mutex
@@ -102,6 +104,7 @@ func NewArtworkHandler(store ArtworkObjectStore, signer *artworkurl.Signer) *Art
 		store: store, signer: signer,
 		emergency:         newEmergencyArtworkCache(emergencyArtworkCacheBytes, emergencyArtworkCacheEntries),
 		verified:          newVerifiedArtworkCache(verifiedArtworkCacheBytes),
+		variants:          artworkvariant.New(store),
 		repairSignals:     make(chan metadata.ArtworkTargetState, repairSignalQueueSize),
 		repairSignalUntil: make(map[string]time.Time),
 		// Request-path provider recovery is intentionally smaller than the
@@ -163,6 +166,11 @@ func (h *ArtworkHandler) serve(w http.ResponseWriter, r *http.Request, encodedCa
 		return
 	}
 	storedKey := state.StoredVariant(variant)
+	if h.variants != nil && storedKey != "" {
+		if selected, selectErr := h.variants.Select(r.Context(), state.SelectedPath, state.ImageType, variant); selectErr == nil {
+			storedKey = selected
+		}
+	}
 	backendReadable := true
 	authoritativeMiss := false
 	if health, ok := h.store.(artworkStoreHealth); ok {

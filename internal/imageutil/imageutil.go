@@ -39,9 +39,8 @@ func ValidateImage(data []byte) (string, error) {
 }
 
 const (
-	webpQuality                = 90
-	maxCachedOriginalDimension = 1920
-	thumbhashSourceDimension   = 100
+	webpQuality              = 90
+	thumbhashSourceDimension = 100
 
 	// maxSourcePixels bounds the decoded size of any source image before the
 	// pipeline fully decodes it. Byte limits on uploads do not bound pixels: a
@@ -51,6 +50,11 @@ const (
 	// camera sensors while capping a single decode at a few hundred MB.
 	maxSourcePixels = 80_000_000
 )
+
+// MaxCachedOriginalDimension caps the longest edge of the stored original.
+// It is exported so the image-size capability reports the encoder's live
+// contract instead of duplicating the number.
+const MaxCachedOriginalDimension = 1920
 
 // checkSourceDimensions rejects images whose header-declared dimensions are
 // invalid or would decode to more than maxSourcePixels. Dimensions come from a
@@ -103,7 +107,7 @@ func GenerateVariants(data []byte, widths []int) (*VariantResult, error) {
 		Quality:       webpQuality,
 		StripMetadata: true,
 	}
-	fitWithin(&originalOptions, size, maxCachedOriginalDimension)
+	fitWithin(&originalOptions, size, MaxCachedOriginalDimension)
 	original, err := bimg.NewImage(data).Process(originalOptions)
 	if err != nil {
 		return nil, fmt.Errorf("imageutil: encode original: %w", err)

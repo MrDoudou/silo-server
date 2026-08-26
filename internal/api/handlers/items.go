@@ -15,10 +15,12 @@ import (
 
 	"github.com/Silo-Server/silo-server/internal/access"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/auth"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	evt "github.com/Silo-Server/silo-server/internal/events"
+	"github.com/Silo-Server/silo-server/internal/imagesize"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 	"github.com/Silo-Server/silo-server/internal/models"
 	"github.com/Silo-Server/silo-server/internal/overlays"
@@ -939,7 +941,7 @@ func (h *ItemsHandler) writeCatalogBrowseResponse(w http.ResponseWriter, r *http
 	episodeMetadata := h.listEpisodeBrowseMetadata(r.Context(), result.Items)
 	items := make([]itemListResponse, 0, len(result.Items))
 	for _, item := range result.Items {
-		resp := h.toItemListResponseWithOverlay(r, item, overlaySummaries[item.ContentID], userStates[item.ContentID])
+		resp := h.toItemListResponseWithOverlay(r, item, overlaySummaries[item.ContentID], userStates[item.ContentID], filter.ImageSize)
 		// The resolver validated the item's own hint against this profile, so
 		// its answer replaces the unvalidated one carried by the item.
 		resp.PlayContentID = playTargets[playableTargetKeyForItem(item)]
@@ -1087,19 +1089,25 @@ func (h *ItemsHandler) writeCatalogFiltersResponse(w http.ResponseWriter, r *htt
 }
 
 // toItemListResponse converts a MediaItem to an itemListResponse with presigned URLs.
-func (h *ItemsHandler) toItemListResponse(r *http.Request, item *models.MediaItem) itemListResponse {
-	return h.toItemListResponseWithOverlay(r, item, nil, nil)
+func (h *ItemsHandler) toItemListResponse(r *http.Request, item *models.MediaItem, size imagesize.Size) itemListResponse {
+	return h.toItemListResponseWithOverlay(r, item, nil, nil, size)
 }
 
-func (h *ItemsHandler) toItemListResponseWithOverlay(r *http.Request, item *models.MediaItem, overlaySummary *models.OverlaySummary, userState *itemUserStateResponse) itemListResponse {
+func (h *ItemsHandler) toItemListResponseWithOverlay(r *http.Request, item *models.MediaItem, overlaySummary *models.OverlaySummary, userState *itemUserStateResponse, size imagesize.Size) itemListResponse {
 	if h.detailSvc != nil {
 		if localized, err := h.detailSvc.LocalizeItemModel(r.Context(), item, h.accessFilterOrDeny(r)); err == nil && localized != nil {
 			item = localized
 		}
 	}
 	resp := itemListResponseShell(item, overlaySummary, userState)
-	resp.PosterURL = h.itemArtworkURL(r, item.ContentID, artworkurl.SurfaceItemPosters, "poster", item.PosterPath, "w300")
-	resp.BackdropURL = h.itemArtworkURL(r, item.ContentID, artworkurl.SurfaceItemBackdrops, "backdrop", item.BackdropPath, "w300")
+	posterVariant := artworkkey.VariantW300
+	backdropVariant := artworkkey.VariantW300
+	if size != imagesize.Unset {
+		posterVariant = imagesize.Variant(artworkkey.ImageTypePoster, size)
+		backdropVariant = imagesize.Variant(imageTypeForBackdropPath(item.BackdropPath), size)
+	}
+	resp.PosterURL = h.itemArtworkURL(r, item.ContentID, artworkurl.SurfaceItemPosters, artworkImagePoster, item.PosterPath, posterVariant)
+	resp.BackdropURL = h.itemArtworkURL(r, item.ContentID, artworkurl.SurfaceItemBackdrops, artworkImageBackdrop, item.BackdropPath, backdropVariant)
 	return resp
 }
 
@@ -1156,7 +1164,7 @@ func (h *ItemsHandler) localizeItemListModels(ctx context.Context, items []*mode
 	return localized
 }
 
-func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, items []*models.MediaItem) map[string]itemListImageURLs {
+func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, items []*models.MediaItem, size imagesize.Size) map[string]itemListImageURLs {
 	urls := make(map[string]itemListImageURLs, len(items))
 	if h == nil || h.detailSvc == nil || len(items) == 0 {
 		return urls
@@ -1169,7 +1177,7 @@ func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, items []*model
 	}
 
 	pending := make([]pendingImages, 0, len(items))
-	targets := make([]artworkurl.Target, 0, len(items)*2)
+	requests := make([]artworkurl.TargetRequest, 0, len(items)*2)
 
 	for _, item := range items {
 		if item == nil || item.ContentID == "" {
@@ -1185,14 +1193,31 @@ func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, items []*model
 			}.WithReference(item.BackdropPath),
 		}
 		pending = append(pending, images)
-		targets = append(targets, images.poster, images.backdrop)
+		posterVariant := artworkkey.VariantW300
+		backdropVariant := artworkkey.VariantW300
+		if size != imagesize.Unset {
+			posterVariant = imagesize.Variant(artworkkey.ImageTypePoster, size)
+			backdropVariant = imagesize.Variant(imageTypeForBackdropPath(item.BackdropPath), size)
+		}
+		requests = append(requests,
+			artworkurl.TargetRequest{Target: images.poster, Variant: posterVariant},
+			artworkurl.TargetRequest{Target: images.backdrop, Variant: backdropVariant},
+		)
 	}
 
-	resolved := h.detailSvc.PresignArtworkTargetsWithExpiry(ctx, targets, "w300")
+	resolved := h.detailSvc.PresignArtworkTargetRequestsWithExpiry(ctx, requests)
 	for _, images := range pending {
+		posterVariant := artworkkey.VariantW300
+		backdropVariant := artworkkey.VariantW300
+		if size != imagesize.Unset {
+			posterVariant = imagesize.Variant(artworkkey.ImageTypePoster, size)
+			backdropVariant = imagesize.Variant(imageTypeForBackdropPath(images.backdrop.Reference), size)
+		}
 		urls[images.contentID] = itemListImageURLs{
-			posterURL:   resolved[images.poster.CacheKey()].URL,
-			backdropURL: resolved[images.backdrop.CacheKey()].URL,
+			posterURL: resolved[(artworkurl.TargetRequest{Target: images.poster, Variant: posterVariant}).CacheKey()].URL,
+			backdropURL: resolved[(artworkurl.TargetRequest{
+				Target: images.backdrop, Variant: backdropVariant,
+			}).CacheKey()].URL,
 		}
 	}
 	return urls
@@ -1286,25 +1311,9 @@ func (h *ItemsHandler) listItemUserStates(r *http.Request, items []*models.Media
 	return states
 }
 
-// toEpisodeResponse converts an Episode model to an API response.
-func (h *ItemsHandler) toEpisodeResponse(r *http.Request, ep *models.Episode) episodeResponse {
-	return h.toEpisodeResponseWithFallback(r, ep, episodeImageFallback{})
-}
-
-func (h *ItemsHandler) toEpisodeResponseWithFallback(r *http.Request, ep *models.Episode, fallback episodeImageFallback) episodeResponse {
-	if h.detailSvc != nil {
-		if localized, err := h.detailSvc.LocalizeEpisodeModel(r.Context(), ep, h.accessFilterOrDeny(r)); err == nil && localized != nil {
-			ep = localized
-		}
-	}
-	resp, stillPath := episodeResponseShell(ep, fallback)
-	resp.StillURL = h.itemArtworkURL(r, ep.ContentID, artworkurl.SurfaceEpisodeStills, "still", stillPath, "w300")
-	return resp
-}
-
 // episodeResponseShell maps an already-localized episode onto the response
 // shape, returning the card-variant still path for the caller to presign.
-func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback) (episodeResponse, string) {
+func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback, size imagesize.Size) (episodeResponse, string) {
 	stillPath := ep.StillPath
 	stillThumbhash := ep.StillThumbhash
 	if strings.TrimSpace(stillPath) == "" && strings.TrimSpace(fallback.Path) != "" {
@@ -1328,7 +1337,7 @@ func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback) (ep
 		resp.AirDate = ep.AirDate.Format("2006-01-02")
 	}
 
-	return resp, cardThumbnailPath(stillPath)
+	return resp, stillPath
 }
 
 // buildEpisodeResponses converts episodes to API responses using batched
@@ -1337,6 +1346,7 @@ func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback) (ep
 func (h *ItemsHandler) buildEpisodeResponses(r *http.Request, episodes []*models.Episode) []episodeResponse {
 	ctx := r.Context()
 	filter := h.accessFilterOrDeny(r)
+	size := filter.ImageSize
 
 	if h.detailSvc != nil {
 		if localized, err := h.detailSvc.LocalizeEpisodeModels(ctx, episodes, filter); err == nil && len(localized) == len(episodes) {
@@ -1361,7 +1371,7 @@ func (h *ItemsHandler) buildEpisodeResponses(r *http.Request, episodes []*models
 		if ep == nil {
 			continue
 		}
-		shell, stillPath := episodeResponseShell(ep, fallbacks[ep.SeriesID])
+		shell, stillPath := episodeResponseShell(ep, fallbacks[ep.SeriesID], size)
 		resp = append(resp, shell)
 		stillPaths = append(stillPaths, stillPath)
 	}
@@ -1376,7 +1386,11 @@ func (h *ItemsHandler) buildEpisodeResponses(r *http.Request, episodes []*models
 				Slot:    artworkImageStill,
 			}.WithReference(stillPaths[i]))
 		}
-		stillURLs = h.detailSvc.PresignArtworkTargetsWithExpiry(ctx, targets, "w300")
+		variant := artworkkey.VariantW300
+		if size != imagesize.Unset {
+			variant = imagesize.Variant(artworkkey.ImageTypeStill, size)
+		}
+		stillURLs = h.detailSvc.PresignArtworkTargetsWithExpiry(ctx, targets, variant)
 		for i := range resp {
 			stillPaths[i] = targets[i].CacheKey()
 		}
@@ -1884,24 +1898,20 @@ func maxFileBitrate(files []*models.MediaFile) int {
 }
 
 // toSeasonResponse converts a Season model to an API response.
-func (h *ItemsHandler) toSeasonResponse(r *http.Request, seriesID string, s *models.Season) seasonResponse {
-	episodes, _ := h.episodeRepo.ListBySeason(r.Context(), seriesID, s.SeasonNumber)
-	return h.toSeasonResponseFromEpisodes(r, seriesID, s, episodes, h.getAggregateUserData(r, episodes))
-}
-
 func (h *ItemsHandler) toSeasonResponseFromEpisodes(
 	r *http.Request,
 	seriesID string,
 	s *models.Season,
 	episodes []*models.Episode,
 	userData *catalog.SeasonUserData,
+	size imagesize.Size,
 ) seasonResponse {
 	if h.detailSvc != nil {
 		if localized, err := h.detailSvc.LocalizeSeasonModel(r.Context(), s, h.accessFilterOrDeny(r)); err == nil && localized != nil {
 			s = localized
 		}
 	}
-	return h.seasonResponseFromEpisodes(r, s, episodes, userData)
+	return h.seasonResponseFromEpisodes(r, s, episodes, userData, size)
 }
 
 // seasonResponseFromEpisodes maps a season that has already been localized.
@@ -1912,6 +1922,7 @@ func (h *ItemsHandler) seasonResponseFromEpisodes(
 	s *models.Season,
 	episodes []*models.Episode,
 	userData *catalog.SeasonUserData,
+	size imagesize.Size,
 ) seasonResponse {
 	resp := seasonResponse{
 		ContentID:       s.ContentID,
@@ -1925,7 +1936,11 @@ func (h *ItemsHandler) seasonResponseFromEpisodes(
 	if s.AirDate != nil {
 		resp.AirDate = s.AirDate.Format("2006-01-02")
 	}
-	resp.PosterURL = h.itemArtworkURL(r, s.ContentID, artworkurl.SurfaceSeasonPosters, "poster", s.PosterPath, "w500")
+	variant := artworkkey.VariantW500
+	if size != imagesize.Unset {
+		variant = imagesize.Variant(artworkkey.ImageTypePoster, size)
+	}
+	resp.PosterURL = h.itemArtworkURL(r, s.ContentID, artworkurl.SurfaceSeasonPosters, artworkImagePoster, s.PosterPath, variant)
 	resp.UserData = userData
 
 	return resp
@@ -2170,7 +2185,7 @@ func featuredPosterPath(path string) string {
 // used as backdrops lack a w1920 variant and clamp to their largest cached
 // size. Full URLs (TMDB/TVDB) and plugin-prefixed paths are returned as-is.
 func featuredBackdropPath(path string) string {
-	return catalog.BackdropVariantPath(path, "w1920")
+	return catalog.BackdropVariantPath(path, artworkkey.VariantW1920)
 }
 
 // presignURL resolves an image path to a usable URL, delegating to the
@@ -2320,6 +2335,12 @@ func (h *ItemsHandler) accessFilterOrError(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to resolve user access")
 		return catalog.AccessFilter{}, false
 	}
+	size, err := imagesize.FromRequest(r)
+	if err != nil {
+		writeInvalidImageSize(w)
+		return catalog.AccessFilter{}, false
+	}
+	filter.ImageSize = size
 	return filter, true
 }
 
@@ -2330,8 +2351,9 @@ func (h *ItemsHandler) accessFilterOrError(w http.ResponseWriter, r *http.Reques
 func (h *ItemsHandler) accessFilterOrDeny(r *http.Request) catalog.AccessFilter {
 	filter, err := h.accessFilter(r)
 	if err != nil {
-		return catalog.AccessFilter{AllowedLibraryIDs: []int{}}
+		return catalog.AccessFilter{AllowedLibraryIDs: []int{}, ImageSize: requestImageSize(r)}
 	}
+	filter.ImageSize = requestImageSize(r)
 	return filter
 }
 

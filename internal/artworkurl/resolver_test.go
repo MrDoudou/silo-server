@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
@@ -71,6 +72,60 @@ func TestResolverDirectPolicyUsesBackendURL(t *testing.T) {
 	}
 	if !strings.HasPrefix(resolved.URL, "https://cdn.test/") || direct.requestedTTL != 30*time.Minute {
 		t.Fatalf("resolved = %#v, ttl %s", resolved, direct.requestedTTL)
+	}
+}
+
+func TestResolverDirectPolicySelectsPreLadderVariantFromManifest(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	variantData := map[string][]byte{
+		artworkkey.OriginalVariant: []byte("old original"),
+		artworkkey.VariantW500:     []byte("old medium"),
+		artworkkey.VariantW300:     []byte("old small"),
+	}
+	revision, err := artworkkey.BuildPortableRevision(artworkkey.RevisionInput{
+		ImageType: artworkkey.ImageTypePoster,
+		MediaType: "image/webp",
+		Ext:       ".webp",
+		Variants: []artworkkey.VariantBytes{
+			{Name: artworkkey.OriginalVariant, Data: variantData[artworkkey.OriginalVariant]},
+			{Name: artworkkey.VariantW500, Data: variantData[artworkkey.VariantW500]},
+			{Name: artworkkey.VariantW300, Data: variantData[artworkkey.VariantW300]},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for variant, key := range revision.VariantKeys {
+		if err := store.WriteImmutable(t.Context(), key, variantData[variant], artworkstore.ObjectMetadata{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.WriteImmutable(t.Context(), revision.ManifestKey, revision.ManifestJSON, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+
+	resolver, err := NewResolver(nil, testSigner(t, time.Hour), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
+	resolver.SetLocalURLAuth(func() string { return "public" })
+	resolver.SetStore(store)
+	target := Target{Surface: SurfaceItemPosters, Keys: []string{"movie-1"}, Slot: artworkkey.ImageTypePoster}.WithReference(revision.OriginalKey)
+	resolved, err := resolver.ResolveTargetURL(t.Context(), target, artworkkey.VariantW780)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPath, err := DirectPathFromKey(revision.VariantKeys[artworkkey.VariantW500])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := resolved.URL, DirectRoutePrefix+wantPath; got != want {
+		t.Fatalf("URL = %q, want manifest-selected fallback %q", got, want)
 	}
 }
 

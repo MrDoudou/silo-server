@@ -223,9 +223,13 @@ func (t *ArtworkRevisionTracker) RecordArtworkRevision(
 	return nil
 }
 
+// artworkSourceClassProvider is the canonical provider source class; the
+// remaining classes appear once here and stay literals.
+const artworkSourceClassProvider = "provider"
+
 func normalizeArtworkSourceClass(sourceClass string) string {
 	switch strings.ToLower(strings.TrimSpace(sourceClass)) {
-	case "provider", "plugin", "library_sidecar", "embedded", "generated", "upload", "bundled":
+	case artworkSourceClassProvider, "plugin", "library_sidecar", "embedded", "generated", "upload", "bundled":
 		return strings.ToLower(strings.TrimSpace(sourceClass))
 	default:
 		return "unknown"

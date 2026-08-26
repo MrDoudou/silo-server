@@ -405,11 +405,11 @@ func TestCachePosterWritesPortableRevisionWithManifestLast(t *testing.T) {
 	}
 
 	keys := store.keys()
-	// Three variants plus the manifest.
-	if len(keys) != 4 {
-		t.Fatalf("wrote %d objects, want 4: %v", len(keys), keys)
+	// Four variants plus the manifest.
+	if len(keys) != 5 {
+		t.Fatalf("wrote %d objects, want 5: %v", len(keys), keys)
 	}
-	for _, variant := range []string{"original", "w500", "w300"} {
+	for _, variant := range []string{"original", "w780", "w500", "w300"} {
 		want := result.VariantPaths[variant]
 		if want != wantDir+"/"+variant+".webp" {
 			t.Errorf("%s key = %q, want %q", variant, want, wantDir+"/"+variant+".webp")
@@ -511,7 +511,7 @@ func TestCacheSkipsWritingVariantsThatAlreadyExist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prime immutable variants: %v", err)
 	}
-	store.setExisting(first.VariantPaths["original"], first.VariantPaths["w500"], first.VariantPaths["w300"])
+	store.setExisting(first.VariantPaths["original"], first.VariantPaths["w780"], first.VariantPaths["w500"], first.VariantPaths["w300"])
 	store.resetCalls()
 
 	result, err := c.Cache(context.Background(), req)
@@ -526,10 +526,10 @@ func TestCacheSkipsWritingVariantsThatAlreadyExist(t *testing.T) {
 	if got := store.keys(); len(got) != 1 || got[0] != result.ManifestPath {
 		t.Fatalf("wrote %v, want only the manifest %q", got, result.ManifestPath)
 	}
-	if result.UploadedVariants != 0 || result.ExistingVariants != 3 {
-		t.Fatalf("write stats = uploaded %d existing %d, want uploaded 0 existing 3", result.UploadedVariants, result.ExistingVariants)
+	if result.UploadedVariants != 0 || result.ExistingVariants != 4 {
+		t.Fatalf("write stats = uploaded %d existing %d, want uploaded 0 existing 4", result.UploadedVariants, result.ExistingVariants)
 	}
-	for _, key := range []string{result.VariantPaths["original"], result.VariantPaths["w500"], result.VariantPaths["w300"]} {
+	for _, key := range []string{result.VariantPaths["original"], result.VariantPaths["w780"], result.VariantPaths["w500"], result.VariantPaths["w300"]} {
 		if !hasKey(store.checkedKeys(), key) {
 			t.Fatalf("content match was not checked for %q; checked %v", key, store.checkedKeys())
 		}
@@ -552,7 +552,7 @@ func TestCacheWritesOnlyMissingVariants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prime immutable variants: %v", err)
 	}
-	store.setExisting(first.VariantPaths["original"], first.VariantPaths["w500"])
+	store.setExisting(first.VariantPaths["original"], first.VariantPaths["w780"], first.VariantPaths["w500"])
 	store.resetCalls()
 
 	result, err := c.Cache(context.Background(), req)
@@ -563,8 +563,8 @@ func TestCacheWritesOnlyMissingVariants(t *testing.T) {
 	if got := store.keys(); !slices.Equal(got, want) {
 		t.Fatalf("wrote %v, want %v", got, want)
 	}
-	if result.UploadedVariants != 1 || result.ExistingVariants != 2 {
-		t.Fatalf("write stats = uploaded %d existing %d, want uploaded 1 existing 2", result.UploadedVariants, result.ExistingVariants)
+	if result.UploadedVariants != 1 || result.ExistingVariants != 3 {
+		t.Fatalf("write stats = uploaded %d existing %d, want uploaded 1 existing 3", result.UploadedVariants, result.ExistingVariants)
 	}
 }
 
@@ -584,8 +584,8 @@ func TestCacheDifferentContentCreatesDifferentImmutableRevision(t *testing.T) {
 	if first.Revision == second.Revision || first.OriginalPath == second.OriginalPath {
 		t.Fatalf("different content reused revision: first=%q second=%q", first.OriginalPath, second.OriginalPath)
 	}
-	if got := store.keys(); len(got) != 8 {
-		t.Fatalf("wrote %v, want both immutable revisions in full (3 variants + manifest each)", got)
+	if got := store.keys(); len(got) != 10 {
+		t.Fatalf("wrote %v, want both immutable revisions in full (4 variants + manifest each)", got)
 	}
 }
 
@@ -653,9 +653,9 @@ func TestCacheVariantLadders(t *testing.T) {
 		want      []string
 		forbidden []string
 	}{
-		{"poster", metadata.ImagePoster, "poster", []string{"original", "w500", "w300"}, []string{"w1280"}},
+		{"poster", metadata.ImagePoster, "poster", []string{"original", "w780", "w500", "w300"}, []string{"w1280"}},
 		{"backdrop", metadata.ImageBackdrop, "backdrop", []string{"original", "w1920", "w1280", "w300"}, []string{"w500"}},
-		{"logo", metadata.ImageLogo, "logo", []string{"original", "w500"}, []string{"w300", "w1280"}},
+		{"logo", metadata.ImageLogo, "logo", []string{"original", "w1280", "w500"}, []string{"w300"}},
 		{"profile", metadata.ImageProfile, "profile", []string{"original", "w500", "w300"}, []string{"w1920"}},
 	}
 	for _, tc := range tests {
@@ -908,9 +908,9 @@ func TestCacheDoesNotRetryContentMismatch(t *testing.T) {
 	if !errors.Is(err, artworkstore.ErrContentMismatch) {
 		t.Fatalf("CacheBytes error = %v, want ErrContentMismatch", err)
 	}
-	// The logo ladder is two variants written concurrently; each may attempt
+	// The logo ladder is three variants written concurrently; each may attempt
 	// exactly once.
-	if got := store.attempts(); got > 2 {
+	if got := store.attempts(); got > 3 {
 		t.Fatalf("write attempts = %d, want at most one per variant", got)
 	}
 }

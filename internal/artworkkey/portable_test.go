@@ -278,6 +278,7 @@ func TestObjectKeysExpandsBothGrammars(t *testing.T) {
 	want := []string{
 		dir + "/manifest.json",
 		dir + "/original.webp",
+		dir + "/w780.webp",
 		dir + "/w500.webp",
 		dir + "/w300.webp",
 	}
@@ -297,6 +298,7 @@ func TestObjectKeysExpandsBothGrammars(t *testing.T) {
 	legacy := ObjectKeys("tmdb/movies/550/poster/original.abc123.webp", "poster")
 	wantLegacy := []string{
 		"tmdb/movies/550/poster/original.abc123.webp",
+		"tmdb/movies/550/poster/w780.abc123.webp",
 		"tmdb/movies/550/poster/w500.abc123.webp",
 		"tmdb/movies/550/poster/w300.abc123.webp",
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/auth"
 	"github.com/Silo-Server/silo-server/internal/catalog"
+	"github.com/Silo-Server/silo-server/internal/imagesize"
 	"github.com/Silo-Server/silo-server/internal/models"
 	"github.com/Silo-Server/silo-server/internal/sections"
 	"github.com/Silo-Server/silo-server/internal/sections/recipes"
@@ -583,6 +584,9 @@ func (h *SectionHandler) HandleLibraryLayout(w http.ResponseWriter, r *http.Requ
 
 // HandleHomeSections handles GET /home/sections
 func (h *SectionHandler) HandleHomeSections(w http.ResponseWriter, r *http.Request) {
+	if !rejectInvalidImageSize(w, r) {
+		return
+	}
 	resolved, libraryIDs, accessFilter, profileID, err := h.loadResolvedHomeSections(r)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load sections")
@@ -599,6 +603,9 @@ func (h *SectionHandler) HandleHomeSections(w http.ResponseWriter, r *http.Reque
 
 // HandleHomeSectionItems handles GET /home/sections/{id}/items
 func (h *SectionHandler) HandleHomeSectionItems(w http.ResponseWriter, r *http.Request) {
+	if !rejectInvalidImageSize(w, r) {
+		return
+	}
 	sectionID := chi.URLParam(r, "id")
 	if sectionID == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "Section ID is required")
@@ -653,6 +660,9 @@ func (h *SectionHandler) HandleHomeSectionItems(w http.ResponseWriter, r *http.R
 
 // HandleLibrarySections handles GET /library/{id}/sections
 func (h *SectionHandler) HandleLibrarySections(w http.ResponseWriter, r *http.Request) {
+	if !rejectInvalidImageSize(w, r) {
+		return
+	}
 	idStr := chi.URLParam(r, "id")
 	libraryID, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -675,6 +685,9 @@ func (h *SectionHandler) HandleLibrarySections(w http.ResponseWriter, r *http.Re
 
 // HandleLibrarySectionItems handles GET /library/{id}/sections/{sectionId}/items
 func (h *SectionHandler) HandleLibrarySectionItems(w http.ResponseWriter, r *http.Request) {
+	if !rejectInvalidImageSize(w, r) {
+		return
+	}
 	idStr := chi.URLParam(r, "id")
 	libraryID, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -1297,7 +1310,7 @@ func (h *SectionHandler) buildSectionsResponse(r *http.Request, withItems []sect
 		}
 	}
 	userStates := h.listSectionItemUserStates(r, allItems)
-	imageURLs := h.resolveSectionItemImageURLs(r.Context(), withItems)
+	imageURLs := h.resolveSectionItemImageURLs(r.Context(), withItems, requestImageSize(r))
 	episodeMeta := h.listSectionEpisodeItemMeta(r.Context(), withItems, requestAccessFilter(r))
 	mangaChapterMeta := h.listSectionMangaChapterItemMeta(r.Context(), allItems)
 	for _, s := range withItems {
@@ -1425,18 +1438,21 @@ func (h *SectionHandler) listSectionEpisodeItemMeta(ctx context.Context, withIte
 	return meta
 }
 
-func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withItems []sections.SectionWithItems) map[sectionItemImageKey]sectionItemImageURLs {
+func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withItems []sections.SectionWithItems, size imagesize.Size) map[sectionItemImageKey]sectionItemImageURLs {
 	result := make(map[sectionItemImageKey]sectionItemImageURLs)
 	if h.DetailSvc == nil {
 		return result
 	}
 
 	type pendingImages struct {
-		key          sectionItemImageKey
-		posterTarget artworkurl.Target
-		backdropWide artworkurl.Target
-		backdropCard artworkurl.Target
-		logoTarget   artworkurl.Target
+		key             sectionItemImageKey
+		posterTarget    artworkurl.Target
+		backdropWide    artworkurl.Target
+		backdropCard    artworkurl.Target
+		logoTarget      artworkurl.Target
+		posterVariant   string
+		backdropVariant string
+		logoVariant     string
 	}
 
 	pending := make([]pendingImages, 0)
@@ -1453,42 +1469,54 @@ func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withIt
 					ownerID = *meta.SeriesID
 				}
 			}
-			poster := artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{ownerID}, Slot: artworkImagePoster}.WithReference(featuredPosterPath(item.PosterPath))
+			poster := artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{ownerID}, Slot: artworkImagePoster}.WithReference(item.PosterPath)
 			backdrop := artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{ownerID}, Slot: artworkImageBackdrop}.WithReference(item.BackdropPath)
 			logo := artworkurl.Target{Surface: artworkurl.SurfaceItemLogos, Keys: []string{ownerID}, Slot: artworkImageLogo}.WithReference(item.LogoPath)
+			posterVariant := artworkkey.VariantW500
+			backdropVariant := artworkkey.VariantW1280
+			logoVariant := artworkkey.OriginalVariant
+			if size != imagesize.Unset {
+				posterVariant = imagesize.Variant(artworkkey.ImageTypePoster, size)
+				backdropVariant = imagesize.Variant(imageTypeForBackdropPath(item.BackdropPath), size)
+				logoVariant = imagesize.Variant(artworkkey.ImageTypeLogo, size)
+			}
 			images := pendingImages{
 				key: sectionItemImageKey{
 					sectionID: section.ID,
 					contentID: item.ContentID,
 				},
-				posterTarget: poster,
-				logoTarget:   logo,
+				posterTarget:    poster,
+				logoTarget:      logo,
+				posterVariant:   posterVariant,
+				backdropVariant: backdropVariant,
+				logoVariant:     logoVariant,
 			}
-			if sectionBackdropPath(section.SectionType, item.BackdropPath) == cardThumbnailPath(item.BackdropPath) {
-				images.backdropCard = backdrop.WithReference(cardThumbnailPath(item.BackdropPath))
-				requests = append(requests, artworkurl.TargetRequest{Target: images.backdropCard, Variant: artworkkey.VariantW300})
+			if size == imagesize.Unset && sectionBackdropPath(section.SectionType, item.BackdropPath) == cardThumbnailPath(item.BackdropPath) {
+				images.backdropVariant = artworkkey.VariantW300
+				images.backdropCard = backdrop
+				requests = append(requests, artworkurl.TargetRequest{Target: images.backdropCard, Variant: images.backdropVariant})
 			} else {
 				images.backdropWide = backdrop
-				requests = append(requests, artworkurl.TargetRequest{Target: images.backdropWide, Variant: artworkkey.VariantW1280})
+				requests = append(requests, artworkurl.TargetRequest{Target: images.backdropWide, Variant: images.backdropVariant})
 			}
 			pending = append(pending, images)
 			requests = append(requests,
-				artworkurl.TargetRequest{Target: poster, Variant: artworkkey.VariantW500},
-				artworkurl.TargetRequest{Target: logo, Variant: artworkkey.OriginalVariant},
+				artworkurl.TargetRequest{Target: poster, Variant: images.posterVariant},
+				artworkurl.TargetRequest{Target: logo, Variant: images.logoVariant},
 			)
 		}
 	}
 
 	resolved := h.DetailSvc.PresignArtworkTargetRequestsWithExpiry(ctx, requests)
 	for _, images := range pending {
-		backdrop := resolved[(artworkurl.TargetRequest{Target: images.backdropWide, Variant: artworkkey.VariantW1280}).CacheKey()].URL
+		backdrop := resolved[(artworkurl.TargetRequest{Target: images.backdropWide, Variant: images.backdropVariant}).CacheKey()].URL
 		if images.backdropCard.Surface != "" {
-			backdrop = resolved[(artworkurl.TargetRequest{Target: images.backdropCard, Variant: artworkkey.VariantW300}).CacheKey()].URL
+			backdrop = resolved[(artworkurl.TargetRequest{Target: images.backdropCard, Variant: images.backdropVariant}).CacheKey()].URL
 		}
 		result[images.key] = sectionItemImageURLs{
-			posterURL:   resolved[(artworkurl.TargetRequest{Target: images.posterTarget, Variant: artworkkey.VariantW500}).CacheKey()].URL,
+			posterURL:   resolved[(artworkurl.TargetRequest{Target: images.posterTarget, Variant: images.posterVariant}).CacheKey()].URL,
 			backdropURL: backdrop,
-			logoURL:     resolved[(artworkurl.TargetRequest{Target: images.logoTarget, Variant: artworkkey.OriginalVariant}).CacheKey()].URL,
+			logoURL:     resolved[(artworkurl.TargetRequest{Target: images.logoTarget, Variant: images.logoVariant}).CacheKey()].URL,
 		}
 	}
 	return result
@@ -1557,6 +1585,10 @@ func sectionBackdropPath(sectionType sections.SectionType, path string) string {
 		return catalog.BackdropVariantPath(path, "w1280")
 	}
 	return featuredBackdropPath(path)
+}
+
+func sizedSectionBackdropPath(sectionType sections.SectionType, path string, size imagesize.Size) string {
+	return sizedImagePath(path, imageTypeForBackdropPath(path), size, sectionBackdropPath(sectionType, path))
 }
 
 func (h *SectionHandler) listSectionItemUserStates(r *http.Request, items []*models.MediaItem) map[string]*itemUserStateResponse {

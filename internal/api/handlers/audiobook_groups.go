@@ -5,8 +5,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
+	"github.com/Silo-Server/silo-server/internal/imagesize"
 )
 
 type audiobookGroupResponse struct {
@@ -105,7 +107,7 @@ func (h *CatalogHandler) HandleGetAudiobookGroups(w http.ResponseWriter, r *http
 		return
 	}
 
-	resolvedPosters := h.resolveAudiobookGroupPosterURLs(r, result.Groups)
+	resolvedPosters := h.resolveAudiobookGroupPosterURLs(r, result.Groups, filter.ImageSize)
 	resp := audiobookGroupsResponse{
 		Total:      result.Total,
 		TotalExact: result.TotalExact,
@@ -136,7 +138,7 @@ func (h *CatalogHandler) HandleGetAudiobookGroups(w http.ResponseWriter, r *http
 	writeJSON(w, http.StatusOK, resp)
 }
 
-func (h *CatalogHandler) resolveAudiobookGroupPosterURLs(r *http.Request, groups []catalog.AudiobookGroup) map[string]catalog.ResolvedImageURL {
+func (h *CatalogHandler) resolveAudiobookGroupPosterURLs(r *http.Request, groups []catalog.AudiobookGroup, size imagesize.Size) map[string]catalog.ResolvedImageURL {
 	if h == nil || h.itemsH == nil || h.itemsH.detailSvc == nil || len(groups) == 0 {
 		return map[string]catalog.ResolvedImageURL{}
 	}
@@ -156,5 +158,9 @@ func (h *CatalogHandler) resolveAudiobookGroupPosterURLs(r *http.Request, groups
 			targets = append(targets, target)
 		}
 	}
-	return h.itemsH.detailSvc.PresignArtworkTargetsWithExpiry(r.Context(), targets, "w300")
+	variant := artworkkey.VariantW300
+	if size != imagesize.Unset {
+		variant = imagesize.Variant(artworkkey.ImageTypePoster, size)
+	}
+	return h.itemsH.detailSvc.PresignArtworkTargetsWithExpiry(r.Context(), targets, variant)
 }

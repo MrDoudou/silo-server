@@ -10,10 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/cache"
 	"github.com/Silo-Server/silo-server/internal/catalog"
+	"github.com/Silo-Server/silo-server/internal/imagesize"
 
 	pluginv1 "github.com/Silo-Server/silo-plugin-sdk/pkg/pluginproto/silo/plugin/v1"
 	"golang.org/x/sync/singleflight"
@@ -303,7 +305,7 @@ func (r *PluginImageResolver) ResolveArtworkTargetsWithExpiry(
 	if targetResolver.DeliveryPolicy() == artworkurl.DeliveryPolicyDirect {
 		for _, target := range targets {
 			if strings.Contains(target.Reference, "://") && !strings.HasPrefix(target.Reference, artworkurl.LibraryReferencePrefix) {
-				result[target.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, target.Reference, variant)
+				result[target.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, target.Reference, providerVariantForTarget(target.Slot, variant))
 				continue
 			}
 			resolved, found := targetResolver.ResolveTargetURLs(ctx, []artworkurl.Target{target}, variant)[target.CacheKey()]
@@ -319,6 +321,25 @@ func (r *PluginImageResolver) ResolveArtworkTargetsWithExpiry(
 	return result
 }
 
+// providerVariantForTarget translates a concrete stored rung back into the
+// semantic vocabulary understood by metadata plugins. Target.Slot is required:
+// w1280 is a medium backdrop but the newly-added large logo rung.
+func providerVariantForTarget(imageType, variant string) string {
+	if variant == artworkkey.OriginalVariant {
+		return imagesize.PluginVariantOriginal
+	}
+	large := imagesize.Variant(imageType, imagesize.Large)
+	medium := imagesize.Variant(imageType, imagesize.Medium)
+	if variant == large && large != medium {
+		return imagesize.PluginVariantLarge
+	}
+	small := imagesize.Variant(imageType, imagesize.Small)
+	if variant == small && small != medium {
+		return imagesize.PluginVariantCard
+	}
+	return imagesize.PluginVariantFeatured
+}
+
 func (r *PluginImageResolver) ResolveArtworkTargetRequestsWithExpiry(ctx context.Context, requests []artworkurl.TargetRequest) map[string]catalog.ResolvedImageURL {
 	result := make(map[string]catalog.ResolvedImageURL, len(requests))
 	if len(requests) == 0 {
@@ -330,9 +351,21 @@ func (r *PluginImageResolver) ResolveArtworkTargetRequestsWithExpiry(ctx context
 	targetResolver, ok := artwork.(targetArtworkURLResolver)
 	if !ok {
 		for _, request := range requests {
-			result[request.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, request.Target.Reference, request.Variant)
+			result[request.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, request.Target.Reference, providerVariantForTarget(request.Target.Slot, request.Variant))
 		}
 		return result
+	}
+	if targetResolver.DeliveryPolicy() == artworkurl.DeliveryPolicyDirect {
+		stored := make([]artworkurl.TargetRequest, 0, len(requests))
+		for _, request := range requests {
+			reference := request.Target.Reference
+			if strings.Contains(reference, "://") && !strings.HasPrefix(reference, artworkurl.LibraryReferencePrefix) {
+				result[request.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, reference, providerVariantForTarget(request.Target.Slot, request.Variant))
+				continue
+			}
+			stored = append(stored, request)
+		}
+		requests = stored
 	}
 	for key, resolved := range targetResolver.ResolveTargetRequests(ctx, requests) {
 		result[key] = catalog.ResolvedImageURL{URL: resolved.URL, ExpiresAt: resolved.ExpiresAt}

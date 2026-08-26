@@ -1377,6 +1377,7 @@ func main() {
 			log.Fatalf("artwork storage: %v", resolverErr)
 		}
 		artworkURLs = resolver
+		resolver.SetStore(deps.ArtworkStore.Store)
 		resolver.SetDeliveryPolicy(func() string {
 			if deps.LiveConfig != nil {
 				if live := deps.LiveConfig(); live != nil {

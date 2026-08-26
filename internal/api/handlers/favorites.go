@@ -15,6 +15,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	evt "github.com/Silo-Server/silo-server/internal/events"
+	"github.com/Silo-Server/silo-server/internal/imagesize"
 	"github.com/Silo-Server/silo-server/internal/models"
 	"github.com/Silo-Server/silo-server/internal/userstore"
 	"github.com/Silo-Server/silo-server/internal/watchsync"
@@ -133,6 +134,9 @@ const (
 
 // HandleListFavorites handles GET /favorites.
 func (h *PersonalDataHandler) HandleListFavorites(w http.ResponseWriter, r *http.Request) {
+	if !rejectInvalidImageSize(w, r) {
+		return
+	}
 	userID := apimw.GetUserID(r.Context())
 	profileID := apimw.GetProfileID(r.Context())
 
@@ -289,6 +293,9 @@ func (h *PersonalDataHandler) dispatchLocalListEvent(ctx context.Context, list w
 
 // HandleListWatchlist handles GET /watchlist.
 func (h *PersonalDataHandler) HandleListWatchlist(w http.ResponseWriter, r *http.Request) {
+	if !rejectInvalidImageSize(w, r) {
+		return
+	}
 	userID := apimw.GetUserID(r.Context())
 	profileID := apimw.GetProfileID(r.Context())
 
@@ -454,6 +461,9 @@ func (h *PersonalDataHandler) HandleRemoveFromWatchlist(w http.ResponseWriter, r
 
 // HandleListHistory handles GET /history.
 func (h *PersonalDataHandler) HandleListHistory(w http.ResponseWriter, r *http.Request) {
+	if !rejectInvalidImageSize(w, r) {
+		return
+	}
 	userID := apimw.GetUserID(r.Context())
 	profileID := apimw.GetProfileID(r.Context())
 
@@ -588,6 +598,11 @@ func resolveItemsByIDs(h *PersonalDataHandler, r *http.Request, ids []string) ([
 	// Index by content ID for order-preserving lookup.
 	byID := make(map[string]*itemListResponse, len(mediaItems))
 	filter := requestAccessFilter(r)
+	size := requestImageSize(r)
+	posterSize, cardSize := string(imagesize.Medium), string(imagesize.Small)
+	if size != imagesize.Unset {
+		posterSize, cardSize = string(size), string(size)
+	}
 	accessibleItems := make([]*models.MediaItem, 0, len(mediaItems))
 	for _, mi := range mediaItems {
 		if err := h.itemRepo.EnsureAccessible(r.Context(), mi.ContentID, filter); err != nil {
@@ -623,8 +638,8 @@ func resolveItemsByIDs(h *PersonalDataHandler, r *http.Request, ids []string) ([
 			BackdropThumbhash: mi.BackdropThumbhash,
 			UserState:         userStates[mi.ContentID],
 		}
-		resp.PosterURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{mi.ContentID}, Slot: artworkImagePoster}, mi.PosterPath, artworkImagePoster, "medium")
-		resp.BackdropURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{mi.ContentID}, Slot: artworkImageBackdrop}, mi.BackdropPath, artworkImageBackdrop, "small")
+		resp.PosterURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{mi.ContentID}, Slot: artworkImagePoster}, mi.PosterPath, artworkImagePoster, posterSize)
+		resp.BackdropURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{mi.ContentID}, Slot: artworkImageBackdrop}, mi.BackdropPath, artworkImageBackdrop, cardSize)
 		byID[mi.ContentID] = &resp
 	}
 
@@ -665,14 +680,14 @@ func resolveItemsByIDs(h *PersonalDataHandler, r *http.Request, ids []string) ([
 					}
 					// Use episode still as backdrop, fall back to parent series images.
 					if ep.StillPath != "" {
-						resp.BackdropURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceEpisodeStills, Keys: []string{ep.ContentID}, Slot: artworkImageStill}, ep.StillPath, artworkImageStill, "small")
+						resp.BackdropURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceEpisodeStills, Keys: []string{ep.ContentID}, Slot: artworkImageStill}, ep.StillPath, artworkImageStill, cardSize)
 						resp.BackdropThumbhash = ep.StillThumbhash
 					} else if parent != nil {
-						resp.BackdropURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{parent.ContentID}, Slot: artworkImageBackdrop}, parent.BackdropPath, artworkImageBackdrop, "small")
+						resp.BackdropURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{parent.ContentID}, Slot: artworkImageBackdrop}, parent.BackdropPath, artworkImageBackdrop, cardSize)
 						resp.BackdropThumbhash = parent.BackdropThumbhash
 					}
 					if parent != nil {
-						resp.PosterURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{parent.ContentID}, Slot: artworkImagePoster}, parent.PosterPath, artworkImagePoster, "medium")
+						resp.PosterURL = h.targetURL(r, artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{parent.ContentID}, Slot: artworkImagePoster}, parent.PosterPath, artworkImagePoster, posterSize)
 						resp.PosterThumbhash = parent.PosterThumbhash
 						resp.Year = parent.Year
 						resp.Genres = parent.Genres

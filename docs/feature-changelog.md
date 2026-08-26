@@ -2,6 +2,21 @@
 
 ## 2026-08-25
 
+### Let clients choose one consistent artwork size
+
+Native list, detail, season, episode, home, library-section, and personal-list
+responses now accept `image_size=small|medium|large|original`; one value applies
+to every artwork URL in the response, while omitting it preserves each route's
+previous defaults. Posters and stills gain a 780px rung and logos gain a 1280px
+rung, all reported live by `GET /api/v1/images/capability` and the artwork
+capability ladder. Jellyfin width requests use the same mapping.
+
+Target-bound resilient URLs carry the selected variant, and direct policy mints
+the corresponding raw object key. When an immutable revision predates the wider
+rungs, its manifest selects the nearest smaller stored image without reporting
+loss, scheduling repair, or showing a placeholder; legacy keys use a bounded
+existence cache for the same compatibility fallback.
+
 ### Keep artwork available while storage is missing or rebuilding
 
 Artwork URLs now identify the catalog target instead of one storage key. The

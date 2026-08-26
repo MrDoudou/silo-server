@@ -25,8 +25,16 @@ const (
 	OriginalVariant = "original"
 	VariantW300     = "w300"
 	VariantW500     = "w500"
+	VariantW780     = "w780"
 	VariantW1280    = "w1280"
+	VariantW1920    = "w1920"
 )
+
+// LadderVersion identifies the generated variant set. It changes only when
+// VariantWidths changes, so readers can distinguish revisions produced before
+// a ladder extension without treating their intentionally smaller manifests as
+// damaged. No request path uses it as a reason to enqueue repair work.
+const LadderVersion = 2
 
 // defaultVariantExt is the extension assumed when a caller builds a key
 // without naming one. Every encode the pipeline performs today outputs WebP.
@@ -182,7 +190,11 @@ func VariantWidths(imageType string) []int {
 	case ImageTypeBackdrop:
 		return []int{1920, 1280, 300}
 	case ImageTypeLogo:
-		return []int{500}
+		return []int{1280, 500}
+	case ImageTypePoster, ImageTypeStill:
+		return []int{780, 500, 300}
+	case ImageTypeProfile:
+		return []int{500, 300}
 	case ImageTypeCollectionBackdrop:
 		// Narrower than a catalog backdrop: collection backdrops are shown in
 		// headers and cards, never as a full-viewport hero.
@@ -190,7 +202,7 @@ func VariantWidths(imageType string) []int {
 	case ImageTypeAvatar:
 		// Square, and only ever rendered at avatar size.
 		return []int{256}
-	default: // poster, still, profile, library-poster, collection-poster
+	default: // library-poster, collection-poster, and defensive unknowns
 		return []int{500, 300}
 	}
 }
@@ -204,6 +216,20 @@ func VariantNames(imageType string) []string {
 		names = append(names, "w"+strconv.Itoa(width))
 	}
 	return names
+}
+
+// IsLadderExtensionVariant reports whether variant is the newest wide rung for
+// an artwork type whose ladder grew at LadderVersion. Older portable manifests
+// may legitimately omit only these rungs; their absence is a compatibility
+// fallback condition, not evidence of storage loss.
+func IsLadderExtensionVariant(imageType, variant string) bool {
+	switch strings.ToLower(strings.TrimSpace(imageType)) {
+	case ImageTypePoster, ImageTypeStill, ImageTypeLogo:
+		widths := VariantWidths(imageType)
+		return len(widths) > 0 && variant == "w"+strconv.Itoa(widths[0])
+	default:
+		return false
+	}
 }
 
 // ObjectKeys expands an original key to every expected key for its image type.

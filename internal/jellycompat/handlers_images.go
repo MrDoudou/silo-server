@@ -30,7 +30,7 @@ type ImagesHandler struct {
 	codec        *ResourceIDCodec
 	sessions     *SessionStore
 	images       *ImageCache
-	personRepo   *catalog.PersonRepository
+	personRepo   imagePersonRepository
 	detailSvc    *catalog.DetailService
 	itemRepo     imageItemRepository
 	folderRepo   imageFolderRepository
@@ -60,6 +60,10 @@ type imageItemRepository interface {
 	EnsureAccessible(ctx context.Context, contentID string, filter catalog.AccessFilter) error
 }
 
+type imagePersonRepository interface {
+	Get(ctx context.Context, id int64) (*models.Person, error)
+}
+
 type imageSeasonRepository interface {
 	GetByID(ctx context.Context, contentID string) (*models.Season, error)
 }
@@ -77,12 +81,16 @@ func NewImagesHandler(content ContentService, codec *ResourceIDCodec, sessions *
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
+	var persons imagePersonRepository
+	if personRepo != nil {
+		persons = personRepo
+	}
 	return &ImagesHandler{
 		content:      content,
 		codec:        codec,
 		sessions:     sessions,
 		images:       images,
-		personRepo:   personRepo,
+		personRepo:   persons,
 		detailSvc:    detailSvc,
 		itemRepo:     itemRepo,
 		folderRepo:   folderRepo,

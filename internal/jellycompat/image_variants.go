@@ -24,8 +24,6 @@ const (
 // image type this layer defaults to a hero size rather than a card size.
 const compatBackdropImageType = "Backdrop"
 
-const compatMediumImageSize = "medium"
-
 const (
 	compatArtworkPoster   = artworkkey.ImageTypePoster
 	compatArtworkBackdrop = artworkkey.ImageTypeBackdrop
@@ -37,19 +35,11 @@ const (
 )
 
 func compatArtworkVariant(imageType, size string) string {
-	switch size {
-	case artworkkey.OriginalVariant:
-		return artworkkey.OriginalVariant
-	case compatCardImageSize:
-		return artworkkey.VariantW300
-	case compatMediumImageSize:
-		if imageType == artworkkey.ImageTypeBackdrop {
-			return artworkkey.VariantW1280
-		}
-		return artworkkey.VariantW500
-	default:
-		return artworkkey.OriginalVariant
+	parsed, err := imagesize.Parse(size)
+	if err != nil || parsed == imagesize.Unset {
+		parsed = imagesize.Medium
 	}
+	return imagesize.Variant(imageType, parsed)
 }
 
 func compatPresignImage(detailSvc *catalog.DetailService, ctx context.Context, path, imageType, size string) string {
