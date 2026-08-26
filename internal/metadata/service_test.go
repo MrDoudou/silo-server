@@ -2364,21 +2364,21 @@ func TestClaimConfirmedSeriesRootOwnership_ClaimsRootAndGroups(t *testing.T) {
 			MediaFolderID:    10,
 			ObservedRootPath: "/media/shows/Example Show",
 			GroupKeyVersion:  1,
-			ContentGroupKey:  "v1|series|example_show|2024",
+			ContentGroupKey:  "v1|series|anchor|tvdb-296762",
 		},
 		{
 			ID:               2,
 			MediaFolderID:    10,
 			ObservedRootPath: "/media/shows/Example Show",
 			GroupKeyVersion:  1,
-			ContentGroupKey:  "v1|series|example_show|2024",
+			ContentGroupKey:  "v1|series|anchor|tvdb-296762",
 		},
 		{
 			ID:               3,
 			MediaFolderID:    10,
 			ObservedRootPath: "/media/shows/Example Show",
 			GroupKeyVersion:  2,
-			ContentGroupKey:  "v2|series|example_show|2024",
+			ContentGroupKey:  "v2|series|anchor|tvdb-296762",
 		},
 	}
 
@@ -2387,14 +2387,144 @@ func TestClaimConfirmedSeriesRootOwnership_ClaimsRootAndGroups(t *testing.T) {
 	if got := h.rootClaimRepo.claims["10:/media/shows/Example Show"]; got != "matched-series" {
 		t.Fatalf("root claim = %q, want matched-series", got)
 	}
-	if got := h.groupClaimRepo.claims["10:1:v1|series|example_show|2024"]; got != "matched-series" {
+	if got := h.groupClaimRepo.claims["10:1:v1|series|anchor|tvdb-296762"]; got != "matched-series" {
 		t.Fatalf("group claim v1 = %q, want matched-series", got)
 	}
-	if got := h.groupClaimRepo.claims["10:2:v2|series|example_show|2024"]; got != "matched-series" {
+	if got := h.groupClaimRepo.claims["10:2:v2|series|anchor|tvdb-296762"]; got != "matched-series" {
 		t.Fatalf("group claim v2 = %q, want matched-series", got)
 	}
 	if len(h.groupClaimRepo.claims) != 2 {
 		t.Fatalf("group claim count = %d, want 2", len(h.groupClaimRepo.claims))
+	}
+}
+
+func TestClaimConfirmedSeriesRootOwnership_SkipsTitleYearGroupKeys(t *testing.T) {
+	h := newTestHarness()
+	ctx := context.Background()
+
+	files := []*models.MediaFile{
+		{
+			ID:               1,
+			MediaFolderID:    10,
+			ObservedRootPath: "/media/shows/Passenger (2026)",
+			GroupKeyVersion:  1,
+			ContentGroupKey:  "v1|series|passenger|2026",
+		},
+		{
+			ID:               2,
+			MediaFolderID:    10,
+			ObservedRootPath: "/media/shows/Passenger (2026)",
+			GroupKeyVersion:  1,
+			ContentGroupKey:  "v1|series|anchor|tvdb-111",
+		},
+	}
+
+	h.service.claimConfirmedSeriesRootOwnership(ctx, 10, "/media/shows/Passenger (2026)", "matched-series", files)
+
+	if _, ok := h.groupClaimRepo.claims["10:1:v1|series|passenger|2026"]; ok {
+		t.Fatal("title/year series group keys must not be claimed; they collide across unrelated shows")
+	}
+	if got := h.groupClaimRepo.claims["10:1:v1|series|anchor|tvdb-111"]; got != "matched-series" {
+		t.Fatalf("anchored group claim = %q, want matched-series", got)
+	}
+}
+
+func TestCreateOrFindSkeleton_SeriesIgnoresMatchedTitleYearGroupClaim(t *testing.T) {
+	h := newTestHarness()
+	ctx := context.Background()
+
+	existingContentID := "matched-passenger-show"
+	_, err := h.groupClaimRepo.ClaimAndRelinkFiles(ctx, 10, 1, "v1|series|passenger|2026", existingContentID)
+	if err != nil {
+		t.Fatalf("claiming test content group: %v", err)
+	}
+	if err := h.itemRepo.Upsert(ctx, &models.MediaItem{
+		ContentID: existingContentID,
+		Status:    "matched",
+		Title:     "Passenger",
+		Year:      2026,
+		Type:      "series",
+		Studios:   []string{},
+		Networks:  []string{},
+		Countries: []string{},
+		Genres:    []string{},
+	}); err != nil {
+		t.Fatalf("upsert existing item: %v", err)
+	}
+
+	// A different show whose title normalizes to the same title+year key
+	// (leading article stripped) must not be stolen by the prior claim.
+	file := &models.MediaFile{
+		ID:                5,
+		MediaFolderID:     10,
+		FilePath:          "/media/shows/The Passenger (2026)/Season 01/The.Passenger.S01E01.mkv",
+		CanonicalRootPath: "/media/shows/The Passenger (2026)",
+		ObservedRootPath:  "/media/shows/The Passenger (2026)",
+		ContentGroupKey:   "v1|series|passenger|2026",
+		GroupKeyVersion:   1,
+		BaseTitle:         "The Passenger",
+		BaseYear:          2026,
+		BaseType:          "series",
+	}
+
+	result, err := h.service.createOrFindSkeleton(ctx, file, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ContentID == existingContentID {
+		t.Fatalf("series title/year group claim reused across roots: got %q", result.ContentID)
+	}
+	if !result.IsNew {
+		t.Fatal("expected IsNew=true when only a colliding title/year series group claim exists")
+	}
+}
+
+func TestCreateOrFindSkeleton_SeriesReusesMatchedAnchoredGroupClaim(t *testing.T) {
+	h := newTestHarness()
+	ctx := context.Background()
+
+	existingContentID := "matched-anchored-series"
+	groupKey := "v1|series|anchor|tvdb-296762"
+	_, err := h.groupClaimRepo.ClaimAndRelinkFiles(ctx, 10, 1, groupKey, existingContentID)
+	if err != nil {
+		t.Fatalf("claiming test content group: %v", err)
+	}
+	if err := h.itemRepo.Upsert(ctx, &models.MediaItem{
+		ContentID: existingContentID,
+		Status:    "matched",
+		Title:     "Example Show",
+		Year:      2024,
+		Type:      "series",
+		Studios:   []string{},
+		Networks:  []string{},
+		Countries: []string{},
+		Genres:    []string{},
+	}); err != nil {
+		t.Fatalf("upsert existing item: %v", err)
+	}
+
+	file := &models.MediaFile{
+		ID:                5,
+		MediaFolderID:     10,
+		FilePath:          "/media/shows/Example Show 4K {tvdb-296762}/Season 01/Example.S01E01.mkv",
+		CanonicalRootPath: "/media/shows/Example Show 4K {tvdb-296762}",
+		ObservedRootPath:  "/media/shows/Example Show 4K {tvdb-296762}",
+		ContentGroupKey:   groupKey,
+		GroupKeyVersion:   1,
+		BaseTitle:         "Example Show",
+		BaseYear:          2024,
+		BaseType:          "series",
+	}
+
+	result, err := h.service.createOrFindSkeleton(ctx, file, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, want := result.ContentID, existingContentID; got != want {
+		t.Fatalf("ContentID = %q, want %q", got, want)
+	}
+	if result.IsNew {
+		t.Fatal("expected IsNew=false when reusing a matched provider-anchored series group claim")
 	}
 }
 

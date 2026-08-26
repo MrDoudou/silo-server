@@ -5997,7 +5997,16 @@ func (s *MetadataService) createOrFindSkeleton(ctx context.Context, file *models
 
 	// Dedup 1: confirmed content-group ownership always wins, including for
 	// movies. Provisional claims are intentionally ignored.
-	if contentGroupKey != "" && s.groupClaimRepo != nil {
+	//
+	// Series title/year (and isolated) keys are excluded: they collide across
+	// unrelated show roots after article stripping / missing years, and a
+	// confirmed claim for show A would otherwise steal show B's entire root
+	// via claimGroupAndRelink + UpdateContentIDByObservedRootPath. Provider-
+	// anchored keys are collision-free by construction. Movies keep title/year
+	// reuse for multi-version folders; series multi-root joins go through
+	// provider-ID rebind after each root matches independently.
+	seriesTitleYearGroupClaim := res.Type == "series" && !naming.IsProviderAnchoredGroupKey(contentGroupKey)
+	if contentGroupKey != "" && s.groupClaimRepo != nil && !seriesTitleYearGroupClaim {
 		claimedGroup, err := s.groupClaimRepo.Get(ctx, folderID, groupKeyVersion, contentGroupKey)
 		if err != nil {
 			return nil, fmt.Errorf("loading claimed content group: %w", err)
@@ -6298,6 +6307,12 @@ func (s *MetadataService) claimConfirmedSeriesRootOwnership(
 		}
 		groupKey := strings.TrimSpace(file.ContentGroupKey)
 		if file.GroupKeyVersion <= 0 || groupKey == "" {
+			continue
+		}
+		// Only provider-anchored keys are safe as folder-wide ownership
+		// evidence. Title/year keys collide across distinct shows; claiming
+		// them lets createOrFindSkeleton Dedup 1 merge the wrong series.
+		if !naming.IsProviderAnchoredGroupKey(groupKey) {
 			continue
 		}
 		claimKey := fmt.Sprintf("%d:%s", file.GroupKeyVersion, groupKey)

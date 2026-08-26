@@ -127,3 +127,24 @@ func TestInferGroupIdentity_SeriesTitleConflictWithoutIDsStaysAmbiguous(t *testi
 		t.Fatalf("State = %q, want %q", got, want)
 	}
 }
+
+func TestIsProviderAnchoredGroupKey(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		key  string
+		want bool
+	}{
+		{"v1|series|anchor|tvdb-296762", true},
+		{"v1|movie|anchor|tmdb-78", true},
+		{"v1|series|passenger|2026", false},
+		{"v1|movie|heat|1995", false},
+		{"v1|series|isolated|deadbeef", false},
+		{"", false},
+		{"v1|series|anchor|", false},
+	}
+	for _, tc := range cases {
+		if got := IsProviderAnchoredGroupKey(tc.key); got != tc.want {
+			t.Fatalf("IsProviderAnchoredGroupKey(%q) = %v, want %v", tc.key, got, tc.want)
+		}
+	}
+}

@@ -307,6 +307,16 @@ func makeContentGroupKey(contentType, title string, year int, observedRootPath, 
 	return fmt.Sprintf("v%d|%s|%s|%04d", ContentGroupKeyVersion, contentType, comparable, year)
 }
 
+// IsProviderAnchoredGroupKey reports whether a content-group key was minted
+// from an explicit provider tag (vN|<type>|anchor|<provider>-<id>). Title/year
+// and isolated keys are not provider-anchored: they can collide across
+// unrelated roots ("The Passenger" vs "Passenger", remakes, yearless folders),
+// so matchers must not treat them as safe cross-root ownership evidence.
+func IsProviderAnchoredGroupKey(groupKey string) bool {
+	parts := strings.Split(strings.TrimSpace(groupKey), "|")
+	return len(parts) == 4 && parts[2] == "anchor" && parts[1] != "" && parts[3] != ""
+}
+
 func isolatedGroupKey(contentType, observedRootPath, filePath string) string {
 	seed := filepath.Clean(observedRootPath)
 	if seed == "" {
