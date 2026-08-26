@@ -149,13 +149,14 @@ func TestPartitionExtraPathsKeepsDottedAmbiguousTitlesPrimary(t *testing.T) {
 	paths := []string{
 		"/movies/Life.Is.Short.mkv",
 		"/movies/Cut.Scene.mkv",
+		"/movies/The.Interview.mkv",
 		"/movies/Heat (1995)-trailer.mkv",
 	}
 	primary, extras := partitionExtraPaths(paths, "movies", []string{"/movies"})
-	if len(primary) != 2 {
-		t.Fatalf("primary = %v, want Life.Is.Short and Cut.Scene", primary)
+	if len(primary) != 3 {
+		t.Fatalf("primary = %v, want Life.Is.Short, Cut.Scene, The.Interview", primary)
 	}
-	if len(extras) != 1 || extras[0].Path != paths[2] {
+	if len(extras) != 1 || extras[0].Path != paths[3] {
 		t.Fatalf("extras = %+v, want only the -trailer file", extras)
 	}
 }
