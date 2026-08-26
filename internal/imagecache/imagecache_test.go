@@ -350,6 +350,44 @@ func TestCacheAdoptsPluginReferenceBeforeResolvingOrDownloading(t *testing.T) {
 	}
 }
 
+func TestCacheImageAdoptsResolvedPluginReference(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := makeTestJPEG(t)
+	firstClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(data)), Header: make(http.Header)}, nil
+	})}
+	req := metadata.CacheImageRequest{
+		SourceURL:       "https://images.example/poster.jpg",
+		SourceReference: "tmdb://poster/opaque-42",
+		ProviderID:      testTMDBProviderID,
+		ContentType:     testMoviesContentType,
+		ContentID:       "42",
+		ImageType:       metadata.ImagePoster,
+	}
+	fingerprint := stablePluginSourceFingerprint(req.SourceReference)
+	if fingerprint == "" {
+		t.Fatal("stable plugin source fingerprint is empty")
+	}
+	first, err := newWithHTTPClient(store, firstClient).CacheImage(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("download must not run on adoption hit")
+	})}
+	second, err := newWithHTTPClient(store, secondClient).CacheImage(context.Background(), req)
+	if err != nil {
+		t.Fatalf("adopt resolved plugin reference: %v", err)
+	}
+	if second.OriginalPath != first.OriginalPath || second.ExistingVariants == 0 || second.UploadedVariants != 0 {
+		t.Fatalf("adopted result = %#v; first = %#v", second, first)
+	}
+}
+
 func TestCacheBytesDoesNotUploadWhenRevisionTrackingFails(t *testing.T) {
 	store := &mockStore{}
 	tracker := &recordingRevisionTracker{err: errors.New("registry unavailable")}

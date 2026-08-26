@@ -15,6 +15,7 @@ import (
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
+	"github.com/Silo-Server/silo-server/internal/imagesize"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 	"github.com/Silo-Server/silo-server/internal/models"
 	"github.com/Silo-Server/silo-server/internal/ratelimit"
@@ -97,6 +98,9 @@ type personResponse struct {
 
 // HandleSearch serves GET /api/people?q=&limit=
 func (h *PeopleHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
+	if !rejectInvalidImageSize(w, r) {
+		return
+	}
 	query := r.URL.Query().Get("q")
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit <= 0 {
@@ -111,13 +115,16 @@ func (h *PeopleHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 
 	resp := make([]personResponse, len(people))
 	for i, p := range people {
-		resp[i] = h.toResponse(r.Context(), p)
+		resp[i] = h.toResponse(r.Context(), p, requestImageSize(r))
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
 // HandleGetPerson serves GET /api/people/:id
 func (h *PeopleHandler) HandleGetPerson(w http.ResponseWriter, r *http.Request) {
+	if !rejectInvalidImageSize(w, r) {
+		return
+	}
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -134,7 +141,7 @@ func (h *PeopleHandler) HandleGetPerson(w http.ResponseWriter, r *http.Request) 
 
 	h.enqueuePersonRefreshIfDue(*person)
 
-	writeJSON(w, http.StatusOK, h.toResponse(r.Context(), *person))
+	writeJSON(w, http.StatusOK, h.toResponse(r.Context(), *person, requestImageSize(r)))
 }
 
 // HandleRefreshPerson serves POST /api/v1/people/:id/refresh.
@@ -206,7 +213,7 @@ func (h *PeopleHandler) HandleAdminRefreshPerson(w http.ResponseWriter, r *http.
 		return
 	}
 
-	writeJSON(w, http.StatusOK, h.toResponse(r.Context(), *person))
+	writeJSON(w, http.StatusOK, h.toResponse(r.Context(), *person, requestImageSize(r)))
 }
 
 type UpdatePersonRequest struct {
@@ -285,7 +292,7 @@ func (h *PeopleHandler) HandleAdminUpdatePerson(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	writeJSON(w, http.StatusOK, h.toResponse(r.Context(), *person))
+	writeJSON(w, http.StatusOK, h.toResponse(r.Context(), *person, requestImageSize(r)))
 }
 
 // HandleGetPersonItems serves GET /api/people/:id/items?type=&limit=&offset=
@@ -338,7 +345,7 @@ func (h *PeopleHandler) HandleGetPersonItems(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-func (h *PeopleHandler) toResponse(ctx context.Context, p models.Person) personResponse {
+func (h *PeopleHandler) toResponse(ctx context.Context, p models.Person, size imagesize.Size) personResponse {
 	resp := personResponse{
 		ID:         p.ID,
 		Name:       p.Name,
@@ -359,9 +366,12 @@ func (h *PeopleHandler) toResponse(ctx context.Context, p models.Person) personR
 		resp.DeathDate = &s
 	}
 	if p.PhotoPath != "" && p.PhotoPath != "-" && h.detailSvc != nil {
+		if size == imagesize.Unset {
+			size = imagesize.Medium
+		}
 		resp.PhotoURL = h.detailSvc.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
 			Surface: artworkurl.SurfacePersonPhotos, Keys: []string{strconv.FormatInt(p.ID, 10)}, Slot: artworkImageProfile,
-		}, p.PhotoPath, "profile", "")
+		}, p.PhotoPath, artworkImageProfile, string(size))
 	}
 	if p.PhotoThumbhash != "" && p.PhotoThumbhash != "-" {
 		resp.PhotoThumbhash = p.PhotoThumbhash

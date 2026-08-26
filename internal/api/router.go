@@ -1863,6 +1863,12 @@ func NewRouter(deps Dependencies) chi.Router {
 				subtitleSource = subtitleManager
 			}
 			downloadSvc.SetOfflineDeps(detailSvc, subtitleSource, nil)
+			if deps.ArtworkDelivery != nil {
+				artworkDelivery := chi.NewRouter()
+				artworkDelivery.Get("/api/v1/artwork/{"+handlers.ArtworkCapabilityParam+"}/{"+handlers.ArtworkVariantParam+"}", deps.ArtworkDelivery.ServeHTTP)
+				artworkDelivery.Head("/api/v1/artwork/{"+handlers.ArtworkCapabilityParam+"}/{"+handlers.ArtworkVariantParam+"}", deps.ArtworkDelivery.ServeHTTP)
+				downloadSvc.SetArtworkDelivery(artworkDelivery)
+			}
 		}
 		if deps.ArtifactManager != nil {
 			// Prepare-to-file pipeline (Phase 3): remux/transcode-to-single-file.

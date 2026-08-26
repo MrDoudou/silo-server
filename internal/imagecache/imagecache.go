@@ -61,15 +61,16 @@ type ImageURLResolver interface {
 // decide where it is stored, because the portable layout addresses artwork by
 // the bytes it produced.
 type CacheRequest struct {
-	SourceURL     string
-	ProviderID    string
-	ContentType   string // "movies" or "series"
-	ContentID     string
-	ImageType     metadata.ImageType
-	SeasonNumber  *int
-	EpisodeNumber *int
-	Language      string
-	ImageResolver ImageURLResolver // optional; used when SourceURL is a plugin:// path
+	SourceURL       string
+	SourceReference string // stable provider/plugin path before URL resolution
+	ProviderID      string
+	ContentType     string // "movies" or "series"
+	ContentID       string
+	ImageType       metadata.ImageType
+	SeasonNumber    *int
+	EpisodeNumber   *int
+	Language        string
+	ImageResolver   ImageURLResolver // optional; used when SourceURL is a plugin:// path
 	// KeyDiscriminator carries the local sidecar's content hash.
 	//
 	// It no longer affects the object key: content addressing already rotates
@@ -127,6 +128,7 @@ func newWithHTTPClient(store ObjectStore, client *http.Client) *Cacher {
 func (c *Cacher) CacheImage(ctx context.Context, req metadata.CacheImageRequest) (*metadata.CacheImageResult, error) {
 	result, err := c.Cache(ctx, CacheRequest{
 		SourceURL:            req.SourceURL,
+		SourceReference:      req.SourceReference,
 		ProviderID:           req.ProviderID,
 		ContentType:          req.ContentType,
 		ContentID:            req.ContentID,
@@ -320,7 +322,11 @@ func (c *Cacher) Cache(ctx context.Context, req CacheRequest) (*CacheResult, err
 	}
 
 	imageType := metadata.ImageTypeToString(req.ImageType)
-	fingerprint := stablePluginSourceFingerprint(req.SourceURL)
+	sourceReference := req.SourceReference
+	if strings.TrimSpace(sourceReference) == "" {
+		sourceReference = req.SourceURL
+	}
+	fingerprint := stablePluginSourceFingerprint(sourceReference)
 	if adopted, ok := c.tryAdopt(ctx, fingerprint, imageType, artworkSourceClass(req)); ok {
 		return adopted, nil
 	}

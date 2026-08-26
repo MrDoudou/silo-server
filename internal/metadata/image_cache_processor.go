@@ -783,14 +783,15 @@ func (p *ImageCacheProcessor) processOne(ctx context.Context, job *models.Metada
 	}
 
 	result, err := p.cacher.CacheImage(ctx, CacheImageRequest{
-		SourceURL:     downloadURL,
-		ProviderID:    job.ProviderID,
-		ContentType:   job.ContentType,
-		ContentID:     job.ProviderContentID,
-		ImageType:     imageType,
-		SeasonNumber:  job.SeasonNumber,
-		EpisodeNumber: job.EpisodeNumber,
-		Language:      job.TargetLanguage,
+		SourceURL:       downloadURL,
+		SourceReference: job.SourcePath,
+		ProviderID:      job.ProviderID,
+		ContentType:     job.ContentType,
+		ContentID:       job.ProviderContentID,
+		ImageType:       imageType,
+		SeasonNumber:    job.SeasonNumber,
+		EpisodeNumber:   job.EpisodeNumber,
+		Language:        job.TargetLanguage,
 	})
 	if err != nil {
 		p.markFailed(ctx, job, err.Error())

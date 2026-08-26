@@ -364,14 +364,15 @@ const (
 // SeasonNumber / EpisodeNumber fields scope the S3 key so siblings do not
 // collide. Both pointers are nil for item-level images.
 type CacheImageRequest struct {
-	SourceURL     string
-	ProviderID    string
-	ContentType   string // "movies" or "series"
-	ContentID     string
-	ImageType     ImageType
-	SeasonNumber  *int
-	EpisodeNumber *int
-	Language      string
+	SourceURL       string
+	SourceReference string // stable provider/plugin path before URL resolution
+	ProviderID      string
+	ContentType     string // "movies" or "series"
+	ContentID       string
+	ImageType       ImageType
+	SeasonNumber    *int
+	EpisodeNumber   *int
+	Language        string
 	// KeyDiscriminator carries the 8-hex content hash of a local sidecar
 	// file. It no longer affects the object key: materialized artwork is
 	// content-addressed, so changed sidecar bytes already produce a different

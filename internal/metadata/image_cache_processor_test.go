@@ -425,6 +425,9 @@ func TestImageCacheProcessorUpdatesItemArtworkOnSuccess(t *testing.T) {
 	if stats.Succeeded != 1 {
 		t.Fatalf("Succeeded = %d, want 1", stats.Succeeded)
 	}
+	if len(cacher.reqs) != 1 || cacher.reqs[0].SourceReference != jobs.claimed[0].SourcePath {
+		t.Fatalf("stable source reference = %#v, want original plugin path", cacher.reqs)
+	}
 	if items.imageType != ImageCacheImageBackdrop {
 		t.Fatalf("imageType = %q, want backdrop", items.imageType)
 	}

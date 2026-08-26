@@ -7456,11 +7456,12 @@ func (s *MetadataService) cacheItemImages(ctx context.Context, item *models.Medi
 		go func(idx int, j cacheJob) {
 			defer wg.Done()
 			r, err := s.imageCacher.CacheImage(ctx, CacheImageRequest{
-				SourceURL:   j.downloadURL,
-				ProviderID:  j.providerID,
-				ContentType: pluralContentType(item.Type),
-				ContentID:   findContentID(item, j.providerID),
-				ImageType:   j.field.imageType,
+				SourceURL:       j.downloadURL,
+				SourceReference: j.url,
+				ProviderID:      j.providerID,
+				ContentType:     pluralContentType(item.Type),
+				ContentID:       findContentID(item, j.providerID),
+				ImageType:       j.field.imageType,
 			})
 			if err != nil {
 				slog.WarnContext(ctx, "metadata: image cache failed, keeping CDN URL", "component", "metadata",
@@ -7622,13 +7623,14 @@ func (s *MetadataService) ApplyItemImage(ctx context.Context, req ApplyItemImage
 	}
 
 	result, err := s.imageCacher.CacheImage(ctx, CacheImageRequest{
-		SourceURL:     downloadURL,
-		ProviderID:    req.ProviderID,
-		ContentType:   pluralContentType(req.ContentType),
-		ContentID:     req.ContentID,
-		ImageType:     req.ImageType,
-		SeasonNumber:  req.SeasonNumber,
-		EpisodeNumber: req.EpisodeNumber,
+		SourceURL:       downloadURL,
+		SourceReference: req.OriginalURL,
+		ProviderID:      req.ProviderID,
+		ContentType:     pluralContentType(req.ContentType),
+		ContentID:       req.ContentID,
+		ImageType:       req.ImageType,
+		SeasonNumber:    req.SeasonNumber,
+		EpisodeNumber:   req.EpisodeNumber,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("caching image: %w", err)

@@ -26,6 +26,23 @@ type blockingArtworkRevisionDeleter struct {
 	deleted [][]string
 }
 
+type recordingLegacyPrefixDeleter struct {
+	prefixes []string
+}
+
+func (d *recordingLegacyPrefixDeleter) ListPage(context.Context, string, string, int) ([]artworkstore.ObjectInfo, string, bool, error) {
+	return nil, "", true, nil
+}
+
+func (d *recordingLegacyPrefixDeleter) DeleteObjects(context.Context, []string) (int, error) {
+	return 0, nil
+}
+
+func (d *recordingLegacyPrefixDeleter) DeletePrefixMaintenance(_ context.Context, prefix string) (int, error) {
+	d.prefixes = append(d.prefixes, prefix)
+	return 1, nil
+}
+
 func (d *blockingArtworkRevisionDeleter) ListPage(context.Context, string, string, int) ([]artworkstore.ObjectInfo, string, bool, error) {
 	return nil, "", true, nil
 }
@@ -98,6 +115,62 @@ func TestProcessArtworkRevisionGCBatchContinuesAfterRetryFailure(t *testing.T) {
 	if stats != want {
 		t.Fatalf("stats = %+v, want %+v", stats, want)
 	}
+}
+
+func TestArtworkRevisionGCLegacyPrefixEscapesLikeMetacharacters(t *testing.T) {
+	pool := artworkRevisionGCTestPool(t)
+	ctx := context.Background()
+	suffix := time.Now().UnixNano()
+	prefix := fmt.Sprintf("legacy/%%_folder-%d/", suffix)
+	unrelatedPath := fmt.Sprintf("legacy/abcXfolder-%d/original.webp", suffix)
+	realPath := prefix + "original.webp"
+	deleter := &recordingLegacyPrefixDeleter{}
+	collector := NewArtworkRevisionGarbageCollector(pool, deleter)
+
+	seed := func(t *testing.T, contentID, path string) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO media_items (content_id, type, title, status, genres, poster_path)
+			VALUES ($1, 'movie', 'Legacy Prefix GC', 'matched', '{}'::text[], $2)`, contentID, path); err != nil {
+			t.Fatalf("seed artwork reference: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO artwork_legacy_prefix_gc_candidates (prefix, not_before)
+			VALUES ($1, NOW() - interval '1 hour')`, prefix); err != nil {
+			t.Fatalf("seed legacy prefix: %v", err)
+		}
+		t.Cleanup(func() {
+			_, _ = pool.Exec(context.Background(), `DELETE FROM media_items WHERE content_id = $1`, contentID)
+			_, _ = pool.Exec(context.Background(), `DELETE FROM artwork_legacy_prefix_gc_candidates WHERE prefix = $1`, prefix)
+		})
+	}
+
+	t.Run("wildcards do not match an unrelated reference", func(t *testing.T) {
+		contentID := fmt.Sprintf("gc-prefix-unrelated-%d", suffix)
+		seed(t, contentID, unrelatedPath)
+		completed, err := collector.sweepLegacyPrefixes(ctx, 1)
+		if err != nil {
+			t.Fatalf("sweep legacy prefixes: %v", err)
+		}
+		if completed != 1 || len(deleter.prefixes) != 1 || deleter.prefixes[0] != prefix {
+			t.Fatalf("completed/deleted = %d/%v, want 1/%q", completed, deleter.prefixes, prefix)
+		}
+	})
+
+	t.Run("literal prefix still protects a real reference", func(t *testing.T) {
+		contentID := fmt.Sprintf("gc-prefix-real-%d", suffix)
+		seed(t, contentID, realPath)
+		completed, err := collector.sweepLegacyPrefixes(ctx, 1)
+		if err != nil {
+			t.Fatalf("sweep legacy prefixes: %v", err)
+		}
+		if completed != 0 {
+			t.Fatalf("completed = %d, want 0 for a referenced prefix", completed)
+		}
+		if len(deleter.prefixes) != 1 {
+			t.Fatalf("deleted prefixes = %v, want no additional deletion", deleter.prefixes)
+		}
+	})
 }
 
 func TestArtworkRevisionGCSerializesDeletionWithRetracking(t *testing.T) {

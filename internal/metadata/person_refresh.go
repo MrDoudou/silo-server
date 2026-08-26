@@ -266,11 +266,12 @@ func (s *PersonRefreshService) cachePersonPhoto(
 
 	contentID := personCacheContentID(person, detail.ProviderIDs, providerID)
 	result, err := s.imageCacher.CacheImage(ctx, CacheImageRequest{
-		SourceURL:   downloadURL,
-		ProviderID:  providerID,
-		ContentType: "people",
-		ContentID:   contentID,
-		ImageType:   ImagePoster,
+		SourceURL:       downloadURL,
+		SourceReference: detail.PhotoPath,
+		ProviderID:      providerID,
+		ContentType:     "people",
+		ContentID:       contentID,
+		ImageType:       ImagePoster,
 	})
 	if err != nil {
 		return "", "", err

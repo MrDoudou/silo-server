@@ -15,6 +15,7 @@ import (
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
+	"github.com/Silo-Server/silo-server/internal/pathscope"
 )
 
 const (
@@ -164,7 +165,7 @@ func (g *ArtworkRevisionGarbageCollector) sweepLegacyPrefixes(ctx context.Contex
 	completed := 0
 	for _, prefix := range prefixes {
 		var referenced bool
-		if err := g.pool.QueryRow(ctx, artworkLegacyPrefixReferencedSQL(), prefix).Scan(&referenced); err != nil {
+		if err := g.pool.QueryRow(ctx, artworkLegacyPrefixReferencedSQL(), artworkLegacyPrefixPattern(prefix)).Scan(&referenced); err != nil {
 			return completed, err
 		}
 		if referenced {
@@ -189,7 +190,11 @@ func (g *ArtworkRevisionGarbageCollector) sweepLegacyPrefixes(ctx context.Contex
 }
 
 func artworkLegacyPrefixReferencedSQL() string {
-	return `WITH refs AS (` + artworkInventoryReferenceSQL() + `) SELECT EXISTS (SELECT 1 FROM refs WHERE path LIKE $1 || '%')`
+	return `WITH refs AS (` + artworkInventoryReferenceSQL() + `) SELECT EXISTS (SELECT 1 FROM refs WHERE path LIKE $1 ESCAPE '\')`
+}
+
+func artworkLegacyPrefixPattern(prefix string) string {
+	return pathscope.EscapeLike(prefix) + "%"
 }
 
 func processArtworkRevisionGCBatch(

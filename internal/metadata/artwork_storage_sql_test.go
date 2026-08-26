@@ -139,10 +139,13 @@ func TestLegacyPrefixCleanupChecksEveryLiveArtworkSurface(t *testing.T) {
 			t.Fatalf("legacy-prefix proof omits %q (%s):\n%s", surface.name, surface.table, query)
 		}
 	}
-	for _, want := range []string{"FROM user_profiles", "path LIKE $1 || '%'"} {
+	for _, want := range []string{"FROM user_profiles", `path LIKE $1 ESCAPE '\'`} {
 		if !strings.Contains(query, want) {
 			t.Fatalf("legacy-prefix proof is missing %q:\n%s", want, query)
 		}
+	}
+	if got, want := artworkLegacyPrefixPattern(`legacy/%_folder\part/`), `legacy/\%\_folder\\part/%`; got != want {
+		t.Fatalf("legacy-prefix pattern = %q, want %q", got, want)
 	}
 }
 
