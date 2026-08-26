@@ -550,6 +550,10 @@ func (h *CollectionHandler) HandleDeleteCollection(w http.ResponseWriter, r *htt
 		return
 	}
 
+	if _, ok := h.requireCollectionCreator(w, r, store, collectionID); !ok {
+		return
+	}
+
 	if err := store.DeleteCollection(r.Context(), collectionID); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to delete collection")
 		return
@@ -615,6 +619,10 @@ func (h *CollectionHandler) HandleAddCollectionItem(w http.ResponseWriter, r *ht
 	store, err := h.storeProvider.ForUser(r.Context(), userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to access user store")
+		return
+	}
+
+	if _, ok := h.requireCollectionCreator(w, r, store, collectionID); !ok {
 		return
 	}
 
@@ -813,6 +821,10 @@ func (h *CollectionHandler) HandleReorderCollectionItems(w http.ResponseWriter, 
 		return
 	}
 
+	if _, ok := h.requireCollectionCreator(w, r, store, collectionID); !ok {
+		return
+	}
+
 	if err := store.ReorderCollectionItems(r.Context(), collectionID, req.OrderedIDs); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
@@ -835,6 +847,10 @@ func (h *CollectionHandler) HandleRemoveCollectionItem(w http.ResponseWriter, r 
 	store, err := h.storeProvider.ForUser(r.Context(), userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to access user store")
+		return
+	}
+
+	if _, ok := h.requireCollectionCreator(w, r, store, collectionID); !ok {
 		return
 	}
 
@@ -946,6 +962,32 @@ func firstNonEmptyCollection(values ...string) string {
 // errCollectionForbidden is returned by the artwork pipeline when the caller
 // is not the collection's creator. It surfaces as a 403 to the client.
 var errCollectionForbidden = errors.New("only the creator can edit this collection")
+
+// requireCollectionCreator loads a personal collection and rejects the request
+// unless the active profile created it. Shared membership can list and view a
+// collection; update/sync/image already required the creator, but delete and
+// item mutations previously keyed only on account user_id.
+func (h *CollectionHandler) requireCollectionCreator(
+	w http.ResponseWriter,
+	r *http.Request,
+	store userstore.UserStore,
+	collectionID string,
+) (*userstore.Collection, bool) {
+	collection, err := store.GetCollection(r.Context(), collectionID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, "not_found", "Collection not found")
+			return nil, false
+		}
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load collection")
+		return nil, false
+	}
+	if collection.CreatorProfileID != apimw.GetProfileID(r.Context()) {
+		writeError(w, http.StatusForbidden, "forbidden", "Only the creator can edit this collection")
+		return nil, false
+	}
+	return collection, true
+}
 
 // HandleDeleteCollectionImage clears the poster on a personal collection.
 // The query parameter "type" is required and currently only "poster" is

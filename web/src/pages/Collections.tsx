@@ -33,6 +33,7 @@ import { CollectionPosterCard } from "@/components/collections/CollectionPosterC
 import MediaCarousel from "@/components/MediaCarousel";
 import { useSyncUserCollection } from "@/hooks/queries/userCollectionImports";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ import { carouselCardWidthClasses } from "@/lib/uiCustomization";
 import {
   buildUserCollectionCatalogHref,
   buildUserCollectionEditorPath,
+  isCollectionCreator,
 } from "./userCollectionsShared";
 
 type ImportedCollectionType = Extract<UserCollectionType, "mdblist" | "tmdb" | "trakt">;
@@ -70,6 +72,7 @@ function CollectionList() {
   const [confirmDeleteCollection, setConfirmDeleteCollection] = useState<Collection | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const navigate = useNavigate();
+  const { profile } = useCurrentProfile();
   const deleteMutation = useDeleteCollection();
   const syncMutation = useSyncUserCollection();
   const reorderMutation = useReorderCollections();
@@ -160,15 +163,16 @@ function CollectionList() {
             groups={groups}
             renderItem={(collection) => {
               const syncable = isImportedType(collection.collection_type);
+              const canManage = isCollectionCreator(collection, profile?.id);
               const isSyncing = syncMutation.isPending && syncMutation.variables === collection.id;
               return (
                 <SortableCollectionCard
                   collection={collection}
-                  syncable={syncable}
+                  syncable={syncable && canManage}
                   isSyncing={isSyncing}
                   onSync={() => syncMutation.mutate(collection.id)}
                   onEdit={() => navigate(buildUserCollectionEditorPath(collection.id))}
-                  onDelete={() => setConfirmDeleteCollection(collection)}
+                  onDelete={canManage ? () => setConfirmDeleteCollection(collection) : undefined}
                 />
               );
             }}
@@ -296,7 +300,7 @@ function SortableCollectionCard({
   isSyncing: boolean;
   onSync: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useGroupedCollectionCard(collection.id);
@@ -363,18 +367,20 @@ function SortableCollectionCard({
           >
             <Pencil className="h-3 w-3" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9"
-            aria-label="Delete collection"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+          {onDelete ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              aria-label="Delete collection"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          ) : null}
         </div>
       </CardHeader>
     </Card>

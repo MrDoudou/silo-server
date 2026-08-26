@@ -10,6 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCollections, useAddItemToCollection } from "@/hooks/queries/collections";
+import { useCurrentProfile } from "@/hooks/useCurrentProfile";
+import { isCollectionCreator } from "@/pages/userCollectionsShared";
 import { useUserLibraries } from "@/hooks/queries/libraries";
 import { useQueries } from "@tanstack/react-query";
 import {
@@ -47,6 +49,7 @@ export default function AddToCollectionDialog({
   itemTitle,
 }: AddToCollectionDialogProps) {
   const isAdmin = useIsActingAdmin();
+  const { profile } = useCurrentProfile();
   const { data: userCollections, isLoading: userLoading } = useCollections();
   const { data: libraries } = useUserLibraries();
   const addItem = useAddItemToCollection();
@@ -65,7 +68,7 @@ export default function AddToCollectionDialog({
   const picks = useMemo<CollectionPick[]>(() => {
     const out: CollectionPick[] = [];
     for (const c of userCollections ?? []) {
-      if (c.collection_type === "manual") {
+      if (c.collection_type === "manual" && isCollectionCreator(c, profile?.id)) {
         out.push({ id: c.id, title: c.name, source: "user", group: "My Collections" });
       }
     }
@@ -82,7 +85,7 @@ export default function AddToCollectionDialog({
       }
     }
     return out;
-  }, [userCollections, libraries, libraryQueries, isAdmin]);
+  }, [userCollections, libraries, libraryQueries, isAdmin, profile?.id]);
 
   const groups = useMemo(() => {
     const m = new Map<string, CollectionPick[]>();

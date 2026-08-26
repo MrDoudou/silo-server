@@ -94,6 +94,16 @@ export function isCollectionReadOnly(
   return collection.creator_profile_id !== currentProfileId;
 }
 
+export function isCollectionCreator(
+  collection: Collection | null | undefined,
+  currentProfileId?: string | null,
+): boolean {
+  if (!collection || !currentProfileId) {
+    return false;
+  }
+  return collection.creator_profile_id === currentProfileId;
+}
+
 function UserCollectionSummary({
   draft,
   collection,

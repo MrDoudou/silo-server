@@ -82,6 +82,9 @@ func GetCollection(db *sql.DB, id string) (*Collection, error) {
 		 FROM personal_collections WHERE id = ?`,
 		id,
 	).Scan(&c.ID, &c.ProfileID, &c.CreatorProfileID, &c.Name, &c.CollectionType, &isShared, &c.QueryDefinition, &c.SortConfig, &c.CreatedAt, &c.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("collection %s not found", id)
+	}
 	if err != nil {
 		return nil, err
 	}

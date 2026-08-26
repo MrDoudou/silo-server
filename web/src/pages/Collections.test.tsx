@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildUserCollectionCatalogHref,
   buildUserCollectionEditorPath,
+  isCollectionCreator,
   isCollectionReadOnly,
   toCreateCollectionBody,
   toUpdateCollectionBody,
@@ -36,6 +37,32 @@ describe("Collections helpers", () => {
         "profile-1",
       ),
     ).toBe(true);
+  });
+
+  it("treats only the creating profile as the collection manager", () => {
+    const shared = {
+      id: "col-1",
+      profile_id: "profile-2",
+      creator_profile_id: "profile-2",
+      name: "Shared Picks",
+      collection_type: "manual" as const,
+      is_shared: true,
+      allowed_profile_ids: ["profile-1"],
+      query_definition: {
+        library_ids: [],
+        match: "all",
+        groups: [],
+        sort: { field: "added_at", order: "desc" },
+      },
+      sort_config: {},
+      sort_order: 0,
+      group_id: null,
+      created_at: "",
+      updated_at: "",
+    };
+    expect(isCollectionCreator(shared, "profile-2")).toBe(true);
+    expect(isCollectionCreator(shared, "profile-1")).toBe(false);
+    expect(isCollectionCreator(shared, null)).toBe(false);
   });
 
   it("serializes smart collection access settings into the request body", () => {
