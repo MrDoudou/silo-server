@@ -79,7 +79,7 @@ func TestMergeAndPersist_RespectsFieldImagesLock(t *testing.T) {
 	}
 }
 
-func TestPersistSeasonsAndEpisodes_RespectsParentFieldImagesLock(t *testing.T) {
+func TestMergeAndPersist_RespectsParentFieldImagesLockOnSeasonsAndEpisodes(t *testing.T) {
 	const seriesID = "series-locked-art"
 	const curatedSeasonPoster = "tmdb/series/1396/season/1/poster/original.curated.webp"
 	const curatedSeasonSource = "tmdb://images/season/curated.jpg"
@@ -87,7 +87,12 @@ func TestPersistSeasonsAndEpisodes_RespectsParentFieldImagesLock(t *testing.T) {
 	const curatedStillSource = "tmdb://images/still/curated.jpg"
 
 	service, itemRepo, seasonRepo, episodeRepo := newSeasonEpisodeServiceForTest(seriesID)
+	itemRepo.items[seriesID].Status = "matched"
 	itemRepo.items[seriesID].LockedFields = []int{int(FieldImages)}
+	itemRepo.items[seriesID].Studios = []string{}
+	itemRepo.items[seriesID].Networks = []string{}
+	itemRepo.items[seriesID].Countries = []string{}
+	itemRepo.items[seriesID].Genres = []string{}
 
 	seasonRepo.seasons[seasonKey(seriesID, 1)] = &models.Season{
 		ContentID:        "season-locked-art",
@@ -108,25 +113,27 @@ func TestPersistSeasonsAndEpisodes_RespectsParentFieldImagesLock(t *testing.T) {
 		StillSourcePath: curatedStillSource,
 	}
 
-	service.persistSeasonsAndEpisodes(
-		context.Background(),
-		itemRepo.items[seriesID],
-		map[string]string{"tmdb": "1396"},
-		"en",
-		"en",
-		[]SeasonResult{{
-			SeasonNumber: 1,
-			Title:        "Season 1",
-			PosterPath:   "https://image.tmdb.org/t/p/original/new-season.jpg",
-		}},
-		[]EpisodeResult{{
-			SeasonNumber:  1,
-			EpisodeNumber: 1,
-			Title:         "Pilot",
-			StillPath:     "https://image.tmdb.org/t/p/original/new-still.jpg",
-		}},
-		MergeReplaceUnlocked,
-	)
+	_, err := service.mergeAndPersist(context.Background(), ProcessRequest{
+		ContentID: seriesID,
+		Language:  "en",
+		Mode:      ModeManualRefresh,
+	}, &MetadataResult{
+		HasMetadata: true,
+		Title:       "Test Series",
+		ProviderIDs: map[string]string{"tmdb": "1396"},
+	}, nil, []SeasonResult{{
+		SeasonNumber: 1,
+		Title:        "Season 1",
+		PosterPath:   "https://image.tmdb.org/t/p/original/new-season.jpg",
+	}}, []EpisodeResult{{
+		SeasonNumber:  1,
+		EpisodeNumber: 1,
+		Title:         "Pilot",
+		StillPath:     "https://image.tmdb.org/t/p/original/new-still.jpg",
+	}}, "series")
+	if err != nil {
+		t.Fatalf("mergeAndPersist: %v", err)
+	}
 
 	season := seasonRepo.seasons[seasonKey(seriesID, 1)]
 	if season == nil {

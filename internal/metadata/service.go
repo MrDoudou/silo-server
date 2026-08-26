@@ -2333,6 +2333,13 @@ func (s *MetadataService) mergeAndPersist(
 	// Build the item for persistence.
 	now := time.Now()
 	item := metadataResultToItem(accumulator, contentType)
+	// metadataResultToItem does not carry locks. persistSeasonsAndEpisodes
+	// (and any later writer on this in-memory item) must see FieldImages so
+	// a curated season poster or episode still is not recached from a new
+	// provider URL after Quick/Complete Refresh.
+	if existingItem != nil {
+		item.LockedFields = existingItem.LockedFields
+	}
 	item.DefaultMetadataLanguage = canonicalLanguage
 	item.MatchedAt = &now
 	item.LastRefreshed = &now
