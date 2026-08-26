@@ -533,6 +533,13 @@ func (c *Cacher) downloadImage(ctx context.Context, rawURL string) ([]byte, erro
 	return data, nil
 }
 
+// NewSecureHTTPClient returns an HTTP client that only dials public unicast
+// addresses and re-checks redirect targets. HTTP(S)_PROXY is ignored so a
+// caller-controlled URL cannot bounce through a local forwarder.
+func NewSecureHTTPClient() *http.Client {
+	return newSecureHTTPClient()
+}
+
 func newSecureHTTPClient() *http.Client {
 	transport := &http.Transport{
 		Proxy:               nil,
@@ -548,6 +555,13 @@ func newSecureHTTPClient() *http.Client {
 			return validatePublicImageURL(req.URL)
 		},
 	}
+}
+
+// ValidatePublicURL rejects non-http(s) URLs and literal private/loopback
+// hosts. Hostnames that are not IP literals are checked at dial time by
+// NewSecureHTTPClient.
+func ValidatePublicURL(u *url.URL) error {
+	return validatePublicImageURL(u)
 }
 
 func validatePublicImageURL(u *url.URL) error {

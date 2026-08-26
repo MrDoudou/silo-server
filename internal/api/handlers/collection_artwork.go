@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/Silo-Server/silo-server/internal/imagecache"
 	"github.com/Silo-Server/silo-server/internal/imageutil"
 	"github.com/Silo-Server/silo-server/internal/s3client"
 )
@@ -21,7 +23,8 @@ const (
 	userCollectionImagePrefix  = "user-collection-images"
 	collectionTemplateImageDir = "/images/collection-templates/"
 
-	collectionImageMaxBytes = 10 << 20 // 10 MB
+	collectionImageMaxBytes     = 10 << 20 // 10 MB
+	collectionImageFetchTimeout = 30 * time.Second
 )
 
 // storeBundledCollectionPosterIfS3Configured stores a built-in collection
@@ -80,7 +83,8 @@ func readCollectionImageMultipart(r *http.Request, fieldName string) ([]byte, er
 }
 
 // downloadCollectionImageURL fetches an image from an http(s) URL with size
-// limits.
+// limits. A nil client uses the public-only imagecache transport so
+// poster_source_url cannot reach loopback, link-local, or RFC1918 hosts.
 func downloadCollectionImageURL(ctx context.Context, client *http.Client, rawURL string) ([]byte, error) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil {
@@ -89,12 +93,19 @@ func downloadCollectionImageURL(ctx context.Context, client *http.Client, rawURL
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return nil, fmt.Errorf("image source URL must use http or https")
 	}
+	if client == nil {
+		if err := imagecache.ValidatePublicURL(parsed); err != nil {
+			return nil, err
+		}
+		client = imagecache.NewSecureHTTPClient()
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, collectionImageFetchTimeout)
+	defer cancel()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("building request: %w", err)
-	}
-	if client == nil {
-		client = http.DefaultClient
 	}
 	resp, err := client.Do(req)
 	if err != nil {

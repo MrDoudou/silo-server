@@ -29,6 +29,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/collage"
 	"github.com/Silo-Server/silo-server/internal/collections/templates"
 	evt "github.com/Silo-Server/silo-server/internal/events"
+	"github.com/Silo-Server/silo-server/internal/imagecache"
 	"github.com/Silo-Server/silo-server/internal/models"
 	"github.com/Silo-Server/silo-server/internal/s3client"
 	"github.com/Silo-Server/silo-server/internal/sections"
@@ -88,7 +89,7 @@ func NewLibraryCollectionHandler(
 	s3GP *s3client.Client,
 ) *LibraryCollectionHandler {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient = imagecache.NewSecureHTTPClient()
 	}
 
 	return &LibraryCollectionHandler{

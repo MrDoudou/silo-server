@@ -13,6 +13,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/Silo-Server/silo-server/internal/imagecache"
 	"github.com/Silo-Server/silo-server/internal/s3client"
 )
 
@@ -154,6 +155,69 @@ func TestStoreBundledCollectionPosterIfS3Configured_UploadsTemplatePoster(t *tes
 		if !want[path] {
 			t.Fatalf("unexpected PUT path %q in %#v", path, puts)
 		}
+	}
+}
+
+func TestDownloadCollectionImageURL_RejectsPrivateAndNonHTTPSources(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	for _, rawURL := range []string{
+		"http://127.0.0.1/",
+		"http://127.0.0.1:1/",
+		"http://[::1]/",
+		"http://169.254.169.254/latest/meta-data/",
+		"http://10.0.0.1/poster.jpg",
+		"http://192.168.1.1/poster.jpg",
+		"http://172.16.0.1/poster.jpg",
+		"file:///etc/passwd",
+		"ftp://example.com/poster.jpg",
+	} {
+		_, err := downloadCollectionImageURL(ctx, nil, rawURL)
+		if err == nil {
+			t.Errorf("%s: expected error, got nil", rawURL)
+		}
+	}
+}
+
+func TestDownloadCollectionImageURL_RejectsLocalhostHostname(t *testing.T) {
+	t.Parallel()
+
+	_, err := downloadCollectionImageURL(context.Background(), nil, "http://localhost/")
+	if err == nil {
+		t.Fatal("expected localhost to be rejected")
+	}
+}
+
+func TestDownloadCollectionImageURL_SecureClientRejectsLoopbackLiteral(t *testing.T) {
+	t.Parallel()
+
+	_, err := downloadCollectionImageURL(context.Background(), imagecache.NewSecureHTTPClient(), "http://127.0.0.1/")
+	if err == nil {
+		t.Fatal("expected secure client to reject loopback")
+	}
+}
+
+func TestDownloadCollectionImageURL_CustomClientCanReachLoopback(t *testing.T) {
+	t.Parallel()
+
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("jpeg-bytes"))
+	}))
+	t.Cleanup(srv.Close)
+
+	got, err := downloadCollectionImageURL(context.Background(), srv.Client(), srv.URL+"/poster.jpg")
+	if err != nil {
+		t.Fatalf("downloadCollectionImageURL: %v", err)
+	}
+	if string(got) != "jpeg-bytes" {
+		t.Fatalf("body = %q, want jpeg-bytes", got)
+	}
+	if hits != 1 {
+		t.Fatalf("hits = %d, want 1", hits)
 	}
 }
 
