@@ -66,6 +66,8 @@ func TestDiscoverOrphansClassifiesAuxiliaryArtwork(t *testing.T) {
 			{Key: "user-collection-images/personal/poster/original.webp", SizeBytes: 14},
 			{Key: "profile-avatars/12/main/original.webp", SizeBytes: 15},
 			{Key: indexKey, SizeBytes: 16},
+			{Key: "chapter-images/movie-1/0.webp", SizeBytes: 17},
+			{Key: "subtitles/movie-1/en.vtt", SizeBytes: 18},
 		},
 		done: true,
 	}}}

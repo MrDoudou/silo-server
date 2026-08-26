@@ -317,6 +317,32 @@ func registerClientIPConfigReload(watcher *nodeconfig.Watcher, resolver *clienti
 	})
 }
 
+func buildABSCompatRouter(deps *api.Dependencies, ipResolver *clientip.Resolver) *chi.Mux {
+	absRouter := chi.NewRouter()
+	if ipResolver != nil {
+		absRouter.Use(clientip.Middleware(ipResolver))
+	}
+	absRouter.Use(chimiddleware.Recoverer)
+	absRouter.Use(httpstream.CompressExcept(5, abs.SkipMediaCompression))
+
+	if deps.ArtworkDelivery != nil {
+		absRouter.Get("/api/v1/artwork/{"+handlers.ArtworkCapabilityParam+"}/{"+handlers.ArtworkVariantParam+"}", deps.ArtworkDelivery.ServeHTTP)
+		absRouter.Head("/api/v1/artwork/{"+handlers.ArtworkCapabilityParam+"}/{"+handlers.ArtworkVariantParam+"}", deps.ArtworkDelivery.ServeHTTP)
+	}
+	if deps.DB != nil && deps.ArtworkURLSigner != nil {
+		directLibraryArtwork := handlers.NewDirectLibraryArtworkHandler(
+			metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.ArtworkURLSigner,
+		)
+		if directLibraryArtwork != nil {
+			absRouter.Get("/api/v1/artwork-library/{"+handlers.DirectLibraryArtworkParam+"}", directLibraryArtwork.ServeHTTP)
+			absRouter.Head("/api/v1/artwork-library/{"+handlers.DirectLibraryArtworkParam+"}", directLibraryArtwork.ServeHTTP)
+		}
+	}
+
+	deps.ABSHandler.Mount(absRouter)
+	return absRouter
+}
+
 // newStreamTelemetryRegistry builds the telemetry registry for this process,
 // preferring the Redis-backed store in distributed mode. Distributed mode is
 // derived from whether Redis is configured unless the operator pinned
@@ -3308,13 +3334,7 @@ func main() {
 	// no collision with silo's /api/v1.
 	var absSrv *http.Server
 	if (mode == "integrated" || mode == "api") && deps.ABSHandler != nil && cfg.AudiobookshelfCompat.Listen != "" {
-		absRouter := chi.NewRouter()
-		if ipResolver != nil {
-			absRouter.Use(clientip.Middleware(ipResolver))
-		}
-		absRouter.Use(chimiddleware.Recoverer)
-		absRouter.Use(httpstream.CompressExcept(5, abs.SkipMediaCompression))
-		deps.ABSHandler.Mount(absRouter)
+		absRouter := buildABSCompatRouter(&deps, ipResolver)
 		absSrv = &http.Server{
 			Addr:              cfg.AudiobookshelfCompat.Listen,
 			Handler:           absRouter,

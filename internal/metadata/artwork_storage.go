@@ -304,7 +304,7 @@ func (s *ArtworkStorageService) discoverOrphans(ctx context.Context, cp *Artwork
 					cp.LegacyUploadBytes += objects[i].SizeBytes
 					continue
 				}
-				if artworkstore.ValidateKey(objects[i].Key) == nil {
+				if artworkkey.IsStoredArtworkKey(objects[i].Key) {
 					keys = append(keys, objects[i].Key)
 				}
 			}
