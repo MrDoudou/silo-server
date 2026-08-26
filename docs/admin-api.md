@@ -634,6 +634,23 @@ endpoint, with one deliberate difference: `/metrics` is unauthenticated, so its
 disk series are labeled `mount="scratch"` / `mount="library-N"` and the library
 paths themselves appear only here, behind admin auth.
 
+## Settings updates
+
+`PUT /api/v1/admin/settings` accepts setting changes under the `values`
+envelope. For example, enabling permanent local direct artwork URLs uses:
+
+```json
+{
+  "values": {
+    "artwork.delivery_policy": "direct",
+    "artwork.url_auth": "public"
+  }
+}
+```
+
+The response also returns the normalized settings under `values`, alongside
+`restart_required` and any `restart_required_keys`.
+
 ## Artwork storage
 
 `GET /api/v1/admin/artwork/storage` returns the latest indexed artwork-storage

@@ -119,6 +119,20 @@ func (t *ArtworkRevisionTracker) TrackArtworkRevision(ctx context.Context, origi
 	return nil
 }
 
+// ParkArtworkRevision marks a successfully published revision dormant. The
+// image-cache repair path publishes through target-specific conditional
+// updates rather than DetailService.PublishArtworkSelection, so it calls this
+// same lifecycle primitive before completing its durable repair job.
+func (t *ArtworkRevisionTracker) ParkArtworkRevision(ctx context.Context, originalPath, imageType string) error {
+	if t == nil || t.pool == nil {
+		return fmt.Errorf("catalog: artwork revision tracking is not configured")
+	}
+	if err := parkArtworkRevision(ctx, t.pool, originalPath, imageType, time.Now().Add(t.gracePeriod)); err != nil {
+		return fmt.Errorf("catalog: park published artwork revision: %w", err)
+	}
+	return nil
+}
+
 const retainUntrackedArtworkSeedSQL = `
 	UPDATE artwork_revision_gc_candidates
 	SET seed_expires_at = NULL,

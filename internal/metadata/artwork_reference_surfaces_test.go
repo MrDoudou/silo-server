@@ -89,3 +89,20 @@ func TestArtworkReferenceUnionIsSingleParameter(t *testing.T) {
 		}
 	}
 }
+
+func TestArtworkRebuildStatusCountsOnlyCurrentReferences(t *testing.T) {
+	lossReferences := artworkLossReferenceUnionSQL()
+	if branches := strings.Split(lossReferences, " UNION ALL "); len(branches) != len(artworkReferenceSurfaces()) {
+		t.Fatalf("loss-reference union has %d branches for %d surfaces", len(branches), len(artworkReferenceSurfaces()))
+	}
+	if got := strings.Count(lossReferences, "IN (SELECT original_path FROM loss_paths)"); got != len(artworkReferenceSurfaces()) {
+		t.Fatalf("loss-reference union scopes %d branches to candidates, want %d", got, len(artworkReferenceSurfaces()))
+	}
+	query := artworkRebuildStatusSQL()
+	if !strings.Contains(query, "referenced_paths AS") {
+		t.Fatalf("rebuild status has no reference snapshot:\n%s", query)
+	}
+	if got := strings.Count(query, "i.original_path IN (SELECT path FROM referenced_paths)"); got != 2 {
+		t.Fatalf("rebuild status scopes %d loss counters to live references, want 2:\n%s", got, query)
+	}
+}

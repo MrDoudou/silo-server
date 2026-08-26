@@ -14,6 +14,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
+	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/models"
 	"github.com/Silo-Server/silo-server/internal/userstore"
 )
@@ -42,6 +43,9 @@ func (c *ArtworkDeliveryCoordinator) ArtworkPublished(ctx context.Context, job *
 	if c == nil || c.pool == nil || job == nil {
 		return nil
 	}
+	if err := c.revisions.ParkArtworkRevision(ctx, publishedPath, job.ImageType); err != nil {
+		return err
+	}
 	if _, err := c.pool.Exec(ctx, `
 		UPDATE artwork_revision_gc_candidates
 		SET missing_at = NULL, repair_state = '', repair_queued_at = NULL,
@@ -61,9 +65,8 @@ func (c *ArtworkDeliveryCoordinator) ArtworkPublished(ctx context.Context, job *
 	}
 	artworkmetrics.Repair("recovered")
 	if c.health != nil {
-		var missing int64
-		if err := c.pool.QueryRow(ctx, `SELECT count(*) FROM artwork_revision_gc_candidates WHERE missing_at IS NOT NULL AND tombstoned_at IS NULL`).Scan(&missing); err == nil {
-			c.health.ReportInventoryMissing(missing)
+		if status, err := c.RebuildStatus(ctx); err == nil {
+			c.health.ReportInventoryMissing(status.MissingReferences)
 		}
 	}
 	return nil
@@ -123,11 +126,12 @@ func localizedItemSurfaceForImageType(imageType string) string {
 // loss detection into the existing durable, deduplicated image-cache queue.
 // It never clears a selected catalog path merely because delivery failed.
 type ArtworkDeliveryCoordinator struct {
-	pool   *pgxpool.Pool
-	jobs   *ImageCacheJobRepository
-	direct *DirectLibraryArtworkResolver
-	users  userstore.UserStoreProvider
-	health *artworkstore.Handle
+	pool      *pgxpool.Pool
+	jobs      *ImageCacheJobRepository
+	revisions *catalog.ArtworkRevisionTracker
+	direct    *DirectLibraryArtworkResolver
+	users     userstore.UserStoreProvider
+	health    *artworkstore.Handle
 }
 
 func (c *ArtworkDeliveryCoordinator) SetStoreHealth(handle *artworkstore.Handle) {
@@ -140,11 +144,55 @@ func NewArtworkDeliveryCoordinator(pool *pgxpool.Pool, direct *DirectLibraryArtw
 	if pool == nil {
 		return nil
 	}
-	coordinator := &ArtworkDeliveryCoordinator{pool: pool, jobs: NewImageCacheJobRepository(pool), direct: direct}
+	coordinator := &ArtworkDeliveryCoordinator{
+		pool: pool, jobs: NewImageCacheJobRepository(pool), revisions: catalog.NewArtworkRevisionTracker(pool), direct: direct,
+	}
 	if len(users) > 0 {
 		coordinator.users = users[0]
 	}
 	return coordinator
+}
+
+// ArtworkRebuildStatus is the durable completion gate for an authoritative
+// empty-store rebuild. Missing and protected counts include only revisions a
+// current catalog surface still selects; orphaned inventory remains visible to
+// accounting and GC without keeping the store in empty_rebuilding.
+type ArtworkRebuildStatus struct {
+	OutstandingJobs   int64
+	ProtectedLosses   int64
+	MissingReferences int64
+}
+
+func artworkRebuildStatusSQL() string {
+	return `WITH loss_paths AS (
+		SELECT original_path FROM artwork_revision_gc_candidates
+		WHERE tombstoned_at IS NULL
+		  AND (missing_at IS NOT NULL OR repair_state = 'protected_loss')
+	), referenced_paths AS (
+		SELECT DISTINCT path FROM (` + artworkLossReferenceUnionSQL() + `) refs
+	) SELECT
+		(SELECT count(*) FROM metadata_image_cache_jobs
+		 WHERE repair_requested AND status IN ('queued', 'running')),
+		(SELECT count(*) FROM artwork_revision_gc_candidates i
+		 WHERE i.repair_state = 'protected_loss' AND i.tombstoned_at IS NULL
+		   AND i.original_path IN (SELECT path FROM referenced_paths)),
+		(SELECT count(*) FROM artwork_revision_gc_candidates i
+		 WHERE i.missing_at IS NOT NULL AND i.tombstoned_at IS NULL
+		   AND i.original_path IN (SELECT path FROM referenced_paths))`
+}
+
+func (c *ArtworkDeliveryCoordinator) RebuildStatus(ctx context.Context) (ArtworkRebuildStatus, error) {
+	var status ArtworkRebuildStatus
+	if c == nil || c.pool == nil {
+		return status, errors.New("artwork delivery coordinator is not configured")
+	}
+	err := c.pool.QueryRow(ctx, artworkRebuildStatusSQL()).Scan(
+		&status.OutstandingJobs, &status.ProtectedLosses, &status.MissingReferences,
+	)
+	if err != nil {
+		return ArtworkRebuildStatus{}, fmt.Errorf("load artwork rebuild status: %w", err)
+	}
+	return status, nil
 }
 
 func (c *ArtworkDeliveryCoordinator) LoadTarget(ctx context.Context, target artworkurl.Target) (ArtworkTargetState, error) {

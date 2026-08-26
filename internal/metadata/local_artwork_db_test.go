@@ -128,8 +128,9 @@ func TestArtworkRepairPublicationDrainsRebuildState(t *testing.T) {
 		if _, err := pool.Exec(ctx, `
 			INSERT INTO artwork_revision_gc_candidates (
 				original_path, object_keys, missing_at, repair_state,
-				repair_queued_at, protected_loss_at
-			) VALUES ($1, ARRAY[$1], NOW(), 'protected_loss', NOW(), NOW())`, path); err != nil {
+				repair_queued_at, protected_loss_at, not_before, next_attempt_at
+			) VALUES ($1, ARRAY[$1], NOW(), 'protected_loss', NOW(), NOW(),
+				NOW() + interval '24 hours', NOW() + interval '24 hours')`, path); err != nil {
 			t.Fatalf("seed missing revision %q: %v", path, err)
 		}
 	}
@@ -168,6 +169,7 @@ func TestArtworkRepairPublicationDrainsRebuildState(t *testing.T) {
 	}
 
 	var outstanding, missing, unresolved int64
+	var publishedNextAttempt *time.Time
 	if err := pool.QueryRow(ctx, `
 		SELECT
 			(SELECT count(*) FROM metadata_image_cache_jobs
@@ -175,11 +177,78 @@ func TestArtworkRepairPublicationDrainsRebuildState(t *testing.T) {
 			(SELECT count(*) FROM artwork_revision_gc_candidates
 			 WHERE original_path = ANY($2) AND missing_at IS NOT NULL AND tombstoned_at IS NULL),
 			(SELECT count(*) FROM artwork_storage_alerts
-			 WHERE target_keys = $3 AND resolved_at IS NULL)`,
-		contentID, []string{oldPath, newPath}, targetKeys).Scan(&outstanding, &missing, &unresolved); err != nil {
+			 WHERE target_keys = $3 AND resolved_at IS NULL),
+			(SELECT next_attempt_at FROM artwork_revision_gc_candidates WHERE original_path = $4)`,
+		contentID, []string{oldPath, newPath}, targetKeys, newPath).Scan(&outstanding, &missing, &unresolved, &publishedNextAttempt); err != nil {
 		t.Fatalf("read rebuild completion gate: %v", err)
 	}
 	if outstanding != 0 || missing != 0 || unresolved != 0 {
 		t.Fatalf("completion gate did not drain: outstanding=%d missing=%d unresolved_alerts=%d", outstanding, missing, unresolved)
+	}
+	if publishedNextAttempt != nil {
+		t.Fatalf("published revision remained armed for GC at %v", *publishedNextAttempt)
+	}
+}
+
+func TestArtworkRebuildStatusIgnoresUnreferencedMissingRevisions(t *testing.T) {
+	pool := localArtworkTestPool(t)
+	ctx := context.Background()
+	suffix := time.Now().UnixNano()
+	contentID := fmt.Sprintf("artwork-rebuild-gate-%d", suffix)
+	referencedPath := fmt.Sprintf("tmdb/movies/%s/poster/original.missing.webp", contentID)
+	orphanPath := fmt.Sprintf("tmdb/movies/%s/poster/original.orphan.webp", contentID)
+	healthyPath := fmt.Sprintf("tmdb/movies/%s/poster/original.healthy.webp", contentID)
+
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM media_items WHERE content_id = $1`, contentID)
+		_, _ = pool.Exec(ctx, `DELETE FROM artwork_revision_gc_candidates WHERE original_path = ANY($1)`, []string{referencedPath, orphanPath, healthyPath})
+	})
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO media_items (content_id, type, title, status, genres, poster_path, poster_source_path)
+		VALUES ($1, 'movie', 'Artwork rebuild gate', 'matched', '{}'::text[], $2, 'tmdb://movie/rebuild-gate')`,
+		contentID, referencedPath); err != nil {
+		t.Fatalf("seed referenced owner: %v", err)
+	}
+	for _, path := range []string{referencedPath, orphanPath} {
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO artwork_revision_gc_candidates (original_path, object_keys)
+			VALUES ($1, ARRAY[$1])`, path); err != nil {
+			t.Fatalf("seed inventory %q: %v", path, err)
+		}
+	}
+
+	coordinator := NewArtworkDeliveryCoordinator(pool, nil)
+	if err := coordinator.markBulkMissing(ctx, []string{referencedPath, orphanPath}); err != nil {
+		t.Fatalf("bulk-mark missing: %v", err)
+	}
+	status, err := coordinator.RebuildStatus(ctx)
+	if err != nil {
+		t.Fatalf("load initial rebuild status: %v", err)
+	}
+	if status.MissingReferences != 1 {
+		t.Fatalf("referenced missing revisions = %d, want 1", status.MissingReferences)
+	}
+
+	if _, err := pool.Exec(ctx, `UPDATE media_items SET poster_path = $2 WHERE content_id = $1`, contentID, healthyPath); err != nil {
+		t.Fatalf("repoint owner: %v", err)
+	}
+	if err := coordinator.ArtworkPublished(ctx, &models.MetadataImageCacheJob{
+		TargetType: ImageCacheTargetItem, TargetContentID: contentID, ImageType: ImageCacheImagePoster,
+	}, referencedPath, healthyPath); err != nil {
+		t.Fatalf("record replacement publication: %v", err)
+	}
+	status, err = coordinator.RebuildStatus(ctx)
+	if err != nil {
+		t.Fatalf("load completed rebuild status: %v", err)
+	}
+	if status.MissingReferences != 0 || status.ProtectedLosses != 0 {
+		t.Fatalf("orphan held rebuild open: missing=%d protected=%d", status.MissingReferences, status.ProtectedLosses)
+	}
+	var orphanStillMissing bool
+	if err := pool.QueryRow(ctx, `SELECT missing_at IS NOT NULL FROM artwork_revision_gc_candidates WHERE original_path = $1`, orphanPath).Scan(&orphanStillMissing); err != nil {
+		t.Fatalf("read orphan inventory: %v", err)
+	}
+	if !orphanStillMissing {
+		t.Fatal("completion gate mutated the orphaned missing row")
 	}
 }

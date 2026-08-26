@@ -75,8 +75,9 @@ func TestQueueAndParkArtworkRevisionUpserts(t *testing.T) {
 	}
 
 	// Publication parks the selected revision: referenced by construction.
-	if err := parkArtworkRevision(ctx, pool, path, "poster", time.Now().Add(time.Hour)); err != nil {
-		t.Fatalf("parkArtworkRevision: %v", err)
+	tracker := NewArtworkRevisionTracker(pool)
+	if err := tracker.ParkArtworkRevision(ctx, path, "poster"); err != nil {
+		t.Fatalf("ParkArtworkRevision: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `
 		SELECT next_attempt_at FROM artwork_revision_gc_candidates

@@ -528,17 +528,33 @@ func profileAvatarReferenceSurface() artworkReferenceSurface {
 }
 
 func artworkReferenceUnionSQL() string {
+	return artworkReferenceUnionMatchingSQL(func(pathExpr string) string {
+		return pathExpr + " = ANY($1)"
+	})
+}
+
+func artworkReferenceUnionMatchingSQL(match func(pathExpr string) string) string {
 	surfaces := artworkReferenceSurfaces()
 	parts := make([]string, 0, len(surfaces))
 	for _, surface := range surfaces {
 		part := "SELECT " + surface.pathExpr + " AS path FROM " + surface.table +
-			" WHERE " + surface.pathExpr + " = ANY($1)"
+			" WHERE " + match(surface.pathExpr)
 		if surface.filter != "" {
 			part += " AND " + surface.filter
 		}
 		parts = append(parts, part)
 	}
 	return strings.Join(parts, " UNION ALL ")
+}
+
+// artworkLossReferenceUnionSQL retains the indexed candidate predicate used
+// by GC while sourcing candidates from the rebuild's loss_paths CTE. This
+// avoids repeatedly projecting every catalog artwork row while rebuilding a
+// large store.
+func artworkLossReferenceUnionSQL() string {
+	return artworkReferenceUnionMatchingSQL(func(pathExpr string) string {
+		return pathExpr + " IN (SELECT original_path FROM loss_paths)"
+	})
 }
 
 func (g *ArtworkRevisionGarbageCollector) isReferenced(ctx context.Context, q artworkReferenceQuerier, originalPath string) (bool, error) {

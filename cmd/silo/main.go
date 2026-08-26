@@ -2829,15 +2829,10 @@ func main() {
 							}
 						}
 						if err == nil && enqueueComplete {
-							var outstanding, protected, missing int64
-							err = deps.DB.QueryRow(appCtx, `
-								SELECT
-									(SELECT count(*) FROM metadata_image_cache_jobs WHERE repair_requested AND status IN ('queued', 'running')),
-									(SELECT count(*) FROM artwork_revision_gc_candidates WHERE repair_state = 'protected_loss' AND tombstoned_at IS NULL),
-									(SELECT count(*) FROM artwork_revision_gc_candidates WHERE missing_at IS NOT NULL AND tombstoned_at IS NULL)
-							`).Scan(&outstanding, &protected, &missing)
-							if err == nil && outstanding == 0 {
-								degraded := protected > 0 || missing > 0
+							var rebuildStatus metadata.ArtworkRebuildStatus
+							rebuildStatus, err = coordinator.RebuildStatus(appCtx)
+							if err == nil && rebuildStatus.OutstandingJobs == 0 {
+								degraded := rebuildStatus.ProtectedLosses > 0 || rebuildStatus.MissingReferences > 0
 								deps.ArtworkStore.CompleteRebuild(degraded)
 								finalHealth := artworkstore.HealthHealthy
 								if degraded {

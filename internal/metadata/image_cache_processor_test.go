@@ -199,6 +199,20 @@ func (f *fakeImageResolver) ResolveImageURL(context.Context, string, string) str
 	return f.url
 }
 
+type fakeArtworkPublicationObserver struct {
+	jobs                  *fakeImageCacheJobs
+	called                int
+	publishedPath         string
+	succeededIDAtCallback int64
+}
+
+func (f *fakeArtworkPublicationObserver) ArtworkPublished(_ context.Context, _ *models.MetadataImageCacheJob, _, publishedPath string) error {
+	f.called++
+	f.publishedPath = publishedPath
+	f.succeededIDAtCallback = f.jobs.succeededID
+	return nil
+}
+
 type fakeEpisodeStillUpdater struct {
 	updated    bool
 	contentID  string
@@ -331,6 +345,8 @@ func TestImageCacheProcessorUpdatesItemArtworkOnSuccess(t *testing.T) {
 	processor := NewImageCacheProcessorWithTargets(jobs, cacher, resolver, ImageCacheProcessorTargets{
 		Items: items,
 	})
+	observer := &fakeArtworkPublicationObserver{jobs: jobs}
+	processor.SetArtworkPublicationObserver(observer)
 	stats, err := processor.RunOnce(context.Background(), "test-worker", 10, 1)
 	if err != nil {
 		t.Fatalf("RunOnce() error = %v", err)
@@ -343,6 +359,12 @@ func TestImageCacheProcessorUpdatesItemArtworkOnSuccess(t *testing.T) {
 	}
 	if items.cachedPath != "tmdb/series/1396/backdrop/original.webp" {
 		t.Fatalf("cachedPath = %q", items.cachedPath)
+	}
+	if observer.called != 1 || observer.publishedPath != items.cachedPath {
+		t.Fatalf("publication observer = %d/%q, want 1/%q", observer.called, observer.publishedPath, items.cachedPath)
+	}
+	if observer.succeededIDAtCallback != 0 || jobs.succeededID != 20 {
+		t.Fatalf("publication/completion order = %d then %d, want 0 then 20", observer.succeededIDAtCallback, jobs.succeededID)
 	}
 }
 
