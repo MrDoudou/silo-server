@@ -49,7 +49,7 @@ func New(cfg Config) *Provider {
 		dlBase = defaultDLBaseURL
 	}
 	return &Provider{
-		client:    &http.Client{Timeout: 15 * time.Second},
+		client:    newHTTPClient(dlBase),
 		baseURL:   base,
 		dlBaseURL: dlBase,
 		apiKey:    cfg.APIKey,
@@ -57,6 +57,31 @@ func New(cfg Config) *Provider {
 			MaxRequests: 40,
 			Window:      10 * time.Second,
 		}),
+	}
+}
+
+func newHTTPClient(dlBase string) *http.Client {
+	downloadHost := ""
+	if parsed, err := url.Parse(dlBase); err == nil {
+		downloadHost = parsed.Host
+	}
+	return &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) == 0 || downloadHost == "" {
+				return nil
+			}
+			// Pin only download-origin requests. Search hits api.subdl.com and
+			// may follow that host's own redirects.
+			origin := via[0].URL
+			if origin.Host != downloadHost {
+				return nil
+			}
+			if req.URL.Scheme != origin.Scheme || req.URL.Host != origin.Host {
+				return fmt.Errorf("subdl: refusing redirect to %s://%s", req.URL.Scheme, req.URL.Host)
+			}
+			return nil
+		},
 	}
 }
 
@@ -135,8 +160,14 @@ func (p *Provider) Download(ctx context.Context, id string) ([]byte, subtitles.S
 		return nil, "", err
 	}
 
-	// id is the relative download URL from search results
-	downloadURL := p.dlBaseURL + id
+	// Search results store a relative download path in SubtitleResult.ID.
+	// Concatenating it onto the base (`https://dl.subdl.com` + `@127.0.0.1:8096/`)
+	// lets a caller-supplied id rewrite the host via URL userinfo. Join as a
+	// path on the configured download origin instead.
+	downloadURL, err := resolveDownloadURL(p.dlBaseURL, id)
+	if err != nil {
+		return nil, "", err
+	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
 	if err != nil {
@@ -212,4 +243,37 @@ func detectFormat(filename string) subtitles.SubtitleFormat {
 	default:
 		return subtitles.FormatSRT
 	}
+}
+
+// resolveDownloadURL joins a search-result path onto the SubDL download origin.
+// The id must be a relative path (optional query). Absolute URLs, scheme-relative
+// hosts, and userinfo (`@host`) are rejected so a client-supplied subtitle_id
+// cannot retarget the GET.
+func resolveDownloadURL(dlBase, id string) (string, error) {
+	base, err := url.Parse(dlBase)
+	if err != nil || base.Scheme == "" || base.Host == "" {
+		return "", fmt.Errorf("subdl: invalid download base")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" || strings.ContainsAny(id, " \t\r\n") {
+		return "", fmt.Errorf("subdl: invalid download path")
+	}
+	if strings.HasPrefix(id, "//") || strings.Contains(id, "@") || strings.Contains(id, "\\") {
+		return "", fmt.Errorf("subdl: invalid download path")
+	}
+	rel, err := url.Parse(id)
+	if err != nil {
+		return "", fmt.Errorf("subdl: invalid download path: %w", err)
+	}
+	if rel.IsAbs() || rel.Scheme != "" || rel.Host != "" || rel.User != nil || rel.Opaque != "" {
+		return "", fmt.Errorf("subdl: download path must be relative")
+	}
+	if strings.HasPrefix(rel.Path, "//") {
+		return "", fmt.Errorf("subdl: invalid download path")
+	}
+	resolved := base.ResolveReference(rel)
+	if resolved.Scheme != base.Scheme || resolved.Host != base.Host {
+		return "", fmt.Errorf("subdl: download path escaped download host")
+	}
+	return resolved.String(), nil
 }
