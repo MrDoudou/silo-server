@@ -11,26 +11,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Silo-Server/silo-server/internal/access"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/historyimport"
-	"github.com/Silo-Server/silo-server/internal/userstore"
 	"github.com/Silo-Server/silo-server/internal/webhooksync"
 )
 
 type WebhookSyncHandler struct {
-	service       *webhooksync.Service
-	storeProvider userstore.UserStoreProvider
-
-	// UserRepo and ProfileTokens gate connection/mapping mutations that can
-	// write watch state into any household profile. Both nil means the
-	// household-management check is unavailable — never that it is unguarded.
-	UserRepo      userLookup
-	ProfileTokens *access.ProfileTokenService
-}
-
-func NewWebhookSyncHandler(service *webhooksync.Service, storeProvider userstore.UserStoreProvider) *WebhookSyncHandler {
-	return &WebhookSyncHandler{service: service, storeProvider: storeProvider}
+	service *webhooksync.Service
 }
 
 type legacyPlexSyncConnection struct {
@@ -101,6 +88,10 @@ type legacyUpdatePlexSyncActorsRequest struct {
 	} `json:"mappings"`
 }
 
+func NewWebhookSyncHandler(service *webhooksync.Service) *WebhookSyncHandler {
+	return &WebhookSyncHandler{service: service}
+}
+
 func (h *WebhookSyncHandler) HandleListConnections(w http.ResponseWriter, r *http.Request) {
 	userID := apimw.GetUserID(r.Context())
 	connections, err := h.service.ListConnections(r.Context(), userID)
@@ -139,9 +130,6 @@ func (h *WebhookSyncHandler) HandleCreateConnection(w http.ResponseWriter, r *ht
 		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required")
 		return
 	}
-	if !h.authorizeHouseholdManagement(w, r, userID) {
-		return
-	}
 	var req webhooksync.CreateConnectionInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "Invalid request body")
@@ -160,9 +148,6 @@ func (h *WebhookSyncHandler) HandleLegacyCreateConnection(w http.ResponseWriter,
 	userID := apimw.GetUserID(r.Context())
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required")
-		return
-	}
-	if !h.authorizeHouseholdManagement(w, r, userID) {
 		return
 	}
 	var req legacyCreatePlexSyncConnectionRequest
@@ -197,13 +182,6 @@ func (h *WebhookSyncHandler) HandleLegacyCreateConnection(w http.ResponseWriter,
 
 func (h *WebhookSyncHandler) HandleUpdateConnection(w http.ResponseWriter, r *http.Request) {
 	userID := apimw.GetUserID(r.Context())
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required")
-		return
-	}
-	if !h.authorizeHouseholdManagement(w, r, userID) {
-		return
-	}
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "Connection ID is required")
@@ -225,13 +203,6 @@ func (h *WebhookSyncHandler) HandleUpdateConnection(w http.ResponseWriter, r *ht
 
 func (h *WebhookSyncHandler) HandleDeleteConnection(w http.ResponseWriter, r *http.Request) {
 	userID := apimw.GetUserID(r.Context())
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required")
-		return
-	}
-	if !h.authorizeHouseholdManagement(w, r, userID) {
-		return
-	}
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "Connection ID is required")
@@ -250,13 +221,6 @@ func (h *WebhookSyncHandler) HandleLegacyDeleteConnection(w http.ResponseWriter,
 
 func (h *WebhookSyncHandler) HandleRotateWebhook(w http.ResponseWriter, r *http.Request) {
 	userID := apimw.GetUserID(r.Context())
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required")
-		return
-	}
-	if !h.authorizeHouseholdManagement(w, r, userID) {
-		return
-	}
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "Connection ID is required")
@@ -272,13 +236,6 @@ func (h *WebhookSyncHandler) HandleRotateWebhook(w http.ResponseWriter, r *http.
 
 func (h *WebhookSyncHandler) HandleLegacyRotateWebhook(w http.ResponseWriter, r *http.Request) {
 	userID := apimw.GetUserID(r.Context())
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required")
-		return
-	}
-	if !h.authorizeHouseholdManagement(w, r, userID) {
-		return
-	}
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "Connection ID is required")
@@ -345,13 +302,6 @@ func (h *WebhookSyncHandler) HandleLegacyGetActors(w http.ResponseWriter, r *htt
 
 func (h *WebhookSyncHandler) HandleUpdateProfileMappings(w http.ResponseWriter, r *http.Request) {
 	userID := apimw.GetUserID(r.Context())
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required")
-		return
-	}
-	if !h.authorizeHouseholdManagement(w, r, userID) {
-		return
-	}
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "Connection ID is required")
@@ -372,13 +322,6 @@ func (h *WebhookSyncHandler) HandleUpdateProfileMappings(w http.ResponseWriter, 
 
 func (h *WebhookSyncHandler) HandleLegacyUpdateActors(w http.ResponseWriter, r *http.Request) {
 	userID := apimw.GetUserID(r.Context())
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required")
-		return
-	}
-	if !h.authorizeHouseholdManagement(w, r, userID) {
-		return
-	}
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "Connection ID is required")
@@ -448,33 +391,6 @@ func (h *WebhookSyncHandler) HandleWebhook(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// authorizeHouseholdManagement gates webhook-sync connection and mapping
-// mutations. These endpoints can wire external watch events into any profile
-// on the account; without the household parent (or admin) check a non-primary
-// profile could map webhooks onto a PIN-locked sibling.
-func (h *WebhookSyncHandler) authorizeHouseholdManagement(w http.ResponseWriter, r *http.Request, userID int) bool {
-	if h == nil || h.storeProvider == nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to access user store")
-		return false
-	}
-	store, err := h.storeProvider.ForUser(r.Context(), userID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to access user store")
-		return false
-	}
-	allowed, err := canManageHousehold(r, store, h.UserRepo, h.ProfileTokens)
-	if err != nil {
-		writeProfileManagementPermissionError(w, err)
-		return false
-	}
-	if !allowed {
-		writeError(w, http.StatusForbidden, "forbidden",
-			"Managing webhook sync requires the primary profile or admin access")
-		return false
-	}
-	return true
 }
 
 func (h *WebhookSyncHandler) writeError(w http.ResponseWriter, err error) {

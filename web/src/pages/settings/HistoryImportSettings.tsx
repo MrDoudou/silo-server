@@ -39,7 +39,6 @@ import {
 import { cn } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, CircleSlash2, Clock, Loader2, XCircle } from "lucide-react";
 import { formatRelativeTime as formatRelativeTimeBase } from "@/lib/date";
-import { useIsActingAdmin } from "@/hooks/useIsActingAdmin";
 
 const STATUS_CONFIG = {
   queued: {
@@ -79,13 +78,8 @@ export default function HistoryImportSettings() {
   useEventChannel("history_import");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const actingAdmin = useIsActingAdmin();
   const { profile } = useCurrentProfile();
   const { data: profiles = [] } = useProfiles();
-  const canImportForHousehold = actingAdmin || profile?.is_primary === true;
-  const importProfiles = canImportForHousehold
-    ? profiles
-    : profiles.filter((item) => item.id === profile?.id);
   const { data: sources = [], isLoading: sourcesLoading } = useHistoryImportSources();
   const { data: recentRuns = [] } = useHistoryImportRuns();
 
@@ -122,11 +116,7 @@ export default function HistoryImportSettings() {
 
   const displayRun = activeRun ?? recentRuns[0] ?? null;
   const pending = loginMutation.isPending || createRunMutation.isPending || plexAuthPending;
-  const effectiveProfileId = (
-    canImportForHousehold
-      ? profileId || profile?.id
-      : profile?.id || profileId
-  ) || "";
+  const effectiveProfileId = profileId || profile?.id || "";
   const returnedPlexAuth = searchParams.get("plex_auth");
   const returnedPlexPinId = searchParams.get("plex_pin_id");
   const returnedPlexPinCode = searchParams.get("plex_pin_code");
@@ -616,7 +606,7 @@ export default function HistoryImportSettings() {
                 <SelectValue placeholder="Choose a profile" />
               </SelectTrigger>
               <SelectContent>
-                {importProfiles.map((item) => (
+                {profiles.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.name}
                   </SelectItem>

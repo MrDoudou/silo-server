@@ -161,8 +161,6 @@ describe("SettingsLayout", () => {
 
     expect(markup).not.toContain("/settings/profiles");
     expect(markup).not.toContain(">Profiles<");
-    expect(markup).not.toContain("/settings/webhook-sync");
-    expect(markup).not.toContain(">Webhook Sync<");
   });
 
   it("shows the profiles section for non-admin users on their primary profile", () => {
@@ -179,8 +177,6 @@ describe("SettingsLayout", () => {
 
     expect(markup).toContain("/settings/profiles");
     expect(markup).toContain(">Profiles<");
-    expect(markup).toContain("/settings/webhook-sync");
-    expect(markup).toContain(">Webhook Sync<");
   });
 
   it("filters personal settings sections from the search box", async () => {

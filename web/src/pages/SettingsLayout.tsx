@@ -377,7 +377,6 @@ const NAV_SECTIONS: NavSection[] = [
           "Server URL",
           "Token",
         ),
-        primaryOrAdmin: true,
       },
       {
         path: "history-import",
