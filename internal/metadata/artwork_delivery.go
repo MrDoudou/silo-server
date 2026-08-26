@@ -227,7 +227,7 @@ func (c *ArtworkDeliveryCoordinator) completeRecoveryGeneration(ctx context.Cont
 }
 
 // RunRecovery coordinates authoritative-empty store recovery until ctx is
-// cancelled. Durable generation/checkpoint state makes restart re-entry and
+// canceled. Durable generation/checkpoint state makes restart re-entry and
 // enqueue idempotence converge through the ordinary image-cache queue.
 func (c *ArtworkDeliveryCoordinator) RunRecovery(ctx context.Context) {
 	if c == nil || c.pool == nil || c.health == nil {
@@ -257,7 +257,7 @@ func (c *ArtworkDeliveryCoordinator) RunRecovery(ctx context.Context) {
 					err = enqueueErr
 				} else {
 					persisted.enqueueComplete = true
-					slog.Info("artwork bulk recovery queued", "targets", queued, "generation", generation)
+					slog.InfoContext(ctx, "artwork bulk recovery queued", "targets", queued, "generation", generation)
 				}
 			}
 			if err == nil && persisted.enqueueComplete {
@@ -275,7 +275,7 @@ func (c *ArtworkDeliveryCoordinator) RunRecovery(ctx context.Context) {
 			}
 		}
 		if err != nil {
-			slog.Warn("artwork recovery coordinator iteration failed", "error", err)
+			slog.WarnContext(ctx, "artwork recovery coordinator iteration failed", "error", err)
 		} else {
 			backoff = 5 * time.Second
 		}

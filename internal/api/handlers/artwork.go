@@ -35,6 +35,7 @@ const (
 
 	artworkContentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
 	artworkFallbackMediaType     = "application/octet-stream"
+	webpContentType              = "image/webp"
 
 	// Open decision 16: process-local, disposable, 64 MiB/256-entry LRU.
 	emergencyArtworkCacheBytes   = 64 << 20
@@ -459,7 +460,7 @@ func fallbackVariant(data []byte, mediaType, imageType, variant string) ([]byte,
 	}
 	for _, candidate := range generated.Variants {
 		if candidate.Key == variant {
-			return candidate.Data, "image/webp"
+			return candidate.Data, webpContentType
 		}
 	}
 	return data, mediaType

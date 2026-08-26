@@ -99,9 +99,9 @@ func TestArtworkStorageJobResumesLatestTimedOutCheckpoint(t *testing.T) {
 	if err != nil || claimed == nil || claimed.ID != withoutResume.ID {
 		t.Fatalf("claim non-resuming artwork refresh = %#v, %v", claimed, err)
 	}
-	cancelledWant := metadata.ArtworkInventoryCheckpoint{Version: 1, Cursor: "revision-750", KnownRevisions: 750}
-	if err := repo.UpdateCheckpoint(ctx, withoutResume.ID, cancelledWant); err != nil {
-		t.Fatalf("save cancelled predecessor checkpoint: %v", err)
+	canceledWant := metadata.ArtworkInventoryCheckpoint{Version: 1, Cursor: "revision-750", KnownRevisions: 750}
+	if err := repo.UpdateCheckpoint(ctx, withoutResume.ID, canceledWant); err != nil {
+		t.Fatalf("save canceled predecessor checkpoint: %v", err)
 	}
 	if _, err := repo.Cancel(ctx, withoutResume.ID, "cancel checkpointed refresh", time.Now().UTC().Add(time.Hour)); err != nil {
 		t.Fatalf("cancel checkpointed predecessor: %v", err)
@@ -113,12 +113,12 @@ func TestArtworkStorageJobResumesLatestTimedOutCheckpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create refresh after cancellation: %v", err)
 	}
-	cancelledResume, err := decodeArtworkInventoryCheckpoint(afterCancellation.Checkpoint)
+	canceledResume, err := decodeArtworkInventoryCheckpoint(afterCancellation.Checkpoint)
 	if err != nil {
-		t.Fatalf("decode cancelled predecessor checkpoint: %v", err)
+		t.Fatalf("decode canceled predecessor checkpoint: %v", err)
 	}
-	if cancelledResume == nil || cancelledResume.Cursor != cancelledWant.Cursor || cancelledResume.KnownRevisions != cancelledWant.KnownRevisions {
-		t.Fatalf("cancelled predecessor checkpoint = %#v, want %#v", cancelledResume, cancelledWant)
+	if canceledResume == nil || canceledResume.Cursor != canceledWant.Cursor || canceledResume.KnownRevisions != canceledWant.KnownRevisions {
+		t.Fatalf("canceled predecessor checkpoint = %#v, want %#v", canceledResume, canceledWant)
 	}
 
 	failed, err := repo.GetByID(ctx, first.ID)
