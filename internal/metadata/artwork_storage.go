@@ -202,7 +202,7 @@ const artworkAccountingPublishSQL = `
 		coverage_limit_reason = $9,
 		adoption_index_bytes = $10,
 		adoption_index_objects = $11,
-		last_error = CASE WHEN $7 > 0 THEN 'inventory refresh had failures' ELSE '' END,
+		last_error = CASE WHEN $7::bigint > 0 THEN 'inventory refresh had failures' ELSE '' END,
 		updated_at = NOW()
 	WHERE singleton`
 
