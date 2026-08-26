@@ -19,6 +19,7 @@ type fakeImageCacheJobs struct {
 	deletedCount  int
 	requeuedIDs   []int64
 	currentSource *string // when set, overrides CurrentTargetSourcePath
+	targetFound   *bool
 }
 
 type targetImageCacheJobs struct {
@@ -78,11 +79,14 @@ func (f *fakeImageCacheJobs) RequeueClaimed(_ context.Context, ids []int64, _ st
 	return nil
 }
 
-func (f *fakeImageCacheJobs) CurrentTargetSourcePath(_ context.Context, job *models.MetadataImageCacheJob) (string, error) {
-	if f.currentSource != nil {
-		return *f.currentSource, nil
+func (f *fakeImageCacheJobs) CurrentTargetSourcePath(_ context.Context, job *models.MetadataImageCacheJob) (string, bool, error) {
+	if f.targetFound != nil && !*f.targetFound {
+		return "", false, nil
 	}
-	return job.SourcePath, nil
+	if f.currentSource != nil {
+		return *f.currentSource, true, nil
+	}
+	return job.SourcePath, true, nil
 }
 
 func (f *fakeImageCacheJobs) EnqueueExistingProviderArtwork(context.Context, int) (int, error) {
@@ -165,8 +169,8 @@ func (f *loopingImageCacheJobs) RequeueClaimed(context.Context, []int64, string)
 	return nil
 }
 
-func (f *loopingImageCacheJobs) CurrentTargetSourcePath(_ context.Context, job *models.MetadataImageCacheJob) (string, error) {
-	return job.SourcePath, nil
+func (f *loopingImageCacheJobs) CurrentTargetSourcePath(_ context.Context, job *models.MetadataImageCacheJob) (string, bool, error) {
+	return job.SourcePath, true, nil
 }
 
 func (f *loopingImageCacheJobs) DeleteSucceededBefore(context.Context, time.Time, int) (int, error) {
@@ -215,14 +219,18 @@ func (f *fakeArtworkPublicationObserver) ArtworkPublished(_ context.Context, _ *
 
 type fakeEpisodeStillUpdater struct {
 	updated    bool
-	contentID  string
+	seriesID   string
+	season     int
+	episode    int
 	sourcePath string
 	cachedPath string
 	thumbhash  string
 }
 
-func (f *fakeEpisodeStillUpdater) UpdateStillIfSourceMatches(_ context.Context, contentID, sourcePath, cachedPath, thumbhash string) (bool, error) {
-	f.contentID = contentID
+func (f *fakeEpisodeStillUpdater) UpdateStillIfSourceMatches(_ context.Context, seriesID string, seasonNumber, episodeNumber int, sourcePath, cachedPath, thumbhash string) (bool, error) {
+	f.seriesID = seriesID
+	f.season = seasonNumber
+	f.episode = episodeNumber
 	f.sourcePath = sourcePath
 	f.cachedPath = cachedPath
 	f.thumbhash = thumbhash
@@ -287,7 +295,7 @@ func TestImageCacheProcessorUpdatesEpisodeOnSuccess(t *testing.T) {
 	jobs := &fakeImageCacheJobs{claimed: []*models.MetadataImageCacheJob{{
 		ID:                1,
 		TargetType:        ImageCacheTargetEpisode,
-		TargetContentID:   "episode-tvdb-1-1-1",
+		TargetContentID:   "series-tvdb-1",
 		SourcePath:        "tvdb://banners/episode.jpg",
 		ProviderID:        "tvdb",
 		ProviderContentID: "1",
@@ -318,8 +326,71 @@ func TestImageCacheProcessorUpdatesEpisodeOnSuccess(t *testing.T) {
 	if episodes.sourcePath != "tvdb://banners/episode.jpg" {
 		t.Fatalf("sourcePath = %q", episodes.sourcePath)
 	}
+	if episodes.seriesID != "series-tvdb-1" || episodes.season != 1 || episodes.episode != 1 {
+		t.Fatalf("episode target = (%q, %d, %d), want (series-tvdb-1, 1, 1)", episodes.seriesID, episodes.season, episodes.episode)
+	}
 	if jobs.succeededID != 1 {
 		t.Fatalf("succeededID = %d", jobs.succeededID)
+	}
+}
+
+func TestImageCacheProcessorFailsRepairWhenTargetLookupMatchesNoRow(t *testing.T) {
+	missing := false
+	jobs := &fakeImageCacheJobs{
+		targetFound: &missing,
+		claimed: []*models.MetadataImageCacheJob{{
+			ID:              19,
+			TargetType:      ImageCacheTargetSeason,
+			TargetContentID: "series-tvdb-293088",
+			SourcePath:      "tvdb://banners/season.jpg",
+			ImageType:       ImageCacheImagePoster,
+			SeasonNumber:    intPointer(0),
+			RepairRequested: true,
+		}},
+	}
+	cacher := &fakeImageCacher{}
+	processor := NewImageCacheProcessorWithTargets(jobs, cacher, &fakeImageResolver{}, ImageCacheProcessorTargets{})
+
+	stats, err := processor.RunOnce(context.Background(), "repair-worker", 1, 1)
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if stats.Failed != 1 || stats.Succeeded != 0 || stats.Skipped != 0 {
+		t.Fatalf("stats = %+v, want one failed repair", stats)
+	}
+	if jobs.failedID != 19 || jobs.succeededID != 0 {
+		t.Fatalf("failed=%d succeeded=%d, want failed=19 succeeded=0", jobs.failedID, jobs.succeededID)
+	}
+	if !strings.Contains(jobs.failedText, "repair target not found") ||
+		!strings.Contains(jobs.failedText, "series-tvdb-293088") ||
+		!strings.Contains(jobs.failedText, "season=0") {
+		t.Fatalf("failure text = %q", jobs.failedText)
+	}
+	if len(cacher.reqs) != 0 {
+		t.Fatalf("cache requests = %d, want none for a missing repair target", len(cacher.reqs))
+	}
+}
+
+func TestImageCacheProcessorSkipsOrdinaryJobWhenTargetVanished(t *testing.T) {
+	missing := false
+	jobs := &fakeImageCacheJobs{
+		targetFound: &missing,
+		claimed: []*models.MetadataImageCacheJob{{
+			ID:              20,
+			TargetType:      ImageCacheTargetItem,
+			TargetContentID: "movie-gone",
+			SourcePath:      "tmdb://posters/gone.jpg",
+			ImageType:       ImageCacheImagePoster,
+		}},
+	}
+	processor := NewImageCacheProcessorWithTargets(jobs, &fakeImageCacher{}, &fakeImageResolver{}, ImageCacheProcessorTargets{})
+
+	stats, err := processor.RunOnce(context.Background(), "ordinary-worker", 1, 1)
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if stats.Skipped != 1 || jobs.succeededID != 20 || jobs.failedID != 0 {
+		t.Fatalf("stats=%+v succeeded=%d failed=%d, want benign skip", stats, jobs.succeededID, jobs.failedID)
 	}
 }
 
@@ -866,6 +937,8 @@ func TestImageCacheProcessorManualBackfillStopsDiscoveryWhenDisabledMidRun(t *te
 		ProviderContentID: "1",
 		ContentType:       "series",
 		ImageType:         ImageCacheImageStill,
+		SeasonNumber:      intPointer(1),
+		EpisodeNumber:     intPointer(1),
 	}
 	jobs := &loopingImageCacheJobs{claimedResults: [][]*models.MetadataImageCacheJob{{job}}}
 	cacher := &fakeImageCacher{result: &CacheImageResult{BasePath: "tvdb/series/1/seasons/1/episodes/1/still", Ext: ".webp"}}
@@ -892,6 +965,8 @@ func TestImageCacheProcessorRequeuesClaimedTailWhenDisabled(t *testing.T) {
 			ProviderContentID: "1",
 			ContentType:       "series",
 			ImageType:         ImageCacheImageStill,
+			SeasonNumber:      intPointer(1),
+			EpisodeNumber:     intPointer(1),
 		})
 	}
 	cacher := &fakeImageCacher{result: &CacheImageResult{BasePath: "tvdb/series/1/seasons/1/episodes/1/still", Ext: ".webp"}}

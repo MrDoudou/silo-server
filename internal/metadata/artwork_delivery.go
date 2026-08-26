@@ -26,13 +26,18 @@ const (
 )
 
 type ArtworkTargetState struct {
-	Target       artworkurl.Target
-	SelectedPath string
-	SourcePath   string
-	ImageType    string
-	Recoverable  bool
-	Protected    bool
-	Missing      bool
+	Target              artworkurl.Target
+	SelectedPath        string
+	SourcePath          string
+	ImageType           string
+	RepairTargetType    string
+	RepairTargetID      string
+	RepairLanguage      string
+	RepairSeasonNumber  *int
+	RepairEpisodeNumber *int
+	Recoverable         bool
+	Protected           bool
+	Missing             bool
 }
 
 // ArtworkPublished reconciles revision-level loss and target-level alerts only
@@ -53,7 +58,10 @@ func (c *ArtworkDeliveryCoordinator) ArtworkPublished(ctx context.Context, job *
 		WHERE original_path = ANY($1::text[])`, []string{previousPath, publishedPath}); err != nil {
 		return err
 	}
-	target, ok := artworkTargetForImageCacheJob(job)
+	target, ok, err := c.artworkTargetForImageCacheJob(ctx, job)
+	if err != nil {
+		return err
+	}
 	if ok {
 		if _, err := c.pool.Exec(ctx, `
 			UPDATE artwork_storage_alerts SET resolved_at = NOW(), last_seen_at = NOW()
@@ -72,9 +80,9 @@ func (c *ArtworkDeliveryCoordinator) ArtworkPublished(ctx context.Context, job *
 	return nil
 }
 
-func artworkTargetForImageCacheJob(job *models.MetadataImageCacheJob) (artworkurl.Target, bool) {
-	if job == nil {
-		return artworkurl.Target{}, false
+func (c *ArtworkDeliveryCoordinator) artworkTargetForImageCacheJob(ctx context.Context, job *models.MetadataImageCacheJob) (artworkurl.Target, bool, error) {
+	if c == nil || c.pool == nil || job == nil {
+		return artworkurl.Target{}, false, nil
 	}
 	target := artworkurl.Target{Slot: job.ImageType}
 	switch job.TargetType {
@@ -82,18 +90,37 @@ func artworkTargetForImageCacheJob(job *models.MetadataImageCacheJob) (artworkur
 		target.Surface, target.Keys = itemSurfaceForImageType(job.ImageType), []string{job.TargetContentID}
 	case ImageCacheTargetItemLocalization:
 		target.Surface, target.Keys = localizedItemSurfaceForImageType(job.ImageType), []string{job.TargetContentID, job.TargetLanguage}
-	case ImageCacheTargetSeason:
-		target.Surface, target.Keys = artworkurl.SurfaceSeasonPosters, []string{job.TargetContentID}
-	case ImageCacheTargetSeasonLocalization:
-		target.Surface, target.Keys = artworkurl.SurfaceLocalizedSeasonPosters, []string{job.TargetContentID, job.TargetLanguage}
+	case ImageCacheTargetSeason, ImageCacheTargetSeasonLocalization:
+		if job.SeasonNumber == nil {
+			return artworkurl.Target{}, false, errors.New("season artwork job has no season number")
+		}
+		var seasonContentID string
+		if err := c.pool.QueryRow(ctx, `SELECT content_id FROM seasons WHERE series_id = $1 AND season_number = $2`,
+			job.TargetContentID, *job.SeasonNumber).Scan(&seasonContentID); err != nil {
+			return artworkurl.Target{}, false, fmt.Errorf("resolve published season artwork target: %w", err)
+		}
+		if job.TargetType == ImageCacheTargetSeason {
+			target.Surface, target.Keys = artworkurl.SurfaceSeasonPosters, []string{seasonContentID}
+		} else {
+			target.Surface, target.Keys = artworkurl.SurfaceLocalizedSeasonPosters, []string{seasonContentID, job.TargetLanguage}
+		}
 	case ImageCacheTargetEpisode:
-		target.Surface, target.Keys = artworkurl.SurfaceEpisodeStills, []string{job.TargetContentID}
+		if job.SeasonNumber == nil || job.EpisodeNumber == nil {
+			return artworkurl.Target{}, false, errors.New("episode artwork job has no season or episode number")
+		}
+		var episodeContentID string
+		if err := c.pool.QueryRow(ctx, `SELECT content_id FROM episodes
+			WHERE series_id = $1 AND season_number = $2 AND episode_number = $3`,
+			job.TargetContentID, *job.SeasonNumber, *job.EpisodeNumber).Scan(&episodeContentID); err != nil {
+			return artworkurl.Target{}, false, fmt.Errorf("resolve published episode artwork target: %w", err)
+		}
+		target.Surface, target.Keys = artworkurl.SurfaceEpisodeStills, []string{episodeContentID}
 	case ImageCacheTargetPerson:
 		target.Surface, target.Keys = artworkurl.SurfacePersonPhotos, []string{job.TargetContentID}
 	default:
-		return artworkurl.Target{}, false
+		return artworkurl.Target{}, false, nil
 	}
-	return target, target.Surface != ""
+	return target, target.Surface != "", nil
 }
 
 func itemSurfaceForImageType(imageType string) string {
@@ -224,13 +251,18 @@ func (c *ArtworkDeliveryCoordinator) LoadTarget(ctx context.Context, target artw
 	if surface.sourceCol != "" {
 		sourceExpr = "COALESCE(" + surface.sourceCol + ", '')"
 	}
+	repairExprs := surface.repairIdentitySelectExpressions()
 	query := fmt.Sprintf(`SELECT COALESCE(%[1]s, ''), %[2]s,
 		EXISTS (SELECT 1 FROM artwork_revision_gc_candidates inventory
-			WHERE inventory.original_path = COALESCE(%[1]s, '') AND inventory.missing_at IS NOT NULL)
-		FROM %[3]s WHERE %[4]s`, surface.pathCol, sourceExpr, surface.table, strings.Join(where, " AND "))
-	var selected, source string
+			WHERE inventory.original_path = COALESCE(%[1]s, '') AND inventory.missing_at IS NOT NULL),
+		%[5]s
+		FROM %[3]s WHERE %[4]s`, surface.pathCol, sourceExpr, surface.table, strings.Join(where, " AND "), strings.Join(repairExprs, ", "))
+	var selected, source, repairTargetID, repairLanguage string
+	var repairSeason, repairEpisode *int
 	var missing bool
-	if err := c.pool.QueryRow(ctx, query, values...).Scan(&selected, &source, &missing); err != nil {
+	if err := c.pool.QueryRow(ctx, query, values...).Scan(
+		&selected, &source, &missing, &repairTargetID, &repairLanguage, &repairSeason, &repairEpisode,
+	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ArtworkTargetState{}, errors.New("artwork target no longer exists")
 		}
@@ -244,6 +276,8 @@ func (c *ArtworkDeliveryCoordinator) LoadTarget(ctx context.Context, target artw
 	recoverable := isRequestRecoverableArtworkSource(source)
 	return ArtworkTargetState{
 		Target: target, SelectedPath: selected, SourcePath: source, ImageType: surface.imageType,
+		RepairTargetType: surface.repairTarget.targetType, RepairTargetID: repairTargetID,
+		RepairLanguage: repairLanguage, RepairSeasonNumber: repairSeason, RepairEpisodeNumber: repairEpisode,
 		Recoverable: recoverable, Protected: !recoverable && selected != "" && selected != "-", Missing: missing,
 	}, nil
 }
@@ -401,22 +435,17 @@ func (c *ArtworkDeliveryCoordinator) SignalMissing(ctx context.Context, state Ar
 }
 
 func repairJobForTarget(state ArtworkTargetState) (EnqueueImageCacheJobInput, bool) {
-	input := EnqueueImageCacheJobInput{SourcePath: state.SourcePath, ImageType: state.ImageType}
-	switch state.Target.Surface {
-	case artworkSurfaceItemPosters, artworkSurfaceItemBackdrops, artworkSurfaceItemLogos:
-		input.TargetType, input.TargetContentID = ImageCacheTargetItem, state.Target.Keys[0]
-	case artworkSurfaceLocalizedItemPosters, artworkSurfaceLocalizedItemBackdrops, artworkSurfaceLocalizedItemLogos:
-		input.TargetType, input.TargetContentID, input.TargetLanguage = ImageCacheTargetItemLocalization, state.Target.Keys[0], state.Target.Keys[1]
-	case artworkSurfaceSeasonPosters:
-		input.TargetType, input.TargetContentID = ImageCacheTargetSeason, state.Target.Keys[0]
-	case artworkSurfaceLocalizedSeasonPosters:
-		input.TargetType, input.TargetContentID, input.TargetLanguage = ImageCacheTargetSeasonLocalization, state.Target.Keys[0], state.Target.Keys[1]
-	case artworkSurfaceEpisodeStills:
-		input.TargetType, input.TargetContentID = ImageCacheTargetEpisode, state.Target.Keys[0]
-	case artworkSurfacePersonPhotos:
-		input.TargetType, input.TargetContentID = ImageCacheTargetPerson, state.Target.Keys[0]
-	default:
+	if state.RepairTargetType == "" || state.RepairTargetID == "" {
 		return EnqueueImageCacheJobInput{}, false
+	}
+	input := EnqueueImageCacheJobInput{
+		TargetType: state.RepairTargetType, TargetContentID: state.RepairTargetID,
+		TargetLanguage: state.RepairLanguage, SeriesID: state.RepairTargetID,
+		SourcePath: state.SourcePath, ImageType: state.ImageType,
+		SeasonNumber: state.RepairSeasonNumber, EpisodeNumber: state.RepairEpisodeNumber,
+	}
+	if input.TargetType == ImageCacheTargetPerson {
+		input.SeriesID = ""
 	}
 	return input, true
 }
@@ -448,6 +477,7 @@ func (c *ArtworkDeliveryCoordinator) EnqueueBulkRecovery(ctx context.Context) (i
 			sourceExpr = "COALESCE(" + surface.sourceCol + ", '')"
 		}
 		selects := append(surface.keySelectExpressions(), surface.pathCol, sourceExpr)
+		selects = append(selects, surface.repairIdentitySelectExpressions()...)
 		order := "updated_at DESC, " + strings.Join(surface.keyColumnNames(), ", ")
 		if surface.noUpdatedAt {
 			order = strings.Join(surface.keyColumnNames(), ", ")
@@ -463,19 +493,23 @@ func (c *ArtworkDeliveryCoordinator) EnqueueBulkRecovery(ctx context.Context) (i
 		protected := make([]ArtworkTargetState, 0, 250)
 		for rows.Next() {
 			keys := make([]string, len(surface.keyCols))
-			dest := make([]any, 0, len(keys)+2)
+			dest := make([]any, 0, len(keys)+6)
 			for i := range keys {
 				dest = append(dest, &keys[i])
 			}
-			var selected, source string
-			dest = append(dest, &selected, &source)
+			var selected, source, repairTargetID, repairLanguage string
+			var repairSeason, repairEpisode *int
+			dest = append(dest, &selected, &source, &repairTargetID, &repairLanguage, &repairSeason, &repairEpisode)
 			if err := rows.Scan(dest...); err != nil {
 				rows.Close()
 				return total, fmt.Errorf("read %s recovery target: %w", surface.name, err)
 			}
 			state := ArtworkTargetState{Target: artworkurl.Target{
 				Surface: surface.name, Keys: keys, Slot: surface.imageType,
-			}, SelectedPath: selected, SourcePath: source, ImageType: surface.imageType, Recoverable: isRequestRecoverableArtworkSource(source)}
+			}, SelectedPath: selected, SourcePath: source, ImageType: surface.imageType,
+				RepairTargetType: surface.repairTarget.targetType, RepairTargetID: repairTargetID,
+				RepairLanguage: repairLanguage, RepairSeasonNumber: repairSeason, RepairEpisodeNumber: repairEpisode,
+				Recoverable: isRequestRecoverableArtworkSource(source)}
 			if input, ok := repairJobForTarget(state); ok && state.Recoverable {
 				batch = append(batch, input)
 				missingPaths = append(missingPaths, selected)

@@ -31,6 +31,42 @@ func TestArtworkReferenceSurfacesCoverEverySweepSurface(t *testing.T) {
 	}
 }
 
+func TestSeriesChildRepairTargetsUseNaturalCatalogKeys(t *testing.T) {
+	wants := map[string]artworkRepairTargetSpec{
+		artworkSurfaceSeasonPosters: {
+			targetType: ImageCacheTargetSeason,
+			targetExpr: "series_id",
+			seasonExpr: "season_number",
+		},
+		artworkSurfaceLocalizedSeasonPosters: {
+			targetType:   ImageCacheTargetSeasonLocalization,
+			targetExpr:   "(SELECT series_id FROM seasons WHERE content_id = season_content_id)",
+			languageExpr: "language",
+			seasonExpr:   "(SELECT season_number FROM seasons WHERE content_id = season_content_id)",
+		},
+		artworkSurfaceEpisodeStills: {
+			targetType:  ImageCacheTargetEpisode,
+			targetExpr:  "series_id",
+			seasonExpr:  "season_number",
+			episodeExpr: "episode_number",
+		},
+	}
+
+	for _, surface := range artworkSweepSurfaces() {
+		want, ok := wants[surface.name]
+		if !ok {
+			continue
+		}
+		if surface.repairTarget != want {
+			t.Fatalf("surface %q repair target = %#v, want %#v", surface.name, surface.repairTarget, want)
+		}
+		delete(wants, surface.name)
+	}
+	if len(wants) != 0 {
+		t.Fatalf("repair target metadata missing surfaces: %#v", wants)
+	}
+}
+
 // TestUploadOwningSurfacesAreReferenced pins the surfaces this branch started
 // tracking upload revisions for. An upload has no re-downloadable source, so a
 // revision collected while a row still points at it is unrecoverable.

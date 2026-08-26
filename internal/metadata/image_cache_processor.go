@@ -68,7 +68,7 @@ type ImageCacheJobClaimer interface {
 	MarkSucceeded(ctx context.Context, id int64, lockedBy string) error
 	MarkFailed(ctx context.Context, id int64, attemptCount int, lockedBy string, errText string) error
 	RequeueClaimed(ctx context.Context, ids []int64, workerID string) error
-	CurrentTargetSourcePath(ctx context.Context, job *models.MetadataImageCacheJob) (string, error)
+	CurrentTargetSourcePath(ctx context.Context, job *models.MetadataImageCacheJob) (current string, found bool, err error)
 	EnqueueExistingProviderArtwork(ctx context.Context, limit int) (int, error)
 	DeleteSucceededBefore(ctx context.Context, before time.Time, limit int) (int, error)
 }
@@ -112,11 +112,11 @@ type LibraryRootResolver interface {
 }
 
 type SeasonArtworkUpdater interface {
-	UpdateArtworkIfSourceMatches(ctx context.Context, contentID, sourcePath, cachedPath, thumbhash string) (bool, error)
+	UpdateArtworkIfSourceMatches(ctx context.Context, seriesID string, seasonNumber int, sourcePath, cachedPath, thumbhash string) (bool, error)
 }
 
 type EpisodeStillUpdater interface {
-	UpdateStillIfSourceMatches(ctx context.Context, contentID, sourcePath, cachedPath, thumbhash string) (bool, error)
+	UpdateStillIfSourceMatches(ctx context.Context, seriesID string, seasonNumber, episodeNumber int, sourcePath, cachedPath, thumbhash string) (bool, error)
 }
 
 type ItemArtworkUpdater interface {
@@ -128,7 +128,7 @@ type ItemLocalizationArtworkUpdater interface {
 }
 
 type SeasonLocalizationArtworkUpdater interface {
-	UpdateArtworkIfSourceMatches(ctx context.Context, contentID, language, sourcePath, cachedPath, thumbhash string) (bool, error)
+	UpdateArtworkIfSourceMatches(ctx context.Context, seriesID string, seasonNumber int, language, sourcePath, cachedPath, thumbhash string) (bool, error)
 }
 
 type PersonPhotoUpdater interface {
@@ -315,7 +315,7 @@ func (p *ImageCacheProcessor) ArtworkCachingEnabled() bool {
 
 // CacheTargetArtwork processes only the artwork queued for a manually
 // refreshed item, and for a series also the artwork of its seasons, episodes,
-// and localizations, which are queued under their own content IDs. It waits a
+// and localizations, which use that series ID plus their natural numeric keys. It waits a
 // bounded while for jobs a background worker already holds so the interactive
 // refresh does not report success before the cached paths have been updated;
 // past that it returns ErrTargetArtworkPending and lets the queue finish.
@@ -735,10 +735,30 @@ func (p *ImageCacheProcessor) processOne(ctx context.Context, job *models.Metada
 	// Confirm the target still references this job's source before doing the
 	// download and immutable upload. The conditional update below remains the
 	// final concurrency guard; this early check avoids work for an obsolete job.
-	current, err := p.jobs.CurrentTargetSourcePath(ctx, job)
+	current, found, err := p.jobs.CurrentTargetSourcePath(ctx, job)
 	if err != nil {
 		p.markFailed(ctx, job, err.Error())
 		return imageCacheProcessResult{outcome: "failed"}
+	}
+	if !found {
+		if job.RepairRequested {
+			errText := fmt.Sprintf(
+				"repair target not found: type=%s target=%s language=%s season=%s episode=%s",
+				job.TargetType, job.TargetContentID, job.TargetLanguage,
+				optionalImageCacheNumber(job.SeasonNumber), optionalImageCacheNumber(job.EpisodeNumber),
+			)
+			p.logger.WarnContext(ctx, "metadata image cache: repair target lookup matched no row",
+				"target_type", job.TargetType,
+				"target_content_id", job.TargetContentID,
+				"target_language", job.TargetLanguage,
+				"season_number", optionalImageCacheNumber(job.SeasonNumber),
+				"episode_number", optionalImageCacheNumber(job.EpisodeNumber),
+			)
+			p.markFailed(ctx, job, errText)
+			return imageCacheProcessResult{outcome: "failed"}
+		}
+		p.markSucceeded(ctx, job)
+		return imageCacheProcessResult{outcome: "skipped"}
 	}
 	if current != job.SourcePath {
 		p.markSucceeded(ctx, job)
@@ -795,6 +815,13 @@ func (p *ImageCacheProcessor) processOne(ctx context.Context, job *models.Metada
 	return processResult
 }
 
+func optionalImageCacheNumber(value *int) string {
+	if value == nil {
+		return "-"
+	}
+	return strconv.Itoa(*value)
+}
+
 // finishJobWithTargetUpdate persists the cached path/thumbhash to the job's
 // target row and marks the job terminal, setting processResult.outcome.
 func (p *ImageCacheProcessor) finishJobWithTargetUpdate(ctx context.Context, job *models.MetadataImageCacheJob, cachedPath, thumbhash string, processResult *imageCacheProcessResult) {
@@ -840,17 +867,26 @@ func (p *ImageCacheProcessor) updateTargetArtwork(ctx context.Context, job *mode
 		if p.targets.Seasons == nil {
 			return false, errors.New("missing season updater")
 		}
-		return p.targets.Seasons.UpdateArtworkIfSourceMatches(ctx, job.TargetContentID, job.SourcePath, cachedPath, thumbhash)
+		if job.SeasonNumber == nil {
+			return false, errors.New("season artwork job has no season number")
+		}
+		return p.targets.Seasons.UpdateArtworkIfSourceMatches(ctx, job.TargetContentID, *job.SeasonNumber, job.SourcePath, cachedPath, thumbhash)
 	case ImageCacheTargetSeasonLocalization:
 		if p.targets.SeasonLocalizations == nil {
 			return false, errors.New("missing season localization updater")
 		}
-		return p.targets.SeasonLocalizations.UpdateArtworkIfSourceMatches(ctx, job.TargetContentID, job.TargetLanguage, job.SourcePath, cachedPath, thumbhash)
+		if job.SeasonNumber == nil {
+			return false, errors.New("season localization artwork job has no season number")
+		}
+		return p.targets.SeasonLocalizations.UpdateArtworkIfSourceMatches(ctx, job.TargetContentID, *job.SeasonNumber, job.TargetLanguage, job.SourcePath, cachedPath, thumbhash)
 	case ImageCacheTargetEpisode:
 		if p.targets.Episodes == nil {
 			return false, errors.New("missing episode updater")
 		}
-		return p.targets.Episodes.UpdateStillIfSourceMatches(ctx, job.TargetContentID, job.SourcePath, cachedPath, thumbhash)
+		if job.SeasonNumber == nil || job.EpisodeNumber == nil {
+			return false, errors.New("episode artwork job has no season or episode number")
+		}
+		return p.targets.Episodes.UpdateStillIfSourceMatches(ctx, job.TargetContentID, *job.SeasonNumber, *job.EpisodeNumber, job.SourcePath, cachedPath, thumbhash)
 	case ImageCacheTargetPerson:
 		if p.targets.People == nil {
 			return false, errors.New("missing person updater")

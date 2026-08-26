@@ -247,8 +247,9 @@ func (r *ImageCacheJobRepository) enqueueBatch(ctx context.Context, inputs []Enq
 
 func normalizeImageCacheJobInput(in EnqueueImageCacheJobInput) (EnqueueImageCacheJobInput, bool) {
 	in.SourcePath = strings.TrimSpace(in.SourcePath)
+	in.TargetContentID = strings.TrimSpace(in.TargetContentID)
 	in.TargetLanguage = strings.TrimSpace(in.TargetLanguage)
-	if !isCacheableImageSourcePath(in.SourcePath) {
+	if !isCacheableImageSourcePath(in.SourcePath) || !validImageCacheJobTarget(in) {
 		return EnqueueImageCacheJobInput{}, false
 	}
 	if in.ContentType == "" {
@@ -261,6 +262,28 @@ func normalizeImageCacheJobInput(in EnqueueImageCacheJobInput) (EnqueueImageCach
 		in.ProviderContentID = firstNonEmpty(in.SeriesID, in.TargetContentID)
 	}
 	return in, true
+}
+
+func validImageCacheJobTarget(in EnqueueImageCacheJobInput) bool {
+	if in.TargetContentID == "" {
+		return false
+	}
+	switch in.TargetType {
+	case ImageCacheTargetSeason:
+		return in.ImageType == ImageCacheImagePoster && in.TargetLanguage == "" && in.SeasonNumber != nil && in.EpisodeNumber == nil
+	case ImageCacheTargetSeasonLocalization:
+		return in.ImageType == ImageCacheImagePoster && in.TargetLanguage != "" && in.SeasonNumber != nil && in.EpisodeNumber == nil
+	case ImageCacheTargetEpisode:
+		return in.ImageType == ImageCacheImageStill && in.TargetLanguage == "" && in.SeasonNumber != nil && in.EpisodeNumber != nil
+	case ImageCacheTargetItem:
+		return in.TargetLanguage == "" && in.SeasonNumber == nil && in.EpisodeNumber == nil
+	case ImageCacheTargetItemLocalization:
+		return in.TargetLanguage != "" && in.SeasonNumber == nil && in.EpisodeNumber == nil
+	case ImageCacheTargetPerson:
+		return in.ImageType == ImageCacheImageProfile && in.TargetLanguage == "" && in.SeasonNumber == nil && in.EpisodeNumber == nil
+	default:
+		return false
+	}
 }
 
 func (r *ImageCacheJobRepository) enqueueBatchChunk(ctx context.Context, inputs []EnqueueImageCacheJobInput, requeueSucceeded bool) (int, error) {
@@ -291,7 +314,7 @@ func (r *ImageCacheJobRepository) enqueueBatchChunk(ctx context.Context, inputs 
 	requeueSucceededArg := len(args) + 1
 	args = append(args, requeueSucceeded)
 	fmt.Fprintf(&sql, `
-	ON CONFLICT (target_type, target_content_id, image_type, target_language) DO UPDATE SET
+	ON CONFLICT (target_type, target_content_id, image_type, target_language, season_number, episode_number) DO UPDATE SET
 		series_id = EXCLUDED.series_id,
 			source_path = EXCLUDED.source_path,
 			provider_id = EXCLUDED.provider_id,
@@ -408,11 +431,9 @@ func (r *ImageCacheJobRepository) enqueueBatchChunk(ctx context.Context, inputs 
 
 // imageCacheTargetScope matches every job an interactive refresh of one
 // content ID is responsible for: the target's own rows plus the rows of its
-// children. Season, episode, and localization jobs are enqueued under their
-// own content ID with series_id pointing at the series, so a series-level
-// refresh only reaches them through series_id. Item and item_localization
-// rows carry series_id = the item's own content ID, so a movie or a
-// season/episode target still matches on target_content_id alone. Person
+// children. Season, season-localization, and episode jobs use the owning
+// series content ID plus their natural numeric keys. Item and
+// item-localization rows carry series_id = the item's own content ID. Person
 // jobs have an empty series_id and stay out of scope.
 func imageCacheTargetScope(param string) string {
 	return "(target_content_id = " + param + " OR series_id = " + param + ")"
@@ -673,25 +694,24 @@ func (r *ImageCacheJobRepository) RequeueClaimed(ctx context.Context, ids []int6
 
 // CurrentTargetSourcePath reports the source path currently stored on the
 // job's target row so the processor can confirm it still owns the artwork
-// before uploading to the deterministic storage key. Returns ("", nil) when
-// the row no longer exists or the target type is unknown.
-func (r *ImageCacheJobRepository) CurrentTargetSourcePath(ctx context.Context, job *models.MetadataImageCacheJob) (string, error) {
+// before uploading to the deterministic storage key. found is false when the
+// row no longer exists or the target tuple is invalid.
+func (r *ImageCacheJobRepository) CurrentTargetSourcePath(ctx context.Context, job *models.MetadataImageCacheJob) (current string, found bool, err error) {
 	if r == nil || r.pool == nil || job == nil {
-		return "", nil
+		return "", false, nil
 	}
 	query, args, ok := currentTargetSourceQuery(job)
 	if !ok {
-		return "", nil
+		return "", false, nil
 	}
-	var current string
-	err := r.pool.QueryRow(ctx, query, args...).Scan(&current)
+	err = r.pool.QueryRow(ctx, query, args...).Scan(&current)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
+		return "", false, nil
 	}
 	if err != nil {
-		return "", fmt.Errorf("reading current target source path: %w", err)
+		return "", false, fmt.Errorf("reading current target source path: %w", err)
 	}
-	return current, nil
+	return current, true, nil
 }
 
 // CurrentTargetCachedPath reports the cached image path currently stored on
@@ -736,14 +756,26 @@ func currentTargetSourceQuery(job *models.MetadataImageCacheJob) (string, []any,
 		return fmt.Sprintf("SELECT %s FROM media_item_localizations WHERE content_id = $1 AND language = $2", col),
 			[]any{job.TargetContentID, job.TargetLanguage}, true
 	case ImageCacheTargetSeason:
-		return "SELECT poster_source_path FROM seasons WHERE content_id = $1",
-			[]any{job.TargetContentID}, true
+		if job.SeasonNumber == nil {
+			return "", nil, false
+		}
+		return "SELECT poster_source_path FROM seasons WHERE series_id = $1 AND season_number = $2",
+			[]any{job.TargetContentID, *job.SeasonNumber}, true
 	case ImageCacheTargetSeasonLocalization:
-		return "SELECT poster_source_path FROM season_localizations WHERE season_content_id = $1 AND language = $2",
-			[]any{job.TargetContentID, job.TargetLanguage}, true
+		if job.SeasonNumber == nil || job.TargetLanguage == "" {
+			return "", nil, false
+		}
+		return `SELECT loc.poster_source_path FROM season_localizations loc
+			JOIN seasons s ON s.content_id = loc.season_content_id
+			WHERE s.series_id = $1 AND s.season_number = $2 AND loc.language = $3`,
+			[]any{job.TargetContentID, *job.SeasonNumber, job.TargetLanguage}, true
 	case ImageCacheTargetEpisode:
-		return "SELECT still_source_path FROM episodes WHERE content_id = $1",
-			[]any{job.TargetContentID}, true
+		if job.SeasonNumber == nil || job.EpisodeNumber == nil {
+			return "", nil, false
+		}
+		return `SELECT still_source_path FROM episodes
+			WHERE series_id = $1 AND season_number = $2 AND episode_number = $3`,
+			[]any{job.TargetContentID, *job.SeasonNumber, *job.EpisodeNumber}, true
 	case ImageCacheTargetPerson:
 		return "SELECT photo_source_path FROM people WHERE id = $1::bigint",
 			[]any{job.TargetContentID}, true
@@ -917,7 +949,7 @@ func (r *ImageCacheJobRepository) EnqueueExistingProviderArtwork(ctx context.Con
 			SELECT
 				'poster'::text,
 				'season'::text,
-				s.content_id AS target_content_id,
+				s.series_id AS target_content_id,
 				''::text AS target_language,
 				s.series_id,
 				s.poster_source_path AS source_path,
@@ -936,7 +968,7 @@ func (r *ImageCacheJobRepository) EnqueueExistingProviderArtwork(ctx context.Con
 			SELECT
 				'poster'::text,
 				'season_localization'::text,
-				s.content_id,
+				s.series_id,
 				loc.language,
 				s.series_id,
 				loc.poster_source_path,
@@ -956,7 +988,7 @@ func (r *ImageCacheJobRepository) EnqueueExistingProviderArtwork(ctx context.Con
 			SELECT
 				'still'::text,
 				'episode'::text,
-				e.content_id,
+				e.series_id,
 				''::text,
 				e.series_id,
 				e.still_source_path,
@@ -998,6 +1030,8 @@ func (r *ImageCacheJobRepository) EnqueueExistingProviderArtwork(ctx context.Con
 			 AND j.target_content_id = ac.target_content_id
 			 AND j.image_type = ac.image_type
 			 AND j.target_language = ac.target_language
+			 AND j.season_number IS NOT DISTINCT FROM ac.season_number
+			 AND j.episode_number IS NOT DISTINCT FROM ac.episode_number
 			WHERE j.id IS NULL
 			   OR j.source_path IS DISTINCT FROM ac.source_path
 			   OR j.status = 'succeeded'

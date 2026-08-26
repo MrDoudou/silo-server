@@ -2,9 +2,12 @@ package metadata
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Silo-Server/silo-server/internal/models"
 )
 
 func TestImageCacheRetryDelayCaps(t *testing.T) {
@@ -163,5 +166,74 @@ func TestExpandedImageCacheMigrationDefinesTargetMatrixAndLanguageUniqueKey(t *t
 		if !strings.Contains(sql, want) {
 			t.Fatalf("migration missing %q", want)
 		}
+	}
+}
+
+func TestNaturalArtworkRepairTargetMigrationKeysSeriesChildrenByNumbers(t *testing.T) {
+	body, err := os.ReadFile("../../migrations/sql/20260826045932_natural_artwork_repair_targets.sql")
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	sql := string(body)
+	for _, want := range []string{
+		"SET target_content_id = series_id",
+		"UNIQUE NULLS NOT DISTINCT",
+		"target_language,\n            season_number,\n            episode_number",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("natural-target migration missing %q", want)
+		}
+	}
+}
+
+func TestCurrentTargetSourceQueriesUseSeriesNaturalKeys(t *testing.T) {
+	season, episode := 2, 7
+	tests := []struct {
+		name     string
+		job      *models.MetadataImageCacheJob
+		wantSQL  []string
+		wantArgs []any
+	}{
+		{
+			name: "season",
+			job: &models.MetadataImageCacheJob{
+				TargetType: ImageCacheTargetSeason, TargetContentID: "series-1", SeasonNumber: &season,
+			},
+			wantSQL:  []string{"FROM seasons", "series_id = $1", "season_number = $2"},
+			wantArgs: []any{"series-1", 2},
+		},
+		{
+			name: "season localization",
+			job: &models.MetadataImageCacheJob{
+				TargetType: ImageCacheTargetSeasonLocalization, TargetContentID: "series-1", TargetLanguage: "fr", SeasonNumber: &season,
+			},
+			wantSQL:  []string{"FROM season_localizations", "JOIN seasons", "s.series_id = $1", "s.season_number = $2", "loc.language = $3"},
+			wantArgs: []any{"series-1", 2, "fr"},
+		},
+		{
+			name: "episode",
+			job: &models.MetadataImageCacheJob{
+				TargetType: ImageCacheTargetEpisode, TargetContentID: "series-1", SeasonNumber: &season, EpisodeNumber: &episode,
+			},
+			wantSQL:  []string{"FROM episodes", "series_id = $1", "season_number = $2", "episode_number = $3"},
+			wantArgs: []any{"series-1", 2, 7},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, args, ok := currentTargetSourceQuery(tt.job)
+			if !ok {
+				t.Fatal("currentTargetSourceQuery rejected a valid natural target")
+			}
+			for _, want := range tt.wantSQL {
+				if !strings.Contains(query, want) {
+					t.Fatalf("query missing %q:\n%s", want, query)
+				}
+			}
+			if !reflect.DeepEqual(args, tt.wantArgs) {
+				t.Fatalf("args = %#v, want %#v", args, tt.wantArgs)
+			}
+		})
 	}
 }

@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
+	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/models"
 )
 
@@ -54,9 +56,12 @@ func TestCurrentTargetCachedPathItem(t *testing.T) {
 	if want := "local/movies/" + contentID + "/deadbeef/poster/original.webp"; cached != want {
 		t.Fatalf("cached = %q, want %q", cached, want)
 	}
-	source, err := repo.CurrentTargetSourcePath(ctx, job)
+	source, found, err := repo.CurrentTargetSourcePath(ctx, job)
 	if err != nil {
 		t.Fatalf("CurrentTargetSourcePath: %v", err)
+	}
+	if !found {
+		t.Fatal("CurrentTargetSourcePath did not find the seeded item")
 	}
 	if source != "file:///media/movies/Film/poster.jpg" {
 		t.Fatalf("source = %q", source)
@@ -104,6 +109,83 @@ func TestEnqueueBatchAcceptsLocalSourceDB(t *testing.T) {
 	}
 	if providerID != "local" {
 		t.Fatalf("provider_id = %q, want local", providerID)
+	}
+}
+
+func TestBulkRecoverySeasonJobUsesNaturalTargetAndPublishes(t *testing.T) {
+	pool := localArtworkTestPool(t)
+	ctx := context.Background()
+	suffix := time.Now().UnixNano()
+	seriesID := fmt.Sprintf("series-repair-season-%d", suffix)
+	seasonID := fmt.Sprintf("season-repair-season-%d-0", suffix)
+	sourcePath := fmt.Sprintf("tvdb://series/%d/seasons/0/poster.jpg", suffix)
+	selectedPath := fmt.Sprintf("tvdb/series/%d/seasons/0/poster/original.webp", suffix)
+	publishedPath := fmt.Sprintf("tvdb/series/%d/seasons/0/poster/repaired.webp", suffix)
+	workerID := fmt.Sprintf("season-repair-worker-%d", suffix)
+
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM metadata_image_cache_jobs WHERE series_id = $1`, seriesID)
+		_, _ = pool.Exec(ctx, `DELETE FROM artwork_revision_gc_candidates WHERE original_path = $1`, selectedPath)
+		_, _ = pool.Exec(ctx, `DELETE FROM media_items WHERE content_id = $1`, seriesID)
+		_, _ = pool.Exec(ctx, `UPDATE artwork_storage_accounting_state
+			SET rebuild_surface_name = '', rebuild_enqueued_at = NULL WHERE singleton`)
+	})
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO media_items (content_id, type, title, status, genres)
+		VALUES ($1, 'series', 'Repair Season', 'matched', '{}'::text[]);
+		INSERT INTO seasons (
+			content_id, series_id, season_number, title, poster_path, poster_source_path
+		) VALUES ($2, $1, 0, 'Specials', $3, $4);
+		UPDATE artwork_storage_accounting_state
+		SET rebuild_surface_name = '', rebuild_enqueued_at = NULL WHERE singleton
+	`, seriesID, seasonID, selectedPath, sourcePath); err != nil {
+		t.Fatalf("seed season recovery target: %v", err)
+	}
+
+	coordinator := NewArtworkDeliveryCoordinator(pool, nil)
+	if _, err := coordinator.EnqueueBulkRecovery(ctx); err != nil {
+		t.Fatalf("enqueue bulk recovery: %v", err)
+	}
+	repo := NewImageCacheJobRepository(pool)
+	jobs, err := repo.claimDueForTarget(ctx, workerID, seriesID, 10)
+	if err != nil {
+		t.Fatalf("claim season repair: %v", err)
+	}
+	var job *models.MetadataImageCacheJob
+	for _, candidate := range jobs {
+		if candidate.TargetType == ImageCacheTargetSeason && candidate.SeasonNumber != nil && *candidate.SeasonNumber == 0 {
+			job = candidate
+			break
+		}
+	}
+	if job == nil {
+		t.Fatalf("claimed jobs = %#v, want season 0 repair", jobs)
+	}
+	if job.TargetContentID != seriesID || job.SeriesID != seriesID || !job.RepairRequested {
+		t.Fatalf("season repair tuple = target=%q series=%q repair=%v, want %q/%q/true",
+			job.TargetContentID, job.SeriesID, job.RepairRequested, seriesID, seriesID)
+	}
+	current, found, err := repo.CurrentTargetSourcePath(ctx, job)
+	if err != nil || !found || current != sourcePath {
+		t.Fatalf("round-trip target lookup = source=%q found=%v err=%v", current, found, err)
+	}
+
+	cacher := &fakeImageCacher{result: &CacheImageResult{BasePath: strings.TrimSuffix(publishedPath, "/repaired.webp"), Ext: ".webp"}}
+	processor := NewImageCacheProcessorWithTargets(repo, cacher, &fakeImageResolver{url: "https://artworks.thetvdb.com/season.jpg"}, ImageCacheProcessorTargets{
+		Seasons: catalog.NewSeasonRepository(pool),
+	})
+	result := processor.processOne(ctx, job)
+	if result.outcome != "succeeded" {
+		t.Fatalf("process season repair outcome = %q", result.outcome)
+	}
+
+	var storedPath string
+	if err := pool.QueryRow(ctx, `SELECT poster_path FROM seasons WHERE series_id = $1 AND season_number = 0`, seriesID).Scan(&storedPath); err != nil {
+		t.Fatalf("read published season: %v", err)
+	}
+	wantPath := strings.TrimSuffix(publishedPath, "/repaired.webp") + "/original.webp"
+	if storedPath != wantPath {
+		t.Fatalf("published season path = %q, want %q", storedPath, wantPath)
 	}
 }
 

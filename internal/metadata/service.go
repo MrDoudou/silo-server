@@ -4438,7 +4438,7 @@ func (s *MetadataService) persistSeasonsAndEpisodes(
 		seasonNumber := season.SeasonNumber
 		imageJobs = append(imageJobs, EnqueueImageCacheJobInput{
 			TargetType:        ImageCacheTargetSeason,
-			TargetContentID:   season.ContentID,
+			TargetContentID:   seriesID,
 			SeriesID:          seriesID,
 			SourcePath:        season.PosterSourcePath,
 			ProviderID:        providerID,
@@ -4457,7 +4457,7 @@ func (s *MetadataService) persistSeasonsAndEpisodes(
 		episodeNumber := episode.EpisodeNumber
 		imageJobs = append(imageJobs, EnqueueImageCacheJobInput{
 			TargetType:        ImageCacheTargetEpisode,
-			TargetContentID:   episode.ContentID,
+			TargetContentID:   seriesID,
 			SeriesID:          seriesID,
 			SourcePath:        episode.StillSourcePath,
 			ProviderID:        providerID,
@@ -4476,7 +4476,7 @@ func (s *MetadataService) persistSeasonsAndEpisodes(
 		seasonNumber := season.SeasonNumber
 		imageJobs = append(imageJobs, EnqueueImageCacheJobInput{
 			TargetType:        ImageCacheTargetSeasonLocalization,
-			TargetContentID:   season.ContentID,
+			TargetContentID:   seriesID,
 			TargetLanguage:    loc.Language,
 			SeriesID:          seriesID,
 			SourcePath:        loc.PosterSourcePath,

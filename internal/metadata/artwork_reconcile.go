@@ -278,6 +278,48 @@ type artworkSweepSurface struct {
 	// Used for small tables holding admin/user uploads, where a blind reset
 	// would discard the last pointer to an object that survived migration.
 	alwaysVerify bool
+	// repairTarget describes the durable metadata_image_cache_jobs identity
+	// selected from this surface. Series children deliberately use the owning
+	// series ID plus their natural numeric keys; generated season/episode
+	// content IDs are not part of the queue contract.
+	repairTarget artworkRepairTargetSpec
+}
+
+type artworkRepairTargetSpec struct {
+	targetType   string
+	targetExpr   string
+	languageExpr string
+	seasonExpr   string
+	episodeExpr  string
+}
+
+const (
+	repairEmptyTextSQL   = "''::text"
+	repairNullIntegerSQL = "NULL::integer"
+)
+
+func (s artworkSweepSurface) repairIdentitySelectExpressions() []string {
+	if s.repairTarget.targetType == "" {
+		return []string{repairEmptyTextSQL, repairEmptyTextSQL, repairNullIntegerSQL, repairNullIntegerSQL}
+	}
+	language := s.repairTarget.languageExpr
+	if language == "" {
+		language = repairEmptyTextSQL
+	}
+	season := s.repairTarget.seasonExpr
+	if season == "" {
+		season = repairNullIntegerSQL
+	}
+	episode := s.repairTarget.episodeExpr
+	if episode == "" {
+		episode = repairNullIntegerSQL
+	}
+	return []string{
+		fmt.Sprintf("COALESCE((%s)::text, '')", s.repairTarget.targetExpr),
+		fmt.Sprintf("COALESCE((%s)::text, '')", language),
+		season,
+		episode,
+	}
 }
 
 func artworkSweepSurfaceByName(name string) (artworkSweepSurface, bool) {
@@ -387,6 +429,11 @@ func artworkSweepSurfaces() []artworkSweepSurface {
 		logoSourcePathColumn        = "logo_source_path"
 		logoPathColumn              = "logo_path"
 		posterURLColumn             = "poster_url"
+		contentIDColumn             = "content_id"
+		languageColumn              = "language"
+		seriesIDColumn              = "series_id"
+		seasonNumberColumn          = "season_number"
+		episodeNumberColumn         = "episode_number"
 	)
 	itemClear := func(pathCol string) string {
 		return fmt.Sprintf(`%s = '', last_refreshed = NULL, updated_at = NOW()`, pathCol)
@@ -395,16 +442,16 @@ func artworkSweepSurfaces() []artworkSweepSurface {
 		return fmt.Sprintf(`%s = '', updated_at = NOW()`, pathCol)
 	}
 	return []artworkSweepSurface{
-		{name: artworkSurfaceItemPosters, table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: posterPathColumn, imageType: ImageCacheImagePoster, sourceCol: posterSourcePathColumn, thumbhashCol: posterThumbhashColumn, clearSet: itemClear(posterPathColumn)},
-		{name: artworkSurfaceItemBackdrops, table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: backdropPathColumn, imageType: ImageCacheImageBackdrop, sourceCol: backdropSourcePathColumn, thumbhashCol: backdropThumbhashColumn, clearSet: itemClear(backdropPathColumn)},
-		{name: artworkSurfaceItemLogos, table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: logoPathColumn, imageType: ImageCacheImageLogo, sourceCol: logoSourcePathColumn, clearSet: itemClear(logoPathColumn)},
-		{name: artworkSurfaceLocalizedItemPosters, table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey("content_id"), textSweepKey("language")}, pathCol: posterPathColumn, imageType: ImageCacheImagePoster, sourceCol: posterSourcePathColumn, thumbhashCol: posterThumbhashColumn, clearSet: plainClear(posterPathColumn)},
-		{name: artworkSurfaceLocalizedItemBackdrops, table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey("content_id"), textSweepKey("language")}, pathCol: backdropPathColumn, imageType: ImageCacheImageBackdrop, sourceCol: backdropSourcePathColumn, thumbhashCol: backdropThumbhashColumn, clearSet: plainClear(backdropPathColumn)},
-		{name: artworkSurfaceLocalizedItemLogos, table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey("content_id"), textSweepKey("language")}, pathCol: logoPathColumn, imageType: ImageCacheImageLogo, sourceCol: logoSourcePathColumn, clearSet: plainClear(logoPathColumn)},
-		{name: artworkSurfaceSeasonPosters, table: seasonsTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: posterPathColumn, imageType: ImageCacheImagePoster, sourceCol: posterSourcePathColumn, thumbhashCol: posterThumbhashColumn, clearSet: plainClear(posterPathColumn)},
-		{name: artworkSurfaceLocalizedSeasonPosters, table: "season_localizations", keyCols: []artworkSweepKey{textSweepKey("season_content_id"), textSweepKey("language")}, pathCol: posterPathColumn, imageType: ImageCacheImagePoster, sourceCol: posterSourcePathColumn, thumbhashCol: posterThumbhashColumn, clearSet: plainClear(posterPathColumn)},
-		{name: artworkSurfaceEpisodeStills, table: episodesTable, keyCols: []artworkSweepKey{textSweepKey("content_id")}, pathCol: "still_path", imageType: ImageCacheImageStill, sourceCol: "still_source_path", thumbhashCol: "still_thumbhash", clearSet: plainClear("still_path")},
-		{name: artworkSurfacePersonPhotos, table: peopleTable, keyCols: []artworkSweepKey{int64SweepKey("id")}, pathCol: "photo_path", imageType: ImageCacheImageProfile, sourceCol: "photo_source_path", thumbhashCol: "photo_thumbhash", clearSet: plainClear("photo_path")},
+		{name: artworkSurfaceItemPosters, table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey(contentIDColumn)}, pathCol: posterPathColumn, imageType: ImageCacheImagePoster, sourceCol: posterSourcePathColumn, thumbhashCol: posterThumbhashColumn, clearSet: itemClear(posterPathColumn), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetItem, targetExpr: contentIDColumn}},
+		{name: artworkSurfaceItemBackdrops, table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey(contentIDColumn)}, pathCol: backdropPathColumn, imageType: ImageCacheImageBackdrop, sourceCol: backdropSourcePathColumn, thumbhashCol: backdropThumbhashColumn, clearSet: itemClear(backdropPathColumn), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetItem, targetExpr: contentIDColumn}},
+		{name: artworkSurfaceItemLogos, table: mediaItemsTable, keyCols: []artworkSweepKey{textSweepKey(contentIDColumn)}, pathCol: logoPathColumn, imageType: ImageCacheImageLogo, sourceCol: logoSourcePathColumn, clearSet: itemClear(logoPathColumn), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetItem, targetExpr: contentIDColumn}},
+		{name: artworkSurfaceLocalizedItemPosters, table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey(contentIDColumn), textSweepKey(languageColumn)}, pathCol: posterPathColumn, imageType: ImageCacheImagePoster, sourceCol: posterSourcePathColumn, thumbhashCol: posterThumbhashColumn, clearSet: plainClear(posterPathColumn), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetItemLocalization, targetExpr: contentIDColumn, languageExpr: languageColumn}},
+		{name: artworkSurfaceLocalizedItemBackdrops, table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey(contentIDColumn), textSweepKey(languageColumn)}, pathCol: backdropPathColumn, imageType: ImageCacheImageBackdrop, sourceCol: backdropSourcePathColumn, thumbhashCol: backdropThumbhashColumn, clearSet: plainClear(backdropPathColumn), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetItemLocalization, targetExpr: contentIDColumn, languageExpr: languageColumn}},
+		{name: artworkSurfaceLocalizedItemLogos, table: mediaItemLocalizationsTable, keyCols: []artworkSweepKey{textSweepKey(contentIDColumn), textSweepKey(languageColumn)}, pathCol: logoPathColumn, imageType: ImageCacheImageLogo, sourceCol: logoSourcePathColumn, clearSet: plainClear(logoPathColumn), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetItemLocalization, targetExpr: contentIDColumn, languageExpr: languageColumn}},
+		{name: artworkSurfaceSeasonPosters, table: seasonsTable, keyCols: []artworkSweepKey{textSweepKey(contentIDColumn)}, pathCol: posterPathColumn, imageType: ImageCacheImagePoster, sourceCol: posterSourcePathColumn, thumbhashCol: posterThumbhashColumn, clearSet: plainClear(posterPathColumn), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetSeason, targetExpr: seriesIDColumn, seasonExpr: seasonNumberColumn}},
+		{name: artworkSurfaceLocalizedSeasonPosters, table: "season_localizations", keyCols: []artworkSweepKey{textSweepKey("season_content_id"), textSweepKey(languageColumn)}, pathCol: posterPathColumn, imageType: ImageCacheImagePoster, sourceCol: posterSourcePathColumn, thumbhashCol: posterThumbhashColumn, clearSet: plainClear(posterPathColumn), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetSeasonLocalization, targetExpr: "(SELECT series_id FROM seasons WHERE content_id = season_content_id)", languageExpr: languageColumn, seasonExpr: "(SELECT season_number FROM seasons WHERE content_id = season_content_id)"}},
+		{name: artworkSurfaceEpisodeStills, table: episodesTable, keyCols: []artworkSweepKey{textSweepKey(contentIDColumn)}, pathCol: "still_path", imageType: ImageCacheImageStill, sourceCol: "still_source_path", thumbhashCol: "still_thumbhash", clearSet: plainClear("still_path"), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetEpisode, targetExpr: seriesIDColumn, seasonExpr: seasonNumberColumn, episodeExpr: episodeNumberColumn}},
+		{name: artworkSurfacePersonPhotos, table: peopleTable, keyCols: []artworkSweepKey{int64SweepKey("id")}, pathCol: "photo_path", imageType: ImageCacheImageProfile, sourceCol: "photo_source_path", thumbhashCol: "photo_thumbhash", clearSet: plainClear("photo_path"), repairTarget: artworkRepairTargetSpec{targetType: ImageCacheTargetPerson, targetExpr: "id::text"}},
 
 		// Admin/user uploads: no re-downloadable source. Clearing falls back
 		// to the generated collage (admin collections), the generated poster
