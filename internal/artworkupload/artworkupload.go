@@ -43,11 +43,11 @@ type RevisionTracker interface {
 	RecordArtworkRevision(ctx context.Context, originalPath, sourceClass string, objects []artworkstore.ObjectInfo) error
 }
 
-// UntrackedSeedRetainer disarms an imported seed when a user-store surface
-// that PostgreSQL cannot inspect publishes it. The row remains inventory, but
-// GC must never infer that the invisible reference is absent.
-type UntrackedSeedRetainer interface {
-	RetainUntrackedArtworkSeed(ctx context.Context, originalPath string) error
+// UntrackedRevisionRetainer disarms an existing candidate when a user-store
+// surface that PostgreSQL cannot inspect publishes it. The row remains
+// inventory, but GC must never infer that the invisible reference is absent.
+type UntrackedRevisionRetainer interface {
+	RetainUntrackedArtworkRevision(ctx context.Context, originalPath string) error
 }
 
 var (
@@ -182,6 +182,11 @@ func (m *Materializer) Materialize(ctx context.Context, req Request) (*Result, e
 	if err != nil {
 		return nil, err
 	}
+	if !req.Track {
+		if err := m.retainUntracked(ctx, revision.OriginalKey); err != nil {
+			return nil, err
+		}
+	}
 
 	thumbhash, err := imageutil.Thumbhash(req.Data)
 	if err != nil {
@@ -256,12 +261,8 @@ func (m *Materializer) tryAdopt(ctx context.Context, req Request, fingerprint st
 			return nil, false, fmt.Errorf("artworkupload: record adopted revision: %w", err)
 		}
 	} else if !req.Track && m.tracker != nil {
-		retainer, ok := m.tracker.(UntrackedSeedRetainer)
-		if !ok {
-			return nil, false, fmt.Errorf("artworkupload: revision tracker cannot retain untracked adopted seeds")
-		}
-		if err := retainer.RetainUntrackedArtworkSeed(ctx, adopted.OriginalKey); err != nil {
-			return nil, false, fmt.Errorf("artworkupload: retain untracked adopted seed: %w", err)
+		if err := m.retainUntracked(ctx, adopted.OriginalKey); err != nil {
+			return nil, false, err
 		}
 	}
 	thumbhash, thumbhashErr := imageutil.Thumbhash(adopted.OriginalData)
@@ -286,6 +287,20 @@ func (m *Materializer) tryAdopt(ctx context.Context, req Request, fingerprint st
 		VariantKeys: variantKeys, Ext: ext, MediaType: adopted.Manifest.MediaType,
 		Thumbhash: thumbhash, ExistingObjects: len(adopted.Objects),
 	}, true, nil
+}
+
+func (m *Materializer) retainUntracked(ctx context.Context, originalPath string) error {
+	if m == nil || m.tracker == nil {
+		return nil
+	}
+	retainer, ok := m.tracker.(UntrackedRevisionRetainer)
+	if !ok {
+		return fmt.Errorf("artworkupload: revision tracker cannot retain untracked revisions")
+	}
+	if err := retainer.RetainUntrackedArtworkRevision(ctx, originalPath); err != nil {
+		return fmt.Errorf("artworkupload: retain untracked revision: %w", err)
+	}
+	return nil
 }
 
 // buildRevision addresses the produced variant set: the revision digest, every

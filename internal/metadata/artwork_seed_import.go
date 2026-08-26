@@ -204,7 +204,7 @@ func (s *ArtworkStorageService) registerImportedRevision(ctx context.Context, or
 	}
 	expires := time.Now().UTC().Add(grace)
 	_, err := s.pool.Exec(ctx, artworkSeedImportUpsertSQL,
-		originalPath, imageType, keys, sizes, contentTypes, total, live, s.generation, expires, retainUnverifiable)
+		originalPath, imageType, keys, sizes, contentTypes, total, live, s.storeGeneration(), expires, retainUnverifiable)
 	return err
 }
 
@@ -222,10 +222,16 @@ const artworkSeedImportUpsertSQL = `
 			total_physical_bytes = EXCLUDED.total_physical_bytes, store_generation = EXCLUDED.store_generation,
 			inventory_complete = TRUE, last_verified_at = NOW(),
 			source_class = CASE
+				WHEN artwork_revision_gc_candidates.seed_imported_at IS NOT NULL
+					AND artwork_revision_gc_candidates.seed_expires_at IS NULL THEN 'seed'
 				WHEN $7 AND artwork_revision_gc_candidates.source_class = 'seed' THEN 'unknown'
 				WHEN artwork_revision_gc_candidates.source_class = 'seed' THEN 'seed'
 				ELSE artwork_revision_gc_candidates.source_class END,
-			seed_imported_at = CASE WHEN $7 THEN NULL ELSE COALESCE(artwork_revision_gc_candidates.seed_imported_at, NOW()) END,
+			seed_imported_at = CASE
+				WHEN artwork_revision_gc_candidates.seed_imported_at IS NOT NULL
+					AND artwork_revision_gc_candidates.seed_expires_at IS NULL
+					THEN artwork_revision_gc_candidates.seed_imported_at
+				WHEN $7 THEN NULL ELSE COALESCE(artwork_revision_gc_candidates.seed_imported_at, NOW()) END,
 			seed_expires_at = CASE WHEN $7 OR $10 THEN NULL ELSE COALESCE(artwork_revision_gc_candidates.seed_expires_at, $9) END,
 			deleted_at = NULL, deletion_started_at = NULL, tombstoned_at = NULL,
 			not_before = CASE WHEN $7 OR $10 THEN GREATEST(artwork_revision_gc_candidates.not_before, NOW()) ELSE COALESCE(artwork_revision_gc_candidates.seed_expires_at, $9) END,

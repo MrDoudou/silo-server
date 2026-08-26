@@ -22,6 +22,18 @@ type scriptedInventoryStore struct {
 	calls int
 }
 
+func TestArtworkStorageServiceReadsStoreGenerationLive(t *testing.T) {
+	generation := "generation-1"
+	service := &ArtworkStorageService{backend: "local", generation: func() string { return generation }}
+	if got := service.storeGeneration(); got != "local:generation-1" {
+		t.Fatalf("store generation = %q, want local:generation-1", got)
+	}
+	generation = "generation-2"
+	if got := service.storeGeneration(); got != "local:generation-2" {
+		t.Fatalf("rotated store generation = %q, want local:generation-2", got)
+	}
+}
+
 func (*scriptedInventoryStore) Open(context.Context, string) (*artworkstore.Object, error) {
 	return nil, artworkstore.ErrNotFound
 }

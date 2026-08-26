@@ -459,13 +459,15 @@ func (h *Handle) check(ctx context.Context) error {
 	}
 	if h.local != nil {
 		if _, err := os.Stat(h.local.Root()); err != nil {
+			_ = h.local.ReopenRoot()
 			if h.localShared {
-				h.local.resetRoot()
 				return ErrWrongMount
 			}
-			h.local.resetRoot()
 		}
 		if h.localShared {
+			if err := h.local.ReopenRoot(); err != nil {
+				return fmt.Errorf("artworkstore: refresh shared store root: %w", err)
+			}
 			if err := h.local.HasFormatMarker(ctx); err != nil {
 				return ErrWrongMount
 			}

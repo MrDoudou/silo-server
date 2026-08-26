@@ -518,6 +518,37 @@ func TestRunningSharedStoreRefusesToPopulateDroppedMount(t *testing.T) {
 	}
 }
 
+func TestRunningSharedStoreReopensRootAfterPathReplacement(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "shared-artwork")
+	settings := newFakeSettings()
+	owned := openLocal(t, root, settings)
+	if err := owned.Store.WriteImmutable(t.Context(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := owned.Close(); err != nil {
+		t.Fatal(err)
+	}
+	shared, err := Open(t.Context(), Options{Backend: BackendLocal, LocalPath: root, LocalShared: true, Settings: settings})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = shared.Close() })
+
+	detached := filepath.Join(parent, "detached-artwork")
+	if err := os.Rename(root, detached); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	shared.expireCheckCacheForTest()
+	if err := shared.Check(t.Context()); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("Check after root replacement = %v, want ErrWrongMount", err)
+	}
+}
+
 // Reopening the same store must succeed and must not re-pin.
 func TestReopeningAPinnedStoreSucceeds(t *testing.T) {
 	settings := newFakeSettings()

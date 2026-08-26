@@ -34,12 +34,12 @@ type ArtworkStorageService struct {
 	pool                 *pgxpool.Pool
 	store                ArtworkInventoryStore
 	backend              string
-	generation           string
+	generation           func() string
 	limiter              *rate.Limiter
 	untrackedUserArtwork bool
 }
 
-func NewArtworkStorageService(pool *pgxpool.Pool, store ArtworkInventoryStore, backend, generation string, untrackedUserArtwork ...bool) *ArtworkStorageService {
+func NewArtworkStorageService(pool *pgxpool.Pool, store ArtworkInventoryStore, backend string, generation func() string, untrackedUserArtwork ...bool) *ArtworkStorageService {
 	if pool == nil || store == nil {
 		return nil
 	}
@@ -47,7 +47,7 @@ func NewArtworkStorageService(pool *pgxpool.Pool, store ArtworkInventoryStore, b
 		pool:       pool,
 		store:      store,
 		backend:    strings.TrimSpace(backend),
-		generation: strings.TrimSpace(backend) + ":" + strings.TrimSpace(generation),
+		generation: generation,
 	}
 	if len(untrackedUserArtwork) > 0 {
 		service.untrackedUserArtwork = untrackedUserArtwork[0]
@@ -59,6 +59,13 @@ func NewArtworkStorageService(pool *pgxpool.Pool, store ArtworkInventoryStore, b
 		service.limiter = rate.NewLimiter(rate.Limit(20), 5)
 	}
 	return service
+}
+
+func (s *ArtworkStorageService) storeGeneration() string {
+	if s == nil || s.generation == nil {
+		return strings.TrimSpace(s.backend) + ":"
+	}
+	return strings.TrimSpace(s.backend) + ":" + strings.TrimSpace(s.generation())
 }
 
 type ArtworkInventoryCheckpoint struct {
@@ -186,7 +193,7 @@ func (s *ArtworkStorageService) adoptReferencedSeeds(ctx context.Context) error 
 	_, err := s.pool.Exec(ctx, `UPDATE artwork_revision_gc_candidates seed
 		SET source_class = 'unknown', seed_imported_at = NULL, seed_expires_at = NULL,
 			next_attempt_at = NULL, locked_at = NULL, locked_by = '', updated_at = NOW()
-		WHERE seed.source_class = 'seed' AND seed.tombstoned_at IS NULL
+		WHERE seed.source_class = 'seed' AND seed.seed_expires_at IS NOT NULL AND seed.tombstoned_at IS NULL
 			AND EXISTS (SELECT 1 FROM (`+artworkInventoryReferenceSQL()+`) refs WHERE refs.path = seed.original_path)`)
 	if err != nil {
 		return fmt.Errorf("artwork inventory: adopt referenced seed: %w", err)
@@ -220,12 +227,12 @@ func (s *ArtworkStorageService) refreshResult(ctx context.Context, cp ArtworkInv
 	query := `SELECT count(*) FROM (` + artworkInventoryReferenceSQL() + `) refs
 		LEFT JOIN artwork_revision_gc_candidates inventory ON inventory.original_path = refs.path
 		WHERE inventory.id IS NULL OR NOT inventory.inventory_complete OR inventory.store_generation <> $1`
-	if err := s.pool.QueryRow(ctx, query, s.generation).Scan(&liveMissing); err != nil {
+	if err := s.pool.QueryRow(ctx, query, s.storeGeneration()).Scan(&liveMissing); err != nil {
 		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: count incomplete references: %w", err)
 	}
 	if err := s.pool.QueryRow(ctx, `
 		SELECT count(*) FROM artwork_revision_gc_candidates
-		WHERE tombstoned_at IS NULL AND (NOT inventory_complete OR store_generation <> $1)`, s.generation).Scan(&lifecycleMissing); err != nil {
+		WHERE tombstoned_at IS NULL AND (NOT inventory_complete OR store_generation <> $1)`, s.storeGeneration()).Scan(&lifecycleMissing); err != nil {
 		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: count incomplete lifecycle rows: %w", err)
 	}
 	return ArtworkInventoryRefreshResult{
@@ -420,7 +427,7 @@ func (s *ArtworkStorageService) upsertInventory(ctx context.Context, reference a
 		imageType = reference.imageType
 	}
 	_, err := s.pool.Exec(ctx, artworkInventoryUpsertSQL, reference.path, imageType, keys, sizes, contentTypes, total,
-		artworkSourceClassFromReference(reference.sourcePath), s.generation, complete)
+		artworkSourceClassFromReference(reference.sourcePath), s.storeGeneration(), complete)
 	if err != nil {
 		return fmt.Errorf("artwork inventory: persist %s: %w", reference.path, err)
 	}
@@ -440,6 +447,8 @@ const artworkInventoryUpsertSQL = `
 		object_content_types = EXCLUDED.object_content_types,
 		total_physical_bytes = EXCLUDED.total_physical_bytes,
 		source_class = CASE
+			WHEN artwork_revision_gc_candidates.seed_imported_at IS NOT NULL
+				AND artwork_revision_gc_candidates.seed_expires_at IS NULL THEN 'seed'
 			WHEN EXCLUDED.source_class = 'unknown' THEN artwork_revision_gc_candidates.source_class
 			ELSE EXCLUDED.source_class
 		END,
@@ -627,7 +636,7 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 		SELECT EXISTS (
 			SELECT 1 FROM artwork_revision_gc_candidates
 			WHERE tombstoned_at IS NULL AND (NOT inventory_complete OR store_generation <> $1)
-		)`, s.generation).Scan(&lifecycleIncomplete); err != nil {
+		)`, s.storeGeneration()).Scan(&lifecycleIncomplete); err != nil {
 		return result, fmt.Errorf("artwork accounting: check inventory completeness: %w", err)
 	}
 	if lifecycleIncomplete {

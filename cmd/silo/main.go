@@ -1404,7 +1404,9 @@ func main() {
 		uploads := artworkupload.NewMaterializer(deps.ArtworkStore.Store)
 		if deps.DB != nil {
 			uploads.SetRevisionTracker(catalog.NewArtworkRevisionTracker(
-				deps.DB, deps.ArtworkStore.Backend+":"+deps.ArtworkStore.GenerationID(),
+				deps.DB, func() string {
+					return deps.ArtworkStore.Backend + ":" + deps.ArtworkStore.GenerationID()
+				},
 			))
 		}
 		deps.ArtworkUploads = uploads
@@ -1854,7 +1856,9 @@ func main() {
 		if deps.ArtworkStore != nil {
 			imageCacher := imagecache.New(deps.ArtworkStore.Store)
 			imageCacher.SetArtworkRevisionTracker(catalog.NewArtworkRevisionTracker(
-				deps.DB, deps.ArtworkStore.Backend+":"+deps.ArtworkStore.GenerationID(),
+				deps.DB, func() string {
+					return deps.ArtworkStore.Backend + ":" + deps.ArtworkStore.GenerationID()
+				},
 			))
 			metadataService.SetImageCacher(imageCacher)
 			imageCacheJobs := metadata.NewImageCacheJobRepository(deps.DB)
@@ -1889,17 +1893,19 @@ func main() {
 			materializeRemote := cfg.Artwork.RemoteMaterialization == config.ArtworkMaterializationSelected
 			metadataService.SetAutoCacheImages(materializeRemote)
 			metadataImageCacheProcessor.SetEnabled(materializeRemote)
+			personRefreshService.SetAutoCacheImages(materializeRemote)
 			configWatcher.OnChange(func(_, updated *config.Config) {
 				updatedMaterialize := updated.Artwork.RemoteMaterialization == config.ArtworkMaterializationSelected
 				metadataService.SetAutoCacheImages(updatedMaterialize)
 				metadataImageCacheProcessor.SetEnabled(updatedMaterialize)
+				personRefreshService.SetAutoCacheImages(updatedMaterialize)
 			})
 			if deps.Scanner != nil {
 				deps.Scanner.SetImageCacher(imageCacher)
 			}
+			personRefreshService.SetImageCacher(imageCacher)
+			personRefreshService.SetImageCacheJobEnqueuer(imageCacheJobs)
 			if materializeRemote {
-				personRefreshService.SetImageCacher(imageCacher)
-				personRefreshService.SetImageCacheJobEnqueuer(imageCacheJobs)
 				slog.Info("metadata image caching enabled")
 			}
 			if audiobookEnricher != nil {
@@ -3103,7 +3109,7 @@ func main() {
 		var artworkStorageService *metadata.ArtworkStorageService
 		if deps.ArtworkStore != nil && artworkURLSigner != nil {
 			artworkStorageService = metadata.NewArtworkStorageService(
-				deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.GenerationID(),
+				deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.GenerationID,
 				!deps.UserArtworkTracked,
 			)
 			directLibraryArtwork := metadata.NewDirectLibraryArtworkResolver(deps.DB)

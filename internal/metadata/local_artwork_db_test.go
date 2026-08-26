@@ -227,8 +227,8 @@ func TestArtworkBulkRecoveryMarksUploadedProfileAvatarAsProtectedLoss(t *testing
 		t.Fatalf("seed uploaded avatar owner: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `
-		INSERT INTO artwork_revision_gc_candidates (original_path, object_keys)
-		VALUES ($1, ARRAY[$1])`, avatarPath); err != nil {
+		INSERT INTO artwork_revision_gc_candidates (original_path, object_keys, not_before)
+		VALUES ($1, ARRAY[$1], NOW())`, avatarPath); err != nil {
 		t.Fatalf("seed uploaded avatar inventory: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `
@@ -346,11 +346,76 @@ func TestArtworkRepairPublicationDrainsRebuildState(t *testing.T) {
 		contentID, []string{oldPath, newPath}, targetKeys, newPath).Scan(&outstanding, &missing, &unresolved, &publishedNextAttempt); err != nil {
 		t.Fatalf("read rebuild completion gate: %v", err)
 	}
-	if outstanding != 0 || missing != 0 || unresolved != 0 {
-		t.Fatalf("completion gate did not drain: outstanding=%d missing=%d unresolved_alerts=%d", outstanding, missing, unresolved)
+	if outstanding != 0 || unresolved != 0 {
+		t.Fatalf("repair queue or alert did not drain: outstanding=%d unresolved_alerts=%d", outstanding, unresolved)
+	}
+	if missing != 1 {
+		t.Fatalf("missing revision rows = %d, want only the unrepaired previous revision", missing)
 	}
 	if publishedNextAttempt != nil {
 		t.Fatalf("published revision remained armed for GC at %v", *publishedNextAttempt)
+	}
+}
+
+func TestArtworkRepairPublicationKeepsChangedSharedRevisionMissing(t *testing.T) {
+	pool := localArtworkTestPool(t)
+	ctx := context.Background()
+	suffix := time.Now().UnixNano()
+	repairedContentID := fmt.Sprintf("artwork-repair-changed-%d", suffix)
+	sharedContentID := fmt.Sprintf("artwork-repair-shared-%d", suffix)
+	oldPath := fmt.Sprintf("tmdb/movies/%d/poster/original.old.webp", suffix)
+	revision := fmt.Sprintf("%064x", suffix)
+	newPath := fmt.Sprintf("artwork/v1/objects/poster/%s/%s/original.webp", revision[:2], revision)
+
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM media_items WHERE content_id = ANY($1)`, []string{repairedContentID, sharedContentID})
+		_, _ = pool.Exec(ctx, `DELETE FROM artwork_revision_gc_candidates WHERE original_path = ANY($1)`, []string{oldPath, newPath})
+	})
+	for _, contentID := range []string{repairedContentID, sharedContentID} {
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO media_items (content_id, type, title, status, genres, poster_path, poster_source_path)
+			VALUES ($1, 'movie', 'Shared repair revision', 'matched', '{}'::text[], $2, 'tmdb://movie/shared-repair')`,
+			contentID, oldPath); err != nil {
+			t.Fatalf("seed shared artwork owner %q: %v", contentID, err)
+		}
+	}
+	for _, path := range []string{oldPath, newPath} {
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO artwork_revision_gc_candidates (
+				original_path, image_type, object_keys, missing_at, repair_state,
+				repair_queued_at, protected_loss_at, not_before, next_attempt_at
+			) VALUES ($1, 'poster', ARRAY[$1], NOW(), 'protected_loss', NOW(), NOW(), NOW(), NOW())`, path); err != nil {
+			t.Fatalf("seed missing revision %q: %v", path, err)
+		}
+	}
+	if _, err := pool.Exec(ctx, `UPDATE media_items SET poster_path = $2 WHERE content_id = $1`, repairedContentID, newPath); err != nil {
+		t.Fatalf("publish changed repaired revision: %v", err)
+	}
+
+	coordinator := NewArtworkDeliveryCoordinator(pool, nil)
+	if err := coordinator.ArtworkPublished(ctx, &models.MetadataImageCacheJob{
+		TargetType: ImageCacheTargetItem, TargetContentID: repairedContentID, ImageType: ImageCacheImagePoster,
+	}, oldPath, newPath); err != nil {
+		t.Fatalf("record changed repair publication: %v", err)
+	}
+
+	var oldMissing, newMissing bool
+	if err := pool.QueryRow(ctx, `
+		SELECT
+			(SELECT missing_at IS NOT NULL FROM artwork_revision_gc_candidates WHERE original_path = $1),
+			(SELECT missing_at IS NOT NULL FROM artwork_revision_gc_candidates WHERE original_path = $2)`,
+		oldPath, newPath).Scan(&oldMissing, &newMissing); err != nil {
+		t.Fatalf("read repaired revision loss state: %v", err)
+	}
+	if !oldMissing || newMissing {
+		t.Fatalf("loss state after changed repair = old:%t new:%t, want old:true new:false", oldMissing, newMissing)
+	}
+	status, err := coordinator.RebuildStatus(ctx)
+	if err != nil {
+		t.Fatalf("load shared repair rebuild status: %v", err)
+	}
+	if status.MissingReferences != 1 {
+		t.Fatalf("shared old revision missing references = %d, want 1", status.MissingReferences)
 	}
 }
 
@@ -375,8 +440,8 @@ func TestArtworkRebuildStatusIgnoresUnreferencedMissingRevisions(t *testing.T) {
 	}
 	for _, path := range []string{referencedPath, orphanPath} {
 		if _, err := pool.Exec(ctx, `
-			INSERT INTO artwork_revision_gc_candidates (original_path, object_keys)
-			VALUES ($1, ARRAY[$1])`, path); err != nil {
+			INSERT INTO artwork_revision_gc_candidates (original_path, object_keys, not_before)
+			VALUES ($1, ARRAY[$1], NOW())`, path); err != nil {
 			t.Fatalf("seed inventory %q: %v", path, err)
 		}
 	}

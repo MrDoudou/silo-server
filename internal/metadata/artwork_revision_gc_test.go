@@ -494,6 +494,7 @@ func TestArtworkRevisionGCDormantSweep(t *testing.T) {
 	referencedContentID := fmt.Sprintf("gc-dormant-ref-%d", suffix)
 	referencedPath := fmt.Sprintf("tmdb/movies/%d/poster/original.ref.webp", suffix)
 	orphanPath := fmt.Sprintf("tmdb/movies/%d/poster/original.orphan.webp", suffix)
+	retainedPath := fmt.Sprintf("artwork/v1/objects/avatar/%d/original.retained.webp", suffix)
 
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO media_items (content_id, type, title, status, genres, poster_path)
@@ -508,17 +509,24 @@ func TestArtworkRevisionGCDormantSweep(t *testing.T) {
 			t.Fatalf("seed dormant candidate: %v", err)
 		}
 	}
-	// Age both rows past the recheck interval; a reference that vanished
-	// through an untriggered surface looks exactly like the orphan row.
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO artwork_revision_gc_candidates (
+			original_path, image_type, object_keys, source_class,
+			seed_imported_at, seed_expires_at, not_before, next_attempt_at
+		) VALUES ($1, 'avatar', '{}', 'seed', NOW(), NULL, NOW() - interval '2 days', NULL)`, retainedPath); err != nil {
+		t.Fatalf("seed retained untracked candidate: %v", err)
+	}
+	// Age all rows past the recheck interval; a reference that vanished through
+	// an untriggered surface looks exactly like the orphan row.
 	if _, err := pool.Exec(ctx, `
 		UPDATE artwork_revision_gc_candidates
 		SET updated_at = NOW() - interval '2 days'
-		WHERE original_path = ANY($1)`, []string{referencedPath, orphanPath}); err != nil {
+		WHERE original_path = ANY($1)`, []string{referencedPath, orphanPath, retainedPath}); err != nil {
 		t.Fatalf("age dormant candidates: %v", err)
 	}
 	t.Cleanup(func() {
 		_, _ = pool.Exec(ctx, `DELETE FROM media_items WHERE content_id = $1`, referencedContentID)
-		_, _ = pool.Exec(ctx, `DELETE FROM artwork_revision_gc_candidates WHERE original_path = ANY($1)`, []string{referencedPath, orphanPath})
+		_, _ = pool.Exec(ctx, `DELETE FROM artwork_revision_gc_candidates WHERE original_path = ANY($1)`, []string{referencedPath, orphanPath, retainedPath})
 	})
 
 	deleter := &blockingArtworkRevisionDeleter{started: make(chan struct{})}
@@ -534,7 +542,7 @@ func TestArtworkRevisionGCDormantSweep(t *testing.T) {
 		t.Fatalf("requeued = %d, want at least the orphan row", requeued)
 	}
 
-	var orphanNext, referencedNext *time.Time
+	var orphanNext, referencedNext, retainedNext *time.Time
 	if err := pool.QueryRow(ctx, `
 		SELECT next_attempt_at FROM artwork_revision_gc_candidates WHERE original_path = $1`, orphanPath).Scan(&orphanNext); err != nil {
 		t.Fatalf("load orphan candidate: %v", err)
@@ -543,10 +551,17 @@ func TestArtworkRevisionGCDormantSweep(t *testing.T) {
 		SELECT next_attempt_at FROM artwork_revision_gc_candidates WHERE original_path = $1`, referencedPath).Scan(&referencedNext); err != nil {
 		t.Fatalf("load referenced candidate: %v", err)
 	}
+	if err := pool.QueryRow(ctx, `
+		SELECT next_attempt_at FROM artwork_revision_gc_candidates WHERE original_path = $1`, retainedPath).Scan(&retainedNext); err != nil {
+		t.Fatalf("load retained untracked candidate: %v", err)
+	}
 	if orphanNext == nil {
 		t.Fatal("orphan dormant row was not re-armed by the sweep")
 	}
 	if referencedNext != nil {
 		t.Fatalf("referenced dormant row was re-armed: %v", *referencedNext)
+	}
+	if retainedNext != nil {
+		t.Fatalf("retained untracked row was re-armed: %v", *retainedNext)
 	}
 }

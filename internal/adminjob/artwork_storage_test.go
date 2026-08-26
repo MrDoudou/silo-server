@@ -38,6 +38,12 @@ func TestArtworkStorageJobResumesLatestTimedOutCheckpoint(t *testing.T) {
 	repo := NewRepository(pool)
 	suffix := time.Now().UnixNano()
 	message := fmt.Sprintf("checkpoint resume test %d", suffix)
+	if _, err := pool.Exec(ctx, `
+		DELETE FROM admin_jobs
+		WHERE job_type IN ($1, $2, $3) AND status IN ($4, $5)`,
+		JobTypeArtworkStorageRefresh, JobTypeArtworkPurge, JobTypeArtworkStorageImport, StatusQueued, StatusRunning); err != nil {
+		t.Fatalf("clear pre-existing artwork storage jobs: %v", err)
+	}
 	first, err := repo.Create(ctx, CreateJobInput{
 		JobType: JobTypeArtworkStorageRefresh, RequestPayload: map[string]any{}, Message: message,
 	})

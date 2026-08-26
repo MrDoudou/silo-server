@@ -21,6 +21,31 @@ func (r *recordingImageCacheJobEnqueuer) EnqueueBatch(_ context.Context, inputs 
 	return len(inputs), nil
 }
 
+func TestPersonRefreshPhotoEnqueueReadsLiveMaterializationPolicy(t *testing.T) {
+	const providerID = "tmdb"
+	service := &PersonRefreshService{}
+	enqueuer := &recordingImageCacheJobEnqueuer{}
+	service.SetImageCacheJobEnqueuer(enqueuer)
+	person := models.Person{ID: 42, PhotoSourcePath: "tmdb://people/42.jpg"}
+
+	service.enqueuePersonPhoto(t.Context(), person, map[string]string{providerID: "42"}, providerID)
+	if len(enqueuer.inputs) != 0 {
+		t.Fatalf("disabled policy enqueued %d person photos, want 0", len(enqueuer.inputs))
+	}
+
+	service.SetAutoCacheImages(true)
+	service.enqueuePersonPhoto(t.Context(), person, map[string]string{providerID: "42"}, providerID)
+	if len(enqueuer.inputs) != 1 {
+		t.Fatalf("selected policy enqueued %d person photos, want 1", len(enqueuer.inputs))
+	}
+
+	service.SetAutoCacheImages(false)
+	service.enqueuePersonPhoto(t.Context(), person, map[string]string{providerID: "42"}, providerID)
+	if len(enqueuer.inputs) != 1 {
+		t.Fatalf("reloaded passthrough policy enqueued %d person photos, want total 1", len(enqueuer.inputs))
+	}
+}
+
 func TestPreserveCachedArtworkKeepsCachedPathWhenSourceMatches(t *testing.T) {
 	path, thumb, source := preserveCachedArtwork(
 		"tvdb://banners/episodes/1.jpg",

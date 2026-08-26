@@ -115,11 +115,25 @@ func (s *FilesystemStore) FreeSpaceBytes(_ context.Context) (int64, error) {
 	return int64(stat.Bavail) * int64(stat.Bsize), nil //nolint:unconvert
 }
 
-// Close releases the store root handle. Later calls reopen it.
+// Close permanently releases the store root handle.
 func (s *FilesystemStore) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.closed = true
+	root := s.root
+	s.root = nil
+	if root == nil {
+		return nil
+	}
+	return root.Close()
+}
+
+// ReopenRoot releases the cached confined root without closing the store. The
+// next operation resolves rootPath again, which lets shared mounts recover
+// safely after a filesystem is replaced at the same pathname.
+func (s *FilesystemStore) ReopenRoot() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	root := s.root
 	s.root = nil
 	if root == nil {
@@ -190,15 +204,6 @@ func (s *FilesystemStore) openRootExisting() (*os.Root, error) {
 	}
 	s.root = root
 	return root, nil
-}
-
-func (s *FilesystemStore) resetRoot() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.root != nil {
-		_ = s.root.Close()
-	}
-	s.root = nil
 }
 
 // Probe creates the root if needed and proves it is a writable directory. An

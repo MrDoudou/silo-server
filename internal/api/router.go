@@ -1327,7 +1327,7 @@ func NewRouter(deps Dependencies) chi.Router {
 		if deps.ArtworkStore != nil {
 			adminArtworkStorageHandler = handlers.NewAdminArtworkStorageHandler(
 				metadata.NewArtworkStorageService(
-					deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.GenerationID(),
+					deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.GenerationID,
 					!deps.UserArtworkTracked,
 				),
 				jobRepo,

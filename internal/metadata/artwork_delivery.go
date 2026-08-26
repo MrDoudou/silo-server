@@ -53,11 +53,13 @@ func (c *ArtworkDeliveryCoordinator) ArtworkPublished(ctx context.Context, job *
 	if err := c.revisions.ParkArtworkRevision(ctx, publishedPath, job.ImageType); err != nil {
 		return err
 	}
+	// Only the published revision was proved durable. If upstream bytes changed,
+	// the previous revision may still be missing while another target selects it.
 	if _, err := c.pool.Exec(ctx, `
 		UPDATE artwork_revision_gc_candidates
 		SET missing_at = NULL, repair_state = '', repair_queued_at = NULL,
 			protected_loss_at = NULL, last_verified_at = NOW(), updated_at = NOW()
-		WHERE original_path = ANY($1::text[])`, []string{previousPath, publishedPath}); err != nil {
+		WHERE original_path = $1`, publishedPath); err != nil {
 		return err
 	}
 	target, ok, err := c.artworkTargetForImageCacheJob(ctx, job)

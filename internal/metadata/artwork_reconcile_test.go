@@ -568,8 +568,8 @@ func TestArtworkReconcileLeavesRowsAloneOnStorageErrors(t *testing.T) {
 	if stats.Errors == 0 || stats.SweepErrors == 0 {
 		t.Fatal("expected the erroring key to be counted")
 	}
-	if saved.SurfaceName != "" || len(saved.SurfaceCursor) != 0 || saved.Finished {
-		t.Fatalf("checkpoint advanced past an errored batch: %#v", saved)
+	if !saved.valid(len(artworkSweepSurfaces())) {
+		t.Fatalf("saved checkpoint is invalid: %#v", saved)
 	}
 
 	var posterPath string
@@ -578,6 +578,20 @@ func TestArtworkReconcileLeavesRowsAloneOnStorageErrors(t *testing.T) {
 	}
 	if posterPath != cachedKey {
 		t.Fatalf("poster_path = %q, want untouched %q after storage error", posterPath, cachedKey)
+	}
+
+	resumeChecker := &fakeObjectChecker{missing: map[string]bool{cachedKey: true}}
+	if _, err := NewArtworkCacheReconciler(pool, resumeChecker).RunResumable(ctx, &saved, nil, nil); err != nil {
+		t.Fatalf("resume from saved checkpoint: %v", err)
+	}
+	if resumeChecker.checked[cachedKey] == 0 {
+		t.Fatalf("resumed reconcile skipped previously-errored key %q", cachedKey)
+	}
+	if err := pool.QueryRow(ctx, `SELECT poster_path FROM media_items WHERE content_id = $1`, contentID).Scan(&posterPath); err != nil {
+		t.Fatalf("read resumed item: %v", err)
+	}
+	if posterPath == cachedKey {
+		t.Fatalf("poster_path remained %q after healthy resume reported it missing", cachedKey)
 	}
 }
 

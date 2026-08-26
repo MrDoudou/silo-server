@@ -81,7 +81,7 @@ type recordingTracker struct {
 	retainErr       error
 }
 
-func (t *recordingTracker) RetainUntrackedArtworkSeed(_ context.Context, originalPath string) error {
+func (t *recordingTracker) RetainUntrackedArtworkRevision(_ context.Context, originalPath string) error {
 	t.retainCalls++
 	t.retainedPath = originalPath
 	return t.retainErr
@@ -295,20 +295,27 @@ func TestTrackingRegistersEveryObjectBeforeTheFirstWrite(t *testing.T) {
 	}
 }
 
-func TestTrackingIsOptOut(t *testing.T) {
+func TestUntrackedMaterializationDisarmsExistingRevisionCandidate(t *testing.T) {
 	store := newMemoryStore()
 	tracker := &recordingTracker{}
 	materializer := NewMaterializer(store)
 	materializer.SetRevisionTracker(tracker)
 
-	if _, err := materializer.Materialize(context.Background(), Request{
+	result, err := materializer.Materialize(context.Background(), Request{
 		ImageType: artworkkey.ImageTypeLibraryPoster,
 		Data:      testJPEG(t, 40, 60, 40),
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	if tracker.calls != 0 {
 		t.Fatalf("tracker called %d times without Track", tracker.calls)
+	}
+	if tracker.recordCalls != 0 {
+		t.Fatalf("inventory recorded %d times without Track", tracker.recordCalls)
+	}
+	if tracker.retainCalls != 1 || tracker.retainedPath != result.OriginalKey {
+		t.Fatalf("untracked retention = calls:%d path:%q, want 1/%q", tracker.retainCalls, tracker.retainedPath, result.OriginalKey)
 	}
 }
 

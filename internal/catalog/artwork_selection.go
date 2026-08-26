@@ -45,18 +45,25 @@ var ErrUnsupportedArtworkSelection = errors.New("catalog: unsupported artwork se
 type ArtworkRevisionTracker struct {
 	pool         *pgxpool.Pool
 	gracePeriod  time.Duration
-	storeBinding string
+	storeBinding func() string
 }
 
-func NewArtworkRevisionTracker(pool *pgxpool.Pool, storeBinding ...string) *ArtworkRevisionTracker {
+func NewArtworkRevisionTracker(pool *pgxpool.Pool, storeBinding ...func() string) *ArtworkRevisionTracker {
 	if pool == nil {
 		return nil
 	}
-	binding := ""
+	var binding func() string
 	if len(storeBinding) > 0 {
-		binding = strings.TrimSpace(storeBinding[0])
+		binding = storeBinding[0]
 	}
 	return &ArtworkRevisionTracker{pool: pool, gracePeriod: defaultArtworkGCGracePeriod, storeBinding: binding}
+}
+
+func (t *ArtworkRevisionTracker) currentStoreBinding() string {
+	if t == nil || t.storeBinding == nil {
+		return ""
+	}
+	return strings.TrimSpace(t.storeBinding())
 }
 
 const trackArtworkRevisionSQL = `
@@ -133,23 +140,28 @@ func (t *ArtworkRevisionTracker) ParkArtworkRevision(ctx context.Context, origin
 	return nil
 }
 
-const retainUntrackedArtworkSeedSQL = `
+const retainUntrackedArtworkRevisionSQL = `
 	UPDATE artwork_revision_gc_candidates
-	SET seed_expires_at = NULL,
+	SET source_class = 'seed',
+		seed_imported_at = COALESCE(seed_imported_at, NOW()),
+		seed_expires_at = NULL,
 		next_attempt_at = NULL,
 		not_before = GREATEST(not_before, NOW()),
+		deleted_at = NULL,
+		deletion_started_at = NULL,
+		tombstoned_at = NULL,
 		attempt_count = 0,
 		locked_at = NULL,
 		locked_by = '',
 		last_error = '',
 		updated_at = NOW()
-	WHERE original_path = $1 AND source_class = 'seed'`
+	WHERE original_path = $1`
 
-// RetainUntrackedArtworkSeed preserves an imported seed that has just been
-// published by a user-store surface outside PostgreSQL's reference union.
+// RetainUntrackedArtworkRevision preserves an existing candidate that has just
+// been published by a user-store surface outside PostgreSQL's reference union.
 // Keeping it as an unarmed seed makes the coverage limitation visible to
 // accounting without allowing GC to delete a live, unverifiable upload.
-func (t *ArtworkRevisionTracker) RetainUntrackedArtworkSeed(ctx context.Context, originalPath string) error {
+func (t *ArtworkRevisionTracker) RetainUntrackedArtworkRevision(ctx context.Context, originalPath string) error {
 	if t == nil || t.pool == nil {
 		return fmt.Errorf("catalog: artwork revision tracking is not configured")
 	}
@@ -157,8 +169,8 @@ func (t *ArtworkRevisionTracker) RetainUntrackedArtworkSeed(ctx context.Context,
 	if originalPath == "" || strings.Contains(originalPath, "://") {
 		return nil
 	}
-	if _, err := t.pool.Exec(ctx, retainUntrackedArtworkSeedSQL, originalPath); err != nil {
-		return fmt.Errorf("catalog: retain untracked artwork seed: %w", err)
+	if _, err := t.pool.Exec(ctx, retainUntrackedArtworkRevisionSQL, originalPath); err != nil {
+		return fmt.Errorf("catalog: retain untracked artwork revision: %w", err)
 	}
 	return nil
 }
@@ -203,17 +215,23 @@ func (t *ArtworkRevisionTracker) RecordArtworkRevision(
 			object_sizes_bytes = $3,
 			object_content_types = $4,
 			total_physical_bytes = $5,
-			source_class = $6,
+			source_class = CASE
+				WHEN seed_imported_at IS NOT NULL AND seed_expires_at IS NULL THEN 'seed'
+				ELSE $6
+			END,
 			store_generation = $7,
 			inventory_complete = TRUE,
 			last_verified_at = NOW(),
-			seed_imported_at = NULL,
+			seed_imported_at = CASE
+				WHEN seed_imported_at IS NOT NULL AND seed_expires_at IS NULL THEN seed_imported_at
+				ELSE NULL
+			END,
 			seed_expires_at = NULL,
 			deleted_at = NULL,
 			deletion_started_at = NULL,
 			tombstoned_at = NULL,
 			updated_at = NOW()
-		WHERE original_path = $1`, originalPath, keys, sizes, contentTypes, total, sourceClass, t.storeBinding)
+		WHERE original_path = $1`, originalPath, keys, sizes, contentTypes, total, sourceClass, t.currentStoreBinding())
 	if err != nil {
 		return fmt.Errorf("catalog: record artwork revision inventory: %w", err)
 	}
@@ -401,7 +419,11 @@ func upsertArtworkRevision(
 				ELSE artwork_revision_gc_candidates.image_type
 			END,
 			not_before = EXCLUDED.not_before,
-			next_attempt_at = EXCLUDED.next_attempt_at,
+			next_attempt_at = CASE
+				WHEN artwork_revision_gc_candidates.seed_imported_at IS NOT NULL
+					AND artwork_revision_gc_candidates.seed_expires_at IS NULL THEN NULL
+				ELSE EXCLUDED.next_attempt_at
+			END,
 			attempt_count = 0,
 			locked_at = NULL,
 			locked_by = '',

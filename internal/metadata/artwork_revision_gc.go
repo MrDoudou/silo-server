@@ -254,6 +254,7 @@ func (g *ArtworkRevisionGarbageCollector) claim(ctx context.Context, workerID st
 			FROM artwork_revision_gc_candidates
 			WHERE not_before <= NOW()
 			  AND next_attempt_at <= NOW()
+			  AND NOT (seed_imported_at IS NOT NULL AND seed_expires_at IS NULL)
 			  AND (locked_at IS NULL OR locked_at < NOW() - ($3 * interval '1 second'))
 			ORDER BY next_attempt_at, id
 			FOR UPDATE SKIP LOCKED
@@ -600,6 +601,7 @@ func (g *ArtworkRevisionGarbageCollector) sweepDormant(ctx context.Context, limi
 		FROM artwork_revision_gc_candidates
 		WHERE next_attempt_at IS NULL
 		  AND tombstoned_at IS NULL
+		  AND NOT (seed_imported_at IS NOT NULL AND seed_expires_at IS NULL)
 		  AND updated_at < NOW() - ($2 * interval '1 second')
 		ORDER BY updated_at, id
 		LIMIT $1`, limit, int64(artworkRevisionDormantRecheck/time.Second))
