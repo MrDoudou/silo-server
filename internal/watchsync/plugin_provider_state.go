@@ -203,13 +203,14 @@ func (p *PluginProvider) listRemoteState(
 		if err != nil {
 			return pluginRemoteTraversal{}, watchSyncRPCError()
 		}
+		requestSecrets := authenticatedContextSecrets(authContext, response.GetUpdatedCredentials())
 		if response.GetUpdatedCredentials() != nil {
 			conn, err = p.persistUpdatedCredentials(ctx, conn, response.GetUpdatedCredentials())
 			if err != nil {
 				return pluginRemoteTraversal{}, err
 			}
 		}
-		if err := watchSyncFaultError(p.Key(), response.GetFault(), conn.AccessToken, conn.RefreshToken); err != nil {
+		if err := watchSyncFaultError(p.Key(), response.GetFault(), requestSecrets...); err != nil {
 			return pluginRemoteTraversal{}, err
 		}
 		if kind == pluginv1.WatchSyncRemoteStateKind_WATCH_SYNC_REMOTE_STATE_KIND_WATCHLIST &&
@@ -359,13 +360,14 @@ func (p *PluginProvider) applyPluginEventsDetailed(
 		if err != nil {
 			return result, statuses, watchSyncRPCError()
 		}
+		requestSecrets := authenticatedContextSecrets(authContext, response.GetUpdatedCredentials())
 		if response.GetUpdatedCredentials() != nil {
 			conn, err = p.persistUpdatedCredentials(ctx, conn, response.GetUpdatedCredentials())
 			if err != nil {
 				return result, statuses, err
 			}
 		}
-		if err := watchSyncFaultError(p.Key(), response.GetFault(), conn.AccessToken, conn.RefreshToken); err != nil {
+		if err := watchSyncFaultError(p.Key(), response.GetFault(), requestSecrets...); err != nil {
 			return result, statuses, err
 		}
 		for index, event := range events[offset:end] {
@@ -387,7 +389,7 @@ func (p *PluginProvider) applyPluginEventsDetailed(
 					}
 					return result, statuses, RateLimitedError{Provider: p.Key(), RetryAfter: retry}
 				}
-				result.Failed[key] = safeApplyMessage(apply, conn.AccessToken, conn.RefreshToken)
+				result.Failed[key] = safeApplyMessage(apply, requestSecrets...)
 			default:
 				result.Failed[key] = "watch sync plugin omitted a valid event result"
 			}

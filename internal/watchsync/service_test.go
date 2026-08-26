@@ -60,6 +60,8 @@ type serviceFakeRepo struct {
 	confirmingScrobbles    map[string]time.Time
 	markSatisfiedErr       error
 	markHistoryStatusErr   error
+	upsertConnectionErr    error
+	pluginCredentialWrites int
 	syncRunMu              sync.Mutex
 	scrobbleMu             sync.Mutex
 }
@@ -117,9 +119,39 @@ func (r *serviceFakeRepo) UpsertConnection(
 	_ context.Context,
 	conn Connection,
 ) (Connection, error) {
+	if r.upsertConnectionErr != nil {
+		return Connection{}, r.upsertConnectionErr
+	}
 	if conn.ID == "" {
 		conn.ID = "conn-1"
 	}
+	conn = cloneConnectionForTest(conn)
+	r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)] = conn
+	return cloneConnectionForTest(conn), nil
+}
+
+func (r *serviceFakeRepo) UpsertPluginConnection(
+	_ context.Context,
+	conn Connection,
+) (Connection, error) {
+	if conn.ID == "" {
+		conn.ID = "conn-1"
+	}
+	conn = cloneConnectionForTest(conn)
+	r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)] = conn
+	return cloneConnectionForTest(conn), nil
+}
+
+func (r *serviceFakeRepo) UpdatePluginCredentials(
+	_ context.Context,
+	conn Connection,
+) (Connection, error) {
+	current, ok := r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)]
+	if !ok || current.ID != conn.ID || current.CredentialRevision != conn.CredentialRevision {
+		return Connection{}, errPluginCredentialUpdateConflict
+	}
+	r.pluginCredentialWrites++
+	conn.CredentialRevision++
 	conn = cloneConnectionForTest(conn)
 	r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)] = conn
 	return cloneConnectionForTest(conn), nil
@@ -1647,6 +1679,8 @@ func TestServicePluginRefreshPersistsAuthoritativeCredentialsBeforeFault(t *test
 		},
 	}}
 	provider := testPluginProvider(t, client)
+	provider.repository = repo
+	repo.upsertConnectionErr = errors.New("whole-row upsert must not be used for plugin credentials")
 	service := NewService(repo, NewRegistry())
 	service.now = func() time.Time { return now }
 	conn := Connection{
@@ -1669,6 +1703,9 @@ func TestServicePluginRefreshPersistsAuthoritativeCredentialsBeforeFault(t *test
 	}
 	if updated.LastError != testReconnectRequired {
 		t.Fatalf("LastError = %q", updated.LastError)
+	}
+	if repo.pluginCredentialWrites != 1 {
+		t.Fatalf("credential writes = %d, want 1", repo.pluginCredentialWrites)
 	}
 }
 

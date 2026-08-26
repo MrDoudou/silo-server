@@ -236,8 +236,11 @@ type Connection struct {
 	// don't burn more of the provider's request quota while still throttled.
 	RateLimitedUntil *time.Time
 	SyncCursors      map[string]string `json:"-"`
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// CredentialRevision fences plugin-returned rotations from a newer
+	// connect/reconnect without coupling them to routine sync-state writes.
+	CredentialRevision int64 `json:"-"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type SyncRun struct {

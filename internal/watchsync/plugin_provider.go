@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -36,7 +38,7 @@ type WatchSyncPluginClientResolver func(context.Context, int, string) (WatchSync
 type WatchSyncPluginConfigResolver func(context.Context, int) (*pluginv1.WatchSyncProviderConfig, error)
 
 type PluginCredentialRepository interface {
-	UpsertConnection(context.Context, Connection) (Connection, error)
+	UpdatePluginCredentials(context.Context, Connection) (Connection, error)
 }
 
 type PluginProviderOptions struct {
@@ -376,7 +378,7 @@ func (p *PluginProvider) RefreshToken(ctx context.Context, _ ServerConfig, conn 
 			return TokenSet{}, err
 		}
 	}
-	if err := watchSyncFaultError(p.Key(), response.GetFault(), conn.AccessToken, conn.RefreshToken, tokens.AccessToken, tokens.RefreshToken); err != nil {
+	if err := watchSyncFaultError(p.Key(), response.GetFault(), authenticatedContextSecrets(authContext, response.GetCredentials())...); err != nil {
 		return tokens, err
 	}
 	if response.GetCredentials() == nil {
@@ -400,7 +402,7 @@ func (p *PluginProvider) LookupAccount(ctx context.Context, _ ServerConfig, conn
 	if err != nil {
 		return ProviderAccount{}, watchSyncRPCError()
 	}
-	if err := watchSyncFaultError(p.Key(), response.GetFault(), conn.AccessToken, conn.RefreshToken); err != nil {
+	if err := watchSyncFaultError(p.Key(), response.GetFault(), authenticatedContextSecrets(authContext)...); err != nil {
 		return ProviderAccount{}, err
 	}
 	return accountFromProto(response.GetAccount())
@@ -454,13 +456,14 @@ func (p *PluginProvider) ExportHistory(ctx context.Context, _ ServerConfig, conn
 	if err != nil {
 		return result, watchSyncRPCError()
 	}
+	requestSecrets := authenticatedContextSecrets(authContext, response.GetUpdatedCredentials())
 	if response.GetUpdatedCredentials() != nil {
 		conn, err = p.persistUpdatedCredentials(ctx, conn, response.GetUpdatedCredentials())
 		if err != nil {
 			return result, err
 		}
 	}
-	if err := watchSyncFaultError(p.Key(), response.GetFault(), conn.AccessToken, conn.RefreshToken); err != nil {
+	if err := watchSyncFaultError(p.Key(), response.GetFault(), requestSecrets...); err != nil {
 		// Batch-level faults apply to the whole request; no per-event results
 		// are committed when the host is told to ignore them.
 		return result, err
@@ -493,7 +496,7 @@ func (p *PluginProvider) ExportHistory(ctx context.Context, _ ServerConfig, conn
 				fault.GetCode() == pluginv1.WatchSyncFaultCode_WATCH_SYNC_FAULT_CODE_RATE_LIMITED {
 				continue
 			}
-			result.Failed[historyID] = safeApplyMessage(apply, conn.AccessToken, conn.RefreshToken)
+			result.Failed[historyID] = safeApplyMessage(apply, requestSecrets...)
 		default:
 			if rateLimited == nil {
 				result.Failed[historyID] = "watch sync plugin omitted a valid event result"
@@ -1093,7 +1096,14 @@ func (p *PluginProvider) persistUpdatedCredentials(
 		return Connection{}, err
 	}
 	conn = connectionWithTokens(conn, tokens)
-	persisted, err := p.repository.UpsertConnection(ctx, conn)
+	return p.persistConnectionCredentials(ctx, conn)
+}
+
+func (p *PluginProvider) persistConnectionCredentials(ctx context.Context, conn Connection) (Connection, error) {
+	if p.repository == nil {
+		return Connection{}, retryableProviderError{message: "watch sync plugin credential storage is unavailable"}
+	}
+	persisted, err := p.repository.UpdatePluginCredentials(ctx, conn)
 	if err != nil {
 		return Connection{}, retryableProviderError{message: "watch sync plugin credential update could not be persisted"}
 	}
@@ -1194,6 +1204,73 @@ func credentialsFromConnection(conn Connection) *pluginv1.WatchSyncCredentials {
 		credentials.ExpiresAt = timestamppb.New(*conn.TokenExpiresAt)
 	}
 	return credentials
+}
+
+// authenticatedContextSecrets returns every secret value sent across an
+// authenticated plugin RPC boundary, plus any credentials returned in the
+// response. Capturing these from the request keeps redaction correct even when
+// credential persistence reloads a concurrently updated connection.
+func authenticatedContextSecrets(
+	authContext *pluginv1.WatchSyncAuthenticatedContext,
+	returned ...*pluginv1.WatchSyncCredentials,
+) []string {
+	secrets := make([]string, 0)
+	if authContext != nil {
+		for _, value := range authContext.GetProviderConfig().GetSecretValues() {
+			secrets = appendWatchSyncSecretCandidates(secrets, value)
+		}
+		secrets = appendWatchSyncCredentialSecrets(secrets, authContext.GetCredentials())
+	}
+	for _, credentials := range returned {
+		secrets = appendWatchSyncCredentialSecrets(secrets, credentials)
+	}
+	return secrets
+}
+
+func appendWatchSyncCredentialSecrets(secrets []string, credentials *pluginv1.WatchSyncCredentials) []string {
+	if credentials == nil {
+		return secrets
+	}
+	secrets = appendWatchSyncSecretCandidates(secrets, credentials.GetAccessToken())
+	secrets = appendWatchSyncSecretCandidates(secrets, credentials.GetRefreshToken())
+	for _, value := range credentials.GetSecretAttributes() {
+		secrets = appendWatchSyncSecretCandidates(secrets, value)
+	}
+	return secrets
+}
+
+func appendWatchSyncSecretCandidates(secrets []string, value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return secrets
+	}
+	secrets = append(secrets, value)
+	var structured any
+	decoder := json.NewDecoder(strings.NewReader(value))
+	decoder.UseNumber()
+	if decoder.Decode(&structured) == nil && decoder.Decode(&struct{}{}) == io.EOF {
+		secrets = appendWatchSyncStructuredSecretCandidates(secrets, structured)
+	}
+	return secrets
+}
+
+func appendWatchSyncStructuredSecretCandidates(secrets []string, value any) []string {
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, nested := range typed {
+			secrets = appendWatchSyncStructuredSecretCandidates(secrets, nested)
+		}
+	case []any:
+		for _, nested := range typed {
+			secrets = appendWatchSyncStructuredSecretCandidates(secrets, nested)
+		}
+	case string:
+		secrets = append(secrets, typed)
+	case json.Number:
+		secrets = append(secrets, typed.String())
+	case bool:
+		secrets = append(secrets, fmt.Sprint(typed))
+	}
+	return secrets
 }
 
 func tokenSetFromProto(credentials *pluginv1.WatchSyncCredentials) (TokenSet, error) {
@@ -1305,10 +1382,38 @@ func safeApplyMessage(result *pluginv1.WatchSyncApplyResult, secrets ...string) 
 
 func sanitizeWatchSyncMessage(message string, fallback string, secrets ...string) string {
 	message = normalizeWatchSyncText(message)
+	normalizedSecrets := make([]string, 0, len(secrets))
+	seen := make(map[string]struct{}, len(secrets))
 	for _, secret := range secrets {
-		if secret = normalizeWatchSyncText(secret); secret != "" {
-			message = strings.ReplaceAll(message, secret, "[REDACTED]")
+		secret = normalizeWatchSyncText(secret)
+		if secret == "" {
+			continue
 		}
+		if _, duplicate := seen[secret]; duplicate {
+			continue
+		}
+		seen[secret] = struct{}{}
+		normalizedSecrets = append(normalizedSecrets, secret)
+	}
+	sort.Slice(normalizedSecrets, func(i, j int) bool {
+		left, right := utf8.RuneCountInString(normalizedSecrets[i]), utf8.RuneCountInString(normalizedSecrets[j])
+		if left == right {
+			return normalizedSecrets[i] < normalizedSecrets[j]
+		}
+		return left > right
+	})
+	for _, secret := range normalizedSecrets {
+		if !strings.Contains(message, secret) {
+			continue
+		}
+		// Very short structured leaves (for example 1, true, or "a")
+		// are too ambiguous for safe substring replacement. Discard the
+		// provider-controlled diagnostic instead of corrupting it or risking
+		// a partial disclosure.
+		if utf8.RuneCountInString(secret) <= 4 {
+			return fallback
+		}
+		message = strings.ReplaceAll(message, secret, "[REDACTED]")
 	}
 	if message == "" {
 		return fallback

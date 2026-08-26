@@ -65,6 +65,7 @@ const (
 )
 
 var errConfirmedStopClaimLost = errors.New("confirmed scrobble stop claim lost")
+var errPluginCredentialUpdateConflict = errors.New("watch sync plugin credentials changed concurrently")
 
 // connectionColumns is the canonical select/returning column list for
 // watch_provider_connections, in the exact order scanConnection reads. Sharing
@@ -78,7 +79,7 @@ const connectionColumns = `
 	sync_watchlist_order_enabled, scrobble_enabled, last_inbound_sync_at,
 	last_progress_sync_at, last_outbound_sync_at, last_favorites_sync_at,
 	last_watchlist_sync_at, last_scrobble_error_at, last_error,
-	rate_limited_until, sync_cursors, created_at, updated_at`
+	rate_limited_until, sync_cursors, credential_revision, created_at, updated_at`
 
 // syncRunColumns is the canonical select/returning column list for
 // watch_provider_sync_runs, in the exact order scanSyncRun reads.
@@ -208,6 +209,30 @@ func (r *PostgresRepository) GetAuthSession(ctx context.Context, id string) (Dev
 }
 
 func (r *PostgresRepository) UpsertConnection(ctx context.Context, conn Connection) (Connection, error) {
+	replacePluginCredentials := !strings.HasPrefix(conn.Provider, providerSourcePlugin+":")
+	return r.upsertConnection(ctx, conn, replacePluginCredentials)
+}
+
+// UpsertPluginConnection is the explicit connect/reconnect write path. Routine
+// connection state updates deliberately preserve the current encrypted plugin
+// credential bundle so stale sync work cannot roll back a newer reconnect.
+func (r *PostgresRepository) UpsertPluginConnection(ctx context.Context, conn Connection) (Connection, error) {
+	if !strings.HasPrefix(conn.Provider, providerSourcePlugin+":") {
+		return Connection{}, fmt.Errorf("upsert plugin connection: provider %q is not a plugin", conn.Provider)
+	}
+	return r.upsertConnection(ctx, conn, true)
+}
+
+func (r *PostgresRepository) upsertConnection(
+	ctx context.Context,
+	conn Connection,
+	replacePluginCredentials bool,
+) (Connection, error) {
+	pluginConnection := strings.HasPrefix(conn.Provider, providerSourcePlugin+":")
+	initialCredentialRevision := int64(0)
+	if pluginConnection {
+		initialCredentialRevision = 1
+	}
 	accessToken, err := r.cipher.Encrypt(conn.AccessToken, TokenAAD("access_token", conn.Provider, conn.UserID, conn.ProfileID))
 	if err != nil {
 		return Connection{}, fmt.Errorf("encrypt watch access token: %w", err)
@@ -229,20 +254,24 @@ func (r *PostgresRepository) UpsertConnection(ctx context.Context, conn Connecti
 			import_watchlist_enabled, export_watchlist_enabled, sync_watchlist_removals_enabled,
 			sync_watchlist_order_enabled, scrobble_enabled, last_inbound_sync_at, last_progress_sync_at,
 			last_outbound_sync_at, last_favorites_sync_at, last_watchlist_sync_at, last_scrobble_error_at,
-			last_error, rate_limited_until, sync_cursors
+			last_error, rate_limited_until, sync_cursors, credential_revision
 		)
 		VALUES (
 			COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()),
 			$2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb
+			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32
 		)
 		ON CONFLICT (provider, user_id, profile_id) DO UPDATE SET
 			provider_account_id = EXCLUDED.provider_account_id,
 			provider_username = EXCLUDED.provider_username,
-			access_token = EXCLUDED.access_token,
-			refresh_token = EXCLUDED.refresh_token,
-			token_expires_at = EXCLUDED.token_expires_at,
-			plugin_credentials = EXCLUDED.plugin_credentials,
+			access_token = CASE WHEN $33 THEN EXCLUDED.access_token ELSE watch_provider_connections.access_token END,
+			refresh_token = CASE WHEN $33 THEN EXCLUDED.refresh_token ELSE watch_provider_connections.refresh_token END,
+			token_expires_at = CASE WHEN $33 THEN EXCLUDED.token_expires_at ELSE watch_provider_connections.token_expires_at END,
+			plugin_credentials = CASE WHEN $33 THEN EXCLUDED.plugin_credentials ELSE watch_provider_connections.plugin_credentials END,
+			credential_revision = CASE
+				WHEN $33 AND $34 THEN watch_provider_connections.credential_revision + 1
+				ELSE watch_provider_connections.credential_revision
+			END,
 			import_watched_enabled = EXCLUDED.import_watched_enabled,
 			import_progress_enabled = EXCLUDED.import_progress_enabled,
 			export_watched_enabled = EXCLUDED.export_watched_enabled,
@@ -298,10 +327,71 @@ func (r *PostgresRepository) UpsertConnection(ctx context.Context, conn Connecti
 		conn.LastError,
 		conn.RateLimitedUntil,
 		encodeSyncCursors(conn.SyncCursors),
+		initialCredentialRevision,
+		replacePluginCredentials,
+		pluginConnection,
 	)
 	saved, err := r.scanConnection(row)
 	if err != nil {
 		return Connection{}, fmt.Errorf("upsert watch provider connection: %w", err)
+	}
+	return saved, nil
+}
+
+// UpdatePluginCredentials atomically replaces only the authentication material
+// returned by a plugin. The credential-revision precondition prevents an
+// in-flight RPC from overwriting credentials or per-connection configuration
+// installed by a newer reconnect, including when those writes happen on
+// different nodes.
+func (r *PostgresRepository) UpdatePluginCredentials(ctx context.Context, conn Connection) (Connection, error) {
+	if strings.TrimSpace(conn.ID) == "" || !strings.HasPrefix(conn.Provider, providerSourcePlugin+":") {
+		return Connection{}, fmt.Errorf("update watch plugin credentials: %w", errPluginCredentialUpdateConflict)
+	}
+	accessToken, err := r.cipher.Encrypt(conn.AccessToken, TokenAAD("access_token", conn.Provider, conn.UserID, conn.ProfileID))
+	if err != nil {
+		return Connection{}, fmt.Errorf("encrypt watch access token: %w", err)
+	}
+	refreshToken, err := r.cipher.Encrypt(conn.RefreshToken, TokenAAD("refresh_token", conn.Provider, conn.UserID, conn.ProfileID))
+	if err != nil {
+		return Connection{}, fmt.Errorf("encrypt watch refresh token: %w", err)
+	}
+	pluginCredentials, err := r.pluginCredentialsForConnection(conn)
+	if err != nil {
+		return Connection{}, err
+	}
+	row := r.pool.QueryRow(ctx, `
+		UPDATE watch_provider_connections
+		SET access_token = $1,
+			refresh_token = $2,
+			token_expires_at = $3,
+			plugin_credentials = $4,
+			last_error = $5,
+			credential_revision = credential_revision + 1,
+			updated_at = now()
+		WHERE id = $6::uuid
+			AND provider = $7
+			AND user_id = $8
+			AND profile_id = $9
+			AND credential_revision = $10
+		RETURNING `+connectionColumns+`
+	`,
+		accessToken,
+		refreshToken,
+		conn.TokenExpiresAt,
+		pluginCredentials,
+		conn.LastError,
+		conn.ID,
+		conn.Provider,
+		conn.UserID,
+		conn.ProfileID,
+		conn.CredentialRevision,
+	)
+	saved, err := r.scanConnection(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Connection{}, fmt.Errorf("update watch plugin credentials: %w", errPluginCredentialUpdateConflict)
+	}
+	if err != nil {
+		return Connection{}, fmt.Errorf("update watch plugin credentials: %w", err)
 	}
 	return saved, nil
 }
@@ -1398,6 +1488,7 @@ func (r *PostgresRepository) scanConnection(row pgx.Row) (Connection, error) {
 		&conn.LastError,
 		&conn.RateLimitedUntil,
 		&rawSyncCursors,
+		&conn.CredentialRevision,
 		&conn.CreatedAt,
 		&conn.UpdatedAt,
 	)

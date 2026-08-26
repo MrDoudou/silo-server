@@ -99,10 +99,14 @@ type fakePluginCredentialRepository struct {
 	err   error
 }
 
-func (r *fakePluginCredentialRepository) UpsertConnection(_ context.Context, conn Connection) (Connection, error) {
+func (r *fakePluginCredentialRepository) UpdatePluginCredentials(_ context.Context, conn Connection) (Connection, error) {
 	if r.err != nil {
 		return Connection{}, r.err
 	}
+	if r.saved.ID != "" && r.saved.CredentialRevision != conn.CredentialRevision {
+		return Connection{}, errPluginCredentialUpdateConflict
+	}
+	conn.CredentialRevision++
 	r.saved = conn
 	return conn, nil
 }
@@ -356,6 +360,77 @@ func TestPersistUpdatedCredentialsKeepsConnectionConfigOverlay(t *testing.T) {
 	}
 	if repository.saved.PluginConfigValues["floppy.base_url"] != "https://personal.example.com" {
 		t.Fatalf("persisted overlay = %#v", repository.saved.PluginConfigValues)
+	}
+}
+
+func TestPersistUpdatedCredentialsRejectsStaleConnectionOverlay(t *testing.T) {
+	repository := &fakePluginCredentialRepository{saved: Connection{
+		ID: "connection", Provider: testPluginProviderKey, UserID: 1, ProfileID: "profile",
+		AccessToken: "reconnected-token", CredentialRevision: 2,
+		PluginConfigValues:  map[string]string{"floppy.base_url": "https://new.example.com"},
+		PluginConfigSecrets: map[string]string{"floppy.token": "new-secret"},
+	}}
+	provider, err := NewPluginProvider(PluginProviderOptions{
+		InstallationID: 4, ProviderKey: testPluginProviderKey, CapabilityID: testPluginCapabilityID,
+		Descriptor: &pluginv1.WatchSyncProviderDescriptor{
+			AuthMethods: []pluginv1.WatchSyncAuthMethod{pluginv1.WatchSyncAuthMethod_WATCH_SYNC_AUTH_METHOD_API_KEY},
+		},
+		ResolveClient: func(context.Context, int, string) (WatchSyncPluginClient, error) {
+			return &fakeWatchSyncPluginClient{}, nil
+		},
+		Repository: repository,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = provider.persistUpdatedCredentials(context.Background(), Connection{
+		ID: "connection", Provider: testPluginProviderKey, UserID: 1, ProfileID: "profile",
+		AccessToken: "stale-token", CredentialRevision: 1,
+		PluginConfigValues:  map[string]string{"floppy.base_url": "https://old.example.com"},
+		PluginConfigSecrets: map[string]string{"floppy.token": "old-secret"},
+	}, &pluginv1.WatchSyncCredentials{AccessToken: "in-flight-rotation"})
+	if !isRetryableProviderError(err) {
+		t.Fatalf("error = %#v, want retryable persistence conflict", err)
+	}
+	if repository.saved.AccessToken != "reconnected-token" ||
+		repository.saved.PluginConfigValues["floppy.base_url"] != "https://new.example.com" ||
+		repository.saved.PluginConfigSecrets["floppy.token"] != "new-secret" {
+		t.Fatalf("newer reconnect was overwritten: %#v", repository.saved)
+	}
+}
+
+func TestPersistUpdatedCredentialsIgnoresRoutineStateTimestamp(t *testing.T) {
+	repository := &fakePluginCredentialRepository{saved: Connection{
+		ID: "connection", Provider: testPluginProviderKey, UserID: 1, ProfileID: "profile",
+		AccessToken: "old-token", CredentialRevision: 3,
+		UpdatedAt: time.Unix(20, 0).UTC(),
+	}}
+	provider, err := NewPluginProvider(PluginProviderOptions{
+		InstallationID: 4, ProviderKey: testPluginProviderKey, CapabilityID: testPluginCapabilityID,
+		Descriptor: &pluginv1.WatchSyncProviderDescriptor{
+			AuthMethods: []pluginv1.WatchSyncAuthMethod{pluginv1.WatchSyncAuthMethod_WATCH_SYNC_AUTH_METHOD_API_KEY},
+		},
+		ResolveClient: func(context.Context, int, string) (WatchSyncPluginClient, error) {
+			return &fakeWatchSyncPluginClient{}, nil
+		},
+		Repository: repository,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	saved, err := provider.persistUpdatedCredentials(context.Background(), Connection{
+		ID: "connection", Provider: testPluginProviderKey, UserID: 1, ProfileID: "profile",
+		AccessToken: "old-token", CredentialRevision: 3,
+		// A routine state write changed updated_at while the RPC was in flight.
+		UpdatedAt: time.Unix(10, 0).UTC(),
+	}, &pluginv1.WatchSyncCredentials{AccessToken: "rotated-token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.AccessToken != "rotated-token" || saved.CredentialRevision != 4 {
+		t.Fatalf("saved credentials = %#v", saved)
 	}
 }
 
@@ -855,6 +930,142 @@ func TestPluginProviderRefreshReturnsCredentialsAlongsideFault(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedPluginFaultRedactsEveryTransmittedSecret(t *testing.T) {
+	const (
+		installationSecret = "installation-secret"
+		profileSecretLeaf  = "profile-secret-leaf"
+		credentialSecret   = "credential-secret"
+		returnedSecret     = "returned-secret"
+	)
+	client := &fakeWatchSyncPluginClient{refreshResponse: &pluginv1.WatchSyncCredentialResponse{
+		Credentials: &pluginv1.WatchSyncCredentials{
+			AccessToken: testRotatedAccessToken,
+			SecretAttributes: map[string]string{
+				"returned": returnedSecret,
+			},
+		},
+		Fault: &pluginv1.WatchSyncFault{
+			Code: pluginv1.WatchSyncFaultCode_WATCH_SYNC_FAULT_CODE_INVALID_CREDENTIAL,
+			SafeMessage: strings.Join([]string{
+				testOldAccessToken, testOldRefreshToken, installationSecret, profileSecretLeaf,
+				credentialSecret, testRotatedAccessToken, returnedSecret,
+			}, " "),
+		},
+	}}
+	provider, err := NewPluginProvider(PluginProviderOptions{
+		InstallationID: 4, ProviderKey: testPluginProviderKey, CapabilityID: testPluginCapabilityID,
+		Descriptor: &pluginv1.WatchSyncProviderDescriptor{
+			AuthMethods: []pluginv1.WatchSyncAuthMethod{pluginv1.WatchSyncAuthMethod_WATCH_SYNC_AUTH_METHOD_API_KEY},
+		},
+		ResolveClient: func(context.Context, int, string) (WatchSyncPluginClient, error) { return client, nil },
+		ResolveConfig: func(context.Context, int) (*pluginv1.WatchSyncProviderConfig, error) {
+			return &pluginv1.WatchSyncProviderConfig{SecretValues: map[string]string{"install": installationSecret}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tokens, err := provider.RefreshToken(context.Background(), ServerConfig{}, Connection{
+		AccessToken:  testOldAccessToken,
+		RefreshToken: testOldRefreshToken,
+		SecretAttributes: map[string]string{
+			"credential": credentialSecret,
+		},
+		PluginConfigSecrets: map[string]string{
+			"profile": `{"password":"` + profileSecretLeaf + `"}`,
+		},
+	})
+	if tokens.AccessToken != testRotatedAccessToken || !isWatchSyncInvalidCredentialError(err) {
+		t.Fatalf("tokens = %#v, error = %#v", tokens, err)
+	}
+	for _, secret := range []string{
+		testOldAccessToken, testOldRefreshToken, installationSecret, profileSecretLeaf,
+		credentialSecret, testRotatedAccessToken, returnedSecret,
+	} {
+		if strings.Contains(err.Error(), secret) {
+			t.Fatalf("secret %q leaked in %q", secret, err)
+		}
+	}
+	if !strings.Contains(err.Error(), "[REDACTED]") {
+		t.Fatalf("error was not redacted: %q", err)
+	}
+}
+
+func TestAuthenticatedPluginResultsRedactConnectionSecrets(t *testing.T) {
+	const profileSecret = "profile-result-secret"
+	connection := Connection{PluginConfigSecrets: map[string]string{"profile": profileSecret}}
+
+	t.Run("remote state fault", func(t *testing.T) {
+		client := &fakeWatchSyncPluginClient{listResponse: &pluginv1.WatchSyncListRemoteStateResponse{
+			Fault: &pluginv1.WatchSyncFault{
+				Code:        pluginv1.WatchSyncFaultCode_WATCH_SYNC_FAULT_CODE_TEMPORARY,
+				SafeMessage: "remote state rejected " + profileSecret,
+			},
+		}}
+		provider := testPluginProviderWithDescriptor(t, client, &pluginv1.WatchSyncProviderDescriptor{
+			AuthMethods:   []pluginv1.WatchSyncAuthMethod{pluginv1.WatchSyncAuthMethod_WATCH_SYNC_AUTH_METHOD_API_KEY},
+			ImportWatched: true,
+			MaxBatchSize:  25,
+		})
+		_, err := provider.FetchWatchedBatch(context.Background(), ServerConfig{}, connection)
+		if !isRetryableProviderError(err) || strings.Contains(err.Error(), profileSecret) || !strings.Contains(err.Error(), "[REDACTED]") {
+			t.Fatalf("error = %#v", err)
+		}
+	})
+
+	t.Run("watched retry result", func(t *testing.T) {
+		client := &fakeWatchSyncPluginClient{applyResponse: retryApplyResponse(testWatchHistoryID, profileSecret)}
+		provider := testPluginProvider(t, client)
+		result, err := provider.ExportHistory(context.Background(), ServerConfig{}, connection, []LocalPlay{{
+			HistoryID: testWatchHistoryID,
+			Kind:      historyimport.KindMovie,
+		}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		message := result.Failed[testWatchHistoryID]
+		if strings.Contains(message, profileSecret) || !strings.Contains(message, "[REDACTED]") {
+			t.Fatalf("message = %q", message)
+		}
+	})
+
+	t.Run("list retry result", func(t *testing.T) {
+		const mediaItemID = "movie-1"
+		client := &fakeWatchSyncPluginClient{applyResponse: retryApplyResponse(
+			pluginv1.WatchSyncOperation_WATCH_SYNC_OPERATION_ADD_FAVORITE.String()+":"+mediaItemID,
+			profileSecret,
+		)}
+		provider := testPluginProviderWithDescriptor(t, client, &pluginv1.WatchSyncProviderDescriptor{
+			AuthMethods:     []pluginv1.WatchSyncAuthMethod{pluginv1.WatchSyncAuthMethod_WATCH_SYNC_AUTH_METHOD_API_KEY},
+			ExportFavorites: true,
+			MaxBatchSize:    25,
+		})
+		result, err := provider.ExportFavorites(context.Background(), ServerConfig{}, connection, []LocalFavorite{{
+			MediaItemID: mediaItemID,
+			Kind:        historyimport.KindMovie,
+		}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		message := result.Failed[mediaItemID]
+		if strings.Contains(message, profileSecret) || !strings.Contains(message, "[REDACTED]") {
+			t.Fatalf("message = %q", message)
+		}
+	})
+}
+
+func retryApplyResponse(eventID, secret string) *pluginv1.WatchSyncApplyEventsResponse {
+	return &pluginv1.WatchSyncApplyEventsResponse{Results: []*pluginv1.WatchSyncApplyResult{{
+		EventId: eventID,
+		Status:  pluginv1.WatchSyncApplyStatus_WATCH_SYNC_APPLY_STATUS_RETRY,
+		Fault: &pluginv1.WatchSyncFault{
+			Code:        pluginv1.WatchSyncFaultCode_WATCH_SYNC_FAULT_CODE_TEMPORARY,
+			SafeMessage: "temporary failure " + secret,
+		},
+	}}}
+}
+
 func TestPluginProviderExportsRichEpisodeIdentity(t *testing.T) {
 	client := &fakeWatchSyncPluginClient{}
 	client.applyResponse = &pluginv1.WatchSyncApplyEventsResponse{Results: []*pluginv1.WatchSyncApplyResult{{
@@ -997,6 +1208,49 @@ func TestPluginProviderNormalizesSecretsBeforeRedaction(t *testing.T) {
 	}}, "line one\nline two")
 	if strings.Contains(message, "line one line two") || !strings.Contains(message, "[REDACTED]") {
 		t.Fatalf("message was not redacted: %q", message)
+	}
+}
+
+func TestPluginProviderRedactsOverlappingSecretsLongestFirst(t *testing.T) {
+	message := safeApplyMessage(&pluginv1.WatchSyncApplyResult{Fault: &pluginv1.WatchSyncFault{
+		SafeMessage: "credential abcdefghij was rejected",
+	}}, "abcde", "abcdefghij")
+	if strings.Contains(message, "fghij") || !strings.Contains(message, "[REDACTED]") {
+		t.Fatalf("message was only partially redacted: %q", message)
+	}
+}
+
+func TestPluginProviderRedactsExactStructuredNumbers(t *testing.T) {
+	const (
+		largeNumber = "12345678901234567890"
+		decimal     = "1.20"
+	)
+	authContext := &pluginv1.WatchSyncAuthenticatedContext{ProviderConfig: &pluginv1.WatchSyncProviderConfig{
+		SecretValues: map[string]string{"structured": `{"large":` + largeNumber + `,"decimal":` + decimal + `}`},
+	}}
+	message := sanitizeWatchSyncMessage(
+		"value "+largeNumber+" was rejected",
+		"watch sync provider request failed",
+		authenticatedContextSecrets(authContext)...,
+	)
+	if strings.Contains(message, largeNumber) || !strings.Contains(message, "[REDACTED]") {
+		t.Fatalf("structured numeric secret leaked: %q", message)
+	}
+	message = sanitizeWatchSyncMessage(
+		"value "+decimal+" was rejected",
+		"watch sync provider request failed",
+		authenticatedContextSecrets(authContext)...,
+	)
+	if strings.Contains(message, decimal) {
+		t.Fatalf("short structured numeric secret leaked: %q", message)
+	}
+}
+
+func TestPluginProviderDropsMessageContainingAmbiguousShortSecret(t *testing.T) {
+	const fallback = "watch sync provider request failed"
+	message := sanitizeWatchSyncMessage("value true was rejected", fallback, "true")
+	if message != fallback {
+		t.Fatalf("message = %q, want fallback %q", message, fallback)
 	}
 }
 

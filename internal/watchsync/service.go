@@ -645,6 +645,15 @@ func (s *Service) persistConnection(
 	conn.ProviderUsername = account.Username
 	conn.LastError = ""
 
+	if strings.HasPrefix(providerKey, providerSourcePlugin+":") {
+		repository, ok := s.repo.(interface {
+			UpsertPluginConnection(context.Context, Connection) (Connection, error)
+		})
+		if !ok {
+			return Connection{}, errors.New("watch sync plugin credential storage is unavailable")
+		}
+		return repository.UpsertPluginConnection(ctx, conn)
+	}
 	return s.repo.UpsertConnection(ctx, conn)
 }
 
@@ -1374,7 +1383,19 @@ func (s *Service) refreshConnectionIfNeeded(ctx context.Context, provider Provid
 	}
 	credentialsReturned := authoritative && strings.TrimSpace(tokens.AccessToken) != ""
 	if err == nil || credentialsReturned || isWatchSyncInvalidCredentialError(err) {
-		persisted, persistErr := s.repo.UpsertConnection(ctx, conn)
+		var persisted Connection
+		var persistErr error
+		if authoritative {
+			persister, ok := provider.(interface {
+				persistConnectionCredentials(context.Context, Connection) (Connection, error)
+			})
+			if !ok {
+				return Connection{}, fmt.Errorf("provider %q does not support authoritative credential persistence", conn.Provider)
+			}
+			persisted, persistErr = persister.persistConnectionCredentials(ctx, conn)
+		} else {
+			persisted, persistErr = s.repo.UpsertConnection(ctx, conn)
+		}
 		if persistErr != nil {
 			return Connection{}, fmt.Errorf("persist refreshed %s connection: %w", conn.Provider, persistErr)
 		}
