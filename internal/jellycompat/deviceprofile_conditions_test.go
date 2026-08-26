@@ -853,3 +853,169 @@ func unsupportedRangeProfile(codec, ranges string) CodecProfile {
 		}},
 	}
 }
+
+func TestCompatVideoCodecTag(t *testing.T) {
+	tests := []struct {
+		name    string
+		version catalog.FileVersion
+		want    string
+	}{
+		{
+			name: "dolby vision profile 8 uses dvh1",
+			version: catalog.FileVersion{
+				CodecVideo:  "hevc",
+				VideoTracks: []models.VideoTrack{{Codec: "hevc", DVProfile: 8}},
+			},
+			want: "dvh1",
+		},
+		{
+			name: "dolby vision profile 5 uses dvh1",
+			version: catalog.FileVersion{
+				CodecVideo:  "hevc",
+				VideoTracks: []models.VideoTrack{{Codec: "hevc", DVProfile: 5}},
+			},
+			want: "dvh1",
+		},
+		{
+			name: "hdr10 hevc uses hvc1",
+			version: catalog.FileVersion{
+				CodecVideo:  "hevc",
+				VideoTracks: []models.VideoTrack{{Codec: "hevc"}},
+			},
+			want: "hvc1",
+		},
+		{
+			name:    "h264 uses avc1",
+			version: catalog.FileVersion{CodecVideo: "h264"},
+			want:    "avc1",
+		},
+		{
+			name:    "unknown codec is omitted",
+			version: catalog.FileVersion{CodecVideo: "mpeg2video"},
+			want:    "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := compatVideoCodecTag(tt.version); got != tt.want {
+				t.Fatalf("compatVideoCodecTag() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildPlaybackSourceSafariHEVCMKVOffersHLSRemux(t *testing.T) {
+	// Captured Safari / WebOS profile shape from issue #756: MP4 direct play,
+	// HLS MP4 transcoding (not mpegts/h264/aac), and a required HEVC
+	// VideoCodecTag of hvc1|dvh1. Before the tag was populated, copy/remux
+	// failed closed and SupportsTranscoding ignored HLS MP4, so PlaybackInfo
+	// returned no URL when 4K video transcode was also disallowed.
+	h := &PlaybackHandler{codec: NewResourceIDCodec()}
+	version := catalog.FileVersion{
+		FileID:     42,
+		Resolution: "2160p",
+		Container:  "mkv",
+		CodecVideo: "hevc",
+		CodecAudio: "eac3",
+		HDR:        true,
+		VideoTracks: []models.VideoTrack{{
+			Codec:          "hevc",
+			Profile:        "Main 10",
+			Level:          153,
+			Width:          3840,
+			Height:         1606,
+			BitDepth:       10,
+			DVProfile:      8,
+			HDR10Plus:      true,
+			VideoRangeType: "DOVIWithHDR10Plus",
+		}},
+		AudioTracks: []models.AudioTrack{{Codec: "eac3", Channels: 6, Default: true}},
+	}
+	profile := DeviceProfile{
+		DirectPlayProfiles: []DirectPlayProfile{{
+			Type:       "Video",
+			Container:  "mp4,m4v",
+			VideoCodec: "hevc,h264",
+			AudioCodec: "aac,mp3,ac3,eac3,flac,alac",
+		}},
+		TranscodingProfiles: []TranscodingProfile{{
+			Type:       "Video",
+			Protocol:   "hls",
+			Container:  "mp4",
+			VideoCodec: "hevc,h264,vp9",
+			AudioCodec: "aac,ac3,eac3,flac,alac",
+		}},
+		CodecProfiles: []CodecProfile{{
+			Type:  "Video",
+			Codec: "hevc",
+			Conditions: []ProfileCondition{{
+				Condition:  "EqualsAny",
+				Property:   "VideoCodecTag",
+				Value:      "hvc1|dvh1",
+				IsRequired: true,
+			}},
+		}},
+	}
+
+	source := h.buildPlaybackSource("item", "play", version, profile, playbackInfoRequest{}, false)
+	if source.SupportsDirectPlay {
+		t.Fatal("SupportsDirectPlay = true, want false for MKV vs MP4")
+	}
+	if source.SupportsDirectStream {
+		t.Fatal("SupportsDirectStream = true, want false: static DirectStreamURL would serve the MKV")
+	}
+	if !source.TranscodeAudio {
+		t.Fatal("TranscodeAudio = false, want true for video-copy HLS remux")
+	}
+	if !source.SupportsTranscoding {
+		t.Fatal("SupportsTranscoding = false, want true so PlaybackInfo includes a TranscodingURL")
+	}
+
+	dto := h.mediaSourceDTO("item", "play", "token", source)
+	if dto.TranscodingURL == "" {
+		t.Fatal("TranscodingURL is empty")
+	}
+	if dto.TranscodingContainer != "mp4" {
+		t.Fatalf("TranscodingContainer = %q, want mp4", dto.TranscodingContainer)
+	}
+	if dto.DirectStreamURL != "" {
+		t.Fatalf("DirectStreamURL = %q, want empty", dto.DirectStreamURL)
+	}
+}
+
+func TestBuildPlaybackSourceRequiredVideoCodecTagAllowsHEVCCopy(t *testing.T) {
+	version := catalog.FileVersion{
+		FileID:      1,
+		Resolution:  "1080p",
+		Container:   "mp4",
+		CodecVideo:  "hevc",
+		CodecAudio:  "aac",
+		VideoTracks: []models.VideoTrack{{Codec: "hevc", Profile: "Main 10", Width: 1920, Height: 1080}},
+		AudioTracks: []models.AudioTrack{{Codec: "aac", Channels: 2, Default: true}},
+	}
+	profile := DeviceProfile{
+		DirectPlayProfiles: []DirectPlayProfile{{
+			Type:       "Video",
+			Container:  "mp4",
+			VideoCodec: "hevc",
+			AudioCodec: "aac",
+		}},
+		CodecProfiles: []CodecProfile{{
+			Type:  "Video",
+			Codec: "hevc",
+			Conditions: []ProfileCondition{{
+				Condition:  "EqualsAny",
+				Property:   "VideoCodecTag",
+				Value:      "hvc1|dvh1",
+				IsRequired: true,
+			}},
+		}},
+	}
+
+	source := (&PlaybackHandler{codec: NewResourceIDCodec()}).buildPlaybackSource(
+		"item", "play", version, profile, playbackInfoRequest{}, true,
+	)
+	if !source.SupportsDirectPlay {
+		t.Fatal("SupportsDirectPlay = false, want true once VideoCodecTag is populated")
+	}
+}

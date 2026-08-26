@@ -1814,14 +1814,24 @@ func (h *PlaybackHandler) buildPlaybackSource(
 	supportsDirectPlay := enableDirectPlay && profile.SupportsDirectPlayForAudioStream(version, selectedAudioIndex)
 	audioSupported := profile.SupportsAudioCodecForDirectStreamForAudioStream(version, selectedAudioIndex)
 	videoSupported := profile.SupportsVideoCodecForDirectStreamForAudioStream(version, selectedAudioIndex)
+	enableTranscoding := boolDefault(req.EnableTranscoding, true)
+	// Video-copy remux (HLS fMP4, TranscodeAudio): used when the client can
+	// copy video but not audio, and when DirectPlay is impossible (typically a
+	// container mismatch — HEVC MKV on Safari/WebOS) even if audio would copy.
+	// DirectStreamURL is static=true and would serve the source MKV; the HLS
+	// remux is the route those clients can actually play. This is not a video
+	// encode, so the 4K transcode policy must not hide it.
 	transcodeAudio := enableDirectStream && allowVideoCopy && videoSupported && !audioSupported
+	if !transcodeAudio && enableTranscoding && enableDirectStream && allowVideoCopy && videoSupported && !supportsDirectPlay {
+		transcodeAudio = true
+	}
 	supportsDirectStream := !transcodeAudio &&
 		enableDirectStream &&
 		allowVideoCopy &&
 		videoSupported &&
 		allowAudioCopy &&
 		audioSupported
-	supportsTranscoding := boolDefault(req.EnableTranscoding, true) && profile.SupportsTranscoding(version)
+	supportsTranscoding := enableTranscoding && (transcodeAudio || profile.SupportsTranscoding(version))
 	// Don't offer full video encodes of 4K sources when allow_4k_transcode is
 	// off. Audio-only transcodes (transcodeAudio) stream-copy the video and
 	// stay available.

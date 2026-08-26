@@ -242,7 +242,35 @@ func buildConditionValues(version catalog.FileVersion, audioStreamIndex *int) co
 	if strings.TrimSpace(audio.Profile) != "" {
 		values["audioprofile"] = conditionValue{text: audio.Profile}
 	}
+	if tag := compatVideoCodecTag(version); tag != "" {
+		values["videocodectag"] = conditionValue{text: tag}
+	}
 	return values
+}
+
+// compatVideoCodecTag is the MP4/HLS sample entry a video-copy remux would
+// write. Safari and WebOS advertise a required HEVC VideoCodecTag of
+// hvc1|dvh1; MKV sources have no sample entry, so leaving this unset makes
+// that required condition fail and blocks copy/remux even though ffmpeg can
+// tag the remuxed stream. Values match VideoSampleEntryForDVCopy for Dolby
+// Vision 5/8 (dvh1) and the hvc1/avc1 labels those clients accept for copy.
+func compatVideoCodecTag(version catalog.FileVersion) string {
+	video := compatPrimaryVideoTrack(version)
+	codec := strings.ToLower(strings.TrimSpace(video.Codec))
+	if codec == "" {
+		codec = strings.ToLower(strings.TrimSpace(version.CodecVideo))
+	}
+	switch codec {
+	case "hevc", "h265":
+		if profile := compatDolbyVisionProfile(video); profile == 5 || profile == 8 {
+			return "dvh1"
+		}
+		return "hvc1"
+	case "h264", "avc":
+		return "avc1"
+	default:
+		return ""
+	}
 }
 
 // compatIsAnamorphic reports whether a video track's display aspect ratio
