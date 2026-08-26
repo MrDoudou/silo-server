@@ -53,6 +53,13 @@ func (h *AdminArtworkStorageHandler) HandleRefresh(w http.ResponseWriter, r *htt
 	}, "An artwork storage refresh or purge is already queued or running")
 }
 
+func (h *AdminArtworkStorageHandler) HandleImport(w http.ResponseWriter, r *http.Request) {
+	h.createJob(w, r, adminjob.CreateJobInput{
+		JobType: adminjob.JobTypeArtworkStorageImport, CreatedByUserID: currentAdminUserID(r),
+		RequestPayload: map[string]any{}, Message: "Queued portable artwork store import",
+	}, "An artwork storage job is already queued or running")
+}
+
 func (h *AdminArtworkStorageHandler) HandlePurge(w http.ResponseWriter, r *http.Request) {
 	var req adminjob.ArtworkPurgeRequest
 	decoder := json.NewDecoder(r.Body)

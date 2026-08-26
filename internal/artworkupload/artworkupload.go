@@ -19,8 +19,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
+	"github.com/Silo-Server/silo-server/internal/artworkadopt"
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/imageutil"
 )
@@ -38,6 +41,13 @@ type Store interface {
 type RevisionTracker interface {
 	TrackArtworkRevision(ctx context.Context, originalPath, imageType string, objectKeys []string) error
 	RecordArtworkRevision(ctx context.Context, originalPath, sourceClass string, objects []artworkstore.ObjectInfo) error
+}
+
+// UntrackedSeedRetainer disarms an imported seed when a user-store surface
+// that PostgreSQL cannot inspect publishes it. The row remains inventory, but
+// GC must never infer that the invisible reference is absent.
+type UntrackedSeedRetainer interface {
+	RetainUntrackedArtworkSeed(ctx context.Context, originalPath string) error
 }
 
 var (
@@ -152,6 +162,12 @@ func (m *Materializer) Materialize(ctx context.Context, req Request) (*Result, e
 	if !artworkkey.IsUploadImageType(req.ImageType) {
 		return nil, fmt.Errorf("artworkupload: %q is not an upload image type", req.ImageType)
 	}
+	fingerprint, _ := artworkkey.ByteSourceFingerprint("upload", req.Data)
+	if adopted, ok, err := m.tryAdopt(ctx, req, fingerprint); err != nil {
+		return nil, err
+	} else if ok {
+		return adopted, nil
+	}
 
 	generate := imageutil.GenerateVariants
 	if req.Square {
@@ -214,7 +230,62 @@ func (m *Materializer) Materialize(ctx context.Context, req Request) (*Result, e
 			return nil, err
 		}
 	}
+	if store, ok := m.store.(artworkadopt.Store); ok {
+		if err := artworkadopt.WriteIndex(ctx, store, fingerprint, revision.Manifest, revision.ManifestJSON); err != nil {
+			slog.WarnContext(ctx, "artwork upload adoption index write failed", "component", "artwork", "error", err)
+		}
+	}
+	artworkmetrics.Materialization("upload", "materialized")
 	return result, nil
+}
+
+func (m *Materializer) tryAdopt(ctx context.Context, req Request, fingerprint string) (*Result, bool, error) {
+	store, ok := m.store.(artworkadopt.Store)
+	if !ok {
+		return nil, false, nil
+	}
+	adopted, ok := artworkadopt.Try(ctx, store, fingerprint, req.ImageType)
+	if !ok {
+		return nil, false, nil
+	}
+	if req.Track && m.tracker != nil {
+		if err := m.tracker.TrackArtworkRevision(ctx, adopted.OriginalKey, req.ImageType, adopted.Manifest.ObjectKeys()); err != nil {
+			return nil, false, nil
+		}
+		if err := m.tracker.RecordArtworkRevision(ctx, adopted.OriginalKey, "upload", adopted.Objects); err != nil {
+			return nil, false, nil
+		}
+	} else if !req.Track && m.tracker != nil {
+		retainer, ok := m.tracker.(UntrackedSeedRetainer)
+		if !ok {
+			return nil, false, fmt.Errorf("artworkupload: revision tracker cannot retain untracked adopted seeds")
+		}
+		if err := retainer.RetainUntrackedArtworkSeed(ctx, adopted.OriginalKey); err != nil {
+			return nil, false, fmt.Errorf("artworkupload: retain untracked adopted seed: %w", err)
+		}
+	}
+	thumbhash, err := imageutil.Thumbhash(adopted.OriginalData)
+	if err != nil {
+		return nil, false, nil
+	}
+	artworkmetrics.Materialization("upload", "adopted")
+	variantKeys := make(map[string]string, len(adopted.Manifest.Variants))
+	ext := ""
+	for _, variant := range adopted.Manifest.Variants {
+		variantKeys[variant.Name] = adopted.Manifest.Directory() + "/" + variant.Filename
+		if variant.Name == artworkkey.OriginalVariant {
+			if dot := strings.LastIndex(variant.Filename, "."); dot >= 0 {
+				ext = variant.Filename[dot:]
+			}
+		}
+	}
+	return &Result{
+		ImageType: adopted.Manifest.ImageType, Revision: adopted.Manifest.Revision,
+		Directory: adopted.Manifest.Directory(), OriginalKey: adopted.OriginalKey,
+		ManifestKey: adopted.Manifest.Directory() + "/" + artworkkey.ManifestName,
+		VariantKeys: variantKeys, Ext: ext, MediaType: adopted.Manifest.MediaType,
+		Thumbhash: thumbhash, ExistingObjects: len(adopted.Objects),
+	}, true, nil
 }
 
 // buildRevision addresses the produced variant set: the revision digest, every
@@ -244,11 +315,13 @@ func (m *Materializer) writeObject(ctx context.Context, key string, data []byte,
 		return false, fmt.Errorf("artworkupload: check existing %s: %w", key, err)
 	}
 	if matches {
+		artworkmetrics.Variant("matched", int64(len(data)))
 		return false, nil
 	}
 	if err := m.store.WriteImmutable(ctx, key, data, artworkstore.ObjectMetadata{MediaType: mediaType}); err != nil {
 		return false, fmt.Errorf("artworkupload: write %s: %w", key, err)
 	}
+	artworkmetrics.Variant("written", int64(len(data)))
 	return true, nil
 }
 

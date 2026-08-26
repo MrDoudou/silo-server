@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 )
@@ -39,15 +40,18 @@ func (h *DirectLibraryArtworkHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		now,
 	)
 	if errors.Is(err, artworkurl.ErrExpired) {
+		artworkmetrics.Delivery("direct_library", "expired_signature")
 		writeError(w, http.StatusUnauthorized, "artwork_url_expired", "Artwork URL expired")
 		return
 	}
 	if err != nil {
+		artworkmetrics.Delivery("direct_library", "invalid_signature")
 		artworkNotFound(w)
 		return
 	}
 	artwork, err := h.resolver.ResolveFile(r.Context(), reference, identity, r.Header.Get("If-None-Match"))
 	if err != nil {
+		artworkmetrics.Delivery("direct_library", "miss")
 		artworkNotFound(w)
 		return
 	}
@@ -60,9 +64,13 @@ func (h *DirectLibraryArtworkHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	header.Set("ETag", `"`+artwork.Fingerprint+`"`)
 	header.Set("Cache-Control", artworkCacheControl(expiresAt, now))
 	if artwork.NotModified {
+		artworkmetrics.Delivery("direct_library", "conditional_hit")
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
+	artworkmetrics.Delivery("direct_library", "served")
 	defer func() { _ = artwork.File.Close() }()
-	http.ServeContent(w, r, "artwork", artwork.ModTime, artwork.File)
+	counting := &artworkCountingResponseWriter{ResponseWriter: w}
+	http.ServeContent(counting, r, "artwork", artwork.ModTime, artwork.File)
+	artworkmetrics.DeliveryBytes("direct_library", counting.bytes)
 }

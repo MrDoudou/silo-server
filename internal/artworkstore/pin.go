@@ -217,3 +217,17 @@ func (s *pinningStore) ensurePinned(ctx context.Context) error {
 	s.pinned.Store(true)
 	return nil
 }
+
+func (s *pinningStore) Root() string {
+	if rooted, ok := s.Store.(interface{ Root() string }); ok {
+		return rooted.Root()
+	}
+	return ""
+}
+
+func (s *pinningStore) FreeSpaceBytes(ctx context.Context) (int64, error) {
+	if capacity, ok := s.Store.(CapacityProvider); ok {
+		return capacity.FreeSpaceBytes(ctx)
+	}
+	return 0, ErrNotFound
+}

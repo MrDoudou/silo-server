@@ -648,7 +648,7 @@ PostgreSQL-backed inventory. That limitation does not force `complete` false
 or cause the startup backfill to repeat: `snapshot_at: null` alone means the
 initial refresh has never completed.
 
-`total` contains unique physical bytes, pending-GC and protected bytes, and
+`total` contains unique physical, pending-GC, protected, and reclaimable bytes, and
 unique object/revision counts. Each `libraries` entry contains
 `referenced_bytes`, `exclusive_bytes`, `shared_bytes`, `reclaimable_bytes`,
 protected/reconstructible totals, counts, and source-class totals. Shared bytes
@@ -656,10 +656,28 @@ are attribution, not additive usage: do not sum library rows to calculate the
 server total. Artwork outside a media-folder ownership graph is reported in
 `server_scoped` instead.
 
+`backend`, `health`, and optional `resolved_path` report the effective store.
+`free_space_bytes` is present only for a backend with meaningful bounded local
+capacity. Adoption-index objects are included in the unique physical/object
+totals. `seed` reports verified copied-store revisions, including expired bytes
+that have become reclaimable and `retained_unverifiable_bytes` / `_revisions`
+for unarmed user-artwork seeds whose SQLite references cannot be inspected by
+the PostgreSQL collector. `unsupported_topology_warnings` names deployment
+requirements the server cannot prove from inside the process; local storage,
+for example, requires one API node or an identically mounted shared POSIX root.
+
 `POST /api/v1/admin/artwork/storage/refresh` returns `202 Accepted` with an
 admin job. The job walks live catalog references asynchronously, resumes from
 its job-row checkpoint after interruption, validates manifests and stored
 objects, and publishes a new snapshot.
+
+`POST /api/v1/admin/artwork/storage/import` returns `202 Accepted` with a
+resumable admin job. It walks `artwork/v1/objects`, imports only revisions with
+a valid completeness manifest and matching object digests, and registers
+otherwise-unreferenced revisions as seeds for the hot-reloadable
+`artwork.seed_adoption_grace` (default `30d`). Incomplete directories are
+skipped. The active artwork refresh, import, and purge jobs are mutually
+exclusive.
 
 `POST /api/v1/admin/artwork/purge` accepts:
 

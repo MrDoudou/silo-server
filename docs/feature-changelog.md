@@ -2,6 +2,11 @@
 
 ## 2026-08-25
 
+### Copy and adopt portable artwork stores
+Portable artwork revisions now carry optional non-secret source-adoption hints. When another server resolves the same stable plugin reference or source bytes, it validates the copied manifest and object digests and reuses the existing revision without downloading or encoding it again.
+
+Admins can import a copied `artwork/v1` tree as a resumable background job. Verified unreferenced revisions receive a 30-day adoption grace, appear separately in storage accounting, become ordinary inventory when referenced, and become reclaimable through the existing safe lifecycle when unused. The admin UI now reports backend health, exact unique/protected/pending/reclaimable usage, snapshot coverage, and non-additive per-library attribution, with guided dry-run and confirmed “Free artwork storage” actions. Local artwork storage is the automatic setup default; shared S3 remains an advanced option.
+
 ### Account for artwork storage and purge it safely
 Artwork storage now has a durable object inventory and indexed admin accounting, including exact known physical bytes and object/revision counts, pending-GC and protected bytes, per-library exclusive/shared/reclaimable attribution, and separately reported server-scoped artwork. A resumable asynchronous refresh inventories older revisions without blocking the reporting endpoint and marks the snapshot incomplete until every live reference is verified.
 

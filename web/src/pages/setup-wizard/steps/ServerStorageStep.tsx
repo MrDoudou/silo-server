@@ -61,7 +61,15 @@ const PRIVATE_S3_KEYS = [
 
 const META_KEYS = ["metadata.cache_images"];
 
-const ALL_KEYS = [...SERVER_KEYS, ...PUBLIC_S3_KEYS, ...PRIVATE_S3_KEYS, ...META_KEYS];
+const ARTWORK_KEYS = ["artwork.storage_backend", "artwork.local_path"];
+
+const ALL_KEYS = [
+  ...SERVER_KEYS,
+  ...PUBLIC_S3_KEYS,
+  ...PRIVATE_S3_KEYS,
+  ...META_KEYS,
+  ...ARTWORK_KEYS,
+];
 
 async function fetchSettingValue(key: string): Promise<string | null> {
   try {
@@ -547,8 +555,43 @@ export function ServerStorageStep() {
         </div>
       </Section>
 
+      <Section
+        label="Local artwork storage"
+        description="Automatic default for posters, backdrops, logos, and generated variants. No value is required."
+      >
+        <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+          <div>
+            <p className="text-sm font-medium">Ready automatically</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Resolved path:{" "}
+              {form.getValue("artwork.local_path") || "Silo application data/artwork"}
+            </p>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="setup-artwork-backend" className="text-xs">
+            Artwork backend
+          </Label>
+          <select
+            id="setup-artwork-backend"
+            className="border-border bg-background h-9 w-full rounded-md border px-3 text-sm"
+            value={form.getValue("artwork.storage_backend") || "auto"}
+            onChange={(event) => form.setValue("artwork.storage_backend", event.target.value)}
+          >
+            <option value="auto">Automatic local storage (Recommended)</option>
+            <option value="local">Local storage</option>
+            <option value="s3">Shared S3 storage</option>
+          </select>
+          <p className="text-muted-foreground text-xs">
+            Shared S3 is intended for clustered deployments whose API nodes do not share a
+            filesystem.
+          </p>
+        </div>
+      </Section>
+
       <StorageBlock
-        title="Public Assets Storage (S3)"
+        title="Advanced: Public Assets Storage (S3)"
         expanded={publicExpanded}
         onToggle={() => setPublicExpanded((value) => !value)}
       >

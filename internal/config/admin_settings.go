@@ -49,6 +49,7 @@ const (
 	ArtworkLocalPathKey             = "artwork.local_path"
 	ArtworkRemoteMaterializationKey = "artwork.remote_materialization"
 	ArtworkURLTTLKey                = "artwork.url_ttl"
+	ArtworkSeedAdoptionGraceKey     = "artwork.seed_adoption_grace"
 )
 
 // Accepted artwork.storage_backend values. "auto" prefers a configured public
@@ -133,9 +134,10 @@ var adminSettingDefaults = map[string]string{
 	"userdb.pool_max_open":       "500",
 	"userdb.idle_timeout":        "12h",
 
-	ArtworkStorageBackendKey: ArtworkBackendAuto,
-	ArtworkLocalPathKey:      DefaultArtworkLocalPath,
-	ArtworkURLTTLKey:         "4h",
+	ArtworkStorageBackendKey:    ArtworkBackendAuto,
+	ArtworkLocalPathKey:         DefaultArtworkLocalPath,
+	ArtworkURLTTLKey:            "4h",
+	ArtworkSeedAdoptionGraceKey: "30d",
 	// artwork.remote_materialization has no static default: an installation
 	// that explicitly stored metadata.cache_images=false adopts passthrough
 	// instead. The upgrade mapping lives in LoadFromDB, and the effective
@@ -569,7 +571,7 @@ func NormalizeAdminSetting(key, raw string) (string, error) {
 			return "", nil
 		}
 		return normalizeAdminEnum(key, value, ArtworkMaterializationSelected, ArtworkMaterializationPassthrough)
-	case ArtworkURLTTLKey:
+	case ArtworkURLTTLKey, ArtworkSeedAdoptionGraceKey:
 		if value == "" {
 			return "", nil
 		}

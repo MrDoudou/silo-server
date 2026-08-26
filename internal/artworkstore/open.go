@@ -124,7 +124,7 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 		return nil, err
 	}
 
-	handle.Store = newPinningStore(handle.Store, resolved, opts.Settings, !recorded.IsZero())
+	handle.Store = observeStore(newPinningStore(handle.Store, resolved, opts.Settings, !recorded.IsZero()), handle.Backend)
 	return handle, nil
 }
 

@@ -76,6 +76,15 @@ type recordingTracker struct {
 	recordedPath    string
 	sourceClass     string
 	objects         []artworkstore.ObjectInfo
+	retainCalls     int
+	retainedPath    string
+	retainErr       error
+}
+
+func (t *recordingTracker) RetainUntrackedArtworkSeed(_ context.Context, originalPath string) error {
+	t.retainCalls++
+	t.retainedPath = originalPath
+	return t.retainErr
 }
 
 func (t *recordingTracker) TrackArtworkRevision(_ context.Context, originalPath, imageType string, objectKeys []string) error {
@@ -300,6 +309,36 @@ func TestTrackingIsOptOut(t *testing.T) {
 	}
 	if tracker.calls != 0 {
 		t.Fatalf("tracker called %d times without Track", tracker.calls)
+	}
+}
+
+func TestUntrackedAdoptionDisarmsImportedSeed(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := testJPEG(t, 64, 64, 42)
+	request := Request{ImageType: artworkkey.ImageTypeAvatar, Data: data, Square: true, Track: false}
+
+	first, err := NewMaterializer(store).Materialize(context.Background(), request)
+	if err != nil {
+		t.Fatalf("seed adoption source materialization: %v", err)
+	}
+	tracker := &recordingTracker{}
+	materializer := NewMaterializer(store)
+	materializer.SetRevisionTracker(tracker)
+	adopted, err := materializer.Materialize(context.Background(), request)
+	if err != nil {
+		t.Fatalf("untracked adoption: %v", err)
+	}
+	if adopted.OriginalKey != first.OriginalKey {
+		t.Fatalf("adopted %q, want %q", adopted.OriginalKey, first.OriginalKey)
+	}
+	if tracker.retainCalls != 1 || tracker.retainedPath != first.OriginalKey {
+		t.Fatalf("seed retention = calls:%d path:%q", tracker.retainCalls, tracker.retainedPath)
+	}
+	if tracker.calls != 0 || tracker.recordCalls != 0 {
+		t.Fatalf("untracked adoption used ordinary lifecycle tracking: track=%d record=%d", tracker.calls, tracker.recordCalls)
 	}
 }
 

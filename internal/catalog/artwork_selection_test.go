@@ -5,11 +5,33 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func TestTrackArtworkRevisionSQLPreservesSeedAdoptionGrace(t *testing.T) {
+	for _, want := range []string{
+		"source_class = 'seed'",
+		"COALESCE(artwork_revision_gc_candidates.seed_expires_at, artwork_revision_gc_candidates.not_before)",
+		"COALESCE(artwork_revision_gc_candidates.seed_expires_at, artwork_revision_gc_candidates.next_attempt_at)",
+		"GREATEST(",
+	} {
+		if !strings.Contains(trackArtworkRevisionSQL, want) {
+			t.Fatalf("tracking SQL does not preserve seed grace %q", want)
+		}
+	}
+}
+
+func TestRetainUntrackedArtworkSeedSQLDisarmsCollection(t *testing.T) {
+	for _, want := range []string{"seed_expires_at = NULL", "next_attempt_at = NULL", "source_class = 'seed'"} {
+		if !strings.Contains(retainUntrackedArtworkSeedSQL, want) {
+			t.Fatalf("retention SQL is missing %q", want)
+		}
+	}
+}
 
 func newArtworkSelectionTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()

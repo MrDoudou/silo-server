@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
@@ -22,7 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkadopt"
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/imageutil"
 	"github.com/Silo-Server/silo-server/internal/metadata"
@@ -31,6 +34,9 @@ import (
 const (
 	maxDownloadBytes = 25 * 1024 * 1024 // allow oversized provider originals; cached variants are dimension-capped
 	downloadTimeout  = 30 * time.Second
+	sourceGenerated  = "generated"
+	urlSchemeHTTP    = "http"
+	urlSchemeHTTPS   = "https"
 )
 
 // ObjectStore is the subset of artworkstore.Store the image pipeline needs:
@@ -74,7 +80,9 @@ type CacheRequest struct {
 	// a sidecar's key whenever its bytes change, which is exactly what the
 	// discriminator was for. Callers still compute it, and it stays here as
 	// the caller's record of which sidecar revision it read.
-	KeyDiscriminator string
+	KeyDiscriminator     string
+	GeneratorVersion     string
+	InputObjectRevisions []string
 }
 
 // CacheResult is returned by Cache on success.
@@ -122,14 +130,16 @@ func newWithHTTPClient(store ObjectStore, client *http.Client) *Cacher {
 // CacheImage implements metadata.ImageCacher using the internal Cache method.
 func (c *Cacher) CacheImage(ctx context.Context, req metadata.CacheImageRequest) (*metadata.CacheImageResult, error) {
 	result, err := c.Cache(ctx, CacheRequest{
-		SourceURL:     req.SourceURL,
-		ProviderID:    req.ProviderID,
-		ContentType:   req.ContentType,
-		ContentID:     req.ContentID,
-		ImageType:     req.ImageType,
-		SeasonNumber:  req.SeasonNumber,
-		EpisodeNumber: req.EpisodeNumber,
-		Language:      req.Language,
+		SourceURL:            req.SourceURL,
+		ProviderID:           req.ProviderID,
+		ContentType:          req.ContentType,
+		ContentID:            req.ContentID,
+		ImageType:            req.ImageType,
+		SeasonNumber:         req.SeasonNumber,
+		EpisodeNumber:        req.EpisodeNumber,
+		Language:             req.Language,
+		GeneratorVersion:     req.GeneratorVersion,
+		InputObjectRevisions: req.InputObjectRevisions,
 	})
 	if err != nil {
 		return nil, err
@@ -141,15 +151,17 @@ func (c *Cacher) CacheImage(ctx context.Context, req metadata.CacheImageRequest)
 // by the image cache processor for file:// sources that it reads itself.
 func (c *Cacher) CacheImageBytes(ctx context.Context, data []byte, req metadata.CacheImageRequest) (*metadata.CacheImageResult, error) {
 	result, err := c.CacheBytes(ctx, data, CacheRequest{
-		SourceURL:        req.SourceURL,
-		ProviderID:       req.ProviderID,
-		ContentType:      req.ContentType,
-		ContentID:        req.ContentID,
-		ImageType:        req.ImageType,
-		SeasonNumber:     req.SeasonNumber,
-		EpisodeNumber:    req.EpisodeNumber,
-		Language:         req.Language,
-		KeyDiscriminator: req.KeyDiscriminator,
+		SourceURL:            req.SourceURL,
+		ProviderID:           req.ProviderID,
+		ContentType:          req.ContentType,
+		ContentID:            req.ContentID,
+		ImageType:            req.ImageType,
+		SeasonNumber:         req.SeasonNumber,
+		EpisodeNumber:        req.EpisodeNumber,
+		Language:             req.Language,
+		KeyDiscriminator:     req.KeyDiscriminator,
+		GeneratorVersion:     req.GeneratorVersion,
+		InputObjectRevisions: req.InputObjectRevisions,
 	})
 	if err != nil {
 		return nil, err
@@ -241,17 +253,31 @@ func validateCacheRequest(req CacheRequest) error {
 // Publication — pointing a catalog row at OriginalPath — happens after this
 // returns, in the caller that owns the target row.
 func (c *Cacher) CacheBytes(ctx context.Context, data []byte, req CacheRequest) (*CacheResult, error) {
+	class := artworkSourceClass(req)
+	var fingerprint string
+	if class == sourceGenerated {
+		fingerprint, _ = artworkkey.GeneratedSourceFingerprint(req.GeneratorVersion, req.InputObjectRevisions)
+	} else {
+		fingerprint, _ = artworkkey.ByteSourceFingerprint(class, data)
+	}
+	return c.cacheBytes(ctx, data, req, fingerprint)
+}
+
+func (c *Cacher) cacheBytes(ctx context.Context, data []byte, req CacheRequest, fingerprint string) (*CacheResult, error) {
 	if err := validateCacheRequest(req); err != nil {
 		return nil, err
 	}
 	if len(data) == 0 {
 		return nil, fmt.Errorf("imagecache: image data is empty")
 	}
+	imageType := metadata.ImageTypeToString(req.ImageType)
+	if adopted, ok := c.tryAdopt(ctx, fingerprint, imageType, artworkSourceClass(req)); ok {
+		return adopted, nil
+	}
 	thumbhash, err := imageutil.Thumbhash(data)
 	if err != nil {
 		return nil, fmt.Errorf("imagecache: thumbhash: %w", err)
 	}
-	imageType := metadata.ImageTypeToString(req.ImageType)
 	result, err := imageutil.GenerateVariants(data, artworkkey.VariantWidths(imageType))
 	if err != nil {
 		return nil, fmt.Errorf("imagecache: generate variants: %w", err)
@@ -275,6 +301,8 @@ func (c *Cacher) CacheBytes(ctx context.Context, data []byte, req CacheRequest) 
 	if err := c.recordRevision(ctx, revision, result, artworkSourceClass(req)); err != nil {
 		return nil, err
 	}
+	c.writeAdoptionIndex(ctx, fingerprint, revision)
+	artworkmetrics.Materialization(artworkSourceClass(req), "materialized")
 	return &CacheResult{
 		BasePath:         revision.Directory,
 		OriginalPath:     revision.OriginalKey,
@@ -295,6 +323,12 @@ func (c *Cacher) Cache(ctx context.Context, req CacheRequest) (*CacheResult, err
 		return nil, err
 	}
 
+	imageType := metadata.ImageTypeToString(req.ImageType)
+	fingerprint := stablePluginSourceFingerprint(req.SourceURL)
+	if adopted, ok := c.tryAdopt(ctx, fingerprint, imageType, artworkSourceClass(req)); ok {
+		return adopted, nil
+	}
+
 	url := req.SourceURL
 
 	// Resolve non-HTTP paths (e.g. plugin_id://path) via the resolver.
@@ -313,7 +347,71 @@ func (c *Cacher) Cache(ctx context.Context, req CacheRequest) (*CacheResult, err
 		return nil, fmt.Errorf("imagecache: download %s: %w", url, err)
 	}
 
-	return c.CacheBytes(ctx, data, req)
+	return c.cacheBytes(ctx, data, req, fingerprint)
+}
+
+func stablePluginSourceFingerprint(source string) string {
+	parsed, err := url.Parse(strings.TrimSpace(source))
+	if err != nil || parsed.Scheme == "" {
+		return ""
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case urlSchemeHTTP, urlSchemeHTTPS, "file", "embedded", sourceGenerated, "upload", "library-artwork":
+		return ""
+	}
+	fingerprint, _ := artworkkey.SourceFingerprint("provider", source)
+	return fingerprint
+}
+
+func (c *Cacher) tryAdopt(ctx context.Context, fingerprint, imageType, sourceClass string) (*CacheResult, bool) {
+	store, ok := c.store.(artworkadopt.Store)
+	if !ok || fingerprint == "" {
+		return nil, false
+	}
+	adopted, ok := artworkadopt.Try(ctx, store, fingerprint, imageType)
+	if !ok {
+		return nil, false
+	}
+	if c.revisionTracker != nil {
+		if err := c.revisionTracker.TrackArtworkRevision(ctx, adopted.OriginalKey, imageType, adopted.Manifest.ObjectKeys()); err != nil {
+			return nil, false
+		}
+		if err := c.revisionTracker.RecordArtworkRevision(ctx, adopted.OriginalKey, sourceClass, adopted.Objects); err != nil {
+			return nil, false
+		}
+	}
+	thumbhash, err := imageutil.Thumbhash(adopted.OriginalData)
+	if err != nil {
+		return nil, false
+	}
+	artworkmetrics.Materialization(sourceClass, "adopted")
+	variantPaths := make(map[string]string, len(adopted.Manifest.Variants))
+	ext := ""
+	for _, variant := range adopted.Manifest.Variants {
+		key := adopted.Manifest.Directory() + "/" + variant.Filename
+		variantPaths[variant.Name] = key
+		if variant.Name == artworkkey.OriginalVariant {
+			if dot := strings.LastIndex(variant.Filename, "."); dot >= 0 {
+				ext = variant.Filename[dot:]
+			}
+		}
+	}
+	return &CacheResult{
+		BasePath: adopted.Manifest.Directory(), OriginalPath: adopted.OriginalKey,
+		Revision: adopted.Manifest.Revision, ManifestPath: adopted.Manifest.Directory() + "/" + artworkkey.ManifestName,
+		VariantPaths: variantPaths, Thumbhash: thumbhash, Ext: ext,
+		ExistingVariants: len(adopted.Manifest.Variants),
+	}, true
+}
+
+func (c *Cacher) writeAdoptionIndex(ctx context.Context, fingerprint string, revision *artworkkey.PortableRevision) {
+	store, ok := c.store.(artworkadopt.Store)
+	if !ok || fingerprint == "" {
+		return
+	}
+	if err := artworkadopt.WriteIndex(ctx, store, fingerprint, revision.Manifest, revision.ManifestJSON); err != nil {
+		slog.WarnContext(ctx, "artwork adoption index write failed", "component", "artwork", "error", err)
+	}
 }
 
 // buildRevision addresses the produced variant set: the revision digest, every
@@ -357,6 +455,7 @@ func (c *Cacher) writeVariants(ctx context.Context, revision *artworkkey.Portabl
 			}
 			if exists {
 				stats[idx].existing = 1
+				artworkmetrics.Variant("matched", int64(len(variant.Data)))
 				return
 			}
 			if err := c.writeObject(ctx, key, variant.Data, revision.MediaType); err != nil {
@@ -364,6 +463,7 @@ func (c *Cacher) writeVariants(ctx context.Context, revision *artworkkey.Portabl
 				return
 			}
 			stats[idx].uploaded = 1
+			artworkmetrics.Variant("written", int64(len(variant.Data)))
 		}(i, v)
 	}
 	wg.Wait()
@@ -429,7 +529,7 @@ func artworkSourceClass(req CacheRequest) string {
 	case strings.HasPrefix(source, "embedded://") || strings.EqualFold(req.ProviderID, "local"):
 		return "embedded"
 	case strings.HasPrefix(source, "generated://"):
-		return "generated"
+		return sourceGenerated
 	case strings.HasPrefix(source, "plugin://"):
 		return "plugin"
 	case source != "":
@@ -541,7 +641,7 @@ func validatePublicImageURL(u *url.URL) error {
 	if u == nil {
 		return fmt.Errorf("empty URL")
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
+	if u.Scheme != urlSchemeHTTP && u.Scheme != urlSchemeHTTPS {
 		return fmt.Errorf("unsupported URL scheme %q", u.Scheme)
 	}
 	host := u.Hostname()

@@ -58,55 +58,92 @@ func NewArtworkRevisionTracker(pool *pgxpool.Pool, storeBinding ...string) *Artw
 	return &ArtworkRevisionTracker{pool: pool, gracePeriod: defaultArtworkGCGracePeriod, storeBinding: binding}
 }
 
-// TrackArtworkRevision records an immutable revision's object manifest. Image
-// caching first supplies an empty manifest before uploading, so it serializes
-// with a collector that may already be deleting an older, unreferenced copy;
-// the image type lets GC expand that pending manifest if an upload only partly
-// succeeds. The cacher replaces it with exact keys only after every upload
-// succeeds. Revisions parked as referenced stay dormant: a re-cache of live
-// artwork is not garbage, and displacement triggers re-arm the row if the
-// reference later moves away.
+const trackArtworkRevisionSQL = `
+	INSERT INTO artwork_revision_gc_candidates (
+		original_path, image_type, object_keys, not_before, next_attempt_at
+	) VALUES ($1, $2, $3, $4, $4)
+	ON CONFLICT (original_path) DO UPDATE SET
+		object_keys = EXCLUDED.object_keys,
+		image_type = CASE
+			WHEN artwork_revision_gc_candidates.image_type = '' THEN EXCLUDED.image_type
+			ELSE artwork_revision_gc_candidates.image_type
+		END,
+		not_before = CASE
+			WHEN artwork_revision_gc_candidates.next_attempt_at IS NULL THEN artwork_revision_gc_candidates.not_before
+			WHEN artwork_revision_gc_candidates.source_class = 'seed' THEN GREATEST(
+				COALESCE(artwork_revision_gc_candidates.seed_expires_at, artwork_revision_gc_candidates.not_before),
+				EXCLUDED.not_before
+			)
+			ELSE EXCLUDED.not_before
+		END,
+		next_attempt_at = CASE
+			WHEN artwork_revision_gc_candidates.next_attempt_at IS NULL THEN NULL
+			WHEN artwork_revision_gc_candidates.source_class = 'seed' THEN GREATEST(
+				COALESCE(artwork_revision_gc_candidates.seed_expires_at, artwork_revision_gc_candidates.next_attempt_at),
+				EXCLUDED.next_attempt_at
+			)
+			ELSE EXCLUDED.next_attempt_at
+		END,
+		deleted_at = NULL,
+		deletion_started_at = NULL,
+		tombstoned_at = NULL,
+		attempt_count = 0,
+		locked_at = NULL,
+		locked_by = '',
+		last_error = '',
+		updated_at = NOW()`
+
+// TrackArtworkRevision records the exact object manifest for a revision before
+// its upload starts. Image caching calls this before uploading, so it
+// serializes with a collector that may already be deleting an older,
+// currently-unreferenced copy. Revisions parked as referenced stay dormant: a
+// re-cache of live artwork is not garbage, and displacement triggers re-arm
+// the row if the reference later moves away.
 func (t *ArtworkRevisionTracker) TrackArtworkRevision(ctx context.Context, originalPath, imageType string, objectKeys []string) error {
 	if t == nil || t.pool == nil {
 		return fmt.Errorf("catalog: artwork revision tracking is not configured")
 	}
 	originalPath = strings.TrimSpace(originalPath)
-	imageType = strings.ToLower(strings.TrimSpace(imageType))
 	keys := compactArtworkObjectKeys(objectKeys)
-	if originalPath == "" || strings.Contains(originalPath, "://") || (len(keys) == 0 && imageType == "") {
+	if originalPath == "" || strings.Contains(originalPath, "://") || len(keys) == 0 {
 		return nil
 	}
 	notBefore := time.Now().Add(t.gracePeriod)
 	// deleted_at is cleared because this upsert precedes a re-upload of the
 	// exact manifest: the objects exist again once the cacher finishes.
-	_, err := t.pool.Exec(ctx, `
-		INSERT INTO artwork_revision_gc_candidates (
-			original_path, image_type, object_keys, not_before, next_attempt_at
-		) VALUES ($1, $2, $3, $4, $4)
-		ON CONFLICT (original_path) DO UPDATE SET
-			object_keys = EXCLUDED.object_keys,
-			image_type = CASE
-				WHEN artwork_revision_gc_candidates.image_type = '' THEN EXCLUDED.image_type
-				ELSE artwork_revision_gc_candidates.image_type
-			END,
-			not_before = CASE
-				WHEN artwork_revision_gc_candidates.next_attempt_at IS NULL THEN artwork_revision_gc_candidates.not_before
-				ELSE EXCLUDED.not_before
-			END,
-			next_attempt_at = CASE
-				WHEN artwork_revision_gc_candidates.next_attempt_at IS NULL THEN NULL
-				ELSE EXCLUDED.next_attempt_at
-			END,
-			deleted_at = NULL,
-			deletion_started_at = NULL,
-			tombstoned_at = NULL,
-			attempt_count = 0,
-			locked_at = NULL,
-			locked_by = '',
-			last_error = '',
-			updated_at = NOW()`, originalPath, imageType, keys, notBefore)
+	_, err := t.pool.Exec(ctx, trackArtworkRevisionSQL, originalPath, strings.ToLower(strings.TrimSpace(imageType)), keys, notBefore)
 	if err != nil {
 		return fmt.Errorf("catalog: track artwork revision: %w", err)
+	}
+	return nil
+}
+
+const retainUntrackedArtworkSeedSQL = `
+	UPDATE artwork_revision_gc_candidates
+	SET seed_expires_at = NULL,
+		next_attempt_at = NULL,
+		not_before = GREATEST(not_before, NOW()),
+		attempt_count = 0,
+		locked_at = NULL,
+		locked_by = '',
+		last_error = '',
+		updated_at = NOW()
+	WHERE original_path = $1 AND source_class = 'seed'`
+
+// RetainUntrackedArtworkSeed preserves an imported seed that has just been
+// published by a user-store surface outside PostgreSQL's reference union.
+// Keeping it as an unarmed seed makes the coverage limitation visible to
+// accounting without allowing GC to delete a live, unverifiable upload.
+func (t *ArtworkRevisionTracker) RetainUntrackedArtworkSeed(ctx context.Context, originalPath string) error {
+	if t == nil || t.pool == nil {
+		return fmt.Errorf("catalog: artwork revision tracking is not configured")
+	}
+	originalPath = strings.TrimSpace(originalPath)
+	if originalPath == "" || strings.Contains(originalPath, "://") {
+		return nil
+	}
+	if _, err := t.pool.Exec(ctx, retainUntrackedArtworkSeedSQL, originalPath); err != nil {
+		return fmt.Errorf("catalog: retain untracked artwork seed: %w", err)
 	}
 	return nil
 }
@@ -155,6 +192,8 @@ func (t *ArtworkRevisionTracker) RecordArtworkRevision(
 			store_generation = $7,
 			inventory_complete = TRUE,
 			last_verified_at = NOW(),
+			seed_imported_at = NULL,
+			seed_expires_at = NULL,
 			deleted_at = NULL,
 			deletion_started_at = NULL,
 			tombstoned_at = NULL,

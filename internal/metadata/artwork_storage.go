@@ -13,6 +13,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
@@ -68,6 +69,14 @@ type ArtworkInventoryCheckpoint struct {
 	Failures       int64  `json:"failures"`
 	StoreCursor    string `json:"store_cursor,omitempty"`
 	OrphanObjects  int64  `json:"orphan_objects"`
+	IndexBytes     int64  `json:"index_bytes"`
+	IndexObjects   int64  `json:"index_objects"`
+	ImportCursor   string `json:"import_cursor,omitempty"`
+	ImportedSeeds  int64  `json:"imported_seeds"`
+	AdoptedSeeds   int64  `json:"adopted_seeds"`
+	RetainedSeeds  int64  `json:"retained_unverifiable_seeds"`
+	ImportSkipped  int64  `json:"import_skipped"`
+	ImportFinished bool   `json:"import_finished"`
 	Finished       bool   `json:"finished"`
 }
 
@@ -141,6 +150,9 @@ func (s *ArtworkStorageService) Refresh(
 	if err := s.discoverOrphans(ctx, &cp, save, progress); err != nil {
 		return ArtworkInventoryRefreshResult{}, err
 	}
+	if err := s.adoptReferencedSeeds(ctx); err != nil {
+		return ArtworkInventoryRefreshResult{}, err
+	}
 
 	cp.Finished = true
 	result, err := s.refreshResult(ctx, cp)
@@ -149,7 +161,7 @@ func (s *ArtworkStorageService) Refresh(
 	}
 	_, err = s.pool.Exec(ctx, artworkAccountingPublishSQL, result.SnapshotAt, result.Complete, result.KnownRevisions, result.MissingRevisions,
 		result.MissingObjects, result.OrphanObjects, result.Failures, s.untrackedUserArtwork,
-		map[bool]string{true: "user artwork is stored outside PostgreSQL inventory", false: ""}[s.untrackedUserArtwork])
+		map[bool]string{true: "user artwork is stored outside PostgreSQL inventory", false: ""}[s.untrackedUserArtwork], cp.IndexBytes, cp.IndexObjects)
 	if err != nil {
 		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: publish snapshot: %w", err)
 	}
@@ -161,7 +173,20 @@ func (s *ArtworkStorageService) Refresh(
 	if progress != nil {
 		progress(int(cp.KnownRevisions), int(cp.KnownRevisions), "Artwork storage accounting refreshed")
 	}
+	artworkmetrics.Inventory(result.SnapshotAt, result.MissingRevisions, result.MissingObjects, result.OrphanObjects)
 	return result, nil
+}
+
+func (s *ArtworkStorageService) adoptReferencedSeeds(ctx context.Context) error {
+	_, err := s.pool.Exec(ctx, `UPDATE artwork_revision_gc_candidates seed
+		SET source_class = 'unknown', seed_imported_at = NULL, seed_expires_at = NULL,
+			next_attempt_at = NULL, locked_at = NULL, locked_by = '', updated_at = NOW()
+		WHERE seed.source_class = 'seed' AND seed.tombstoned_at IS NULL
+			AND EXISTS (SELECT 1 FROM (`+artworkInventoryReferenceSQL()+`) refs WHERE refs.path = seed.original_path)`)
+	if err != nil {
+		return fmt.Errorf("artwork inventory: adopt referenced seed: %w", err)
+	}
+	return nil
 }
 
 const artworkAccountingPublishSQL = `
@@ -175,6 +200,8 @@ const artworkAccountingPublishSQL = `
 		failure_count = $7,
 		coverage_limited = $8,
 		coverage_limit_reason = $9,
+		adoption_index_bytes = $10,
+		adoption_index_objects = $11,
 		last_error = CASE WHEN $7 > 0 THEN 'inventory refresh had failures' ELSE '' END,
 		updated_at = NOW()
 	WHERE singleton`
@@ -215,6 +242,11 @@ func (s *ArtworkStorageService) discoverOrphans(ctx context.Context, cp *Artwork
 		if len(objects) > 0 {
 			keys := make([]string, 0, len(objects))
 			for i := range objects {
+				if artworkkey.IsAdoptionIndexKey(objects[i].Key) {
+					cp.IndexObjects++
+					cp.IndexBytes += objects[i].SizeBytes
+					continue
+				}
 				if artworkstore.ValidateKey(objects[i].Key) == nil {
 					keys = append(keys, objects[i].Key)
 				}
@@ -397,11 +429,11 @@ func artworkSourceClassFromReference(source string) string {
 	case strings.HasPrefix(source, "plugin://"):
 		return "plugin"
 	case strings.Contains(source, "://"):
-		return "provider"
+		return artworkSourceClassProvider
 	case strings.HasPrefix(source, "/"):
 		return "bundled"
 	default:
-		return "unknown"
+		return artworkSourceClassUnknown
 	}
 }
 
@@ -439,14 +471,31 @@ type ArtworkStorageAccounting struct {
 	CoverageLimited      bool                       `json:"coverage_limited"`
 	CoverageLimitReason  string                     `json:"coverage_limit_reason,omitempty"`
 	FailureCount         int64                      `json:"failure_count"`
+	Seed                 ArtworkSeedAccounting      `json:"seed"`
+	AdoptionIndexBytes   int64                      `json:"adoption_index_bytes"`
+	AdoptionIndexObjects int64                      `json:"adoption_index_objects"`
+	ResolvedPath         string                     `json:"resolved_path,omitempty"`
+	Health               string                     `json:"health"`
+	FreeSpaceBytes       *int64                     `json:"free_space_bytes,omitempty"`
+	TopologyWarnings     []string                   `json:"unsupported_topology_warnings,omitempty"`
 }
 
 type ArtworkStorageTotal struct {
-	PhysicalBytes  int64 `json:"physical_bytes"`
-	PendingGCBytes int64 `json:"pending_gc_bytes"`
-	ProtectedBytes int64 `json:"protected_bytes"`
-	ObjectCount    int64 `json:"object_count"`
-	RevisionCount  int64 `json:"revision_count"`
+	PhysicalBytes    int64 `json:"physical_bytes"`
+	PendingGCBytes   int64 `json:"pending_gc_bytes"`
+	ProtectedBytes   int64 `json:"protected_bytes"`
+	ReclaimableBytes int64 `json:"reclaimable_bytes"`
+	ObjectCount      int64 `json:"object_count"`
+	RevisionCount    int64 `json:"revision_count"`
+}
+
+type ArtworkSeedAccounting struct {
+	Bytes                         int64      `json:"bytes"`
+	ExpiredBytes                  int64      `json:"expired_bytes"`
+	Revisions                     int64      `json:"revisions"`
+	RetainedUnverifiableBytes     int64      `json:"retained_unverifiable_bytes"`
+	RetainedUnverifiableRevisions int64      `json:"retained_unverifiable_revisions"`
+	LastImportAt                  *time.Time `json:"last_import_at,omitempty"`
 }
 
 type ArtworkLibraryAccounting struct {
@@ -485,11 +534,28 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	result := ArtworkStorageAccounting{Backend: s.backend, UntrackedUserArtwork: s.untrackedUserArtwork}
+	result := ArtworkStorageAccounting{
+		Backend: s.backend, Health: "ready", UntrackedUserArtwork: s.untrackedUserArtwork,
+		Libraries: make([]ArtworkLibraryAccounting, 0),
+	}
+	if s.backend == artworkstore.BackendLocal {
+		result.TopologyWarnings = []string{"Local artwork storage requires one API node or an identically mounted shared POSIX root on every API node."}
+	}
+	if rooted, ok := s.store.(interface{ Root() string }); ok {
+		result.ResolvedPath = rooted.Root()
+	}
+	if capacity, ok := s.store.(artworkstore.CapacityProvider); ok {
+		if free, err := capacity.FreeSpaceBytes(ctx); err == nil {
+			result.FreeSpaceBytes = &free
+		} else if !errors.Is(err, artworkstore.ErrNotFound) {
+			result.Health = "degraded"
+		}
+	}
 	if err := tx.QueryRow(ctx, artworkAccountingStateSQL).Scan(
 		&result.SnapshotAt, &result.Complete, &result.InventoryDrift.MissingRevisions,
 		&result.InventoryDrift.MissingObjects, &result.InventoryDrift.OrphanObjects,
 		&result.CoverageLimited, &result.CoverageLimitReason, &result.FailureCount,
+		&result.AdoptionIndexBytes, &result.AdoptionIndexObjects, &result.Seed.LastImportAt,
 	); err != nil {
 		return result, fmt.Errorf("artwork accounting: load snapshot: %w", err)
 	}
@@ -506,11 +572,16 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 	}
 	if err := tx.QueryRow(ctx, artworkStorageTotalSQL()).Scan(
 		&result.Total.PhysicalBytes, &result.Total.PendingGCBytes, &result.Total.ProtectedBytes,
-		&result.Total.ObjectCount, &result.Total.RevisionCount,
+		&result.Total.ReclaimableBytes, &result.Total.ObjectCount, &result.Total.RevisionCount,
+		&result.Seed.Bytes, &result.Seed.ExpiredBytes, &result.Seed.Revisions,
+		&result.Seed.RetainedUnverifiableBytes, &result.Seed.RetainedUnverifiableRevisions,
 	); err != nil {
 		return result, fmt.Errorf("artwork accounting: total: %w", err)
 	}
+	result.Total.PhysicalBytes += result.AdoptionIndexBytes
+	result.Total.ObjectCount += result.AdoptionIndexObjects
 	result.KnownBytes = result.Total.PhysicalBytes
+	artworkmetrics.SeedExpiredBytes(result.Seed.ExpiredBytes)
 
 	rows, err := tx.Query(ctx, artworkLibraryAccountingSQL())
 	if err != nil {
@@ -572,7 +643,8 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 
 const artworkAccountingStateSQL = `
 	SELECT snapshot_at, inventory_complete, missing_revisions, missing_objects, orphan_objects,
-		coverage_limited, coverage_limit_reason, failure_count
+		coverage_limited, coverage_limit_reason, failure_count,
+		adoption_index_bytes, adoption_index_objects, last_seed_import_at
 	FROM artwork_storage_accounting_state WHERE singleton`
 
 func artworkReconstructibleSQL(sourceExpr string) string {
@@ -606,19 +678,19 @@ func artworkLibraryReferencesSQL() string {
 		UNION ALL SELECT mf.id, mf.poster_path, FALSE FROM media_folders mf WHERE %s
 		UNION ALL SELECT lc.library_id, lc.poster_url, FALSE FROM library_collections lc WHERE %s
 		UNION ALL SELECT lc.library_id, lc.backdrop_url, FALSE FROM library_collections lc WHERE %s`,
-		reconstructible("mi.poster_source_path"), surface("item posters").cachedPredicate(),
-		reconstructible("mi.backdrop_source_path"), surface("item backdrops").cachedPredicate(),
-		reconstructible("mi.logo_source_path"), surface("item logos").cachedPredicate(),
-		reconstructible("loc.poster_source_path"), strings.ReplaceAll(surface("localized item posters").cachedPredicate(), "poster_path", "loc.poster_path"),
-		reconstructible("loc.backdrop_source_path"), strings.ReplaceAll(surface("localized item backdrops").cachedPredicate(), "backdrop_path", "loc.backdrop_path"),
-		reconstructible("loc.logo_source_path"), strings.ReplaceAll(surface("localized item logos").cachedPredicate(), "logo_path", "loc.logo_path"),
-		reconstructible("se.poster_source_path"), strings.ReplaceAll(surface("season posters").cachedPredicate(), "poster_path", "se.poster_path"),
-		reconstructible("loc.poster_source_path"), strings.ReplaceAll(surface("localized season posters").cachedPredicate(), "poster_path", "loc.poster_path"),
-		reconstructible("ep.still_source_path"), strings.ReplaceAll(surface("episode stills").cachedPredicate(), "still_path", "ep.still_path"),
-		reconstructible("p.photo_source_path"), strings.ReplaceAll(surface("person photos").cachedPredicate(), "photo_path", "p.photo_path"),
-		strings.ReplaceAll(surface("library posters").cachedPredicate(), "poster_path", "mf.poster_path"),
-		strings.ReplaceAll(surface("collection posters").cachedPredicate(), "poster_url", "lc.poster_url"),
-		strings.ReplaceAll(surface("collection backdrops").cachedPredicate(), "backdrop_url", "lc.backdrop_url"),
+		reconstructible("mi.poster_source_path"), surface(artworkSurfaceItemPosters).cachedPredicate(),
+		reconstructible("mi.backdrop_source_path"), surface(artworkSurfaceItemBackdrops).cachedPredicate(),
+		reconstructible("mi.logo_source_path"), surface(artworkSurfaceItemLogos).cachedPredicate(),
+		reconstructible("loc.poster_source_path"), strings.ReplaceAll(surface(artworkSurfaceLocalizedItemPosters).cachedPredicate(), "poster_path", "loc.poster_path"),
+		reconstructible("loc.backdrop_source_path"), strings.ReplaceAll(surface(artworkSurfaceLocalizedItemBackdrops).cachedPredicate(), "backdrop_path", "loc.backdrop_path"),
+		reconstructible("loc.logo_source_path"), strings.ReplaceAll(surface(artworkSurfaceLocalizedItemLogos).cachedPredicate(), "logo_path", "loc.logo_path"),
+		reconstructible("se.poster_source_path"), strings.ReplaceAll(surface(artworkSurfaceSeasonPosters).cachedPredicate(), "poster_path", "se.poster_path"),
+		reconstructible("loc.poster_source_path"), strings.ReplaceAll(surface(artworkSurfaceLocalizedSeasonPosters).cachedPredicate(), "poster_path", "loc.poster_path"),
+		reconstructible("ep.still_source_path"), strings.ReplaceAll(surface(artworkSurfaceEpisodeStills).cachedPredicate(), "still_path", "ep.still_path"),
+		reconstructible("p.photo_source_path"), strings.ReplaceAll(surface(artworkSurfacePersonPhotos).cachedPredicate(), "photo_path", "p.photo_path"),
+		strings.ReplaceAll(surface(artworkSurfaceLibraryPosters).cachedPredicate(), "poster_path", "mf.poster_path"),
+		strings.ReplaceAll(surface(artworkSurfaceCollectionPosters).cachedPredicate(), "poster_url", "lc.poster_url"),
+		strings.ReplaceAll(surface(artworkSurfaceCollectionBackdrops).cachedPredicate(), "backdrop_url", "lc.backdrop_url"),
 	)
 }
 
@@ -635,7 +707,7 @@ func artworkStorageAccountingCTE() string {
 }
 
 func artworkServerReferencesSQL() string {
-	personal, ok := artworkSweepSurfaceByName("user collection posters")
+	personal, ok := artworkSweepSurfaceByName(artworkSurfaceUserCollectionPosters)
 	if !ok {
 		panic("missing artwork sweep surface user collection posters")
 	}
@@ -655,8 +727,16 @@ func artworkStorageTotalSQL() string {
 		COALESCE(sum(total_physical_bytes) FILTER (WHERE lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
 		COALESCE(sum(total_physical_bytes) FILTER (WHERE lifecycle_state IN ('pending_gc', 'deleting')), 0),
 		COALESCE(sum(total_physical_bytes) FILTER (WHERE original_path IN (SELECT path FROM protected_paths) AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
+		COALESCE(sum(total_physical_bytes) FILTER (WHERE
+			(source_class = 'seed' AND seed_expires_at <= NOW() AND lifecycle_state IN ('parked', 'pending_gc', 'deleting'))
+			OR (lifecycle_state IN ('pending_gc', 'deleting') AND original_path NOT IN (SELECT path FROM protected_paths))), 0),
 		COALESCE(sum((SELECT count(*) FROM unnest(object_sizes_bytes) size WHERE size > 0)) FILTER (WHERE lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
-		count(*) FILTER (WHERE lifecycle_state IN ('parked', 'pending_gc', 'deleting'))
+		count(*) FILTER (WHERE lifecycle_state IN ('parked', 'pending_gc', 'deleting')),
+		COALESCE(sum(total_physical_bytes) FILTER (WHERE source_class = 'seed' AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
+		COALESCE(sum(total_physical_bytes) FILTER (WHERE source_class = 'seed' AND seed_expires_at <= NOW() AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
+		count(*) FILTER (WHERE source_class = 'seed' AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')),
+		COALESCE(sum(total_physical_bytes) FILTER (WHERE source_class = 'seed' AND seed_imported_at IS NOT NULL AND seed_expires_at IS NULL AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
+		count(*) FILTER (WHERE source_class = 'seed' AND seed_imported_at IS NOT NULL AND seed_expires_at IS NULL AND lifecycle_state IN ('parked', 'pending_gc', 'deleting'))
 		FROM artwork_revision_gc_candidates`
 }
 

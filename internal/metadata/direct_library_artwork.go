@@ -162,7 +162,11 @@ func (r *DirectLibraryArtworkResolver) fingerprint(key string, opened ConfinedLo
 	if err != nil {
 		return "", err
 	}
-	return value.(string), nil
+	fingerprint, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("direct-library artwork fingerprint has unexpected type %T", value)
+	}
+	return fingerprint, nil
 }
 
 func (r *DirectLibraryArtworkResolver) storeFingerprint(key, fingerprint string) {
@@ -230,24 +234,24 @@ func (r *DirectLibraryArtworkResolver) roots(ctx context.Context, surfaceName st
 	var query string
 	var arg any = keys[0]
 	switch surfaceName {
-	case "item posters", "item backdrops", "item logos", "localized item posters", "localized item backdrops", "localized item logos":
+	case artworkSurfaceItemPosters, artworkSurfaceItemBackdrops, artworkSurfaceItemLogos, artworkSurfaceLocalizedItemPosters, artworkSurfaceLocalizedItemBackdrops, artworkSurfaceLocalizedItemLogos:
 		query = `SELECT DISTINCT mfp.path FROM media_folder_paths mfp JOIN media_item_libraries mil ON mil.media_folder_id = mfp.media_folder_id WHERE mil.content_id = $1`
-	case "season posters":
+	case artworkSurfaceSeasonPosters:
 		query = `SELECT DISTINCT mfp.path FROM seasons s JOIN media_item_libraries mil ON mil.content_id = s.series_id JOIN media_folder_paths mfp ON mfp.media_folder_id = mil.media_folder_id WHERE s.content_id = $1`
-	case "localized season posters":
+	case artworkSurfaceLocalizedSeasonPosters:
 		query = `SELECT DISTINCT mfp.path FROM season_localizations loc JOIN seasons s ON s.content_id = loc.season_content_id JOIN media_item_libraries mil ON mil.content_id = s.series_id JOIN media_folder_paths mfp ON mfp.media_folder_id = mil.media_folder_id WHERE loc.season_content_id = $1`
-	case "episode stills":
+	case artworkSurfaceEpisodeStills:
 		query = `SELECT DISTINCT mfp.path FROM episodes ep JOIN media_item_libraries mil ON mil.content_id = ep.series_id JOIN media_folder_paths mfp ON mfp.media_folder_id = mil.media_folder_id WHERE ep.content_id = $1`
-	case "person photos":
+	case artworkSurfacePersonPhotos:
 		personID, err := strconv.ParseInt(keys[0], 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid person artwork identity")
 		}
 		arg = personID
 		query = `SELECT DISTINCT mfp.path FROM item_people ip JOIN media_item_libraries mil ON mil.content_id = ip.content_id JOIN media_folder_paths mfp ON mfp.media_folder_id = mil.media_folder_id WHERE ip.person_id = $1`
-	case "collection posters", "collection backdrops":
+	case artworkSurfaceCollectionPosters, artworkSurfaceCollectionBackdrops:
 		query = `SELECT DISTINCT mfp.path FROM library_collections lc JOIN media_folder_paths mfp ON mfp.media_folder_id = lc.library_id WHERE lc.id = $1`
-	case "library posters":
+	case artworkSurfaceLibraryPosters:
 		libraryID, err := strconv.Atoi(keys[0])
 		if err != nil {
 			return nil, fmt.Errorf("invalid library artwork identity")

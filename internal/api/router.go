@@ -3225,6 +3225,7 @@ func NewRouter(deps Dependencies) chi.Router {
 								r.Route("/artwork", func(r chi.Router) {
 									r.Get("/storage", adminArtworkStorageHandler.HandleStorage)
 									r.Post("/storage/refresh", adminArtworkStorageHandler.HandleRefresh)
+									r.Post("/storage/import", adminArtworkStorageHandler.HandleImport)
 									r.Post("/purge", adminArtworkStorageHandler.HandlePurge)
 								})
 							}

@@ -80,6 +80,14 @@ type writeCall struct {
 	data      []byte
 }
 
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) { return f(request) }
+
+type fixedImageResolver struct{ url string }
+
+func (r fixedImageResolver) ResolveImageURL(context.Context, string, string) string { return r.url }
+
 func (m *mockStore) WriteImmutable(_ context.Context, key string, data []byte, meta artworkstore.ObjectMetadata) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -309,6 +317,36 @@ func TestCacheBytesTracksExactRevisionBeforeUpload(t *testing.T) {
 		if object.MediaType == "" {
 			t.Fatalf("inventory content type for %s is empty", object.Key)
 		}
+	}
+}
+
+func TestCacheAdoptsPluginReferenceBeforeResolvingOrDownloading(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := makeTestJPEG(t)
+	firstClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(data)), Header: make(http.Header)}, nil
+	})}
+	req := CacheRequest{
+		SourceURL: "tmdb://poster/opaque-42", ProviderID: testTMDBProviderID,
+		ContentType: testMoviesContentType, ContentID: "42", ImageType: metadata.ImagePoster,
+		ImageResolver: fixedImageResolver{url: "https://images.example/poster.jpg"},
+	}
+	first, err := newWithHTTPClient(store, firstClient).Cache(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("download must not run on adoption hit")
+	})}
+	second, err := newWithHTTPClient(store, secondClient).Cache(context.Background(), req)
+	if err != nil {
+		t.Fatalf("adopt cache: %v", err)
+	}
+	if second.OriginalPath != first.OriginalPath || second.ExistingVariants == 0 || second.UploadedVariants != 0 {
+		t.Fatalf("adopted result = %#v; first = %#v", second, first)
 	}
 }
 

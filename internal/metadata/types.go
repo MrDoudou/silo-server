@@ -378,6 +378,11 @@ type CacheImageRequest struct {
 	// immutable key. It remains the caller's record of which sidecar revision
 	// it read.
 	KeyDiscriminator string
+	// GeneratorVersion and InputObjectRevisions form the stable adoption
+	// identity for deterministic generated artwork. Both are required; callers
+	// that cannot provide them deliberately omit the adoption index.
+	GeneratorVersion     string
+	InputObjectRevisions []string
 }
 
 // CacheImageResult is returned by ImageCacher on success.

@@ -53,6 +53,11 @@ func TestAdminArtworkStorageEndpointsReadSnapshotAndQueueAsyncJobs(t *testing.T)
 	if recorder.Code != http.StatusAccepted || jobs.input.JobType != adminjob.JobTypeArtworkStorageRefresh {
 		t.Fatalf("refresh response = %d %s, job = %#v", recorder.Code, recorder.Body.String(), jobs.input)
 	}
+	recorder = httptest.NewRecorder()
+	handler.HandleImport(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/admin/artwork/storage/import", nil))
+	if recorder.Code != http.StatusAccepted || jobs.input.JobType != adminjob.JobTypeArtworkStorageImport {
+		t.Fatalf("import response = %d %s, job = %#v", recorder.Code, recorder.Body.String(), jobs.input)
+	}
 
 	recorder = httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/artwork/purge", strings.NewReader(

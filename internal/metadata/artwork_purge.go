@@ -391,21 +391,21 @@ func loadPurgeSurface(ctx context.Context, tx pgx.Tx, surface artworkSweepSurfac
 
 func purgeSurfaceOwnershipPredicate(name, alias string) (string, error) {
 	switch name {
-	case "item posters", "item backdrops", "item logos", "localized item posters", "localized item backdrops", "localized item logos":
+	case artworkSurfaceItemPosters, artworkSurfaceItemBackdrops, artworkSurfaceItemLogos, artworkSurfaceLocalizedItemPosters, artworkSurfaceLocalizedItemBackdrops, artworkSurfaceLocalizedItemLogos:
 		return fmt.Sprintf("EXISTS (SELECT 1 FROM media_item_libraries mil WHERE mil.content_id = %s.content_id AND mil.media_folder_id = $1)", alias), nil
-	case "season posters":
+	case artworkSurfaceSeasonPosters:
 		return fmt.Sprintf("EXISTS (SELECT 1 FROM media_item_libraries mil WHERE mil.content_id = %s.series_id AND mil.media_folder_id = $1)", alias), nil
-	case "localized season posters":
+	case artworkSurfaceLocalizedSeasonPosters:
 		return fmt.Sprintf("EXISTS (SELECT 1 FROM seasons se JOIN media_item_libraries mil ON mil.content_id = se.series_id WHERE se.content_id = %s.season_content_id AND mil.media_folder_id = $1)", alias), nil
-	case "episode stills":
+	case artworkSurfaceEpisodeStills:
 		return fmt.Sprintf("EXISTS (SELECT 1 FROM media_item_libraries mil WHERE mil.content_id = %s.series_id AND mil.media_folder_id = $1)", alias), nil
-	case "person photos":
+	case artworkSurfacePersonPhotos:
 		return fmt.Sprintf("EXISTS (SELECT 1 FROM item_people ip JOIN media_item_libraries mil ON mil.content_id = ip.content_id WHERE ip.person_id = %s.id AND mil.media_folder_id = $1)", alias), nil
-	case "collection posters", "collection backdrops":
+	case artworkSurfaceCollectionPosters, artworkSurfaceCollectionBackdrops:
 		return alias + ".library_id = $1", nil
-	case "user collection posters":
-		return "FALSE", nil
-	case "library posters":
+	case artworkSurfaceUserCollectionPosters:
+		return artworkNoRemoteSource, nil
+	case artworkSurfaceLibraryPosters:
 		return alias + ".id = $1", nil
 	default:
 		return "", fmt.Errorf("artwork purge: unknown surface %q", name)

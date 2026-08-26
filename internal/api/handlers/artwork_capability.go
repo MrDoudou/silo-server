@@ -47,6 +47,7 @@ type artworkCapabilityResponse struct {
 	// the signed direct-library fallback without changing this default.
 	LocalSourcePolicy string                             `json:"local_source_policy"`
 	StorageManagement artworkStorageManagementCapability `json:"storage_management"`
+	Portability       artworkPortabilityCapability       `json:"portability"`
 	// Variants is the variant ladder generated per image type. The names are
 	// the ones a stored key can carry, largest first after "original".
 	Variants map[string][]string `json:"variants"`
@@ -56,6 +57,12 @@ type artworkStorageManagementCapability struct {
 	Accounting            bool `json:"accounting"`
 	SafePurge             bool `json:"safe_purge"`
 	DirectLibraryFallback bool `json:"direct_library_fallback"`
+}
+
+type artworkPortabilityCapability struct {
+	AdoptionIndex bool `json:"adoption_index"`
+	SeedImport    bool `json:"seed_import"`
+	PortableCopy  bool `json:"portable_copy"`
 }
 
 // ArtworkCapabilityHandler answers the artwork capability probe.
@@ -108,6 +115,7 @@ func (h *ArtworkCapabilityHandler) HandleCapability(w http.ResponseWriter, r *ht
 		StorageManagement: artworkStorageManagementCapability{
 			Accounting: true, SafePurge: true, DirectLibraryFallback: true,
 		},
-		Variants: variants,
+		Portability: artworkPortabilityCapability{AdoptionIndex: true, SeedImport: true, PortableCopy: true},
+		Variants:    variants,
 	})
 }

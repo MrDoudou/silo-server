@@ -14,6 +14,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 )
 
 const (
@@ -86,6 +88,14 @@ func NewFilesystemStore(rootPath string) (*FilesystemStore, error) {
 // admin status and log lines; it never leaks into a logical key or a client URL.
 func (s *FilesystemStore) Root() string {
 	return s.rootPath
+}
+
+func (s *FilesystemStore) FreeSpaceBytes(_ context.Context) (int64, error) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(s.rootPath, &stat); err != nil {
+		return 0, fmt.Errorf("artworkstore: stat filesystem capacity: %w", err)
+	}
+	return int64(stat.Bavail) * int64(stat.Bsize), nil
 }
 
 // Close releases the store root handle. Later calls reopen it.
@@ -461,6 +471,7 @@ func (s *FilesystemStore) CleanTempFiles(ctx context.Context, olderThan time.Dur
 	if walkErr != nil {
 		errs = append(errs, walkErr)
 	}
+	artworkmetrics.TempFilesCleaned(removed)
 	return removed, errors.Join(errs...)
 }
 

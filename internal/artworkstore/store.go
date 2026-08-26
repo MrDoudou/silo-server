@@ -80,6 +80,13 @@ type DirectURLProvider interface {
 	ReadURL(ctx context.Context, key string, ttl time.Duration) (ResolvedURL, error)
 }
 
+// CapacityProvider is implemented when the backend has a meaningful bounded
+// local capacity. Object stores deliberately omit it because bucket quotas are
+// provider-specific and generally unavailable from the S3 API.
+type CapacityProvider interface {
+	FreeSpaceBytes(ctx context.Context) (int64, error)
+}
+
 // ResolvedURL is a fetchable URL and the instant it stops working. ExpiresAt is
 // nil for URLs that do not expire.
 type ResolvedURL struct {

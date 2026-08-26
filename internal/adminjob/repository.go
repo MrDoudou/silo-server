@@ -176,7 +176,7 @@ func (r *Repository) Create(ctx context.Context, input CreateJobInput) (*models.
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		var activeJob *models.AdminJob
 		var lookupErr error
-		if input.JobType == JobTypeArtworkStorageRefresh || input.JobType == JobTypeArtworkPurge {
+		if input.JobType == JobTypeArtworkStorageRefresh || input.JobType == JobTypeArtworkPurge || input.JobType == JobTypeArtworkStorageImport {
 			activeJob, lookupErr = r.GetActiveArtworkStorageJob(ctx)
 		} else {
 			activeJob, lookupErr = r.GetActiveByType(ctx, input.JobType)
@@ -194,10 +194,10 @@ func (r *Repository) GetActiveArtworkStorageJob(ctx context.Context) (*models.Ad
 	return scanAdminJob(r.pool.QueryRow(ctx, `
 		SELECT `+adminJobColumns+`
 		FROM admin_jobs
-		WHERE job_type IN ($1, $2) AND status IN ($3, $4)
+		WHERE job_type IN ($1, $2, $3) AND status IN ($4, $5)
 		ORDER BY requested_at ASC
 		LIMIT 1`,
-		JobTypeArtworkStorageRefresh, JobTypeArtworkPurge, StatusQueued, StatusRunning,
+		JobTypeArtworkStorageRefresh, JobTypeArtworkPurge, JobTypeArtworkStorageImport, StatusQueued, StatusRunning,
 	))
 }
 

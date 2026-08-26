@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
@@ -63,7 +64,11 @@ func (r *Resolver) ResolveArtworkURL(ctx context.Context, key string) (artworkst
 		return artworkstore.ResolvedURL{}, err
 	}
 	if r.direct != nil {
-		return r.direct.ReadURL(ctx, key, r.directTTL())
+		resolved, err := r.direct.ReadURL(ctx, key, r.directTTL())
+		if err == nil {
+			artworkmetrics.DirectURLMinted()
+		}
+		return resolved, err
 	}
 	return r.signer.Sign(key, time.Now())
 }

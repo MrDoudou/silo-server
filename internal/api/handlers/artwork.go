@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/go-chi/chi/v5"
@@ -50,6 +51,17 @@ type ArtworkObjectStore interface {
 type ArtworkHandler struct {
 	store  ArtworkObjectStore
 	signer *artworkurl.Signer
+}
+
+type artworkCountingResponseWriter struct {
+	http.ResponseWriter
+	bytes int64
+}
+
+func (w *artworkCountingResponseWriter) Write(data []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(data)
+	w.bytes += int64(n)
+	return n, err
 }
 
 // NewArtworkHandler builds the delivery handler. It returns nil when either
@@ -102,6 +114,7 @@ func (h *ArtworkHandler) serve(w http.ResponseWriter, r *http.Request, encodedKe
 	)
 	switch {
 	case errors.Is(err, artworkurl.ErrExpired):
+		artworkmetrics.Delivery("store", "expired_signature")
 		// The capability was ours and has simply run out; the client refetches
 		// the catalog response to get a current URL. No store lookup happened,
 		// so this still says nothing about which keys exist. No
@@ -110,6 +123,7 @@ func (h *ArtworkHandler) serve(w http.ResponseWriter, r *http.Request, encodedKe
 		writeError(w, http.StatusUnauthorized, "artwork_url_expired", "Artwork URL expired")
 		return
 	case err != nil:
+		artworkmetrics.Delivery("store", "invalid_signature")
 		// Malformed, unsigned, or forged. Answered identically to an unknown
 		// key so a caller cannot probe for stored objects.
 		artworkNotFound(w)
@@ -118,6 +132,7 @@ func (h *ArtworkHandler) serve(w http.ResponseWriter, r *http.Request, encodedKe
 
 	object, err := h.store.Open(r.Context(), key)
 	if err != nil {
+		artworkmetrics.Delivery("store", "miss")
 		if errors.Is(err, artworkstore.ErrNotFound) {
 			// A referenced object that is not stored is a clean miss. The
 			// artwork reconciler owns repairing or clearing the reference; a
@@ -167,15 +182,24 @@ func (h *ArtworkHandler) writeObject(
 	// A seekable body (the filesystem store) gets the standard serving
 	// primitives: conditional requests, ranges, and HEAD handled for free.
 	if seeker, ok := object.ReadSeeker(); ok {
-		http.ServeContent(w, r, info.Key, info.ModTime, seeker)
+		if artworkETagMatches(r.Header.Get("If-None-Match"), info.ETag) {
+			artworkmetrics.Delivery("store", "conditional_hit")
+		} else {
+			artworkmetrics.Delivery("store", "served")
+		}
+		counting := &artworkCountingResponseWriter{ResponseWriter: w}
+		http.ServeContent(counting, r, info.Key, info.ModTime, seeker)
+		artworkmetrics.DeliveryBytes("store", counting.bytes)
 		return
 	}
 
 	// A streaming backend answers the parts that do not need seeking.
 	if artworkETagMatches(r.Header.Get("If-None-Match"), info.ETag) {
+		artworkmetrics.Delivery("store", "conditional_hit")
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
+	artworkmetrics.Delivery("store", "served")
 	if info.SizeBytes > 0 {
 		header.Set("Content-Length", strconv.FormatInt(info.SizeBytes, 10))
 	}
@@ -184,7 +208,9 @@ func (h *ArtworkHandler) writeObject(
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	if _, err := io.Copy(w, object.Body); err != nil {
+	written, err := io.Copy(w, object.Body)
+	artworkmetrics.DeliveryBytes("store", written)
+	if err != nil {
 		slog.DebugContext(r.Context(), "artwork response interrupted",
 			"component", "api", "key", info.Key, "error", err)
 	}

@@ -43,6 +43,18 @@ func TestArtworkAccountingUsesPublishedSnapshotAndDistinctDriftCounters(t *testi
 	}
 }
 
+func TestArtworkSeedAccountingExcludesCollectedAndRetainedSeedsFromReclaimable(t *testing.T) {
+	query := artworkStorageTotalSQL()
+	for _, want := range []string{
+		"source_class = 'seed' AND seed_expires_at <= NOW() AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')",
+		"seed_imported_at IS NOT NULL AND seed_expires_at IS NULL",
+	} {
+		if !strings.Contains(query, want) {
+			t.Fatalf("seed accounting SQL is missing %q:\n%s", want, query)
+		}
+	}
+}
+
 func TestArtworkSweepSurfaceNamesPinDurableCatalogIdentity(t *testing.T) {
 	type pinnedSurface struct {
 		table, keys, path, source, thumbhash string
@@ -187,6 +199,23 @@ func TestArtworkInventoryMigrationPinsExactObjectAndJobState(t *testing.T) {
 	} {
 		if !strings.Contains(sql, want) {
 			t.Fatalf("migration is missing %q", want)
+		}
+	}
+}
+
+func TestArtworkSeedAdoptionMigrationPinsLifecycleAndSerialization(t *testing.T) {
+	body, err := os.ReadFile("../../migrations/sql/20260825233000_artwork_seed_adoption.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := string(body)
+	for _, want := range []string{
+		"seed_imported_at timestamptz", "seed_expires_at timestamptz", "source_class IN",
+		"'seed'", "adoption_index_bytes bigint", "last_seed_import_at timestamptz",
+		"'artwork_storage_import'", "artwork_revision_seed_expiry_idx",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("seed migration is missing %q", want)
 		}
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/catalogseed"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 	"github.com/Silo-Server/silo-server/internal/models"
@@ -164,6 +165,7 @@ func (r *Runner) runNext() {
 		JobTypeTemplateBundleApply,
 		JobTypeArtworkStorageRefresh,
 		JobTypeArtworkPurge,
+		JobTypeArtworkStorageImport,
 	})
 	cancel()
 	if err != nil {
@@ -203,9 +205,49 @@ func (r *Runner) runNext() {
 		r.executeArtworkStorageRefresh(job)
 	case JobTypeArtworkPurge:
 		r.executeArtworkPurge(job)
+	case JobTypeArtworkStorageImport:
+		r.executeArtworkStorageImport(job)
 	default:
 		r.failJob(job.ID, 0, 0, "Admin job failed", "unsupported admin job type")
 	}
+}
+
+func (r *Runner) executeArtworkStorageImport(job *models.AdminJob) {
+	if r.artworkStorage == nil {
+		r.failJob(job.ID, 0, 0, "Artwork store import failed", "artwork storage executor is not configured")
+		return
+	}
+	checkpoint, err := decodeArtworkInventoryCheckpoint(job.Checkpoint)
+	if err != nil {
+		r.failJob(job.ID, 0, 0, "Artwork store import failed", err.Error())
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), artworkStorageTimeout)
+	defer cancel()
+	heartbeatStop := make(chan struct{})
+	go r.heartbeatLoop(ctx, job.ID, heartbeatStop)
+	defer close(heartbeatStop)
+	progress := func(current, total int, message string) {
+		if err := r.repo.UpdateProgress(ctx, job.ID, current, total, message); err == nil {
+			r.publishJobByID(ctx, notifications.TypeJobProgress, job.ID)
+		}
+	}
+	result, err := r.artworkStorage.ImportPortable(ctx, checkpoint, func(next metadata.ArtworkInventoryCheckpoint) error {
+		return r.repo.UpdateCheckpoint(ctx, job.ID, next)
+	}, progress)
+	if err != nil {
+		r.failJob(job.ID, 0, 0, "Artwork store import failed", err.Error())
+		return
+	}
+	if err := r.repo.Complete(ctx, job.ID, CompleteJobInput{
+		ResultPayload: result, Message: "Portable artwork store imported",
+		ProgressCurrent: int(result.ImportedSeeds + result.AdoptedLive + result.RetainedUnverifiable),
+		ProgressTotal:   int(result.ImportedSeeds + result.AdoptedLive + result.RetainedUnverifiable), ExpiresAt: time.Now().UTC().Add(r.retention),
+	}); err != nil {
+		slog.Warn("admin jobs: failed to complete artwork store import", "job_id", job.ID, "error", err)
+		return
+	}
+	r.publishJobByID(ctx, notifications.TypeJobCompleted, job.ID)
 }
 
 func (r *Runner) executeArtworkStorageRefresh(job *models.AdminJob) {
@@ -253,12 +295,14 @@ func (r *Runner) executeArtworkPurge(job *models.AdminJob) {
 	}
 	req, err := decodeArtworkPurgeRequest(job.RequestPayload)
 	if err != nil {
+		artworkmetrics.Purge(req.DryRun, "failed", 0, 0)
 		r.failJob(job.ID, 0, 0, "Artwork purge failed", err.Error())
 		return
 	}
 	req.DryRun = job.DryRun
 	checkpoint, err := decodeArtworkPurgeCheckpoint(job.Checkpoint)
 	if err != nil {
+		artworkmetrics.Purge(req.DryRun, "failed", 0, 0)
 		r.failJob(job.ID, 0, 0, "Artwork purge failed", err.Error())
 		return
 	}
@@ -276,9 +320,11 @@ func (r *Runner) executeArtworkPurge(job *models.AdminJob) {
 		return r.repo.UpdateCheckpoint(ctx, job.ID, next)
 	}, progress)
 	if err != nil {
+		artworkmetrics.Purge(req.DryRun, "failed", 0, 0)
 		r.failJob(job.ID, 0, 0, "Artwork purge failed", err.Error())
 		return
 	}
+	artworkmetrics.Purge(req.DryRun, "completed", result.PendingBytes, result.ReclaimableBytes)
 	queueRefresh := !req.DryRun && req.Mode == ArtworkPurgeModeSafeMaterialized
 	result.AccountingRefreshQueued = queueRefresh
 	if err := r.repo.Complete(ctx, job.ID, CompleteJobInput{

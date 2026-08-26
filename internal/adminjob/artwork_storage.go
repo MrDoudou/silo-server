@@ -11,6 +11,7 @@ import (
 const (
 	JobTypeArtworkStorageRefresh = "artwork_storage_refresh"
 	JobTypeArtworkPurge          = "artwork_storage_purge"
+	JobTypeArtworkStorageImport  = "artwork_storage_import"
 
 	ArtworkPurgeModeEdgeOnly         = metadata.ArtworkPurgeModeEdgeOnly
 	ArtworkPurgeModeSafeMaterialized = metadata.ArtworkPurgeModeSafeMaterialized
