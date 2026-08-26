@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/Silo-Server/silo-server/internal/access"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
@@ -70,6 +71,32 @@ func canManageHousehold(
 		return false, err
 	}
 	return true, nil
+}
+
+// authorizeHouseholdProfileTarget reports whether the caller may mutate state
+// for targetProfileID. The caller's own active profile is always allowed; any
+// other profile on the account requires canManageHousehold (primary or admin,
+// plus PIN token when the primary is locked). Callers that omit X-Profile-Id
+// cannot widen to a sibling by naming it in the body alone.
+func authorizeHouseholdProfileTarget(
+	r *http.Request,
+	store userstore.UserStore,
+	users userLookup,
+	tokens *access.ProfileTokenService,
+	targetProfileID string,
+) (bool, error) {
+	targetProfileID = strings.TrimSpace(targetProfileID)
+	if targetProfileID == "" {
+		return false, nil
+	}
+	activeProfileID := apimw.GetProfileID(r.Context())
+	if activeProfileID == "" {
+		activeProfileID = r.Header.Get("X-Profile-Id")
+	}
+	if activeProfileID != "" && activeProfileID == targetProfileID {
+		return true, nil
+	}
+	return canManageHousehold(r, store, users, tokens)
 }
 
 // verifyProfileToken checks the X-Profile-Token a PIN-locked profile must

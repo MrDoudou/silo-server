@@ -1769,11 +1769,15 @@ func NewRouter(deps Dependencies) chi.Router {
 		if deps.EventsHub != nil {
 			historyImportSvc.AddObserver(evt.NewHistoryImportObserver(deps.EventsHub))
 		}
-		historyImportHandler = handlers.NewHistoryImportHandler(historyImportSvc)
+		historyImportHandler = handlers.NewHistoryImportHandler(historyImportSvc, deps.UserStoreProvider)
+		historyImportHandler.UserRepo = userRepo
+		historyImportHandler.ProfileTokens = profileTokenService
 		if deps.UserStoreProvider != nil {
 			webhookSyncSvc := webhooksync.NewService(webhooksync.NewRepository(deps.DB, deps.SecretCipher), historyRepo, deps.UserStoreProvider)
 			webhookSyncSvc.SetStableIdentityResolver(historyIdentity)
-			webhookSyncHandler = handlers.NewWebhookSyncHandler(webhookSyncSvc)
+			webhookSyncHandler = handlers.NewWebhookSyncHandler(webhookSyncSvc, deps.UserStoreProvider)
+			webhookSyncHandler.UserRepo = userRepo
+			webhookSyncHandler.ProfileTokens = profileTokenService
 		}
 	}
 

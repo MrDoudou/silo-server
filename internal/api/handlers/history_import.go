@@ -7,19 +7,28 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Silo-Server/silo-server/internal/access"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/historyimport"
+	"github.com/Silo-Server/silo-server/internal/userstore"
 )
 
 type HistoryImportHandler struct {
-	service *historyimport.Service
+	service       *historyimport.Service
+	storeProvider userstore.UserStoreProvider
+
+	// UserRepo and ProfileTokens enable importing into another household
+	// profile. Both nil means that widening is unavailable — never unguarded.
+	UserRepo      userLookup
+	ProfileTokens *access.ProfileTokenService
 }
 
-func NewHistoryImportHandler(service *historyimport.Service) *HistoryImportHandler {
-	return &HistoryImportHandler{service: service}
+func NewHistoryImportHandler(service *historyimport.Service, storeProvider userstore.UserStoreProvider) *HistoryImportHandler {
+	return &HistoryImportHandler{service: service, storeProvider: storeProvider}
 }
 
 func (h *HistoryImportHandler) HandleListSources(w http.ResponseWriter, r *http.Request) {
@@ -69,6 +78,14 @@ func (h *HistoryImportHandler) HandleCreateRun(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusBadRequest, "bad_request", "Invalid request body")
 		return
 	}
+	req.ProfileID = strings.TrimSpace(req.ProfileID)
+	if req.ProfileID == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "profile_id is required")
+		return
+	}
+	if !h.authorizeImportProfile(w, r, userID, req.ProfileID) {
+		return
+	}
 
 	run, err := h.service.CreateRun(r.Context(), userID, req)
 	if err != nil {
@@ -76,6 +93,42 @@ func (h *HistoryImportHandler) HandleCreateRun(w http.ResponseWriter, r *http.Re
 		return
 	}
 	writeJSON(w, http.StatusCreated, run)
+}
+
+// authorizeImportProfile allows importing into the caller's active profile, or
+// into another household profile when canManageHousehold permits it. Without
+// this gate a non-primary profile could write watch history/favorites into a
+// PIN-locked sibling by naming that profile_id in the body alone.
+func (h *HistoryImportHandler) authorizeImportProfile(w http.ResponseWriter, r *http.Request, userID int, profileID string) bool {
+	if h == nil || h.storeProvider == nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to access user store")
+		return false
+	}
+	store, err := h.storeProvider.ForUser(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to access user store")
+		return false
+	}
+	allowed, err := authorizeHouseholdProfileTarget(r, store, h.UserRepo, h.ProfileTokens, profileID)
+	if err != nil {
+		writeProfileManagementPermissionError(w, err)
+		return false
+	}
+	if !allowed {
+		writeError(w, http.StatusForbidden, "forbidden",
+			"Importing into another profile requires the primary profile or admin access")
+		return false
+	}
+	profile, err := store.GetProfile(r.Context(), profileID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load profile")
+		return false
+	}
+	if profile == nil {
+		writeError(w, http.StatusNotFound, "not_found", "Profile not found")
+		return false
+	}
+	return true
 }
 
 func (h *HistoryImportHandler) HandleListRuns(w http.ResponseWriter, r *http.Request) {
