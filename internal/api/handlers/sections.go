@@ -1310,8 +1310,8 @@ func (h *SectionHandler) buildSectionsResponse(r *http.Request, withItems []sect
 		}
 	}
 	userStates := h.listSectionItemUserStates(r, allItems)
-	imageURLs := h.resolveSectionItemImageURLs(r.Context(), withItems, requestImageSize(r))
 	episodeMeta := h.listSectionEpisodeItemMeta(r.Context(), withItems, requestAccessFilter(r))
+	imageURLs := h.resolveSectionItemImageURLs(r.Context(), withItems, episodeMeta, requestImageSize(r))
 	mangaChapterMeta := h.listSectionMangaChapterItemMeta(r.Context(), allItems)
 	for _, s := range withItems {
 		items := make([]sectionItemResponse, 0, len(s.Items))
@@ -1415,7 +1415,7 @@ func (h *SectionHandler) listSectionEpisodeItemMeta(ctx context.Context, withIte
 				continue
 			}
 			if section.ItemMeta != nil {
-				if _, ok := section.ItemMeta[item.ContentID]; ok {
+				if meta, ok := section.ItemMeta[item.ContentID]; ok && sectionEpisodeArtworkMetaComplete(item, meta) {
 					continue
 				}
 			}
@@ -1438,7 +1438,13 @@ func (h *SectionHandler) listSectionEpisodeItemMeta(ctx context.Context, withIte
 	return meta
 }
 
-func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withItems []sections.SectionWithItems, size imagesize.Size) map[sectionItemImageKey]sectionItemImageURLs {
+func sectionEpisodeArtworkMetaComplete(item *models.MediaItem, meta sections.SectionItemMeta) bool {
+	return (item.PosterPath == "" || meta.PosterOwner.ContentID != "") &&
+		(item.BackdropPath == "" || meta.BackdropOwner.ContentID != "") &&
+		(item.LogoPath == "" || meta.LogoOwner.ContentID != "")
+}
+
+func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withItems []sections.SectionWithItems, episodeMeta map[string]sections.SectionItemMeta, size imagesize.Size) map[sectionItemImageKey]sectionItemImageURLs {
 	result := make(map[sectionItemImageKey]sectionItemImageURLs)
 	if h.DetailSvc == nil {
 		return result
@@ -1463,15 +1469,30 @@ func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withIt
 			if item == nil {
 				continue
 			}
-			ownerID := item.ContentID
-			if item.Type == "episode" && section.ItemMeta != nil {
-				if meta := section.ItemMeta[item.ContentID]; meta.SeriesID != nil && *meta.SeriesID != "" {
-					ownerID = *meta.SeriesID
+			var (
+				meta    sections.SectionItemMeta
+				hasMeta bool
+			)
+			if section.ItemMeta != nil {
+				meta, hasMeta = section.ItemMeta[item.ContentID]
+			}
+			fallbackMeta, hasFallbackMeta := episodeMeta[item.ContentID]
+			if !hasMeta {
+				meta = fallbackMeta
+			} else if hasFallbackMeta {
+				if meta.PosterOwner.ContentID == "" {
+					meta.PosterOwner = fallbackMeta.PosterOwner
+				}
+				if meta.BackdropOwner.ContentID == "" {
+					meta.BackdropOwner = fallbackMeta.BackdropOwner
+				}
+				if meta.LogoOwner.ContentID == "" {
+					meta.LogoOwner = fallbackMeta.LogoOwner
 				}
 			}
-			poster := artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{ownerID}, Slot: artworkImagePoster}.WithReference(item.PosterPath)
-			backdrop := artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{ownerID}, Slot: artworkImageBackdrop}.WithReference(item.BackdropPath)
-			logo := artworkurl.Target{Surface: artworkurl.SurfaceItemLogos, Keys: []string{ownerID}, Slot: artworkImageLogo}.WithReference(item.LogoPath)
+			poster := sectionArtworkTarget(item.ContentID, item.PosterPath, artworkImagePoster, meta.PosterOwner)
+			backdrop := sectionArtworkTarget(item.ContentID, item.BackdropPath, artworkImageBackdrop, meta.BackdropOwner)
+			logo := sectionArtworkTarget(item.ContentID, item.LogoPath, artworkImageLogo, meta.LogoOwner)
 			posterVariant := artworkkey.VariantW500
 			backdropVariant := artworkkey.VariantW1280
 			logoVariant := artworkkey.OriginalVariant
@@ -1520,6 +1541,38 @@ func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withIt
 		}
 	}
 	return result
+}
+
+func sectionArtworkTarget(itemID string, reference string, imageType string, owner sections.SectionArtworkOwner) artworkurl.Target {
+	surface := artworkurl.SurfaceItemPosters
+	switch imageType {
+	case artworkImageBackdrop:
+		surface = artworkurl.SurfaceItemBackdrops
+	case artworkImageLogo:
+		surface = artworkurl.SurfaceItemLogos
+	}
+
+	key := itemID
+	slot := imageType
+	if owner.ContentID != "" {
+		switch owner.Kind {
+		case sections.SectionArtworkOwnerSeries:
+			key = owner.ContentID
+		case sections.SectionArtworkOwnerSeason:
+			if imageType == artworkImagePoster {
+				surface = artworkurl.SurfaceSeasonPosters
+				key = owner.ContentID
+			}
+		case sections.SectionArtworkOwnerEpisode:
+			if imageType == artworkImagePoster || imageType == artworkImageBackdrop {
+				surface = artworkurl.SurfaceEpisodeStills
+				key = owner.ContentID
+				slot = artworkImageStill
+			}
+		}
+	}
+
+	return artworkurl.Target{Surface: surface, Keys: []string{key}, Slot: slot}.WithReference(reference)
 }
 
 func (h *SectionHandler) toSectionItemResponse(sectionType sections.SectionType, item *models.MediaItem, meta *sections.SectionItemMeta, overlaySummary *models.OverlaySummary, userState *itemUserStateResponse, imageURLs sectionItemImageURLs, resolvedPlayContentID string) sectionItemResponse {

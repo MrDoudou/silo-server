@@ -377,6 +377,7 @@ type countingSectionImageResolver struct {
 	singleCalls      int
 	variant          string
 	paths            []string
+	requests         []artworkurl.TargetRequest
 }
 
 func (r *countingSectionImageResolver) ResolveImageURL(_ context.Context, path string, variant string) string {
@@ -419,6 +420,7 @@ func (r *countingSectionImageResolver) ResolveArtworkTargetsWithExpiry(_ context
 
 func (r *countingSectionImageResolver) ResolveArtworkTargetRequestsWithExpiry(_ context.Context, requests []artworkurl.TargetRequest) map[string]catalog.ResolvedImageURL {
 	r.targetBatchCalls++
+	r.requests = append(r.requests, requests...)
 	resolved := make(map[string]catalog.ResolvedImageURL, len(requests))
 	seen := make(map[string]struct{})
 	for _, request := range requests {
@@ -430,6 +432,119 @@ func (r *countingSectionImageResolver) ResolveArtworkTargetRequestsWithExpiry(_ 
 		}
 	}
 	return resolved
+}
+
+func TestBuildSectionsResponseMintsSeriesPosterTargetForEpisode(t *testing.T) {
+	assertEpisodeSectionArtworkTarget(t, episodeSectionArtworkTargetCase{
+		posterPath:  "series/poster/original.jpg",
+		posterOwner: sections.SectionArtworkOwner{Kind: sections.SectionArtworkOwnerSeries, ContentID: "series-1"},
+		wantSurface: artworkurl.SurfaceItemPosters,
+		wantKey:     "series-1",
+		wantSlot:    artworkImagePoster,
+	})
+}
+
+func TestBuildSectionsResponseMintsSeasonPosterTargetForEpisode(t *testing.T) {
+	assertEpisodeSectionArtworkTarget(t, episodeSectionArtworkTargetCase{
+		posterPath:  "season/poster/original.jpg",
+		posterOwner: sections.SectionArtworkOwner{Kind: sections.SectionArtworkOwnerSeason, ContentID: "season-1"},
+		wantSurface: artworkurl.SurfaceSeasonPosters,
+		wantKey:     "season-1",
+		wantSlot:    artworkImagePoster,
+	})
+}
+
+func TestBuildSectionsResponseMintsEpisodeStillPosterTargetForEpisode(t *testing.T) {
+	assertEpisodeSectionArtworkTarget(t, episodeSectionArtworkTargetCase{
+		posterPath:  "episode/still/original.jpg",
+		posterOwner: sections.SectionArtworkOwner{Kind: sections.SectionArtworkOwnerEpisode, ContentID: "episode-1"},
+		wantSurface: artworkurl.SurfaceEpisodeStills,
+		wantKey:     "episode-1",
+		wantSlot:    artworkImageStill,
+	})
+}
+
+func TestBuildSectionsResponseMintsEpisodeStillBackdropTargetForEpisode(t *testing.T) {
+	assertEpisodeSectionArtworkTarget(t, episodeSectionArtworkTargetCase{
+		backdropPath:  "episode/still/original.jpg",
+		backdropOwner: sections.SectionArtworkOwner{Kind: sections.SectionArtworkOwnerEpisode, ContentID: "episode-1"},
+		wantSurface:   artworkurl.SurfaceEpisodeStills,
+		wantKey:       "episode-1",
+		wantSlot:      artworkImageStill,
+	})
+}
+
+func TestBuildSectionsResponseMintsSeriesLogoTargetForEpisode(t *testing.T) {
+	assertEpisodeSectionArtworkTarget(t, episodeSectionArtworkTargetCase{
+		logoPath:    "series/logo/original.png",
+		logoOwner:   sections.SectionArtworkOwner{Kind: sections.SectionArtworkOwnerSeries, ContentID: "series-1"},
+		wantSurface: artworkurl.SurfaceItemLogos,
+		wantKey:     "series-1",
+		wantSlot:    artworkImageLogo,
+	})
+}
+
+type episodeSectionArtworkTargetCase struct {
+	posterPath    string
+	backdropPath  string
+	logoPath      string
+	posterOwner   sections.SectionArtworkOwner
+	backdropOwner sections.SectionArtworkOwner
+	logoOwner     sections.SectionArtworkOwner
+	wantSurface   string
+	wantKey       string
+	wantSlot      string
+}
+
+func assertEpisodeSectionArtworkTarget(t *testing.T, tc episodeSectionArtworkTargetCase) {
+	t.Helper()
+	resolver := &countingSectionImageResolver{}
+	detailSvc := &catalog.DetailService{}
+	detailSvc.SetImageResolver(resolver)
+	h := &SectionHandler{DetailSvc: detailSvc}
+
+	item := &models.MediaItem{
+		ContentID:    "episode-1",
+		Type:         "episode",
+		PosterPath:   tc.posterPath,
+		BackdropPath: tc.backdropPath,
+		LogoPath:     tc.logoPath,
+	}
+	h.buildSectionsResponse(httptest.NewRequest(http.MethodGet, "/sections", nil), []sections.SectionWithItems{{
+		ResolvedSection: sections.ResolvedSection{ID: "episodes", SectionType: sections.SectionCustomFilter},
+		Items:           []*models.MediaItem{item},
+		ItemMeta: map[string]sections.SectionItemMeta{
+			item.ContentID: {
+				PosterOwner:   tc.posterOwner,
+				BackdropOwner: tc.backdropOwner,
+				LogoOwner:     tc.logoOwner,
+			},
+		},
+	}})
+
+	reference := tc.posterPath
+	if reference == "" {
+		reference = tc.backdropPath
+	}
+	if reference == "" {
+		reference = tc.logoPath
+	}
+	for _, request := range resolver.requests {
+		if request.Target.Reference != reference {
+			continue
+		}
+		if request.Target.Surface != tc.wantSurface {
+			t.Fatalf("surface = %q, want %q", request.Target.Surface, tc.wantSurface)
+		}
+		if len(request.Target.Keys) != 1 || request.Target.Keys[0] != tc.wantKey {
+			t.Fatalf("keys = %v, want [%q]", request.Target.Keys, tc.wantKey)
+		}
+		if request.Target.Slot != tc.wantSlot {
+			t.Fatalf("slot = %q, want %q", request.Target.Slot, tc.wantSlot)
+		}
+		return
+	}
+	t.Fatalf("no artwork target found for reference %q in %+v", reference, resolver.requests)
 }
 
 func TestBuildSectionsResponseBatchResolvesImageURLs(t *testing.T) {
