@@ -3086,11 +3086,14 @@ func (r *FileRepository) GetByExtraID(ctx context.Context, extraID string) ([]*m
 }
 
 // FindParentContentIDForStem finds the owning content id of a primary file in
-// dir whose filename stem matches exactly ("Movie A" matches "Movie A.mkv").
-// Used to bind suffix-classified extras ("Movie A-trailer.mkv") in flat
-// multi-item directories.
-func (r *FileRepository) FindParentContentIDForStem(ctx context.Context, folderID int, dir, stem string) (string, error) {
-	pattern := pathscope.EscapeLike(filepath.Join(dir, stem)) + ".%"
+// dir whose filename stem matches exactly ("Movie A" matches "Movie A.mkv",
+// not "Movie A Reloaded.mkv" or "Movie.A.B.mkv"). Used to bind
+// suffix-classified extras ("Movie A-trailer.mkv") in flat multi-item
+// directories. excludePath skips the candidate file itself so a
+// misclassified primary cannot self-parent and convert into an extra.
+func (r *FileRepository) FindParentContentIDForStem(ctx context.Context, folderID int, dir, stem, excludePath string) (string, error) {
+	base := filepath.Join(dir, stem)
+	pattern := pathscope.EscapeLike(base) + ".%"
 	var parentID *string
 	err := r.pool.QueryRow(ctx, `
 		SELECT COALESCE(e.series_id, mf.content_id)
@@ -3098,10 +3101,12 @@ func (r *FileRepository) FindParentContentIDForStem(ctx context.Context, folderI
 		LEFT JOIN episodes e ON e.content_id = mf.episode_id
 		WHERE mf.media_folder_id = $1
 		  AND mf.file_path LIKE $2 ESCAPE '\'
+		  AND substring(mf.file_path from char_length($3) + 1) ~ '^\.[^./]+$'
+		  AND ($4 = '' OR mf.file_path <> $4)
 		  AND mf.extra_id IS NULL
 		  AND (mf.content_id IS NOT NULL OR mf.episode_id IS NOT NULL)
 		ORDER BY mf.id ASC
-		LIMIT 1`, folderID, pattern).Scan(&parentID)
+		LIMIT 1`, folderID, pattern, base, excludePath).Scan(&parentID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil
 	}
@@ -3117,16 +3122,19 @@ func (r *FileRepository) FindParentContentIDForStem(ctx context.Context, folderI
 // FindUnambiguousParentContentIDForDir returns the single content id owning
 // the primary files under dir, or "" when the directory holds no matched
 // content or more than one distinct item (ambiguous — caller defers).
-func (r *FileRepository) FindUnambiguousParentContentIDForDir(ctx context.Context, folderID int, dir string) (string, error) {
+// excludePath skips the candidate file itself so a sole misclassified
+// primary cannot resolve itself as its own extras parent.
+func (r *FileRepository) FindUnambiguousParentContentIDForDir(ctx context.Context, folderID int, dir, excludePath string) (string, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT DISTINCT COALESCE(e.series_id, mf.content_id) AS parent_id
 		FROM media_files mf
 		LEFT JOIN episodes e ON e.content_id = mf.episode_id
 		WHERE mf.media_folder_id = $1
 		  AND mf.file_path LIKE $2 ESCAPE '\'
+		  AND ($3 = '' OR mf.file_path <> $3)
 		  AND mf.extra_id IS NULL
 		  AND (mf.content_id IS NOT NULL OR mf.episode_id IS NOT NULL)
-		LIMIT 2`, folderID, pathPrefixLike(dir))
+		LIMIT 2`, folderID, pathPrefixLike(dir), excludePath)
 	if err != nil {
 		return "", fmt.Errorf("finding parent by dir: %w", err)
 	}

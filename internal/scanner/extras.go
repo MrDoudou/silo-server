@@ -359,6 +359,7 @@ func (s *Scanner) resolveExtraParent(
 	candidate extraCandidate,
 	rootSet map[string]bool,
 ) (string, error) {
+	excludePath := filepath.Clean(candidate.Path)
 	if candidate.SupplementalDir == "" {
 		dir := filepath.Dir(candidate.Path)
 		stem := strings.TrimSuffix(filepath.Base(candidate.Path), filepath.Ext(candidate.Path))
@@ -366,7 +367,7 @@ func (s *Scanner) resolveExtraParent(
 			stem = strings.TrimSpace(stem[:idx])
 		}
 		if stem != "" {
-			parentID, err := s.fileRepo.FindParentContentIDForStem(ctx, folderID, dir, stem)
+			parentID, err := s.fileRepo.FindParentContentIDForStem(ctx, folderID, dir, stem, excludePath)
 			if err != nil {
 				return "", err
 			}
@@ -377,7 +378,7 @@ func (s *Scanner) resolveExtraParent(
 		if rootSet[filepath.Clean(dir)] {
 			return "", nil
 		}
-		return s.fileRepo.FindUnambiguousParentContentIDForDir(ctx, folderID, dir)
+		return s.fileRepo.FindUnambiguousParentContentIDForDir(ctx, folderID, dir, excludePath)
 	}
 
 	parentDir := firstNonSupplementalAncestor(candidate.SupplementalDir)
@@ -385,5 +386,5 @@ func (s *Scanner) resolveExtraParent(
 		// Supplemental dir sits at the library root — no single owner.
 		return "", nil
 	}
-	return s.fileRepo.FindUnambiguousParentContentIDForDir(ctx, folderID, parentDir)
+	return s.fileRepo.FindUnambiguousParentContentIDForDir(ctx, folderID, parentDir, excludePath)
 }

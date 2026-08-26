@@ -143,6 +143,23 @@ func TestPartitionExtraPaths(t *testing.T) {
 	}
 }
 
+func TestPartitionExtraPathsKeepsDottedAmbiguousTitlesPrimary(t *testing.T) {
+	// Regression: ambiguous extras tokens after '.' must not yank a real
+	// title out of the primary pipeline (self-parent + orphan purge).
+	paths := []string{
+		"/movies/Life.Is.Short.mkv",
+		"/movies/Cut.Scene.mkv",
+		"/movies/Heat (1995)-trailer.mkv",
+	}
+	primary, extras := partitionExtraPaths(paths, "movies", []string{"/movies"})
+	if len(primary) != 2 {
+		t.Fatalf("primary = %v, want Life.Is.Short and Cut.Scene", primary)
+	}
+	if len(extras) != 1 || extras[0].Path != paths[2] {
+		t.Fatalf("extras = %+v, want only the -trailer file", extras)
+	}
+}
+
 func TestMovieSupplementalDirsNoLongerSkipExtras(t *testing.T) {
 	// The walk must still hard-skip noise dirs...
 	for _, dir := range []string{"/m/Movie/Sample", "/m/Movie/Subs"} {

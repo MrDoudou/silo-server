@@ -15,6 +15,16 @@ func TestParseExtraSuffix(t *testing.T) {
 		{"Movie-featurette.mp4", "featurette", true},
 		{"Movie-interview.mkv", "other", true},
 		{"Movie-short.mkv", "other", true},
+		{"Movie.trailer.mkv", "trailer", true},
+		// Ambiguous tokens require '-'; dotted title stems stay primary.
+		{"Life.Is.Short.mkv", "", false},
+		{"Cut.Scene.mkv", "", false},
+		{"Movie.Name.Clip.mkv", "", false},
+		{"Title.Extra.mkv", "", false},
+		{"Film.Other.mkv", "", false},
+		{"Name.Interview.mkv", "", false},
+		{"Foo.Bar.short.mkv", "", false},
+		{"Movie.deleted.mkv", "", false},
 		// The token must be the final suffix component.
 		{"Trailer Park Boys S01E01.mkv", "", false},
 		{"The Deleted (2016).mkv", "", false},
