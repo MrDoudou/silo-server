@@ -2339,9 +2339,15 @@ func (s *MetadataService) mergeAndPersist(
 	item.RefreshFailures = 0
 	item.Status = "matched"
 
-	// Apply best images.
+	// Apply best images. FieldImages locks (set when an admin publishes a
+	// curated poster/backdrop/logo) must win over both FillEmpty and
+	// ReplaceUnlocked selection — MergeMetadata already preserves locked
+	// paths, but applyBestImages used to rewrite them afterward.
+	imagesLocked := isFieldLocked(locked, FieldImages)
 	if isCanonicalWrite {
-		applyBestImages(item, images, mergeMode, req.Language)
+		if !imagesLocked {
+			applyBestImages(item, images, mergeMode, req.Language)
+		}
 		item.PosterThumbhash = mergedImageThumbhash(
 			existingImagePath(existingItem, ImagePoster),
 			existingImageThumbhash(existingItem, ImagePoster),
@@ -2403,6 +2409,7 @@ func (s *MetadataService) mergeAndPersist(
 		loc := buildItemLocalizationRecord(
 			existingLoc, contentID, req.Language, contentType, accumulator, images, mergeMode, req.Language,
 			isFieldLocked(locked, FieldName),
+			imagesLocked,
 		)
 		if err := s.itemLocalizationRepo.Upsert(ctx, loc); err != nil {
 			return nil, fmt.Errorf("upserting item localization: %w", err)
@@ -4095,6 +4102,7 @@ func buildItemLocalizationRecord(
 	mergeMode MergeMode,
 	preferredLanguage string,
 	titleLocked bool,
+	imagesLocked bool,
 ) *models.MediaItemLocalization {
 	loc := &models.MediaItemLocalization{
 		ContentID: contentID,
@@ -4147,7 +4155,9 @@ func buildItemLocalizationRecord(
 			break
 		}
 	}
-	applyBestImages(locItem, remoteImages, mergeMode, preferredLanguage)
+	if !imagesLocked {
+		applyBestImages(locItem, remoteImages, mergeMode, preferredLanguage)
+	}
 	prepareItemImagesForQueue(locItem, existingLocItem)
 
 	loc.PosterPath = locItem.PosterPath
@@ -4415,6 +4425,7 @@ func (s *MetadataService) persistSeasonsAndEpisodes(
 	seriesID := series.ContentID
 	seasonIDs := make(map[int]string, len(seasons))
 	isCanonicalWrite := strings.EqualFold(canonicalLanguage, language)
+	imagesLocked := isFieldLocked(intSliceToFields(series.LockedFields), FieldImages)
 	imageJobs := make([]EnqueueImageCacheJobInput, 0, len(seasons)+len(episodes))
 	fallbackProvider := primaryProviderID(providerIDs)
 	keyAttribution := func(sourcePath string) (string, string) {
@@ -4561,18 +4572,26 @@ func (s *MetadataService) persistSeasonsAndEpisodes(
 		if existingSeason != nil && isCanonicalWrite {
 			mergedSeason := seasonResultFromModel(existingSeason)
 			MergeSeasonResult(&providerSeason, &mergedSeason, mergeMode)
-			// preserveCachedArtwork sees the raw provider path so a local
-			// file:// source still routes into *_source_path here.
-			nextPath, nextThumbhash, nextSourcePath := preserveCachedArtwork(
-				season.PosterPath,
-				season.PosterThumbhash,
-				existingSeason.PosterPath,
-				existingSeason.PosterSourcePath,
-				existingSeason.PosterThumbhash,
-			)
-			mergedSeason.PosterPath = nextPath
-			mergedSeason.PosterThumbhash = nextThumbhash
-			mergedSeason.PosterSourcePath = nextSourcePath
+			if imagesLocked {
+				// Curated season posters lock FieldImages on the parent series
+				// (PublishArtworkSelection). Keep the stored artwork intact.
+				mergedSeason.PosterPath = existingSeason.PosterPath
+				mergedSeason.PosterThumbhash = existingSeason.PosterThumbhash
+				mergedSeason.PosterSourcePath = existingSeason.PosterSourcePath
+			} else {
+				// preserveCachedArtwork sees the raw provider path so a local
+				// file:// source still routes into *_source_path here.
+				nextPath, nextThumbhash, nextSourcePath := preserveCachedArtwork(
+					season.PosterPath,
+					season.PosterThumbhash,
+					existingSeason.PosterPath,
+					existingSeason.PosterSourcePath,
+					existingSeason.PosterThumbhash,
+				)
+				mergedSeason.PosterPath = nextPath
+				mergedSeason.PosterThumbhash = nextThumbhash
+				mergedSeason.PosterSourcePath = nextSourcePath
+			}
 			providerSeason = mergedSeason
 		}
 		dbSeason := &models.Season{
@@ -4951,18 +4970,26 @@ func (s *MetadataService) persistSeasonsAndEpisodes(
 			if existingEpisode != nil && isCanonicalWrite {
 				mergedEpisode := episodeResultFromModel(existingEpisode)
 				MergeEpisodeResult(&providerEpisode, &mergedEpisode, mergeMode)
-				// preserveCachedArtwork sees the raw provider path so a local
-				// file:// source still routes into *_source_path here.
-				nextPath, nextThumbhash, nextSourcePath := preserveCachedArtwork(
-					ep.StillPath,
-					ep.StillThumbhash,
-					existingEpisode.StillPath,
-					existingEpisode.StillSourcePath,
-					existingEpisode.StillThumbhash,
-				)
-				mergedEpisode.StillPath = nextPath
-				mergedEpisode.StillThumbhash = nextThumbhash
-				mergedEpisode.StillSourcePath = nextSourcePath
+				if imagesLocked {
+					// Curated episode stills lock FieldImages on the parent
+					// series. Keep the stored still intact through refresh.
+					mergedEpisode.StillPath = existingEpisode.StillPath
+					mergedEpisode.StillThumbhash = existingEpisode.StillThumbhash
+					mergedEpisode.StillSourcePath = existingEpisode.StillSourcePath
+				} else {
+					// preserveCachedArtwork sees the raw provider path so a local
+					// file:// source still routes into *_source_path here.
+					nextPath, nextThumbhash, nextSourcePath := preserveCachedArtwork(
+						ep.StillPath,
+						ep.StillThumbhash,
+						existingEpisode.StillPath,
+						existingEpisode.StillSourcePath,
+						existingEpisode.StillThumbhash,
+					)
+					mergedEpisode.StillPath = nextPath
+					mergedEpisode.StillThumbhash = nextThumbhash
+					mergedEpisode.StillSourcePath = nextSourcePath
+				}
 				providerEpisode = mergedEpisode
 			}
 			dbEp := &models.Episode{
