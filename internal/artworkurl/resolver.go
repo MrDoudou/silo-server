@@ -3,6 +3,7 @@ package artworkurl
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -71,7 +72,7 @@ func (r *Resolver) ResolveArtworkURL(ctx context.Context, key string) (artworkst
 	if strings.HasPrefix(key, LibraryReferencePrefix) {
 		return r.signer.SignLibraryReference(key, time.Now())
 	}
-	return artworkstore.ResolvedURL{}, errors.New("artworkurl: artwork resolution requires a direct-library reference")
+	return artworkstore.ResolvedURL{}, fmt.Errorf("%w: artwork resolution requires a direct-library reference", artworkstore.ErrInvalidKey)
 }
 
 // ResolveArtworkURLs resolves a batch of logical keys. Keys that cannot be

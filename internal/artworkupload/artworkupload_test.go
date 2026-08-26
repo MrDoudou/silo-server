@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/Silo-Server/silo-server/internal/artworkadopt"
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
@@ -397,6 +398,75 @@ func TestManifestIsWrittenLast(t *testing.T) {
 		if key == preview.ManifestKey {
 			t.Fatal("manifest was written for an incomplete revision")
 		}
+	}
+}
+
+func TestUntrackedMaterializationRetainsOnlyAfterManifestWrite(t *testing.T) {
+	data := testJPEG(t, 40, 60, 71)
+	preview, err := NewMaterializer(newMemoryStore()).Materialize(context.Background(), Request{
+		ImageType: artworkkey.ImageTypeLibraryPoster,
+		Data:      data,
+	})
+	if err != nil {
+		t.Fatalf("preview Materialize: %v", err)
+	}
+
+	store := newMemoryStore()
+	store.failOn = preview.ManifestKey
+	tracker := &recordingTracker{}
+	materializer := NewMaterializer(store)
+	materializer.SetRevisionTracker(tracker)
+	if _, err := materializer.Materialize(context.Background(), Request{
+		ImageType: artworkkey.ImageTypeLibraryPoster,
+		Data:      data,
+	}); err == nil {
+		t.Fatal("expected the manifest write to fail")
+	}
+	if tracker.retainCalls != 0 {
+		t.Fatalf("untracked revision retained %d times before manifest success", tracker.retainCalls)
+	}
+}
+
+func TestUntrackedAdoptionRetainsOnlyAfterThumbhash(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestData := testJPEG(t, 64, 64, 72)
+	fingerprint, _ := artworkkey.ByteSourceFingerprint("upload", requestData)
+	revision, err := artworkkey.BuildPortableRevision(artworkkey.RevisionInput{
+		ImageType: artworkkey.ImageTypeAvatar,
+		MediaType: "image/jpeg",
+		Ext:       ".jpg",
+		Variants: []artworkkey.VariantBytes{
+			{Name: artworkkey.OriginalVariant, Data: []byte("not an image")},
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildPortableRevision: %v", err)
+	}
+	if err := store.WriteImmutable(t.Context(), revision.OriginalKey, []byte("not an image"), artworkstore.ObjectMetadata{MediaType: "image/jpeg"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteImmutable(t.Context(), revision.ManifestKey, revision.ManifestJSON, artworkstore.ObjectMetadata{MediaType: "application/json"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := artworkadopt.WriteIndex(t.Context(), store, fingerprint, revision.Manifest, revision.ManifestJSON); err != nil {
+		t.Fatal(err)
+	}
+
+	tracker := &recordingTracker{}
+	materializer := NewMaterializer(store)
+	materializer.SetRevisionTracker(tracker)
+	if _, err := materializer.Materialize(t.Context(), Request{
+		ImageType: artworkkey.ImageTypeAvatar,
+		Data:      requestData,
+		Square:    true,
+	}); err == nil {
+		t.Fatal("expected adopted thumbhash generation to fail")
+	}
+	if tracker.retainCalls != 0 {
+		t.Fatalf("adopted revision retained %d times before thumbhash success", tracker.retainCalls)
 	}
 }
 

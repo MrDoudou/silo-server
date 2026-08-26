@@ -483,6 +483,12 @@ func TestPinnedLocalStoreReportsReachableDifferentCopyAsWrongMount(t *testing.T)
 	if err := handle.Store.WriteImmutable(t.Context(), siblingKey, []byte("blocked"), ObjectMetadata{}); !errors.Is(err, ErrWrongMount) {
 		t.Fatalf("write to wrong mount = %v, want ErrWrongMount", err)
 	}
+	if _, err := handle.Store.Stat(t.Context(), "artwork/v1/objects/poster/missing/original.webp"); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("reconciler-style stat on wrong mount = %v, want ErrWrongMount instead of ErrNotFound", err)
+	}
+	if _, _, _, err := handle.Store.ListPage(t.Context(), "artwork/v1/", "", 10); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("list on wrong mount = %v, want ErrWrongMount", err)
+	}
 }
 
 func TestPinnedLocalStoreRefusesMissingRootWithoutWriting(t *testing.T) {
@@ -510,6 +516,9 @@ func TestPinnedLocalStoreRefusesMissingRootWithoutWriting(t *testing.T) {
 	}
 	if err := handle.Store.WriteImmutable(context.Background(), testKey, []byte("bad"), ObjectMetadata{}); !errors.Is(err, ErrBackendUnavailable) {
 		t.Fatalf("WriteImmutable = %v, want ErrBackendUnavailable", err)
+	}
+	if _, err := handle.Store.Stat(context.Background(), testKey); !errors.Is(err, ErrBackendUnavailable) {
+		t.Fatalf("Stat = %v, want ErrBackendUnavailable", err)
 	}
 }
 

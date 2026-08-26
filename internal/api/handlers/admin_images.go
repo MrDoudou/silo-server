@@ -422,23 +422,35 @@ func appliedArtworkTarget(resolved *resolvedItem, imageType string) artworkurl.T
 	target := artworkurl.Target{Slot: imageType}
 	switch resolved.contentType {
 	case "season":
-		target.Surface = artworkurl.SurfaceSeasonPosters
-		target.Keys = []string{resolved.season.ContentID}
-	case "episode":
-		target.Surface = artworkurl.SurfaceEpisodeStills
-		target.Keys = []string{resolved.episode.ContentID}
-	default:
-		target.Keys = []string{resolved.parentItem.ContentID}
-		switch imageType {
-		case artworkImageBackdrop:
-			target.Surface = artworkurl.SurfaceItemBackdrops
-		case artworkImageLogo:
-			target.Surface = artworkurl.SurfaceItemLogos
-		default:
-			target.Surface = artworkurl.SurfaceItemPosters
+		if resolved.season != nil {
+			target.Surface = artworkurl.SurfaceSeasonPosters
+			target.Keys = []string{resolved.season.ContentID}
+			break
 		}
+		setAppliedParentItemTarget(&target, resolved.parentItem, imageType)
+	case "episode":
+		if resolved.episode != nil {
+			target.Surface = artworkurl.SurfaceEpisodeStills
+			target.Keys = []string{resolved.episode.ContentID}
+			break
+		}
+		setAppliedParentItemTarget(&target, resolved.parentItem, imageType)
+	default:
+		setAppliedParentItemTarget(&target, resolved.parentItem, imageType)
 	}
 	return target
+}
+
+func setAppliedParentItemTarget(target *artworkurl.Target, parentItem *models.MediaItem, imageType string) {
+	target.Keys = []string{parentItem.ContentID}
+	switch imageType {
+	case artworkImageBackdrop:
+		target.Surface = artworkurl.SurfaceItemBackdrops
+	case artworkImageLogo:
+		target.Surface = artworkurl.SurfaceItemLogos
+	default:
+		target.Surface = artworkurl.SurfaceItemPosters
+	}
 }
 
 // resolveImageFolderID finds the primary library folder for a content ID.

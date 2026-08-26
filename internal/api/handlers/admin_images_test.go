@@ -102,8 +102,10 @@ func TestHandleApplyItemImageReturnsTargetCapabilityURL(t *testing.T) {
 
 	parent := &models.MediaItem{ContentID: "series-1", Type: "series", TmdbID: "100"}
 	items := adminImageItemLookup{
-		"movie-1":  {ContentID: "movie-1", Type: "movie", TmdbID: "200"},
-		"series-1": parent,
+		"movie-1":         {ContentID: "movie-1", Type: "movie", TmdbID: "200"},
+		"series-1":        parent,
+		"season-as-item":  {ContentID: "season-as-item", Type: "season", TmdbID: "201"},
+		"episode-as-item": {ContentID: "episode-as-item", Type: "episode", TmdbID: "202"},
 	}
 	seasons := adminImageSeasonLookup{
 		"season-1": {ContentID: "season-1", SeriesID: "series-1", SeasonNumber: 1},
@@ -124,6 +126,8 @@ func TestHandleApplyItemImageReturnsTargetCapabilityURL(t *testing.T) {
 		{name: "item logo", contentID: "movie-1", requestType: "logo", wantSurface: artworkurl.SurfaceItemLogos, wantSlot: artworkImageLogo},
 		{name: "season poster", contentID: "season-1", requestType: "poster", wantSurface: artworkurl.SurfaceSeasonPosters, wantSlot: artworkImagePoster},
 		{name: "episode still", contentID: "episode-1", requestType: "poster", wantSurface: artworkurl.SurfaceEpisodeStills, wantSlot: artworkImageStill},
+		{name: "season media item falls back to item poster", contentID: "season-as-item", requestType: "poster", wantSurface: artworkurl.SurfaceItemPosters, wantSlot: artworkImagePoster},
+		{name: "episode media item falls back to item poster", contentID: "episode-as-item", requestType: "poster", wantSurface: artworkurl.SurfaceItemPosters, wantSlot: artworkImageStill},
 	}
 
 	for _, tc := range tests {

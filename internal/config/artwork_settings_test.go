@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -118,7 +119,7 @@ func TestNormalizeArtworkSettings(t *testing.T) {
 		{ArtworkLocalPathKey, "/srv/silo/artwork/", "/srv/silo/artwork", false},
 		{ArtworkLocalPathKey, "", "", false},
 		{ArtworkLocalPathKey, "artwork", "", true},
-		{ArtworkLocalPathKey, "/", "", true},
+		{ArtworkLocalPathKey, filepath.VolumeName(t.TempDir()) + string(filepath.Separator), "", true},
 	}
 	for _, tc := range tests {
 		got, err := NormalizeAdminSetting(tc.key, tc.value)

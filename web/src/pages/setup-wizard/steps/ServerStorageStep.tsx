@@ -59,7 +59,9 @@ const PRIVATE_S3_KEYS = [
   "s3.private_secret_key",
 ];
 
-const META_KEYS = ["metadata.cache_images"];
+const REMOTE_MATERIALIZATION_KEY = "artwork.remote_materialization";
+const LEGACY_CACHE_IMAGES_KEY = "metadata.cache_images";
+const META_KEYS = [REMOTE_MATERIALIZATION_KEY, LEGACY_CACHE_IMAGES_KEY];
 
 const ARTWORK_KEYS = ["artwork.storage_backend", "artwork.local_path"];
 
@@ -276,6 +278,11 @@ export function ServerStorageStep() {
   }
 
   const publicURLAuth = form.getValue("s3.public_url_auth") || "presigned";
+  const materialization = form.getValue(REMOTE_MATERIALIZATION_KEY);
+  const cacheImagesEnabled =
+    materialization !== ""
+      ? materialization === "selected"
+      : form.getValue(LEGACY_CACHE_IMAGES_KEY) === "true";
   const jellyfinEnabledValue = form.getValue("jellyfin_compat.enabled");
   const jellyfinStatus = jellyfinStatusQuery.data;
   const jellyfinAPIEnabled =
@@ -731,8 +738,12 @@ export function ServerStorageStep() {
           </div>
           <Switch
             id="setup-cache-images"
-            checked={form.getValue("metadata.cache_images") === "true"}
-            onCheckedChange={(v) => form.setValue("metadata.cache_images", v ? "true" : "false")}
+            aria-label="Cache remote artwork"
+            checked={cacheImagesEnabled}
+            onCheckedChange={(enabled) => {
+              form.setValue(REMOTE_MATERIALIZATION_KEY, enabled ? "selected" : "passthrough");
+              form.setValue(LEGACY_CACHE_IMAGES_KEY, enabled ? "true" : "false");
+            }}
             className="ml-4 shrink-0"
           />
         </div>

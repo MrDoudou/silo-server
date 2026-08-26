@@ -303,6 +303,9 @@ func (s *healthStore) WriteImmutable(ctx context.Context, key string, data []byt
 }
 
 func (s *healthStore) Open(ctx context.Context, key string) (*Object, error) {
+	if err := s.writable(); err != nil {
+		return nil, err
+	}
 	object, err := s.Store.Open(ctx, key)
 	if err == nil {
 		s.handle.reportSuccess()
@@ -313,6 +316,9 @@ func (s *healthStore) Open(ctx context.Context, key string) (*Object, error) {
 }
 
 func (s *healthStore) Stat(ctx context.Context, key string) (ObjectInfo, error) {
+	if err := s.writable(); err != nil {
+		return ObjectInfo{}, err
+	}
 	info, err := s.Store.Stat(ctx, key)
 	if err == nil {
 		s.handle.reportSuccess()
@@ -323,6 +329,9 @@ func (s *healthStore) Stat(ctx context.Context, key string) (ObjectInfo, error) 
 }
 
 func (s *healthStore) Matches(ctx context.Context, key string, data []byte) (bool, error) {
+	if err := s.writable(); err != nil {
+		return false, err
+	}
 	matches, err := s.Store.Matches(ctx, key, data)
 	if err == nil {
 		s.handle.reportSuccess()
@@ -346,6 +355,9 @@ func (s *healthStore) Probe(ctx context.Context) error {
 }
 
 func (s *healthStore) ListPage(ctx context.Context, prefix, cursor string, limit int) ([]ObjectInfo, string, bool, error) {
+	if err := s.writable(); err != nil {
+		return nil, "", false, err
+	}
 	objects, next, done, err := s.Store.ListPage(ctx, prefix, cursor, limit)
 	if err == nil {
 		s.handle.reportSuccess()

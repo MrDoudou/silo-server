@@ -1118,8 +1118,10 @@ func (h *ItemsHandler) toItemListResponse(r *http.Request, item *models.MediaIte
 }
 
 func (h *ItemsHandler) toItemListResponseWithOverlay(r *http.Request, item *models.MediaItem, overlaySummary *models.OverlaySummary, userState *itemUserStateResponse, size imagesize.Size) itemListResponse {
+	baseItem := item
+	filter := h.accessFilterOrDeny(r)
 	if h.detailSvc != nil {
-		if localized, err := h.detailSvc.LocalizeItemModel(r.Context(), item, h.accessFilterOrDeny(r)); err == nil && localized != nil {
+		if localized, err := h.detailSvc.LocalizeItemModel(r.Context(), item, filter); err == nil && localized != nil {
 			item = localized
 		}
 	}
@@ -1130,8 +1132,9 @@ func (h *ItemsHandler) toItemListResponseWithOverlay(r *http.Request, item *mode
 		posterVariant = imagesize.Variant(artworkkey.ImageTypePoster, size)
 		backdropVariant = imagesize.Variant(imageTypeForBackdropPath(item.BackdropPath), size)
 	}
-	resp.PosterURL = h.itemArtworkURL(r, item.ContentID, artworkurl.SurfaceItemPosters, artworkImagePoster, item.PosterPath, posterVariant)
-	resp.BackdropURL = h.itemArtworkURL(r, item.ContentID, artworkurl.SurfaceItemBackdrops, artworkImageBackdrop, item.BackdropPath, backdropVariant)
+	posterTarget, backdropTarget := h.itemListArtworkTargets(r.Context(), baseItem, item, filter)
+	resp.PosterURL = h.itemArtworkTargetURL(r, posterTarget, item.PosterPath, posterVariant)
+	resp.BackdropURL = h.itemArtworkTargetURL(r, backdropTarget, item.BackdropPath, backdropVariant)
 	return resp
 }
 
@@ -1188,7 +1191,7 @@ func (h *ItemsHandler) localizeItemListModels(ctx context.Context, items []*mode
 	return localized
 }
 
-func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, items []*models.MediaItem, size imagesize.Size) map[string]itemListImageURLs {
+func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, baseItems, items []*models.MediaItem, filter catalog.AccessFilter, size imagesize.Size) map[string]itemListImageURLs {
 	urls := make(map[string]itemListImageURLs, len(items))
 	if h == nil || h.detailSvc == nil || len(items) == 0 {
 		return urls
@@ -1202,19 +1205,22 @@ func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, items []*model
 
 	pending := make([]pendingImages, 0, len(items))
 	requests := make([]artworkurl.TargetRequest, 0, len(items)*2)
+	baseByContentID := make(map[string]*models.MediaItem, len(baseItems))
+	for _, item := range baseItems {
+		if item != nil {
+			baseByContentID[item.ContentID] = item
+		}
+	}
 
 	for _, item := range items {
 		if item == nil || item.ContentID == "" {
 			continue
 		}
+		posterTarget, backdropTarget := h.itemListArtworkTargets(ctx, baseByContentID[item.ContentID], item, filter)
 		images := pendingImages{
 			contentID: item.ContentID,
-			poster: artworkurl.Target{
-				Surface: artworkurl.SurfaceItemPosters, Keys: []string{item.ContentID}, Slot: artworkImagePoster,
-			}.WithReference(item.PosterPath),
-			backdrop: artworkurl.Target{
-				Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{item.ContentID}, Slot: artworkImageBackdrop,
-			}.WithReference(item.BackdropPath),
+			poster:    posterTarget.WithReference(item.PosterPath),
+			backdrop:  backdropTarget.WithReference(item.BackdropPath),
 		}
 		pending = append(pending, images)
 		posterVariant := artworkkey.VariantW300
@@ -1245,6 +1251,28 @@ func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, items []*model
 		}
 	}
 	return urls
+}
+
+func (h *ItemsHandler) itemListArtworkTargets(ctx context.Context, baseItem, item *models.MediaItem, filter catalog.AccessFilter) (artworkurl.Target, artworkurl.Target) {
+	poster := artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{item.ContentID}, Slot: artworkImagePoster}
+	backdrop := artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{item.ContentID}, Slot: artworkImageBackdrop}
+	if h == nil || h.detailSvc == nil || baseItem == nil {
+		return poster, backdrop
+	}
+	language, err := h.detailSvc.PresentationLanguageForItem(ctx, baseItem, filter)
+	if err != nil || language == "" {
+		return poster, backdrop
+	}
+	keys := []string{item.ContentID, language}
+	if item.PosterPath != baseItem.PosterPath {
+		poster.Surface = artworkurl.SurfaceLocalizedItemPosters
+		poster.Keys = keys
+	}
+	if item.BackdropPath != baseItem.BackdropPath {
+		backdrop.Surface = artworkurl.SurfaceLocalizedItemBackdrops
+		backdrop.Keys = keys
+	}
+	return poster, backdrop
 }
 
 type episodeBrowseMetadata struct {
@@ -2210,14 +2238,18 @@ func (h *ItemsHandler) presignURL(r *http.Request, path string, variant string) 
 }
 
 func (h *ItemsHandler) itemArtworkURL(r *http.Request, contentID, surface, slot, path, variant string) string {
-	if h.detailSvc == nil {
-		return ""
-	}
-	return h.detailSvc.PresignArtworkTargetImageURL(r.Context(), artworkurl.Target{
+	return h.itemArtworkTargetURL(r, artworkurl.Target{
 		Surface: surface,
 		Keys:    []string{contentID},
 		Slot:    slot,
-	}, path, slot, variant)
+	}, path, variant)
+}
+
+func (h *ItemsHandler) itemArtworkTargetURL(r *http.Request, target artworkurl.Target, path, variant string) string {
+	if h.detailSvc == nil {
+		return ""
+	}
+	return h.detailSvc.PresignArtworkTargetImageURL(r.Context(), target, path, target.Slot, variant)
 }
 
 // HandleFilterItems handles POST /items/filter with a full rule-group filter body.

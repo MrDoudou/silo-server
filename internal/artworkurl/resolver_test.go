@@ -2,9 +2,12 @@ package artworkurl
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
 func testLibraryReference(t *testing.T, signer *Signer) string {
@@ -49,8 +52,8 @@ func TestResolveArtworkURLRequiresLibraryReference(t *testing.T) {
 	}
 
 	for _, reference := range []string{testKey, "/images/collection-templates/x.jpg", "../../etc/passwd", ""} {
-		if _, err := resolver.ResolveArtworkURL(context.Background(), reference); err == nil {
-			t.Fatalf("ResolveArtworkURL(%q) succeeded, want a library-reference error", reference)
+		if _, err := resolver.ResolveArtworkURL(context.Background(), reference); !errors.Is(err, artworkstore.ErrInvalidKey) {
+			t.Fatalf("ResolveArtworkURL(%q) error = %v, want ErrInvalidKey", reference, err)
 		}
 	}
 }

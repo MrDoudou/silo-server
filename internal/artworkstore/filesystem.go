@@ -86,7 +86,7 @@ func NewFilesystemStore(rootPath string) (*FilesystemStore, error) {
 		return nil, fmt.Errorf("artworkstore: filesystem store root must be an absolute path: %s", trimmed)
 	}
 	clean := filepath.Clean(trimmed)
-	if clean == string(filepath.Separator) {
+	if filepath.Dir(clean) == clean {
 		return nil, errors.New("artworkstore: refusing to use the filesystem root as the artwork store")
 	}
 	return &FilesystemStore{rootPath: clean}, nil

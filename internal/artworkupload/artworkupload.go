@@ -182,12 +182,6 @@ func (m *Materializer) Materialize(ctx context.Context, req Request) (*Result, e
 	if err != nil {
 		return nil, err
 	}
-	if !req.Track {
-		if err := m.retainUntracked(ctx, revision.OriginalKey); err != nil {
-			return nil, err
-		}
-	}
-
 	thumbhash, err := imageutil.Thumbhash(req.Data)
 	if err != nil {
 		return nil, fmt.Errorf("%w: thumbhash: %w", ErrInvalidImage, err)
@@ -230,6 +224,11 @@ func (m *Materializer) Materialize(ctx context.Context, req Request) (*Result, e
 		artworkstore.MediaTypeForKey(artworkkey.ManifestName)); err != nil {
 		return nil, err
 	}
+	if !req.Track {
+		if err := m.retainUntracked(ctx, revision.OriginalKey); err != nil {
+			return nil, err
+		}
+	}
 	if req.Track {
 		if err := m.record(ctx, revision, variants); err != nil {
 			return nil, err
@@ -260,14 +259,15 @@ func (m *Materializer) tryAdopt(ctx context.Context, req Request, fingerprint st
 		if err := m.tracker.RecordArtworkRevision(ctx, adopted.OriginalKey, "upload", adopted.Objects); err != nil {
 			return nil, false, fmt.Errorf("artworkupload: record adopted revision: %w", err)
 		}
-	} else if !req.Track && m.tracker != nil {
-		if err := m.retainUntracked(ctx, adopted.OriginalKey); err != nil {
-			return nil, false, err
-		}
 	}
 	thumbhash, thumbhashErr := imageutil.Thumbhash(adopted.OriginalData)
 	if thumbhashErr != nil {
 		return nil, false, fmt.Errorf("artworkupload: thumbhash adopted revision: %w", thumbhashErr)
+	}
+	if !req.Track && m.tracker != nil {
+		if err := m.retainUntracked(ctx, adopted.OriginalKey); err != nil {
+			return nil, false, err
+		}
 	}
 	artworkmetrics.Materialization("upload", "adopted")
 	variantKeys := make(map[string]string, len(adopted.Manifest.Variants))

@@ -54,7 +54,8 @@ func readObject(t *testing.T, store *FilesystemStore, key string) ([]byte, Objec
 }
 
 func TestNewFilesystemStoreRejectsUnusableRoots(t *testing.T) {
-	for _, root := range []string{"", "   ", "relative/path", "/"} {
+	filesystemRoot := filepath.VolumeName(t.TempDir()) + string(filepath.Separator)
+	for _, root := range []string{"", "   ", "relative/path", filesystemRoot} {
 		if _, err := NewFilesystemStore(root); err == nil {
 			t.Errorf("NewFilesystemStore(%q) = nil error, want failure", root)
 		}

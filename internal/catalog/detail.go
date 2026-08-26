@@ -1033,6 +1033,16 @@ func (s *DetailService) LocalizeItemModel(ctx context.Context, item *models.Medi
 	return s.localizeItemModelWith(item, language, loc), nil
 }
 
+// PresentationLanguageForItem returns the localization key used for an item.
+// Response builders use it when a localized artwork path must remain bound to
+// its localized catalog row rather than the base media_items row.
+func (s *DetailService) PresentationLanguageForItem(ctx context.Context, item *models.MediaItem, filter AccessFilter) (string, error) {
+	if s == nil || item == nil {
+		return "", nil
+	}
+	return s.resolvePresentationLanguage(ctx, filter, item.OriginalLanguage)
+}
+
 // loadItemLocalizations resolves each item's target and groups repository reads
 // by that language. The former single-language lookup was correct only while a
 // profile had one global target; source-language exceptions make the grouping

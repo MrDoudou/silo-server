@@ -43,6 +43,24 @@ func TestArtworkAccountingUsesPublishedSnapshotAndDistinctDriftCounters(t *testi
 	}
 }
 
+func TestArtworkAccountingCapacityFailurePreservesMoreSevereHealth(t *testing.T) {
+	tests := []struct {
+		current string
+		want    string
+	}{
+		{current: "healthy", want: "degraded"},
+		{current: "degraded", want: "degraded"},
+		{current: "unavailable", want: "unavailable"},
+		{current: "wrong_mount", want: "wrong_mount"},
+		{current: "empty_rebuilding", want: "empty_rebuilding"},
+	}
+	for _, test := range tests {
+		if got := healthAfterCapacityProbeFailure(test.current); got != test.want {
+			t.Errorf("healthAfterCapacityProbeFailure(%q) = %q, want %q", test.current, got, test.want)
+		}
+	}
+}
+
 func TestArtworkSeedAccountingExcludesCollectedAndRetainedSeedsFromReclaimable(t *testing.T) {
 	query := artworkStorageTotalSQL()
 	for _, want := range []string{

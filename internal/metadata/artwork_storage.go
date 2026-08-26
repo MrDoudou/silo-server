@@ -644,7 +644,7 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 		if free, err := capacity.FreeSpaceBytes(ctx); err == nil {
 			result.FreeSpaceBytes = &free
 		} else if !errors.Is(err, artworkstore.ErrNotFound) {
-			result.StoreHealth = string(artworkstore.HealthDegraded)
+			result.StoreHealth = healthAfterCapacityProbeFailure(result.StoreHealth)
 		}
 	}
 	if err := tx.QueryRow(ctx, artworkAccountingStateSQL).Scan(
@@ -745,6 +745,15 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 		return result, fmt.Errorf("artwork accounting: commit snapshot: %w", err)
 	}
 	return result, nil
+}
+
+func healthAfterCapacityProbeFailure(current string) string {
+	switch artworkstore.HealthState(current) {
+	case artworkstore.HealthHealthy, artworkstore.HealthDegraded:
+		return string(artworkstore.HealthDegraded)
+	default:
+		return current
+	}
 }
 
 const artworkAccountingStateSQL = `

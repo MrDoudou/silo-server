@@ -210,7 +210,7 @@ func TestItemListCardImageURLsUsesBatchResolver(t *testing.T) {
 		},
 	}
 
-	urls := handler.itemListCardImageURLs(context.Background(), items, imagesize.Unset)
+	urls := handler.itemListCardImageURLs(context.Background(), items, items, catalog.AccessFilter{}, imagesize.Unset)
 
 	if resolver.singleCalls != 0 {
 		t.Fatalf("single resolver calls = %d, want 0", resolver.singleCalls)
@@ -229,6 +229,40 @@ func TestItemListCardImageURLsUsesBatchResolver(t *testing.T) {
 	}
 	if got := len(resolver.batchPaths); got != 2 {
 		t.Fatalf("batch resolver path count = %d, want 2", got)
+	}
+}
+
+func TestItemListArtworkTargetsBindOnlyOverriddenLocalizedFields(t *testing.T) {
+	resolver := &recordingEpisodeArtworkResolver{}
+	detailSvc := &catalog.DetailService{}
+	detailSvc.SetImageResolver(resolver)
+	handler := &ItemsHandler{detailSvc: detailSvc}
+	base := &models.MediaItem{
+		ContentID:    "movie-1",
+		PosterPath:   "provider://base/poster.jpg",
+		BackdropPath: "provider://base/backdrop.jpg",
+	}
+	localized := *base
+	localized.PosterPath = "provider://fr/poster.jpg"
+
+	handler.itemListCardImageURLs(
+		context.Background(),
+		[]*models.MediaItem{base},
+		[]*models.MediaItem{&localized},
+		catalog.AccessFilter{PresentationLanguage: "fr"},
+		imagesize.Unset,
+	)
+
+	if len(resolver.requests) != 2 {
+		t.Fatalf("resolved requests = %d, want 2", len(resolver.requests))
+	}
+	poster := resolver.requests[0].Target
+	if poster.Surface != artworkurl.SurfaceLocalizedItemPosters || len(poster.Keys) != 2 || poster.Keys[0] != "movie-1" || poster.Keys[1] != "fr" {
+		t.Fatalf("poster target = %+v, want localized item poster [movie-1 fr]", poster)
+	}
+	backdrop := resolver.requests[1].Target
+	if backdrop.Surface != artworkurl.SurfaceItemBackdrops || len(backdrop.Keys) != 1 || backdrop.Keys[0] != "movie-1" {
+		t.Fatalf("backdrop target = %+v, want base item backdrop [movie-1]", backdrop)
 	}
 }
 

@@ -786,7 +786,7 @@ func NormalizeArtworkLocalPath(value string) (string, error) {
 		return "", fmt.Errorf("%s must be an absolute path", ArtworkLocalPathKey)
 	}
 	cleaned := filepath.Clean(trimmed)
-	if cleaned == string(filepath.Separator) {
+	if filepath.Dir(cleaned) == cleaned {
 		return "", fmt.Errorf("%s must not be the filesystem root", ArtworkLocalPathKey)
 	}
 	return cleaned, nil

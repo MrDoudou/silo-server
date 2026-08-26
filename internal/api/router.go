@@ -325,12 +325,7 @@ func NewRouter(deps Dependencies) chi.Router {
 	useBaseMiddleware(r, deps)
 
 	// Build the readiness handler with optional S3 check.
-	var s3Checker handlers.S3HealthChecker
-	if deps.S3Public != nil {
-		s3Checker = deps.S3Public
-	} else if deps.S3Private != nil {
-		s3Checker = deps.S3Private
-	}
+	s3Checker := readinessS3Checker(deps)
 
 	// PG pinger: use the pool if available.
 	var pgPinger handlers.PGPinger
@@ -3603,6 +3598,17 @@ func NewRouter(deps Dependencies) chi.Router {
 	})
 
 	return r
+}
+
+func readinessS3Checker(deps Dependencies) handlers.S3HealthChecker {
+	canonicalArtworkUsesPublicS3 := deps.ArtworkStore != nil && deps.ArtworkStore.Backend == artworkstore.BackendS3
+	if deps.S3Public != nil && !canonicalArtworkUsesPublicS3 {
+		return deps.S3Public
+	}
+	if deps.S3Private != nil {
+		return deps.S3Private
+	}
+	return nil
 }
 
 // useBaseMiddleware mounts the middleware chain every native request passes
