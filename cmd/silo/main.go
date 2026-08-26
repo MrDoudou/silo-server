@@ -1325,11 +1325,10 @@ func main() {
 			s3ArtworkClient = deps.S3Public
 		}
 		artworkHandle, artworkErr := artworkstore.Open(appCtx, artworkstore.Options{
-			Backend:     cfg.Artwork.StorageBackend,
-			LocalPath:   cfg.Artwork.LocalPath,
-			LocalShared: cfg.Artwork.LocalOwnership == config.ArtworkLocalShared,
-			S3:          s3ArtworkClient,
-			Settings:    settingsRepo,
+			Backend:   cfg.Artwork.StorageBackend,
+			LocalPath: cfg.Artwork.LocalPath,
+			S3:        s3ArtworkClient,
+			Settings:  settingsRepo,
 		})
 		if artworkErr != nil {
 			log.Fatalf("artwork storage: %v", artworkErr)

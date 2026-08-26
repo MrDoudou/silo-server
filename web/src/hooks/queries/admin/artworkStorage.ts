@@ -34,6 +34,23 @@ export function useImportArtworkStorage() {
   return useArtworkJob("/admin/artwork/storage/import", "Portable artwork import queued");
 }
 
+export function useRebuildArtworkStorage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<ArtworkStorageAccounting>("/admin/artwork/rebuild", {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    onSuccess: () => {
+      toast.success("Artwork store rebuild started");
+      queryClient.invalidateQueries({ queryKey: storageKey });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Artwork store rebuild failed"),
+  });
+}
+
 export function usePurgeArtworkStorage() {
   const mutation = useArtworkJob("/admin/artwork/purge", "Artwork storage plan queued");
   return {

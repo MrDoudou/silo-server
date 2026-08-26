@@ -359,12 +359,6 @@ func LoadFromDB(m map[string]string) (*Config, error) {
 	}
 	cfg.Artwork.URLTTL = artworkURLTTL
 
-	artworkOwnership := strings.ToLower(strings.TrimSpace(stringOr(m, ArtworkLocalOwnershipKey, ArtworkLocalOwned)))
-	if artworkOwnership != ArtworkLocalOwned && artworkOwnership != ArtworkLocalShared {
-		return nil, fmt.Errorf("invalid value for %q: must be one of %s, %s", ArtworkLocalOwnershipKey, ArtworkLocalOwned, ArtworkLocalShared)
-	}
-	cfg.Artwork.LocalOwnership = artworkOwnership
-
 	// Playback
 	cfg.Playback.FFmpegPath = stringOr(m, "playback.ffmpeg_path", "")
 	cfg.Playback.TranscodeDir = stringOr(m, playbackTranscodeDirSettingKey, DefaultTranscodeDir)

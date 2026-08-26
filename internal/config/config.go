@@ -357,8 +357,6 @@ type ArtworkConfig struct {
 	RemoteMaterialization string `yaml:"-"`
 	// URLTTL bounds how long a minted artwork read URL stays valid.
 	URLTTL time.Duration `yaml:"-"`
-	// LocalOwnership is owned or shared and controls root recreation safety.
-	LocalOwnership string `yaml:"-"`
 }
 
 // ClientIPConfig holds client IP resolution settings.

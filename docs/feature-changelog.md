@@ -1,5 +1,26 @@
 # Feature Changelog
 
+## 2026-08-26
+
+### Make lost local artwork roots require an explicit rebuild
+
+All local artwork stores now use the same cautious mount behavior. Initial
+setup still creates and adopts an unpinned root automatically, but once a store
+generation is pinned Silo never recreates a missing root or rotates its
+generation during a health check. Missing roots become unavailable; missing or
+mismatched markers become wrong-mount; writes stay blocked and a persistent
+admin alert remains active until the store recovers.
+
+Admins can explicitly rebuild an absent or empty local root from the Artwork
+Storage card. The rebuild creates a fresh generation, persists
+empty-rebuilding state, and resumes the existing durable recovery loop. S3
+behavior is unchanged and the rebuild action reports that backend as
+unsupported. The `artwork.local_ownership` setting was removed because there
+is no longer an owned/shared behavior split. The
+`artwork.seed_adoption_grace` setting was also removed; imported unreferenced
+seeds retain the existing fixed 30-day grace before scheduled GC or on-demand
+purge can reclaim them. Existing database rows are left untouched.
+
 ## 2026-08-25
 
 ### Let clients choose one consistent artwork size
@@ -30,9 +51,9 @@ protected and raise a persistent data-loss warning.
 
 Artwork stores now report healthy, degraded, unavailable, empty-rebuilding,
 and wrong-mount states. Transient startup outages no longer crash-loop the
-server, destructive collection pauses during outages, owned local roots can be
-rebuilt, and shared roots refuse every write when their mount sentinel is
-absent. Storage accounting and the admin card show missing bytes and recovery
+server, destructive collection pauses during outages, and local roots refuse
+every write when their mount sentinel is absent. Storage accounting and the
+admin card show missing bytes and recovery
 progress. Artwork delivery is resilient-only: every backend uses target-bound
 Silo URLs with verified fallback serving and automatic background recovery.
 

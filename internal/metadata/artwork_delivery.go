@@ -196,6 +196,33 @@ type artworkRecoveryState struct {
 	enqueueComplete   bool
 }
 
+const artworkStoreRootAlertKind = "store_root_missing"
+
+func (c *ArtworkDeliveryCoordinator) syncStoreRootAlert(ctx context.Context, state artworkstore.HealthState) error {
+	if c == nil || c.pool == nil || c.health == nil || c.health.Backend != artworkstore.BackendLocal || !c.health.IsPinned() {
+		return nil
+	}
+	if state == artworkstore.HealthUnavailable || state == artworkstore.HealthWrongMount {
+		message := "Pinned local artwork store root is unavailable; restore it or explicitly rebuild the artwork store"
+		if state == artworkstore.HealthWrongMount {
+			message = "Pinned local artwork store markers are absent or mismatched; restore the expected mount or explicitly rebuild the artwork store"
+		}
+		_, err := c.pool.Exec(ctx, `INSERT INTO artwork_storage_alerts
+			(kind, surface_name, target_keys, image_slot, original_path, message)
+			VALUES ($1, 'artwork_store', '{}', 'root', '', $2)
+			ON CONFLICT (kind, surface_name, target_keys, image_slot) DO UPDATE SET
+				message = EXCLUDED.message, last_seen_at = NOW(), resolved_at = NULL`, artworkStoreRootAlertKind, message)
+		return err
+	}
+	if state == artworkstore.HealthHealthy {
+		_, err := c.pool.Exec(ctx, `UPDATE artwork_storage_alerts
+			SET resolved_at = NOW(), last_seen_at = NOW()
+			WHERE kind = $1 AND resolved_at IS NULL`, artworkStoreRootAlertKind)
+		return err
+	}
+	return nil
+}
+
 func (c *ArtworkDeliveryCoordinator) loadRecoveryState(ctx context.Context) (artworkRecoveryState, error) {
 	var state artworkRecoveryState
 	err := c.pool.QueryRow(ctx, `SELECT store_health, rebuild_generation,
@@ -239,6 +266,9 @@ func (c *ArtworkDeliveryCoordinator) RunRecovery(ctx context.Context) {
 	for {
 		state, _ := c.health.Health()
 		persisted, err := c.loadRecoveryState(ctx)
+		if alertErr := c.syncStoreRootAlert(ctx, state); alertErr != nil && err == nil {
+			err = fmt.Errorf("sync artwork store root alert: %w", alertErr)
+		}
 		generation := c.health.GenerationID()
 		if err == nil && persisted.storeHealth == string(artworkstore.HealthEmptyRebuilding) &&
 			persisted.rebuildGeneration == generation && state != artworkstore.HealthEmptyRebuilding &&

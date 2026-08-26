@@ -30,9 +30,11 @@ const (
 )
 
 var ErrBackendUnavailable = errors.New("artworkstore: backend unavailable")
-var ErrWrongMount = errors.New("artworkstore: shared artwork mount identity is absent")
+var ErrWrongMount = errors.New("artworkstore: artwork mount identity is absent")
 var ErrRevisionMissing = errors.New("artworkstore: authoritative artwork revision miss")
 var ErrStoreIdentity = errors.New("artworkstore: reachable store identity is invalid")
+var ErrStoreNotEmpty = errors.New("artworkstore: store is not empty")
+var ErrRebuildUnsupported = errors.New("artworkstore: explicit rebuild is supported only for local storage")
 
 type healthTracker struct {
 	mu          sync.RWMutex
@@ -153,6 +155,10 @@ func (h *Handle) reportProbeFailure(err error) {
 	}
 	if errors.Is(err, ErrWrongMount) || errors.Is(err, ErrStoreIdentity) {
 		h.health.force(HealthWrongMount)
+		return
+	}
+	if errors.Is(err, ErrBackendUnavailable) {
+		h.health.force(HealthUnavailable)
 		return
 	}
 	var mismatch *PinMismatchError

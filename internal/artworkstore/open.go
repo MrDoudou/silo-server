@@ -27,11 +27,6 @@ type Options struct {
 	// unpinnable store would let a later configuration change silently
 	// reinterpret live catalog keys against different storage.
 	Settings SettingsStore
-
-	// LocalShared enables shared/NAS sentinel protection. Once pinned, a
-	// missing copy marker becomes wrong_mount and is never recreated on the
-	// uncovered host mountpoint.
-	LocalShared bool
 }
 
 // Handle is an opened, probed, and pin-verified canonical artwork store.
@@ -48,11 +43,11 @@ type Handle struct {
 	// backends that do not have one. See Pin.
 	Generation   string
 	generationMu sync.RWMutex
+	pinned       bool
 
 	local       *FilesystemStore
 	s3          *S3Store
 	settings    SettingsStore
-	localShared bool
 	health      *healthTracker
 	probeSignal chan struct{}
 
@@ -85,6 +80,24 @@ func (h *Handle) setGeneration(generation string) {
 	h.generationMu.Unlock()
 }
 
+// IsPinned reports whether a durable store pin has been recorded. A local
+// bootstrap generation exists before first materialization, so GenerationID
+// alone cannot answer this question.
+func (h *Handle) IsPinned() bool {
+	if h == nil {
+		return false
+	}
+	h.generationMu.RLock()
+	defer h.generationMu.RUnlock()
+	return h.pinned
+}
+
+func (h *Handle) markPinned() {
+	h.generationMu.Lock()
+	h.pinned = true
+	h.generationMu.Unlock()
+}
+
 func (h *Handle) resolvedPin() Pin {
 	if h == nil {
 		return Pin{}
@@ -105,6 +118,7 @@ func (h *Handle) replaceGenerationPin(ctx context.Context, generation string) er
 		return err
 	}
 	h.Generation = generation
+	h.pinned = true
 	return nil
 }
 
@@ -127,6 +141,7 @@ func (h *Handle) recordGenerationPinIfAbsent(ctx context.Context, generation str
 		return Pin{}, err
 	}
 	h.Generation = generation
+	h.pinned = true
 	return recorded, nil
 }
 
@@ -168,9 +183,10 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 	}
 
 	handle := &Handle{
-		Backend: backend, settings: opts.Settings, localShared: opts.LocalShared,
+		Backend: backend, settings: opts.Settings,
 		health: newHealthTracker(backend, HealthHealthy), probeSignal: make(chan struct{}, 1),
 	}
+	handle.pinned = !recorded.IsZero()
 	switch backend {
 	case BackendS3:
 		store, err := NewS3Store(opts.S3)
@@ -240,34 +256,29 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 		}
 		handle.local = store
 		handle.Store = store
-		if opts.LocalShared {
-			store.configureShared()
-		}
-		// A pinned shared mount must prove both sentinels before any operation
+		// A pinned local mount must prove both sentinels before any operation
 		// that can create the configured directory or write into it. Otherwise
-		// an unavailable NAS path could be replaced by a writable host
+		// an unavailable path could be replaced by a writable host
 		// mountpoint and the startup probe would contaminate the wrong disk.
-		if opts.LocalShared {
+		if !recorded.IsZero() {
+			handle.setGeneration(recorded.Generation)
+			store.setPinnedGeneration(recorded.Generation)
+			if _, err := os.Stat(store.Root()); err != nil {
+				handle.health.force(HealthUnavailable)
+				break
+			}
 			if err := store.HasFormatMarker(ctx); err != nil {
-				if !recorded.IsZero() {
-					handle.setGeneration(recorded.Generation)
-				}
 				handle.health.force(HealthWrongMount)
 				break
 			}
 			marker, err := store.ReadMarker(ctx)
 			if err != nil {
-				if !recorded.IsZero() {
-					handle.setGeneration(recorded.Generation)
-				}
 				handle.health.force(HealthWrongMount)
 				break
 			}
-			handle.setGeneration(marker.ID)
-			store.setSharedGeneration(marker.ID)
 			if err := VerifyPin(recorded, Pin{Backend: backend, Generation: marker.ID}); err != nil {
-				_ = store.Close()
-				return nil, err
+				handle.health.force(HealthWrongMount)
+				break
 			}
 			if err := store.Probe(ctx); err != nil {
 				handle.health.force(HealthUnavailable)
@@ -288,9 +299,6 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 		switch {
 		case markerErr == nil:
 			handle.setGeneration(marker.ID)
-		case errors.Is(markerErr, ErrNoMarker) && !recorded.IsZero() && opts.LocalShared:
-			handle.setGeneration(recorded.Generation)
-			handle.health.force(HealthWrongMount)
 		case errors.Is(markerErr, ErrNoMarker):
 			marker, _, markerErr = store.EnsureMarker(ctx)
 			if markerErr != nil {
@@ -327,7 +335,15 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 	}
 
 	handle.Store = &healthStore{
-		Store:  observeStore(newPinningStore(handle.Store, handle.resolvedPin, opts.Settings, !recorded.IsZero()), handle.Backend),
+		Store: observeStore(newPinningStore(
+			handle.Store, handle.resolvedPin, opts.Settings, !recorded.IsZero(),
+			func(pin Pin) {
+				handle.markPinned()
+				if handle.local != nil {
+					handle.local.setPinnedGeneration(pin.Generation)
+				}
+			},
+		), handle.Backend),
 		handle: handle,
 	}
 	return handle, nil
@@ -448,15 +464,14 @@ func (h *Handle) check(ctx context.Context) error {
 		return &PinMismatchError{Recorded: recorded, Resolved: Pin{Backend: h.Backend, Generation: h.GenerationID()}}
 	}
 	if h.local != nil {
-		if _, err := os.Stat(h.local.Root()); err != nil {
-			_ = h.local.ReopenRoot()
-			if h.localShared {
-				return ErrWrongMount
-			}
+		if err := h.local.ReopenRoot(); err != nil {
+			return fmt.Errorf("artworkstore: refresh local store root: %w", err)
 		}
-		if h.localShared {
-			if err := h.local.ReopenRoot(); err != nil {
-				return fmt.Errorf("artworkstore: refresh shared store root: %w", err)
+		if !recorded.IsZero() {
+			h.setGeneration(recorded.Generation)
+			h.local.setPinnedGeneration(recorded.Generation)
+			if _, err := os.Stat(h.local.Root()); err != nil {
+				return ErrBackendUnavailable
 			}
 			if err := h.local.HasFormatMarker(ctx); err != nil {
 				return ErrWrongMount
@@ -465,12 +480,7 @@ func (h *Handle) check(ctx context.Context) error {
 			if err != nil {
 				return ErrWrongMount
 			}
-			generation := h.GenerationID()
-			if !recorded.IsZero() {
-				generation = recorded.Generation
-				h.setGeneration(generation)
-				h.local.setSharedGeneration(generation)
-			}
+			generation := recorded.Generation
 			if marker.ID != generation {
 				return &PinMismatchError{
 					Recorded: Pin{Backend: h.Backend, Generation: generation},
@@ -483,19 +493,13 @@ func (h *Handle) check(ctx context.Context) error {
 			return err
 		}
 		if err := h.local.HasFormatMarker(ctx); err != nil {
-			if h.localShared {
-				return ErrWrongMount
-			}
 			if err := h.local.EnsureFormatMarker(ctx); err != nil {
 				return err
 			}
 		}
 		marker, err := h.local.ReadMarker(ctx)
 		if err != nil {
-			if !errors.Is(err, ErrNoMarker) || h.localShared {
-				if h.localShared && errors.Is(err, ErrNoMarker) {
-					return ErrWrongMount
-				}
+			if !errors.Is(err, ErrNoMarker) {
 				return err
 			}
 			marker, _, err = h.local.EnsureMarker(ctx)
@@ -506,6 +510,7 @@ func (h *Handle) check(ctx context.Context) error {
 			if err := h.replaceGenerationPin(ctx, marker.ID); err != nil {
 				return err
 			}
+			h.local.setPinnedGeneration(marker.ID)
 			recorded = Pin{Backend: h.Backend, Generation: marker.ID}
 		}
 		generation := h.GenerationID()
@@ -570,6 +575,41 @@ func (h *Handle) check(ctx context.Context) error {
 		return nil
 	}
 	return errors.New("artworkstore: artwork storage is not configured")
+}
+
+// RebuildEmpty explicitly replaces an unavailable empty local store with a
+// fresh physical generation. S3 has no local root to recreate and keeps its
+// existing authoritative-empty recovery behavior.
+func (h *Handle) RebuildEmpty(ctx context.Context) error {
+	if h == nil || h.local == nil {
+		return ErrRebuildUnsupported
+	}
+	h.checkMu.Lock()
+	defer h.checkMu.Unlock()
+	previousHealth, _ := h.Health()
+	h.health.force(HealthUnavailable)
+	if err := h.local.prepareEmptyRebuild(ctx); err != nil {
+		h.health.force(previousHealth)
+		return err
+	}
+	if err := h.local.Probe(ctx); err != nil {
+		return err
+	}
+	if err := h.local.EnsureFormatMarker(ctx); err != nil {
+		return err
+	}
+	marker, _, err := h.local.EnsureMarker(ctx)
+	if err != nil {
+		return err
+	}
+	if err := h.replaceGenerationPin(ctx, marker.ID); err != nil {
+		return err
+	}
+	h.local.setPinnedGeneration(marker.ID)
+	h.health.force(HealthEmptyRebuilding)
+	h.checkedAt = time.Time{}
+	h.checkErr = nil
+	return nil
 }
 
 func (h *Handle) checkZeroPinArtwork(ctx context.Context) (bool, error) {

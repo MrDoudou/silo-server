@@ -67,7 +67,8 @@ func replacePin(ctx context.Context, settings SettingsStore, pin Pin) error {
 // Generation identifies the physical copy for backends that have one: the
 // filesystem and S3 stores both record a random copy-marker id. A reachable
 // non-empty store with a different id is a fatal configuration mismatch; an
-// authoritatively empty owned store receives a new generation and is rebuilt.
+// authoritatively empty S3 store may receive a new generation and be rebuilt;
+// a pinned local store requires the explicit rebuild action.
 type Pin struct {
 	Version    int    `json:"version"`
 	Backend    string `json:"backend"`
@@ -177,6 +178,7 @@ type pinningStore struct {
 	pin      func() Pin
 	settings SettingsStore
 	pinned   atomic.Bool
+	onPinned func(Pin)
 	// pinOnce serializes the pin attempt so concurrent variant writes make
 	// one settings round trip, not one per object.
 	pinOnce sync.Mutex
@@ -184,11 +186,11 @@ type pinningStore struct {
 
 // newPinningStore wraps store so writes pin it. A nil settings store or an
 // already-verified pin returns the store unchanged.
-func newPinningStore(store Store, pin func() Pin, settings SettingsStore, alreadyPinned bool) Store {
+func newPinningStore(store Store, pin func() Pin, settings SettingsStore, alreadyPinned bool, onPinned func(Pin)) Store {
 	if store == nil || pin == nil || settings == nil {
 		return store
 	}
-	wrapped := &pinningStore{Store: store, pin: pin, settings: settings}
+	wrapped := &pinningStore{Store: store, pin: pin, settings: settings, onPinned: onPinned}
 	wrapped.pinned.Store(alreadyPinned)
 	return wrapped
 }
@@ -233,6 +235,9 @@ func (s *pinningStore) ensurePinned(ctx context.Context) error {
 		return err
 	}
 	s.pinned.Store(true)
+	if s.onPinned != nil {
+		s.onPinned(pin)
+	}
 	return nil
 }
 

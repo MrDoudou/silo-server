@@ -63,19 +63,12 @@ type FilesystemStore struct {
 	mu               sync.Mutex
 	root             *os.Root
 	closed           bool
-	shared           bool
-	sharedGeneration string
+	pinnedGeneration string
 }
 
-func (s *FilesystemStore) configureShared() {
+func (s *FilesystemStore) setPinnedGeneration(generation string) {
 	s.mu.Lock()
-	s.shared = true
-	s.mu.Unlock()
-}
-
-func (s *FilesystemStore) setSharedGeneration(generation string) {
-	s.mu.Lock()
-	s.sharedGeneration = generation
+	s.pinnedGeneration = generation
 	s.mu.Unlock()
 }
 
@@ -129,7 +122,7 @@ func (s *FilesystemStore) Close() error {
 }
 
 // ReopenRoot releases the cached confined root without closing the store. The
-// next operation resolves rootPath again, which lets shared mounts recover
+// next operation resolves rootPath again, which lets local mounts recover
 // safely after a filesystem is replaced at the same pathname.
 func (s *FilesystemStore) ReopenRoot() error {
 	s.mu.Lock()
@@ -153,9 +146,9 @@ func (s *FilesystemStore) openRoot() (*os.Root, error) {
 	if s.root != nil {
 		return s.root, nil
 	}
-	if s.shared {
+	if s.pinnedGeneration != "" {
 		if _, err := os.Stat(s.rootPath); err != nil {
-			return nil, fmt.Errorf("%w: opening shared store root %s: %w", ErrWrongMount, s.rootPath, err)
+			return nil, fmt.Errorf("artworkstore: opening pinned store root %s: %w", s.rootPath, err)
 		}
 	} else if err := os.MkdirAll(s.rootPath, storeDirPerm); err != nil {
 		return nil, fmt.Errorf("artworkstore: creating store root %s: %w", s.rootPath, err)
@@ -164,9 +157,9 @@ func (s *FilesystemStore) openRoot() (*os.Root, error) {
 	if err != nil {
 		return nil, fmt.Errorf("artworkstore: opening store root %s: %w", s.rootPath, err)
 	}
-	if s.shared && s.sharedGeneration != "" {
+	if s.pinnedGeneration != "" {
 		marker, markerErr := readMarker(root)
-		if markerErr != nil || marker.ID != s.sharedGeneration {
+		if markerErr != nil || marker.ID != s.pinnedGeneration {
 			_ = root.Close()
 			return nil, ErrWrongMount
 		}
@@ -184,6 +177,51 @@ func (s *FilesystemStore) openRoot() (*os.Root, error) {
 	}
 	s.root = root
 	return root, nil
+}
+
+// prepareEmptyRebuild creates the configured root when absent and removes its
+// old identity sentinels only after proving that no logical artwork objects are
+// present. The caller must block ordinary writes while this runs and then
+// create fresh sentinels before making the store writable again.
+func (s *FilesystemStore) prepareEmptyRebuild(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return errors.New("artworkstore: filesystem store is closed")
+	}
+	if s.root != nil {
+		_ = s.root.Close()
+		s.root = nil
+	}
+	if err := os.MkdirAll(s.rootPath, storeDirPerm); err != nil {
+		return fmt.Errorf("artworkstore: recreating store root %s: %w", s.rootPath, err)
+	}
+	root, err := os.OpenRoot(s.rootPath)
+	if err != nil {
+		return fmt.Errorf("artworkstore: opening rebuilt store root %s: %w", s.rootPath, err)
+	}
+	defer func() { _ = root.Close() }()
+	if err := fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if entry.IsDir() || name == markerFileName || name == formatMarkerFileName {
+			return nil
+		}
+		return fmt.Errorf("%w: %s", ErrStoreNotEmpty, name)
+	}); err != nil {
+		return err
+	}
+	for _, name := range []string{markerFileName, formatMarkerFileName} {
+		if err := root.Remove(name); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("artworkstore: removing old store sentinel %s: %w", name, err)
+		}
+	}
+	s.pinnedGeneration = ""
+	return nil
 }
 
 func (s *FilesystemStore) openRootExisting() (*os.Root, error) {

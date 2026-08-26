@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Silo-Server/silo-server/internal/adminjob"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 	"github.com/Silo-Server/silo-server/internal/models"
 )
@@ -27,12 +28,46 @@ type fakeArtworkStorageJobs struct {
 	input adminjob.CreateJobInput
 }
 
+type fakeArtworkStorageRebuilder struct {
+	fakeArtworkStorageAccountant
+	result metadata.ArtworkStorageAccounting
+	err    error
+	called int
+}
+
+func (f *fakeArtworkStorageRebuilder) RebuildEmpty(context.Context) (metadata.ArtworkStorageAccounting, error) {
+	f.called++
+	return f.result, f.err
+}
+
 func (f *fakeArtworkStorageJobs) Create(_ context.Context, input adminjob.CreateJobInput) (*models.AdminJob, error) {
 	f.input = input
 	return &models.AdminJob{
 		ID: "job-1", JobType: input.JobType, Status: adminjob.StatusQueued,
 		DryRun: input.DryRun, RequestedAt: time.Now(),
 	}, nil
+}
+
+func TestAdminArtworkRebuildReturnsNewState(t *testing.T) {
+	rebuilder := &fakeArtworkStorageRebuilder{result: metadata.ArtworkStorageAccounting{
+		Backend: "local", StoreHealth: "empty_rebuilding",
+	}}
+	handler := NewAdminArtworkStorageHandler(rebuilder, &fakeArtworkStorageJobs{})
+	recorder := httptest.NewRecorder()
+	handler.HandleRebuild(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/admin/artwork/rebuild", nil))
+	if recorder.Code != http.StatusOK || rebuilder.called != 1 || !strings.Contains(recorder.Body.String(), `"store_health":"empty_rebuilding"`) {
+		t.Fatalf("rebuild response = %d %s, calls = %d", recorder.Code, recorder.Body.String(), rebuilder.called)
+	}
+}
+
+func TestAdminArtworkRebuildRejectsUnsupportedBackend(t *testing.T) {
+	rebuilder := &fakeArtworkStorageRebuilder{err: artworkstore.ErrRebuildUnsupported}
+	handler := NewAdminArtworkStorageHandler(rebuilder, &fakeArtworkStorageJobs{})
+	recorder := httptest.NewRecorder()
+	handler.HandleRebuild(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/admin/artwork/rebuild", nil))
+	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(recorder.Body.String(), "unsupported_backend") {
+		t.Fatalf("rebuild response = %d %s", recorder.Code, recorder.Body.String())
+	}
 }
 
 func TestAdminArtworkStorageEndpointsReadSnapshotAndQueueAsyncJobs(t *testing.T) {

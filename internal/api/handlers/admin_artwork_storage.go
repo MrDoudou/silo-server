@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/Silo-Server/silo-server/internal/adminjob"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 	"github.com/Silo-Server/silo-server/internal/models"
 )
@@ -19,8 +20,13 @@ type artworkStorageAccountant interface {
 	Accounting(ctx context.Context) (metadata.ArtworkStorageAccounting, error)
 }
 
+type artworkStorageRebuilder interface {
+	RebuildEmpty(ctx context.Context) (metadata.ArtworkStorageAccounting, error)
+}
+
 type AdminArtworkStorageHandler struct {
 	accounting artworkStorageAccountant
+	rebuilder  artworkStorageRebuilder
 	jobs       artworkStorageJobRepository
 }
 
@@ -28,7 +34,29 @@ func NewAdminArtworkStorageHandler(accounting artworkStorageAccountant, jobs art
 	if accounting == nil || jobs == nil {
 		return nil
 	}
-	return &AdminArtworkStorageHandler{accounting: accounting, jobs: jobs}
+	handler := &AdminArtworkStorageHandler{accounting: accounting, jobs: jobs}
+	handler.rebuilder, _ = accounting.(artworkStorageRebuilder)
+	return handler
+}
+
+func (h *AdminArtworkStorageHandler) HandleRebuild(w http.ResponseWriter, r *http.Request) {
+	if h == nil || h.rebuilder == nil {
+		writeError(w, http.StatusServiceUnavailable, "not_configured", "Artwork store rebuild is not configured")
+		return
+	}
+	state, err := h.rebuilder.RebuildEmpty(r.Context())
+	if err != nil {
+		switch {
+		case errors.Is(err, artworkstore.ErrRebuildUnsupported):
+			writeError(w, http.StatusUnprocessableEntity, "unsupported_backend", "Artwork store rebuild is supported only for local storage")
+		case errors.Is(err, artworkstore.ErrStoreNotEmpty):
+			writeError(w, http.StatusConflict, "store_not_empty", "Artwork store rebuild requires an empty local root")
+		default:
+			writeError(w, http.StatusInternalServerError, "internal_error", "Failed to rebuild artwork storage")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, state)
 }
 
 func (h *AdminArtworkStorageHandler) HandleStorage(w http.ResponseWriter, r *http.Request) {

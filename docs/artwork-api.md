@@ -19,6 +19,22 @@ Clients should capability-detect these fields rather than infer behavior from a 
 The companion `GET /api/v1/images/capability` endpoint maps the client-facing
 `image_size=small|medium|large|original` values onto these same live variants.
 
+## Server settings
+
+Artwork storage exposes `artwork.storage_backend`, `artwork.local_path`,
+`artwork.remote_materialization`, and `artwork.url_ttl`. Local roots all use the
+same cautious mount semantics; there is no ownership-mode setting. Imported,
+unreferenced seed revisions have a fixed 30-day adoption grace.
+
+## Admin storage controls
+
+The admin-authenticated storage endpoints are documented in
+[`admin-api.md`](admin-api.md). In addition to accounting, refresh, import, and
+safe purge, `POST /api/v1/admin/artwork/rebuild` explicitly rebuilds an empty
+local store after its pinned root is unavailable or has the wrong markers. A
+successful response is the new storage-accounting state with
+`store_health: "empty_rebuilding"`. S3 returns `422 unsupported_backend`.
+
 ## Resilient delivery
 
 `GET|HEAD /api/v1/artwork/{signed-capability}/{variant}` is the default URL for

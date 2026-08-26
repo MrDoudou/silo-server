@@ -11,10 +11,69 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/models"
 )
+
+type alertTestSettings map[string]string
+
+func (s alertTestSettings) Get(_ context.Context, key string) (string, error) {
+	return s[key], nil
+}
+
+func (s alertTestSettings) SetIfAbsent(_ context.Context, key, value string) (bool, error) {
+	if s[key] != "" {
+		return false, nil
+	}
+	s[key] = value
+	return true, nil
+}
+
+func (s alertTestSettings) Set(_ context.Context, key, value string) error {
+	s[key] = value
+	return nil
+}
+
+func TestStoreRootAlertLifecycle(t *testing.T) {
+	pool := localArtworkTestPool(t)
+	ctx := t.Context()
+	handle, err := artworkstore.Open(ctx, artworkstore.Options{
+		Backend: artworkstore.BackendLocal, LocalPath: t.TempDir(), Settings: alertTestSettings{},
+	})
+	if err != nil {
+		t.Fatalf("open alert test store: %v", err)
+	}
+	t.Cleanup(func() { _ = handle.Close() })
+	if err := handle.Store.WriteImmutable(ctx, "artwork/v1/alert-test.webp", []byte("pinned"), artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatalf("pin alert test store: %v", err)
+	}
+	coordinator := &ArtworkDeliveryCoordinator{pool: pool, health: handle}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM artwork_storage_alerts WHERE kind = $1`, artworkStoreRootAlertKind)
+	})
+
+	if err := coordinator.syncStoreRootAlert(ctx, artworkstore.HealthUnavailable); err != nil {
+		t.Fatalf("raise root alert: %v", err)
+	}
+	var active int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM artwork_storage_alerts WHERE kind = $1 AND resolved_at IS NULL`, artworkStoreRootAlertKind).Scan(&active); err != nil {
+		t.Fatalf("read active root alert: %v", err)
+	}
+	if active != 1 {
+		t.Fatalf("active root alerts = %d, want 1", active)
+	}
+	if err := coordinator.syncStoreRootAlert(ctx, artworkstore.HealthHealthy); err != nil {
+		t.Fatalf("resolve root alert: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM artwork_storage_alerts WHERE kind = $1 AND resolved_at IS NULL`, artworkStoreRootAlertKind).Scan(&active); err != nil {
+		t.Fatalf("read resolved root alert: %v", err)
+	}
+	if active != 0 {
+		t.Fatalf("active root alerts after recovery = %d, want 0", active)
+	}
+}
 
 func localArtworkTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()

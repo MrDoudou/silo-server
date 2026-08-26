@@ -2,22 +2,20 @@ package metadata
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
-	"github.com/Silo-Server/silo-server/internal/config"
 )
 
-const defaultSeedAdoptionGrace = 30 * 24 * time.Hour
+// seedAdoptionGrace leaves copied, unreferenced seeds available for adoption
+// before the normal scheduled artwork-revision GC and on-demand purge job may
+// reclaim them.
+const seedAdoptionGrace = 30 * 24 * time.Hour
 
 type ArtworkSeedImportResult struct {
 	ImportedSeeds        int64     `json:"imported_seeds"`
@@ -53,10 +51,6 @@ func (s *ArtworkStorageService) ImportPortable(
 	if cp.ImportFinished {
 		return seedImportResult(cp), nil
 	}
-	grace, err := s.seedAdoptionGrace(ctx)
-	if err != nil {
-		return ArtworkSeedImportResult{}, err
-	}
 	for {
 		if err := s.waitRateLimit(ctx); err != nil {
 			return ArtworkSeedImportResult{}, err
@@ -85,7 +79,7 @@ func (s *ArtworkStorageService) ImportPortable(
 				return ArtworkSeedImportResult{}, err
 			}
 			retainUnverifiable := s.untrackedUserArtwork && isUntrackedUserArtworkImageType(manifest.ImageType)
-			if err := s.registerImportedRevision(ctx, originalKey, manifest.ImageType, inventory, live, retainUnverifiable, grace); err != nil {
+			if err := s.registerImportedRevision(ctx, originalKey, manifest.ImageType, inventory, live, retainUnverifiable); err != nil {
 				return ArtworkSeedImportResult{}, err
 			}
 			_ = manifestJSON // retained by verification; inventory records its exact size.
@@ -191,7 +185,7 @@ func (s *ArtworkStorageService) artworkPathReferenced(ctx context.Context, origi
 	return referenced, err
 }
 
-func (s *ArtworkStorageService) registerImportedRevision(ctx context.Context, originalPath, imageType string, objects []artworkstore.ObjectInfo, live, retainUnverifiable bool, grace time.Duration) error {
+func (s *ArtworkStorageService) registerImportedRevision(ctx context.Context, originalPath, imageType string, objects []artworkstore.ObjectInfo, live, retainUnverifiable bool) error {
 	keys := make([]string, 0, len(objects))
 	sizes := make([]int64, 0, len(objects))
 	contentTypes := make([]string, 0, len(objects))
@@ -202,7 +196,7 @@ func (s *ArtworkStorageService) registerImportedRevision(ctx context.Context, or
 		contentTypes = append(contentTypes, object.MediaType)
 		total += object.SizeBytes
 	}
-	expires := time.Now().UTC().Add(grace)
+	expires := time.Now().UTC().Add(seedAdoptionGrace)
 	_, err := s.pool.Exec(ctx, artworkSeedImportUpsertSQL,
 		originalPath, imageType, keys, sizes, contentTypes, total, live, s.storeGeneration(), expires, retainUnverifiable)
 	return err
@@ -237,32 +231,3 @@ const artworkSeedImportUpsertSQL = `
 			not_before = CASE WHEN $7 OR $10 THEN GREATEST(artwork_revision_gc_candidates.not_before, NOW()) ELSE COALESCE(artwork_revision_gc_candidates.seed_expires_at, $9) END,
 			next_attempt_at = CASE WHEN $7 OR $10 THEN NULL ELSE COALESCE(artwork_revision_gc_candidates.seed_expires_at, $9) END,
 			attempt_count = 0, locked_at = NULL, locked_by = '', last_error = '', updated_at = NOW()`
-
-func (s *ArtworkStorageService) seedAdoptionGrace(ctx context.Context) (time.Duration, error) {
-	var raw string
-	err := s.pool.QueryRow(ctx, `SELECT value FROM server_settings WHERE key = $1`, config.ArtworkSeedAdoptionGraceKey).Scan(&raw)
-	if err != nil {
-		// An absent row is the shipped hot default.
-		if errors.Is(err, pgx.ErrNoRows) {
-			return defaultSeedAdoptionGrace, nil
-		}
-		return 0, err
-	}
-	raw = strings.TrimSpace(raw)
-	return parseSeedAdoptionGrace(raw)
-}
-
-func parseSeedAdoptionGrace(raw string) (time.Duration, error) {
-	raw = strings.TrimSpace(raw)
-	if strings.HasSuffix(raw, "d") {
-		days, err := strconv.ParseInt(strings.TrimSuffix(raw, "d"), 10, 32)
-		if err == nil && days > 0 {
-			return time.Duration(days) * 24 * time.Hour, nil
-		}
-	}
-	grace, err := time.ParseDuration(raw)
-	if err != nil || grace <= 0 {
-		return 0, fmt.Errorf("invalid %s %q", config.ArtworkSeedAdoptionGraceKey, raw)
-	}
-	return grace, nil
-}

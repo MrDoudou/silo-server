@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { HardDrive, RefreshCw, ShieldCheck } from "lucide-react";
+import { HardDrive, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { AdminJob, ArtworkPurgeRequest } from "@/api/types";
 import {
   useArtworkStorage,
   useImportArtworkStorage,
   usePurgeArtworkStorage,
+  useRebuildArtworkStorage,
   useRefreshArtworkStorage,
 } from "@/hooks/queries/admin/artworkStorage";
 import { useAdminLibraries, useAllAdminJobs } from "@/hooks/queries/admin/libraries";
@@ -56,10 +57,12 @@ export default function AdminArtworkStorage() {
   const storage = useArtworkStorage();
   const refresh = useRefreshArtworkStorage();
   const importStore = useImportArtworkStorage();
+  const rebuild = useRebuildArtworkStorage();
   const purge = usePurgeArtworkStorage();
   const libraries = useAdminLibraries().data ?? [];
   const jobs = useAllAdminJobs(50).data ?? [];
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [rebuildDialogOpen, setRebuildDialogOpen] = useState(false);
   const [scope, setScope] = useState("server");
   const [previewJobID, setPreviewJobID] = useState("");
   const previewJob = jobs.find((job) => job.id === previewJobID);
@@ -86,6 +89,8 @@ export default function AdminArtworkStorage() {
   const storeHealth = data.store_health ?? "unknown";
   const libraryNames = new Map(libraries.map((library) => [library.id, library.name]));
   const snapshotAge = formatSnapshotAge(data.snapshot_at);
+  const canRebuild =
+    data.backend === "local" && ["unavailable", "wrong_mount"].includes(storeHealth);
 
   return (
     <section
@@ -155,6 +160,11 @@ export default function AdminArtworkStorage() {
       )}
 
       <div className="flex flex-wrap gap-2">
+        {canRebuild && (
+          <Button size="sm" variant="destructive" onClick={() => setRebuildDialogOpen(true)}>
+            <TriangleAlert className="mr-2 h-4 w-4" /> Rebuild artwork store
+          </Button>
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -176,6 +186,30 @@ export default function AdminArtworkStorage() {
           <ShieldCheck className="mr-2 h-4 w-4" /> Free artwork storage
         </Button>
       </div>
+
+      <Dialog open={rebuildDialogOpen} onOpenChange={setRebuildDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rebuild the empty artwork store?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              This creates a new local store generation and queues recovery of reconstructible
+              artwork. Continue only when the previous store root is gone or the replacement root is
+              empty.
+            </p>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                rebuild.mutate(undefined, { onSuccess: () => setRebuildDialogOpen(false) })
+              }
+              disabled={rebuild.isPending}
+            >
+              Confirm rebuild artwork store
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">

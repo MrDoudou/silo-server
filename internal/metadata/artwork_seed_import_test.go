@@ -8,15 +8,9 @@ import (
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 )
 
-func TestParseSeedAdoptionGrace(t *testing.T) {
-	for raw, want := range map[string]time.Duration{"30d": 30 * 24 * time.Hour, "72h": 72 * time.Hour} {
-		got, err := parseSeedAdoptionGrace(raw)
-		if err != nil || got != want {
-			t.Fatalf("parse %q = %s, %v; want %s", raw, got, err, want)
-		}
-	}
-	if _, err := parseSeedAdoptionGrace("0d"); err == nil {
-		t.Fatal("zero grace was accepted")
+func TestSeedAdoptionGraceIsFixedAtThirtyDays(t *testing.T) {
+	if seedAdoptionGrace != 30*24*time.Hour {
+		t.Fatalf("seed adoption grace = %s, want 30 days", seedAdoptionGrace)
 	}
 }
 

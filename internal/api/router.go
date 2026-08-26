@@ -1325,13 +1325,12 @@ func NewRouter(deps Dependencies) chi.Router {
 		adminJobsHandler.CancelRegistry = deps.AdminJobCancelRegistry
 		adminJobsHandler.RealtimeHub = deps.RealtimeHub
 		if deps.ArtworkStore != nil {
-			adminArtworkStorageHandler = handlers.NewAdminArtworkStorageHandler(
-				metadata.NewArtworkStorageService(
-					deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.GenerationID,
-					!deps.UserArtworkTracked,
-				),
-				jobRepo,
+			artworkStorageService := metadata.NewArtworkStorageService(
+				deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.GenerationID,
+				!deps.UserArtworkTracked,
 			)
+			artworkStorageService.SetRebuilder(deps.ArtworkStore)
+			adminArtworkStorageHandler = handlers.NewAdminArtworkStorageHandler(artworkStorageService, jobRepo)
 		}
 		if adminHandler != nil && deps.FolderRepo != nil && deps.FileRepo != nil && itemRepo != nil && episodeRepo != nil {
 			adminHandler.JobRepo = jobRepo
@@ -3254,6 +3253,7 @@ func NewRouter(deps Dependencies) chi.Router {
 							if adminArtworkStorageHandler != nil {
 								r.Route("/artwork", func(r chi.Router) {
 									r.Get("/storage", adminArtworkStorageHandler.HandleStorage)
+									r.Post("/rebuild", adminArtworkStorageHandler.HandleRebuild)
 									r.Post("/storage/refresh", adminArtworkStorageHandler.HandleRefresh)
 									r.Post("/storage/import", adminArtworkStorageHandler.HandleImport)
 									r.Post("/purge", adminArtworkStorageHandler.HandlePurge)

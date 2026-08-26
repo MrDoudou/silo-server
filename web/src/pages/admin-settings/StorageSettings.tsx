@@ -51,8 +51,6 @@ const KEYS = [
   ...PRIVATE_S3_KEYS,
   "artwork.storage_backend",
   "artwork.local_path",
-  "artwork.seed_adoption_grace",
-  "artwork.local_ownership",
   "s3.user_db_endpoint",
   "s3.user_db_region",
   "s3.user_db_path_style",
@@ -320,23 +318,6 @@ export default function StorageSettings() {
               value={form.getValue("artwork.local_path")}
               onChange={(v) => form.setValue("artwork.local_path", v)}
               hint="Used when automatic mode resolves to local disk and by explicit local mode. A restart is required after changing the path."
-            />
-            <SettingField
-              label="Local storage ownership"
-              type="select"
-              value={form.getValue("artwork.local_ownership") || "owned"}
-              onChange={(v) => form.setValue("artwork.local_ownership", v)}
-              options={[
-                { value: "owned", label: "Private server-owned root" },
-                { value: "shared", label: "Shared/NAS mount" },
-              ]}
-              hint="Shared/NAS mode refuses writes when its mount sentinels disappear, preventing data from landing on an uncovered host directory."
-            />
-            <SettingField
-              label="Copied-store adoption grace"
-              value={form.getValue("artwork.seed_adoption_grace") || "30d"}
-              onChange={(v) => form.setValue("artwork.seed_adoption_grace", v)}
-              hint="Verified imported revisions remain adoptable for this long. Applies immediately."
             />
           </TabsContent>
 

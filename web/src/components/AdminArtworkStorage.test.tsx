@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminArtworkStorage, { formatArtworkBytes } from "./AdminArtworkStorage";
 
 const mockState = vi.hoisted(() => ({
+  storeHealth: "healthy",
   libraries: [
     {
       library_id: 7,
@@ -25,7 +26,7 @@ vi.mock("@/hooks/queries/admin/artworkStorage", () => ({
       snapshot_at: "2026-08-25T12:00:00Z",
       backend: "local",
       resolved_path: "/var/lib/silo/artwork",
-      health: "ready",
+      store_health: mockState.storeHealth,
       complete: false,
       known_bytes: 4096,
       total: {
@@ -52,6 +53,7 @@ vi.mock("@/hooks/queries/admin/artworkStorage", () => ({
   }),
   useRefreshArtworkStorage: () => ({ mutate: vi.fn(), isPending: false }),
   useImportArtworkStorage: () => ({ mutate: vi.fn(), isPending: false }),
+  useRebuildArtworkStorage: () => ({ mutate: vi.fn(), isPending: false }),
   usePurgeArtworkStorage: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -62,6 +64,7 @@ vi.mock("@/hooks/queries/admin/libraries", () => ({
 
 describe("AdminArtworkStorage", () => {
   beforeEach(() => {
+    mockState.storeHealth = "healthy";
     mockState.libraries = [
       {
         library_id: 7,
@@ -96,5 +99,11 @@ describe("AdminArtworkStorage", () => {
     const markup = renderToStaticMarkup(<AdminArtworkStorage />);
     expect(markup).toContain("Shared (non-additive)");
     expect(markup).not.toContain("Library #");
+  });
+
+  it("offers an explicit rebuild for an unavailable local store", () => {
+    mockState.storeHealth = "unavailable";
+    const markup = renderToStaticMarkup(<AdminArtworkStorage />);
+    expect(markup).toContain("Rebuild artwork store");
   });
 });

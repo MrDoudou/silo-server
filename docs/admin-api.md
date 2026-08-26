@@ -637,14 +637,12 @@ paths themselves appear only here, behind admin auth.
 ## Settings updates
 
 `PUT /api/v1/admin/settings` accepts setting changes under the `values`
-envelope. For example, configuring artwork materialization and local-root
-ownership uses:
+envelope. For example, configuring artwork materialization uses:
 
 ```json
 {
   "values": {
-    "artwork.remote_materialization": "selected",
-    "artwork.local_ownership": "shared"
+    "artwork.remote_materialization": "selected"
   }
 }
 ```
@@ -682,6 +680,11 @@ reports `missing_bytes`, `repair_pending_bytes`, and
 `protected_loss_count`. A protected loss remains selected and renders a
 placeholder until an administrator restores or replaces it; a transport outage
 does not increment missing counts.
+For a pinned local store, an absent root is `unavailable`; absent, invalid, or
+mismatched identity markers on a present root are `wrong_mount`. Neither state
+recreates the root or rotates the generation automatically. A persistent
+`store_root_missing` artwork-storage alert remains active until the store is
+healthy again.
 `free_space_bytes` is present only for a backend with meaningful bounded local
 capacity. Adoption-index objects are included in the unique physical/object
 totals. `seed` reports verified copied-store revisions, including expired bytes
@@ -699,10 +702,19 @@ objects, and publishes a new snapshot.
 `POST /api/v1/admin/artwork/storage/import` returns `202 Accepted` with a
 resumable admin job. It walks `artwork/v1/objects`, imports only revisions with
 a valid completeness manifest and matching object digests, and registers
-otherwise-unreferenced revisions as seeds for the hot-reloadable
-`artwork.seed_adoption_grace` (default `30d`). Incomplete directories are
-skipped. The active artwork refresh, import, and purge jobs are mutually
-exclusive.
+otherwise-unreferenced revisions as seeds with a fixed 30-day adoption grace.
+Incomplete directories are skipped. The active
+artwork refresh, import, and purge jobs are mutually exclusive.
+
+`POST /api/v1/admin/artwork/rebuild` is the explicit recovery action for an
+empty local artwork root. It creates the root when missing, verifies that a
+present replacement root contains no artwork objects, writes fresh format and
+store-generation markers, atomically replaces the durable and live generation
+pin, persists `empty_rebuilding`, and returns the new storage-accounting state
+with `200 OK`. The recovery coordinator then repopulates reconstructible
+artwork through the ordinary durable repair queue. A non-empty replacement
+root returns `409 store_not_empty`. S3 returns `422 unsupported_backend`; its
+existing marker and authoritative-empty recovery behavior is unchanged.
 
 `POST /api/v1/admin/artwork/purge` accepts:
 

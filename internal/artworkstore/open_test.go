@@ -307,9 +307,7 @@ func TestPinnedLocalStoreRefusesToSwitchToS3(t *testing.T) {
 	}
 }
 
-// An owned local store that is authoritatively empty is recreated under a new
-// generation and enters bulk recovery instead of crash-looping.
-func TestPinnedOwnedLocalStoreRecreatesAnEmptyRoot(t *testing.T) {
+func TestPinnedLocalStoreDoesNotCreateMissingRootOnOpen(t *testing.T) {
 	settings := newFakeSettings()
 	handle := openLocal(t, t.TempDir(), settings)
 	if err := handle.Store.WriteImmutable(context.Background(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
@@ -317,24 +315,28 @@ func TestPinnedOwnedLocalStoreRecreatesAnEmptyRoot(t *testing.T) {
 	}
 	_ = handle.Close()
 
+	missingRoot := filepath.Join(t.TempDir(), "missing-artwork")
 	reopened, err := Open(context.Background(), Options{
 		Backend:   BackendLocal,
-		LocalPath: t.TempDir(),
+		LocalPath: missingRoot,
 		Settings:  settings,
 	})
 	if err != nil {
-		t.Fatalf("Open = %v, want recovery", err)
+		t.Fatalf("Open = %v, want unavailable handle", err)
 	}
 	t.Cleanup(func() { _ = reopened.Close() })
-	if state, _ := reopened.Health(); state != HealthEmptyRebuilding {
-		t.Fatalf("health = %q, want %q", state, HealthEmptyRebuilding)
+	if state, _ := reopened.Health(); state != HealthUnavailable {
+		t.Fatalf("health = %q, want %q", state, HealthUnavailable)
 	}
-	if reopened.Generation == handle.Generation {
-		t.Fatal("recreated owned store retained the lost copy generation")
+	if reopened.Generation != handle.Generation {
+		t.Fatalf("generation = %q, want pinned %q", reopened.Generation, handle.Generation)
+	}
+	if _, err := os.Stat(missingRoot); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing pinned root was recreated: %v", err)
 	}
 }
 
-func TestRunningOwnedLocalStoreRecreatesDeletedRootAndRotatesGeneration(t *testing.T) {
+func TestRunningPinnedLocalStoreRequiresExplicitRebuildAfterDeletedRoot(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "artwork")
 	settings := newFakeSettings()
 	handle := openLocal(t, root, settings)
@@ -346,17 +348,53 @@ func TestRunningOwnedLocalStoreRecreatesDeletedRootAndRotatesGeneration(t *testi
 		t.Fatal(err)
 	}
 	handle.expireCheckCacheForTest()
-	if err := handle.Check(t.Context()); err != nil {
-		t.Fatalf("Check after root deletion: %v", err)
+	if err := handle.Check(t.Context()); !errors.Is(err, ErrBackendUnavailable) {
+		t.Fatalf("Check after root deletion = %v, want unavailable", err)
+	}
+	if state, _ := handle.Health(); state != HealthUnavailable {
+		t.Fatalf("health = %q, want unavailable", state)
+	}
+	if handle.Generation != oldGeneration {
+		t.Fatalf("generation = %q, want pinned %q", handle.Generation, oldGeneration)
+	}
+	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("pinned root was recreated automatically: %v", err)
+	}
+	if err := handle.Store.WriteImmutable(t.Context(), testKey, []byte("blocked"), ObjectMetadata{}); !errors.Is(err, ErrBackendUnavailable) {
+		t.Fatalf("write while unavailable = %v, want ErrBackendUnavailable", err)
+	}
+	if err := handle.RebuildEmpty(t.Context()); err != nil {
+		t.Fatalf("RebuildEmpty: %v", err)
 	}
 	if state, _ := handle.Health(); state != HealthEmptyRebuilding {
-		t.Fatalf("health = %q, want empty_rebuilding", state)
+		t.Fatalf("health after rebuild = %q, want empty_rebuilding", state)
 	}
 	if handle.Generation == "" || handle.Generation == oldGeneration {
-		t.Fatalf("generation = %q, want a new physical-store identity", handle.Generation)
+		t.Fatalf("generation after rebuild = %q, want rotation from %q", handle.Generation, oldGeneration)
+	}
+	if pin := settings.pin(t); pin.Generation != handle.Generation {
+		t.Fatalf("pin after rebuild = %+v, want local/%s", pin, handle.Generation)
 	}
 	if err := handle.Store.WriteImmutable(t.Context(), testKey, []byte("rebuilt"), ObjectMetadata{}); err != nil {
-		t.Fatalf("write into safely recreated owned root: %v", err)
+		t.Fatalf("write into explicitly rebuilt root: %v", err)
+	}
+}
+
+func TestRebuildEmptyRefusesRootWithArtworkObjects(t *testing.T) {
+	root := t.TempDir()
+	handle := openLocal(t, root, newFakeSettings())
+	if err := handle.Store.WriteImmutable(t.Context(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	oldGeneration := handle.GenerationID()
+	if err := handle.RebuildEmpty(t.Context()); !errors.Is(err, ErrStoreNotEmpty) {
+		t.Fatalf("RebuildEmpty = %v, want ErrStoreNotEmpty", err)
+	}
+	if state, _ := handle.Health(); state != HealthHealthy {
+		t.Fatalf("health after refused rebuild = %q, want healthy", state)
+	}
+	if handle.GenerationID() != oldGeneration {
+		t.Fatalf("generation after refused rebuild = %q, want %q", handle.GenerationID(), oldGeneration)
 	}
 }
 
@@ -418,7 +456,7 @@ func TestCleanTempFilesReachesFilesystemThroughHandleWrappers(t *testing.T) {
 	}
 }
 
-func TestPinnedLocalStoreRefusesAReachableDifferentCopy(t *testing.T) {
+func TestPinnedLocalStoreReportsReachableDifferentCopyAsWrongMount(t *testing.T) {
 	settings := newFakeSettings()
 	first := openLocal(t, t.TempDir(), settings)
 	if err := first.Store.WriteImmutable(context.Background(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
@@ -434,14 +472,20 @@ func TestPinnedLocalStoreRefusesAReachableDifferentCopy(t *testing.T) {
 	}
 	_ = other.Close()
 
-	_, err := Open(context.Background(), Options{Backend: BackendLocal, LocalPath: otherRoot, Settings: settings})
-	var mismatch *PinMismatchError
-	if !errors.As(err, &mismatch) {
-		t.Fatalf("Open = %v, want PinMismatchError", err)
+	handle, err := Open(context.Background(), Options{Backend: BackendLocal, LocalPath: otherRoot, Settings: settings})
+	if err != nil {
+		t.Fatalf("Open = %v, want wrong-mount health", err)
+	}
+	t.Cleanup(func() { _ = handle.Close() })
+	if state, _ := handle.Health(); state != HealthWrongMount {
+		t.Fatalf("health = %q, want %q", state, HealthWrongMount)
+	}
+	if err := handle.Store.WriteImmutable(t.Context(), siblingKey, []byte("blocked"), ObjectMetadata{}); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("write to wrong mount = %v, want ErrWrongMount", err)
 	}
 }
 
-func TestPinnedSharedLocalStoreRefusesMissingSentinelsWithoutWriting(t *testing.T) {
+func TestPinnedLocalStoreRefusesMissingRootWithoutWriting(t *testing.T) {
 	settings := newFakeSettings()
 	root := t.TempDir()
 	first := openLocal(t, root, settings)
@@ -452,82 +496,82 @@ func TestPinnedSharedLocalStoreRefusesMissingSentinelsWithoutWriting(t *testing.
 
 	uncovered := filepath.Join(t.TempDir(), "missing-mount")
 	handle, err := Open(context.Background(), Options{
-		Backend: BackendLocal, LocalPath: uncovered, LocalShared: true, Settings: settings,
+		Backend: BackendLocal, LocalPath: uncovered, Settings: settings,
 	})
 	if err != nil {
-		t.Fatalf("Open = %v, want wrong_mount health", err)
+		t.Fatalf("Open = %v, want unavailable health", err)
 	}
 	t.Cleanup(func() { _ = handle.Close() })
-	if state, _ := handle.Health(); state != HealthWrongMount {
-		t.Fatalf("health = %q, want %q", state, HealthWrongMount)
+	if state, _ := handle.Health(); state != HealthUnavailable {
+		t.Fatalf("health = %q, want %q", state, HealthUnavailable)
 	}
 	if _, err := os.Stat(uncovered); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("uncovered mountpoint was created: %v", err)
 	}
-	if err := handle.Store.WriteImmutable(context.Background(), testKey, []byte("bad"), ObjectMetadata{}); !errors.Is(err, ErrWrongMount) {
-		t.Fatalf("WriteImmutable = %v, want ErrWrongMount", err)
+	if err := handle.Store.WriteImmutable(context.Background(), testKey, []byte("bad"), ObjectMetadata{}); !errors.Is(err, ErrBackendUnavailable) {
+		t.Fatalf("WriteImmutable = %v, want ErrBackendUnavailable", err)
 	}
 }
 
-func TestRunningSharedStoreRefusesToPopulateDroppedMount(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "shared-artwork")
+func TestRunningPinnedStoreRefusesToPopulateDroppedMount(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "artwork")
 	settings := newFakeSettings()
-	owned := openLocal(t, root, settings)
-	if err := owned.Store.WriteImmutable(t.Context(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
+	initial := openLocal(t, root, settings)
+	if err := initial.Store.WriteImmutable(t.Context(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := owned.Close(); err != nil {
+	if err := initial.Close(); err != nil {
 		t.Fatal(err)
 	}
-	shared, err := Open(t.Context(), Options{Backend: BackendLocal, LocalPath: root, LocalShared: true, Settings: settings})
+	handle, err := Open(t.Context(), Options{Backend: BackendLocal, LocalPath: root, Settings: settings})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = shared.Close() })
+	t.Cleanup(func() { _ = handle.Close() })
 	if err := os.RemoveAll(root); err != nil {
 		t.Fatal(err)
 	}
-	shared.expireCheckCacheForTest()
-	if err := shared.Check(t.Context()); !errors.Is(err, ErrWrongMount) {
-		t.Fatalf("Check = %v, want ErrWrongMount", err)
+	handle.expireCheckCacheForTest()
+	if err := handle.Check(t.Context()); !errors.Is(err, ErrBackendUnavailable) {
+		t.Fatalf("Check = %v, want ErrBackendUnavailable", err)
 	}
-	if err := shared.Store.WriteImmutable(t.Context(), testKey, []byte("wrong disk"), ObjectMetadata{}); !errors.Is(err, ErrWrongMount) {
-		t.Fatalf("write = %v, want ErrWrongMount", err)
+	if err := handle.Store.WriteImmutable(t.Context(), testKey, []byte("wrong disk"), ObjectMetadata{}); !errors.Is(err, ErrBackendUnavailable) {
+		t.Fatalf("write = %v, want ErrBackendUnavailable", err)
 	}
-	if err := shared.Store.Probe(t.Context()); !errors.Is(err, ErrWrongMount) {
-		t.Fatalf("wrapped probe = %v, want ErrWrongMount", err)
+	if err := handle.Store.Probe(t.Context()); !errors.Is(err, ErrBackendUnavailable) {
+		t.Fatalf("wrapped probe = %v, want ErrBackendUnavailable", err)
 	}
-	if cleaner, ok := shared.Store.(interface {
+	if cleaner, ok := handle.Store.(interface {
 		CleanTempFiles(context.Context, time.Duration) (int, error)
 	}); !ok {
 		t.Fatal("health store does not expose guarded temp cleanup")
-	} else if _, err := cleaner.CleanTempFiles(t.Context(), time.Hour); !errors.Is(err, ErrWrongMount) {
-		t.Fatalf("temp cleanup = %v, want ErrWrongMount", err)
+	} else if _, err := cleaner.CleanTempFiles(t.Context(), time.Hour); !errors.Is(err, ErrBackendUnavailable) {
+		t.Fatalf("temp cleanup = %v, want ErrBackendUnavailable", err)
 	}
-	if _, err := shared.local.Open(t.Context(), testKey); !errors.Is(err, ErrWrongMount) {
-		t.Fatalf("raw shared open = %v, want ErrWrongMount", err)
+	if _, err := handle.local.Open(t.Context(), testKey); err == nil {
+		t.Fatal("raw pinned store open unexpectedly succeeded")
 	}
 	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("shared mountpoint was recreated: %v", err)
+		t.Fatalf("pinned mountpoint was recreated: %v", err)
 	}
 }
 
-func TestRunningSharedStoreReopensRootAfterPathReplacement(t *testing.T) {
+func TestRunningPinnedStoreReopensRootAfterPathReplacement(t *testing.T) {
 	parent := t.TempDir()
-	root := filepath.Join(parent, "shared-artwork")
+	root := filepath.Join(parent, "artwork")
 	settings := newFakeSettings()
-	owned := openLocal(t, root, settings)
-	if err := owned.Store.WriteImmutable(t.Context(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
+	initial := openLocal(t, root, settings)
+	if err := initial.Store.WriteImmutable(t.Context(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := owned.Close(); err != nil {
+	if err := initial.Close(); err != nil {
 		t.Fatal(err)
 	}
-	shared, err := Open(t.Context(), Options{Backend: BackendLocal, LocalPath: root, LocalShared: true, Settings: settings})
+	handle, err := Open(t.Context(), Options{Backend: BackendLocal, LocalPath: root, Settings: settings})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = shared.Close() })
+	t.Cleanup(func() { _ = handle.Close() })
 
 	detached := filepath.Join(parent, "detached-artwork")
 	if err := os.Rename(root, detached); err != nil {
@@ -537,8 +581,8 @@ func TestRunningSharedStoreReopensRootAfterPathReplacement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	shared.expireCheckCacheForTest()
-	if err := shared.Check(t.Context()); !errors.Is(err, ErrWrongMount) {
+	handle.expireCheckCacheForTest()
+	if err := handle.Check(t.Context()); !errors.Is(err, ErrWrongMount) {
 		t.Fatalf("Check after root replacement = %v, want ErrWrongMount", err)
 	}
 }

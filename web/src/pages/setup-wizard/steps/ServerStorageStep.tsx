@@ -61,7 +61,7 @@ const PRIVATE_S3_KEYS = [
 
 const META_KEYS = ["metadata.cache_images"];
 
-const ARTWORK_KEYS = ["artwork.storage_backend", "artwork.local_path", "artwork.local_ownership"];
+const ARTWORK_KEYS = ["artwork.storage_backend", "artwork.local_path"];
 
 const ALL_KEYS = [
   ...SERVER_KEYS,

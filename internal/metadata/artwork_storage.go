@@ -37,6 +37,33 @@ type ArtworkStorageService struct {
 	generation           func() string
 	limiter              *rate.Limiter
 	untrackedUserArtwork bool
+	rebuilder            *artworkstore.Handle
+}
+
+// SetRebuilder enables the explicit local-store rebuild admin action. The
+// inventory service owns the durable recovery-state update that follows the
+// storage handle's atomic pin/generation replacement.
+func (s *ArtworkStorageService) SetRebuilder(handle *artworkstore.Handle) {
+	if s != nil {
+		s.rebuilder = handle
+	}
+}
+
+// RebuildEmpty recreates an empty local store, persists the recovery
+// generation, and returns the immediately observable admin state.
+func (s *ArtworkStorageService) RebuildEmpty(ctx context.Context) (ArtworkStorageAccounting, error) {
+	if s == nil || s.pool == nil || s.rebuilder == nil {
+		return ArtworkStorageAccounting{}, artworkstore.ErrRebuildUnsupported
+	}
+	if err := s.rebuilder.RebuildEmpty(ctx); err != nil {
+		return ArtworkStorageAccounting{}, err
+	}
+	if _, err := s.pool.Exec(ctx, `UPDATE artwork_storage_accounting_state SET
+		store_health = 'empty_rebuilding', health_changed_at = NOW(), rebuild_generation = $1,
+		rebuild_surface_name = '', rebuild_enqueued_at = NULL WHERE singleton`, s.rebuilder.GenerationID()); err != nil {
+		return ArtworkStorageAccounting{}, fmt.Errorf("persist artwork rebuild state: %w", err)
+	}
+	return s.Accounting(ctx)
 }
 
 func NewArtworkStorageService(pool *pgxpool.Pool, store ArtworkInventoryStore, backend string, generation func() string, untrackedUserArtwork ...bool) *ArtworkStorageService {
