@@ -60,8 +60,8 @@ type serviceFakeRepo struct {
 	confirmingScrobbles    map[string]time.Time
 	markSatisfiedErr       error
 	markHistoryStatusErr   error
-	upsertConnectionErr    error
 	pluginCredentialWrites int
+	beforePluginErrorWrite func()
 	syncRunMu              sync.Mutex
 	scrobbleMu             sync.Mutex
 }
@@ -119,11 +119,22 @@ func (r *serviceFakeRepo) UpsertConnection(
 	_ context.Context,
 	conn Connection,
 ) (Connection, error) {
-	if r.upsertConnectionErr != nil {
-		return Connection{}, r.upsertConnectionErr
-	}
 	if conn.ID == "" {
 		conn.ID = "conn-1"
+	}
+	if current, ok := r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)]; ok &&
+		strings.HasPrefix(conn.Provider, providerSourcePlugin+":") {
+		conn.ProviderAccountID = current.ProviderAccountID
+		conn.ProviderUsername = current.ProviderUsername
+		conn.AccessToken = current.AccessToken
+		conn.RefreshToken = current.RefreshToken
+		conn.TokenExpiresAt = current.TokenExpiresAt
+		conn.TokenType = current.TokenType
+		conn.Scopes = append([]string(nil), current.Scopes...)
+		conn.SecretAttributes = cloneStringMap(current.SecretAttributes)
+		conn.PluginConfigValues = cloneStringMap(current.PluginConfigValues)
+		conn.PluginConfigSecrets = cloneStringMap(current.PluginConfigSecrets)
+		conn.CredentialRevision = current.CredentialRevision
 	}
 	conn = cloneConnectionForTest(conn)
 	r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)] = conn
@@ -136,6 +147,11 @@ func (r *serviceFakeRepo) UpsertPluginConnection(
 ) (Connection, error) {
 	if conn.ID == "" {
 		conn.ID = "conn-1"
+	}
+	if current, ok := r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)]; ok {
+		conn.CredentialRevision = current.CredentialRevision + 1
+	} else {
+		conn.CredentialRevision = 1
 	}
 	conn = cloneConnectionForTest(conn)
 	r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)] = conn
@@ -151,10 +167,41 @@ func (r *serviceFakeRepo) UpdatePluginCredentials(
 		return Connection{}, errPluginCredentialUpdateConflict
 	}
 	r.pluginCredentialWrites++
-	conn.CredentialRevision++
-	conn = cloneConnectionForTest(conn)
-	r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)] = conn
-	return cloneConnectionForTest(conn), nil
+	current.AccessToken = conn.AccessToken
+	current.RefreshToken = conn.RefreshToken
+	current.TokenExpiresAt = conn.TokenExpiresAt
+	current.TokenType = conn.TokenType
+	current.Scopes = append([]string(nil), conn.Scopes...)
+	current.SecretAttributes = cloneStringMap(conn.SecretAttributes)
+	current.PluginConfigValues = cloneStringMap(conn.PluginConfigValues)
+	current.PluginConfigSecrets = cloneStringMap(conn.PluginConfigSecrets)
+	current.CredentialRevision++
+	current = cloneConnectionForTest(current)
+	r.connections[connectionKey(conn.Provider, conn.UserID, conn.ProfileID)] = current
+	return cloneConnectionForTest(current), nil
+}
+
+func (r *serviceFakeRepo) UpdatePluginConnectionLastError(
+	_ context.Context,
+	connectionID string,
+	expectedCredentialRevision int64,
+	expected string,
+	next string,
+) (Connection, bool, error) {
+	if r.beforePluginErrorWrite != nil {
+		r.beforePluginErrorWrite()
+	}
+	for key, conn := range r.connections {
+		if conn.ID != connectionID || !strings.HasPrefix(conn.Provider, providerSourcePlugin+":") ||
+			conn.CredentialRevision != expectedCredentialRevision || conn.LastError != expected {
+			continue
+		}
+		conn.LastError = next
+		conn = cloneConnectionForTest(conn)
+		r.connections[key] = conn
+		return cloneConnectionForTest(conn), true, nil
+	}
+	return Connection{}, false, nil
 }
 
 func (r *serviceFakeRepo) GetConnection(
@@ -1608,18 +1655,17 @@ func TestPersistConnectionStoresPluginConfigOverlay(t *testing.T) {
 		t.Fatalf("saved overlay = values %#v secrets %#v", saved.PluginConfigValues, saved.PluginConfigSecrets)
 	}
 
-	rotated, err := service.persistConnection(context.Background(), "plugin:4:floppy", 7, "profile-1", TokenSet{
+	reconnected, err := service.persistConnection(context.Background(), "plugin:4:floppy", 7, "profile-1", TokenSet{
 		AccessToken: "rotated",
 	}, ProviderAccount{ID: "acct", Username: "ada"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rotated.AccessToken != "rotated" {
-		t.Fatalf("access token = %q, want rotated", rotated.AccessToken)
+	if reconnected.AccessToken != "rotated" {
+		t.Fatalf("access token = %q, want rotated", reconnected.AccessToken)
 	}
-	if rotated.PluginConfigValues["floppy.base_url"] != "https://personal.example.com" ||
-		rotated.PluginConfigSecrets["floppy.token"] != "profile-secret" {
-		t.Fatalf("rotated overlay = values %#v secrets %#v", rotated.PluginConfigValues, rotated.PluginConfigSecrets)
+	if reconnected.PluginConfigValues != nil || reconnected.PluginConfigSecrets != nil {
+		t.Fatalf("obsolete reconnect overlay was retained: values %#v secrets %#v", reconnected.PluginConfigValues, reconnected.PluginConfigSecrets)
 	}
 }
 
@@ -1680,7 +1726,6 @@ func TestServicePluginRefreshPersistsAuthoritativeCredentialsBeforeFault(t *test
 	}}
 	provider := testPluginProvider(t, client)
 	provider.repository = repo
-	repo.upsertConnectionErr = errors.New("whole-row upsert must not be used for plugin credentials")
 	service := NewService(repo, NewRegistry())
 	service.now = func() time.Time { return now }
 	conn := Connection{
@@ -1706,6 +1751,84 @@ func TestServicePluginRefreshPersistsAuthoritativeCredentialsBeforeFault(t *test
 	}
 	if repo.pluginCredentialWrites != 1 {
 		t.Fatalf("credential writes = %d, want 1", repo.pluginCredentialWrites)
+	}
+}
+
+func TestServicePluginRefreshPreservesConcurrentConnectionError(t *testing.T) {
+	repo := newServiceFakeRepo()
+	now := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	expiresAt := now.Add(-time.Minute)
+	client := &fakeWatchSyncPluginClient{refreshResponse: &pluginv1.WatchSyncCredentialResponse{
+		Credentials: &pluginv1.WatchSyncCredentials{AccessToken: testRotatedAccessToken, TokenType: testBearerTokenType},
+		Fault: &pluginv1.WatchSyncFault{
+			Code:        pluginv1.WatchSyncFaultCode_WATCH_SYNC_FAULT_CODE_INVALID_CREDENTIAL,
+			SafeMessage: testReconnectRequired,
+		},
+	}}
+	provider := testPluginProvider(t, client)
+	provider.repository = repo
+	service := NewService(repo, NewRegistry())
+	service.now = func() time.Time { return now }
+	requestConnection := Connection{
+		ID: "conn-1", Provider: provider.Key(), UserID: 7, ProfileID: "profile-1",
+		AccessToken: testOldAccessToken, RefreshToken: testOldRefreshToken, TokenExpiresAt: &expiresAt,
+	}
+	current := requestConnection
+	current.LastError = "newer scrobble failure"
+	repo.connections[connectionKey(current.Provider, current.UserID, current.ProfileID)] = current
+
+	if _, err := service.refreshConnectionIfNeeded(context.Background(), provider, ServerConfig{}, requestConnection); !isWatchSyncInvalidCredentialError(err) {
+		t.Fatalf("error = %#v", err)
+	}
+	updated := repo.connections[connectionKey(current.Provider, current.UserID, current.ProfileID)]
+	if updated.AccessToken != testRotatedAccessToken {
+		t.Fatalf("access token = %q, want rotated", updated.AccessToken)
+	}
+	if updated.LastError != "newer scrobble failure" {
+		t.Fatalf("LastError = %q, want concurrent diagnostic preserved", updated.LastError)
+	}
+}
+
+func TestServicePluginRefreshPreservesConcurrentReconnect(t *testing.T) {
+	repo := newServiceFakeRepo()
+	now := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	expiresAt := now.Add(-time.Minute)
+	client := &fakeWatchSyncPluginClient{refreshResponse: &pluginv1.WatchSyncCredentialResponse{
+		Credentials: &pluginv1.WatchSyncCredentials{AccessToken: testRotatedAccessToken},
+		Fault: &pluginv1.WatchSyncFault{
+			Code:        pluginv1.WatchSyncFaultCode_WATCH_SYNC_FAULT_CODE_INVALID_CREDENTIAL,
+			SafeMessage: testReconnectRequired,
+		},
+	}}
+	provider := testPluginProvider(t, client)
+	provider.repository = repo
+	service := NewService(repo, NewRegistry())
+	service.now = func() time.Time { return now }
+	requestConnection := Connection{
+		ID: "conn-1", Provider: provider.Key(), UserID: 7, ProfileID: "profile-1",
+		AccessToken: testOldAccessToken, RefreshToken: testOldRefreshToken,
+		TokenExpiresAt: &expiresAt, CredentialRevision: 1,
+	}
+	key := connectionKey(requestConnection.Provider, requestConnection.UserID, requestConnection.ProfileID)
+	repo.connections[key] = requestConnection
+	repo.beforePluginErrorWrite = func() {
+		reconnected := repo.connections[key]
+		reconnected.AccessToken = "reconnected-access"
+		reconnected.RefreshToken = "reconnected-refresh"
+		reconnected.CredentialRevision++
+		repo.connections[key] = reconnected
+		repo.beforePluginErrorWrite = nil
+	}
+
+	if _, err := service.refreshConnectionIfNeeded(context.Background(), provider, ServerConfig{}, requestConnection); !isWatchSyncInvalidCredentialError(err) {
+		t.Fatalf("error = %#v", err)
+	}
+	updated := repo.connections[key]
+	if updated.AccessToken != "reconnected-access" || updated.RefreshToken != "reconnected-refresh" {
+		t.Fatalf("reconnected credentials were overwritten: %#v", updated)
+	}
+	if updated.LastError != "" {
+		t.Fatalf("LastError = %q, want reconnect state preserved", updated.LastError)
 	}
 }
 

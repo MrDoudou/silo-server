@@ -637,10 +637,10 @@ func (s *Service) persistConnection(
 	conn.UserID = userID
 	conn.ProfileID = profileID
 	conn = connectionWithTokens(conn, tokens)
-	if tokens.PluginConfigValues != nil || tokens.PluginConfigSecrets != nil {
-		conn.PluginConfigValues = cloneStringMap(tokens.PluginConfigValues)
-		conn.PluginConfigSecrets = cloneStringMap(tokens.PluginConfigSecrets)
-	}
+	// A connect/reconnect replaces the complete plugin credential state. Nil
+	// maps intentionally clear an overlay that the provider no longer declares.
+	conn.PluginConfigValues = cloneStringMap(tokens.PluginConfigValues)
+	conn.PluginConfigSecrets = cloneStringMap(tokens.PluginConfigSecrets)
 	conn.ProviderAccountID = account.ID
 	conn.ProviderUsername = account.Username
 	conn.LastError = ""
@@ -1361,6 +1361,8 @@ func (s *Service) refreshConnectionIfNeeded(ctx context.Context, provider Provid
 	if !ok {
 		return Connection{}, fmt.Errorf("provider %q does not support token refresh", conn.Provider)
 	}
+	originalLastError := conn.LastError
+	originalCredentialRevision := conn.CredentialRevision
 	tokens, err := authProvider.RefreshToken(ctx, cfg, conn)
 	_, authoritative := provider.(authoritativeRefreshProvider)
 	if authoritative && strings.TrimSpace(tokens.AccessToken) != "" {
@@ -1386,13 +1388,26 @@ func (s *Service) refreshConnectionIfNeeded(ctx context.Context, provider Provid
 		var persisted Connection
 		var persistErr error
 		if authoritative {
-			persister, ok := provider.(interface {
-				persistConnectionCredentials(context.Context, Connection) (Connection, error)
-			})
-			if !ok {
-				return Connection{}, fmt.Errorf("provider %q does not support authoritative credential persistence", conn.Provider)
+			if credentialsReturned {
+				persister, ok := provider.(interface {
+					persistConnectionCredentials(context.Context, Connection) (Connection, error)
+				})
+				if !ok {
+					return Connection{}, fmt.Errorf("provider %q does not support authoritative credential persistence", conn.Provider)
+				}
+				persisted, persistErr = persister.persistConnectionCredentials(ctx, conn)
+			} else {
+				persisted, persistErr = s.reloadConnection(ctx, conn)
 			}
-			persisted, persistErr = persister.persistConnectionCredentials(ctx, conn)
+			if persistErr == nil {
+				diagnosticCredentialRevision := originalCredentialRevision
+				if credentialsReturned {
+					diagnosticCredentialRevision = persisted.CredentialRevision
+				}
+				persisted, persistErr = s.persistAuthoritativeRefreshLastError(
+					ctx, persisted, diagnosticCredentialRevision, originalLastError, conn.LastError,
+				)
+			}
 		} else {
 			persisted, persistErr = s.repo.UpsertConnection(ctx, conn)
 		}
@@ -1405,6 +1420,36 @@ func (s *Service) refreshConnectionIfNeeded(ctx context.Context, provider Provid
 		return Connection{}, fmt.Errorf("refresh %s token: %w", conn.Provider, err)
 	}
 	return conn, nil
+}
+
+func (s *Service) persistAuthoritativeRefreshLastError(
+	ctx context.Context,
+	conn Connection,
+	expectedCredentialRevision int64,
+	expected string,
+	next string,
+) (Connection, error) {
+	if next == expected || conn.LastError != expected || conn.CredentialRevision != expectedCredentialRevision {
+		return conn, nil
+	}
+	repository, ok := s.repo.(interface {
+		UpdatePluginConnectionLastError(context.Context, string, int64, string, string) (Connection, bool, error)
+	})
+	if !ok {
+		return Connection{}, errors.New("watch sync plugin connection state storage is unavailable")
+	}
+	persisted, updated, err := repository.UpdatePluginConnectionLastError(
+		ctx, conn.ID, expectedCredentialRevision, expected, next,
+	)
+	if err != nil {
+		return Connection{}, err
+	}
+	if updated {
+		return persisted, nil
+	}
+	// Another operation won the diagnostic race after credential persistence.
+	// Return its current row rather than overwriting the newer message.
+	return s.reloadConnection(ctx, conn)
 }
 
 func connectionWithTokens(conn Connection, tokens TokenSet) Connection {

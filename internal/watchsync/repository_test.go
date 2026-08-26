@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Silo-Server/silo-server/internal/secret"
@@ -107,6 +108,28 @@ func TestPluginCredentialBundleIsOnlyWrittenForPluginProviders(t *testing.T) {
 	}
 }
 
+func TestPluginCredentialRevisionMigrationFencesLegacyWriters(t *testing.T) {
+	body, err := os.ReadFile("../../migrations/sql/20260826032121_add_watch_provider_credential_revision.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	migration := string(body)
+	for _, required := range []string{
+		"watch_provider_plugin_credentials_insert_fence",
+		"watch_provider_plugin_credentials_revision_fence",
+		"TG_OP = 'INSERT'",
+		"NEW.credential_revision = 0",
+		"NEW.credential_revision = OLD.credential_revision",
+		"NEW.provider_account_id IS DISTINCT FROM OLD.provider_account_id",
+		"NEW.plugin_credentials IS DISTINCT FROM OLD.plugin_credentials",
+		"ERRCODE = '40001'",
+	} {
+		if !strings.Contains(migration, required) {
+			t.Fatalf("credential revision migration is missing %q", required)
+		}
+	}
+}
+
 func TestPluginCredentialWritesFenceReconnectsDB(t *testing.T) {
 	dsn := strings.TrimSpace(os.Getenv("SILO_TEST_DATABASE_URL"))
 	if dsn == "" {
@@ -154,6 +177,7 @@ func TestPluginCredentialWritesFenceReconnectsDB(t *testing.T) {
 	repository := NewPostgresRepository(pool, cipher)
 	connected, err := repository.UpsertPluginConnection(ctx, Connection{
 		Provider: "plugin:4:tracker", UserID: userID, ProfileID: profileID,
+		ProviderAccountID: "account-a", ProviderUsername: "alice",
 		AccessToken:         "token-a",
 		PluginConfigValues:  map[string]string{"endpoint": "https://a.example.com"},
 		PluginConfigSecrets: map[string]string{"secret": "secret-a"},
@@ -164,7 +188,7 @@ func TestPluginCredentialWritesFenceReconnectsDB(t *testing.T) {
 	requestSnapshot := connected
 
 	stateOnly := connected
-	stateOnly.LastError = "routine state update"
+	stateOnly.LastError = "concurrent sync failure"
 	if _, err := repository.UpsertConnection(ctx, stateOnly); err != nil {
 		t.Fatalf("routine state update: %v", err)
 	}
@@ -176,8 +200,13 @@ func TestPluginCredentialWritesFenceReconnectsDB(t *testing.T) {
 	if rotated.CredentialRevision != connected.CredentialRevision+1 {
 		t.Fatalf("rotation revision = %d, want %d", rotated.CredentialRevision, connected.CredentialRevision+1)
 	}
+	if rotated.LastError != "concurrent sync failure" {
+		t.Fatalf("rotation overwrote concurrent LastError: %q", rotated.LastError)
+	}
 
 	reconnected := rotated
+	reconnected.ProviderAccountID = "account-b"
+	reconnected.ProviderUsername = "bob"
 	reconnected.AccessToken = "token-b"
 	reconnected.PluginConfigValues = map[string]string{"endpoint": "https://b.example.com"}
 	reconnected.PluginConfigSecrets = map[string]string{"secret": "secret-b"}
@@ -197,9 +226,36 @@ func TestPluginCredentialWritesFenceReconnectsDB(t *testing.T) {
 		t.Fatalf("late routine state update: %v", err)
 	}
 	if persisted.AccessToken != "token-b" ||
+		persisted.ProviderAccountID != "account-b" ||
+		persisted.ProviderUsername != "bob" ||
 		persisted.PluginConfigValues["endpoint"] != "https://b.example.com" ||
 		persisted.PluginConfigSecrets["secret"] != "secret-b" ||
 		persisted.CredentialRevision != reconnected.CredentialRevision {
 		t.Fatalf("newer reconnect was overwritten: %#v", persisted)
+	}
+
+	_, err = pool.Exec(ctx, `
+		UPDATE watch_provider_connections
+		SET access_token = $2,
+			plugin_credentials = $3,
+			provider_account_id = $4
+		WHERE id = $1::uuid
+	`, persisted.ID, "legacy-token", "legacy-credential-bundle", "legacy-account")
+	var postgresError *pgconn.PgError
+	if !errors.As(err, &postgresError) || postgresError.Code != "40001" {
+		t.Fatalf("legacy writer error = %#v, want SQLSTATE 40001", err)
+	}
+
+	if _, err := pool.Exec(ctx, `DELETE FROM watch_provider_connections WHERE id = $1::uuid`, persisted.ID); err != nil {
+		t.Fatalf("delete reconnected row: %v", err)
+	}
+	_, err = pool.Exec(ctx, `
+		INSERT INTO watch_provider_connections (
+			provider, user_id, profile_id, provider_account_id, access_token, plugin_credentials
+		) VALUES ($1, $2, $3, $4, $5, $6)
+	`, persisted.Provider, userID, profileID, "legacy-account", "legacy-token", "legacy-credential-bundle")
+	postgresError = nil
+	if !errors.As(err, &postgresError) || postgresError.Code != "40001" {
+		t.Fatalf("legacy insert error = %#v, want SQLSTATE 40001", err)
 	}
 }

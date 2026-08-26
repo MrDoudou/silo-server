@@ -262,8 +262,8 @@ func (r *PostgresRepository) upsertConnection(
 			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32
 		)
 		ON CONFLICT (provider, user_id, profile_id) DO UPDATE SET
-			provider_account_id = EXCLUDED.provider_account_id,
-			provider_username = EXCLUDED.provider_username,
+			provider_account_id = CASE WHEN $33 THEN EXCLUDED.provider_account_id ELSE watch_provider_connections.provider_account_id END,
+			provider_username = CASE WHEN $33 THEN EXCLUDED.provider_username ELSE watch_provider_connections.provider_username END,
 			access_token = CASE WHEN $33 THEN EXCLUDED.access_token ELSE watch_provider_connections.access_token END,
 			refresh_token = CASE WHEN $33 THEN EXCLUDED.refresh_token ELSE watch_provider_connections.refresh_token END,
 			token_expires_at = CASE WHEN $33 THEN EXCLUDED.token_expires_at ELSE watch_provider_connections.token_expires_at END,
@@ -365,21 +365,19 @@ func (r *PostgresRepository) UpdatePluginCredentials(ctx context.Context, conn C
 			refresh_token = $2,
 			token_expires_at = $3,
 			plugin_credentials = $4,
-			last_error = $5,
 			credential_revision = credential_revision + 1,
 			updated_at = now()
-		WHERE id = $6::uuid
-			AND provider = $7
-			AND user_id = $8
-			AND profile_id = $9
-			AND credential_revision = $10
+		WHERE id = $5::uuid
+			AND provider = $6
+			AND user_id = $7
+			AND profile_id = $8
+			AND credential_revision = $9
 		RETURNING `+connectionColumns+`
 	`,
 		accessToken,
 		refreshToken,
 		conn.TokenExpiresAt,
 		pluginCredentials,
-		conn.LastError,
 		conn.ID,
 		conn.Provider,
 		conn.UserID,
@@ -394,6 +392,37 @@ func (r *PostgresRepository) UpdatePluginCredentials(ctx context.Context, conn C
 		return Connection{}, fmt.Errorf("update watch plugin credentials: %w", err)
 	}
 	return saved, nil
+}
+
+// UpdatePluginConnectionLastError records the outcome of an authoritative
+// refresh only when no other operation replaced either the diagnostic or the
+// credential generation while that refresh was in flight. A failed compare
+// preserves the newer connection state.
+func (r *PostgresRepository) UpdatePluginConnectionLastError(
+	ctx context.Context,
+	connectionID string,
+	expectedCredentialRevision int64,
+	expected string,
+	next string,
+) (Connection, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE watch_provider_connections
+		SET last_error = $2,
+			updated_at = now()
+		WHERE id = $1::uuid
+			AND provider LIKE 'plugin:%'
+			AND last_error = $3
+			AND credential_revision = $4
+		RETURNING `+connectionColumns+`
+	`, connectionID, next, expected, expectedCredentialRevision)
+	saved, err := r.scanConnection(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Connection{}, false, nil
+	}
+	if err != nil {
+		return Connection{}, false, fmt.Errorf("update watch plugin connection error: %w", err)
+	}
+	return saved, true, nil
 }
 
 func (r *PostgresRepository) GetConnection(

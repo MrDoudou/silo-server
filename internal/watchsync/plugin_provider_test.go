@@ -106,9 +106,21 @@ func (r *fakePluginCredentialRepository) UpdatePluginCredentials(_ context.Conte
 	if r.saved.ID != "" && r.saved.CredentialRevision != conn.CredentialRevision {
 		return Connection{}, errPluginCredentialUpdateConflict
 	}
-	conn.CredentialRevision++
-	r.saved = conn
-	return conn, nil
+	if r.saved.ID == "" {
+		conn.CredentialRevision++
+		r.saved = conn
+		return conn, nil
+	}
+	r.saved.AccessToken = conn.AccessToken
+	r.saved.RefreshToken = conn.RefreshToken
+	r.saved.TokenExpiresAt = conn.TokenExpiresAt
+	r.saved.TokenType = conn.TokenType
+	r.saved.Scopes = append([]string(nil), conn.Scopes...)
+	r.saved.SecretAttributes = cloneStringMap(conn.SecretAttributes)
+	r.saved.PluginConfigValues = cloneStringMap(conn.PluginConfigValues)
+	r.saved.PluginConfigSecrets = cloneStringMap(conn.PluginConfigSecrets)
+	r.saved.CredentialRevision++
+	return r.saved, nil
 }
 
 func testPluginProvider(t *testing.T, client WatchSyncPluginClient) *PluginProvider {
