@@ -107,9 +107,6 @@ func TestOpenAutoSelectsLocalWithoutS3(t *testing.T) {
 	if handle.LocalRoot() != root {
 		t.Fatalf("LocalRoot = %q, want %q", handle.LocalRoot(), root)
 	}
-	if _, ok := handle.DirectURL(); ok {
-		t.Fatal("the filesystem backend offered a direct URL provider")
-	}
 }
 
 // An existing S3 installation keeps using its bucket under auto.
@@ -130,9 +127,6 @@ func TestOpenAutoSelectsS3WhenConfigured(t *testing.T) {
 	}
 	if handle.Generation == "" {
 		t.Fatal("S3 store has no copy generation")
-	}
-	if _, ok := handle.DirectURL(); !ok {
-		t.Fatal("the S3 backend offered no direct URL provider")
 	}
 	if handle.LocalRoot() != "" {
 		t.Fatal("the S3 backend reported a local root")

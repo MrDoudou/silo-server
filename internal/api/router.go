@@ -1937,34 +1937,15 @@ func NewRouter(deps Dependencies) chi.Router {
 		// attach a bearer header: the signature in the URL is the capability,
 		// minted only while building an authenticated catalog response.
 		//
-		if deps.ArtworkStore != nil && deps.ArtworkURLs != nil && deps.DB != nil {
+		if deps.ArtworkStore != nil && deps.ArtworkURLs != nil && deps.ArtworkDelivery != nil {
 			if artworkHandler := deps.ArtworkDelivery; artworkHandler != nil {
 				r.Get("/artwork/{"+handlers.ArtworkCapabilityParam+"}/{"+handlers.ArtworkVariantParam+"}", artworkHandler.ServeHTTP)
 				r.Head("/artwork/{"+handlers.ArtworkCapabilityParam+"}/{"+handlers.ArtworkVariantParam+"}", artworkHandler.ServeHTTP)
 			}
 		}
-		if deps.ArtworkStore != nil && deps.ArtworkURLSigner != nil {
-			directHandler := handlers.NewDirectArtworkHandler(
-				deps.ArtworkStore.Store,
-				deps.ArtworkURLSigner,
-				func() string {
-					if cfg := deps.CurrentConfig(); cfg != nil {
-						if cfg.Artwork.DeliveryPolicy != config.ArtworkDeliveryDirect {
-							return config.ArtworkURLAuthSigned
-						}
-						return cfg.Artwork.URLAuth
-					}
-					return config.ArtworkURLAuthSigned
-				},
-			)
-			if directHandler != nil {
-				r.Get("/artwork/*", directHandler.ServeHTTP)
-				r.Head("/artwork/*", directHandler.ServeHTTP)
-			}
-		}
-		// Direct-library fallbacks always traverse Silo, even when canonical
-		// objects normally use S3 direct delivery. The opaque signed identity is
-		// revalidated against the catalog and library roots on every request.
+		// Direct-library fallbacks always traverse Silo. The opaque signed
+		// identity is revalidated against the catalog and library roots on every
+		// request.
 		if deps.DB != nil && deps.ArtworkURLSigner != nil {
 			directLibraryHandler := handlers.NewDirectLibraryArtworkHandler(
 				metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.ArtworkURLSigner,
@@ -2942,11 +2923,9 @@ func NewRouter(deps Dependencies) chi.Router {
 				if deps.ArtworkStore != nil {
 					artworkCapabilityHandler := handlers.NewArtworkCapabilityHandler(
 						deps.ArtworkStore.Backend,
-						deps.ArtworkURLs.DirectDelivery,
 						func() string { return deps.CurrentConfig().Artwork.RemoteMaterialization },
 					)
 					artworkCapabilityHandler.SetResilientStatus(
-						deps.ArtworkURLs.DeliveryPolicy,
 						func() string {
 							state, _ := deps.ArtworkStore.Health()
 							return string(state)

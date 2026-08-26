@@ -2,48 +2,35 @@ package artworkurl
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/Silo-Server/silo-server/internal/artworkkey"
-	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
-// fakeDirectURLs stands in for a bucket-backed store that mints its own read
-// URLs.
-type fakeDirectURLs struct {
-	requestedTTL time.Duration
-	calls        int
-	err          error
-}
-
-func (f *fakeDirectURLs) ReadURL(_ context.Context, key string, ttl time.Duration) (artworkstore.ResolvedURL, error) {
-	f.calls++
-	f.requestedTTL = ttl
-	if f.err != nil {
-		return artworkstore.ResolvedURL{}, f.err
+func testLibraryReference(t *testing.T, signer *Signer) string {
+	t.Helper()
+	reference, err := signer.LibraryReference(LibraryIdentity{
+		Surface:     SurfaceItemPosters,
+		Keys:        []string{"movie-1"},
+		Fingerprint: strings.Repeat("a", 64),
+	})
+	if err != nil {
+		t.Fatalf("LibraryReference: %v", err)
 	}
-	expiresAt := time.Now().Add(ttl)
-	return artworkstore.ResolvedURL{URL: "https://cdn.test/" + key, ExpiresAt: &expiresAt}, nil
+	return reference
 }
 
-func TestNewResolverRequiresADeliveryPath(t *testing.T) {
-	if _, err := NewResolver(nil, nil, nil); err == nil {
-		t.Fatal("NewResolver accepted a store with no way to deliver artwork")
+func TestNewResolverRequiresSigner(t *testing.T) {
+	if _, err := NewResolver(nil); err == nil {
+		t.Fatal("NewResolver accepted no signer")
 	}
 }
 
-func TestResolverDefaultsToTargetBoundResilientDeliveryForS3(t *testing.T) {
-	direct := &fakeDirectURLs{}
-	resolver, err := NewResolver(direct, testSigner(t, time.Hour), func() time.Duration { return 30 * time.Minute })
+func TestResolverUsesTargetBoundRoute(t *testing.T) {
+	signer := testSigner(t, time.Hour)
+	resolver, err := NewResolver(signer)
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
-	}
-
-	if resolver.DirectDelivery() {
-		t.Fatal("DirectDelivery = true under resilient policy")
 	}
 	target := Target{Surface: SurfaceItemPosters, Keys: []string{"movie-1"}, Slot: "poster"}.WithReference(testKey)
 	resolved, err := resolver.ResolveTargetURL(context.Background(), target, "w300")
@@ -53,161 +40,56 @@ func TestResolverDefaultsToTargetBoundResilientDeliveryForS3(t *testing.T) {
 	if !strings.HasPrefix(resolved.URL, RoutePrefix) {
 		t.Fatalf("URL = %q, want the resilient API route", resolved.URL)
 	}
-	if direct.calls != 0 {
-		t.Fatalf("direct backend calls = %d, want zero", direct.calls)
-	}
 }
 
-func TestResolverDirectPolicyUsesBackendURL(t *testing.T) {
-	direct := &fakeDirectURLs{}
-	resolver, err := NewResolver(direct, testSigner(t, time.Hour), func() time.Duration { return 30 * time.Minute })
-	if err != nil {
-		t.Fatalf("NewResolver: %v", err)
-	}
-	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
-	target := Target{Surface: SurfaceItemPosters, Keys: []string{"movie-1"}, Slot: "poster"}.WithReference(testKey)
-	resolved, err := resolver.ResolveTargetURL(context.Background(), target, "w300")
-	if err != nil {
-		t.Fatalf("ResolveTargetURL: %v", err)
-	}
-	if !strings.HasPrefix(resolved.URL, "https://cdn.test/") || direct.requestedTTL != 30*time.Minute {
-		t.Fatalf("resolved = %#v, ttl %s", resolved, direct.requestedTTL)
-	}
-}
-
-func TestResolverDirectPolicySelectsPreLadderVariantFromManifest(t *testing.T) {
-	store, err := artworkstore.NewFilesystemStore(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	variantData := map[string][]byte{
-		artworkkey.OriginalVariant: []byte("old original"),
-		artworkkey.VariantW500:     []byte("old medium"),
-		artworkkey.VariantW300:     []byte("old small"),
-	}
-	revision, err := artworkkey.BuildPortableRevision(artworkkey.RevisionInput{
-		ImageType: artworkkey.ImageTypePoster,
-		MediaType: "image/webp",
-		Ext:       ".webp",
-		Variants: []artworkkey.VariantBytes{
-			{Name: artworkkey.OriginalVariant, Data: variantData[artworkkey.OriginalVariant]},
-			{Name: artworkkey.VariantW500, Data: variantData[artworkkey.VariantW500]},
-			{Name: artworkkey.VariantW300, Data: variantData[artworkkey.VariantW300]},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for variant, key := range revision.VariantKeys {
-		if err := store.WriteImmutable(t.Context(), key, variantData[variant], artworkstore.ObjectMetadata{}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := store.WriteImmutable(t.Context(), revision.ManifestKey, revision.ManifestJSON, artworkstore.ObjectMetadata{}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver, err := NewResolver(nil, testSigner(t, time.Hour), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
-	resolver.SetLocalURLAuth(func() string { return "public" })
-	resolver.SetStore(store)
-	target := Target{Surface: SurfaceItemPosters, Keys: []string{"movie-1"}, Slot: artworkkey.ImageTypePoster}.WithReference(revision.OriginalKey)
-	resolved, err := resolver.ResolveTargetURL(t.Context(), target, artworkkey.VariantW780)
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantPath, err := DirectPathFromKey(revision.VariantKeys[artworkkey.VariantW500])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := resolved.URL, DirectRoutePrefix+wantPath; got != want {
-		t.Fatalf("URL = %q, want manifest-selected fallback %q", got, want)
-	}
-}
-
-func TestResolverDirectPolicySignsRawKeyWhenBackendHasNoDirectURL(t *testing.T) {
-	resolver, err := NewResolver(nil, testSigner(t, time.Hour), nil)
+func TestResolveArtworkURLRequiresLibraryReference(t *testing.T) {
+	resolver, err := NewResolver(testSigner(t, time.Hour))
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
 
-	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
-	if resolver.DirectDelivery() {
-		t.Fatal("DirectDelivery = true, want false")
-	}
-	resolved, err := resolver.ResolveArtworkURL(context.Background(), testKey)
-	if err != nil {
-		t.Fatalf("ResolveArtworkURL: %v", err)
-	}
-	directPath, err := DirectPathFromKey(testKey)
-	if err != nil {
-		t.Fatalf("DirectPathFromKey: %v", err)
-	}
-	if !strings.HasPrefix(resolved.URL, DirectRoutePrefix+directPath) {
-		t.Fatalf("URL = %q, want a signed raw-key artwork URL", resolved.URL)
-	}
-	if resolved.ExpiresAt == nil {
-		t.Fatal("signed URL reports no expiry; the resolver cache would never store it")
-	}
-}
-
-func TestResolveArtworkURLRejectsNonKeys(t *testing.T) {
-	resolver, err := NewResolver(nil, testSigner(t, time.Hour), nil)
-	if err != nil {
-		t.Fatalf("NewResolver: %v", err)
-	}
-	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
-
-	// Bundled asset paths and other non-key references reach this resolver
-	// too; none of them may become a signed URL.
-	for _, ref := range []string{"/images/collection-templates/x.jpg", "../../etc/passwd", ""} {
-		if _, err := resolver.ResolveArtworkURL(context.Background(), ref); !errors.Is(err, artworkstore.ErrInvalidKey) {
-			t.Fatalf("ResolveArtworkURL(%q) error = %v, want ErrInvalidKey", ref, err)
+	for _, reference := range []string{testKey, "/images/collection-templates/x.jpg", "../../etc/passwd", ""} {
+		if _, err := resolver.ResolveArtworkURL(context.Background(), reference); err == nil {
+			t.Fatalf("ResolveArtworkURL(%q) succeeded, want a library-reference error", reference)
 		}
 	}
 }
 
-func TestResolveArtworkURLsOmitsFailures(t *testing.T) {
-	resolver, err := NewResolver(nil, testSigner(t, time.Hour), nil)
+func TestResolveArtworkURLsIncludesOnlyLibraryReferences(t *testing.T) {
+	signer := testSigner(t, time.Hour)
+	resolver, err := NewResolver(signer)
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
-	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
+	reference := testLibraryReference(t, signer)
 
 	resolved := resolver.ResolveArtworkURLs(context.Background(), []string{
+		reference,
 		testKey,
 		"/images/collection-templates/x.jpg",
 	})
 	if len(resolved) != 1 {
 		t.Fatalf("resolved %d URLs, want 1: %v", len(resolved), resolved)
 	}
-	if _, ok := resolved[testKey]; !ok {
-		t.Fatalf("resolved map missing %q", testKey)
+	if !strings.HasPrefix(resolved[reference].URL, LibraryRoutePrefix) {
+		t.Fatalf("resolved URL = %q, want direct-library route", resolved[reference].URL)
 	}
 }
 
-func TestResolveArtworkURLsSkipsBackendErrors(t *testing.T) {
-	direct := &fakeDirectURLs{err: errors.New("bucket unreachable")}
-	resolver, err := NewResolver(direct, nil, nil)
+func TestResolveArtworkURLsOmitsInvalidLibraryReferences(t *testing.T) {
+	resolver, err := NewResolver(testSigner(t, time.Hour))
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
-	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
+	malformed := LibraryReferencePrefix + "not-base64"
 
-	if resolved := resolver.ResolveArtworkURLs(context.Background(), []string{testKey}); len(resolved) != 0 {
-		t.Fatalf("resolved = %v, want no entries when the backend fails", resolved)
+	if resolved := resolver.ResolveArtworkURLs(context.Background(), []string{malformed}); len(resolved) != 0 {
+		t.Fatalf("resolved = %v, want no entries for an invalid library reference", resolved)
 	}
 }
 
 func TestNilResolverIsInert(t *testing.T) {
 	var resolver *Resolver
-	if resolver.DirectDelivery() {
-		t.Fatal("nil resolver reported direct delivery")
-	}
 	if _, err := resolver.ResolveArtworkURL(context.Background(), testKey); err == nil {
 		t.Fatal("nil resolver resolved a URL")
 	}

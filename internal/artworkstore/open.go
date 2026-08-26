@@ -382,16 +382,6 @@ func (h *Handle) LocalRoot() string {
 	return h.local.Root()
 }
 
-// DirectURL returns the backend's direct-URL minter when it has one. S3 does;
-// the filesystem store deliberately does not, and its objects are delivered
-// through the signed native artwork route instead.
-func (h *Handle) DirectURL() (DirectURLProvider, bool) {
-	if h == nil || h.s3 == nil {
-		return nil, false
-	}
-	return h.s3, true
-}
-
 // Check re-verifies the store for a readiness probe: the backend is reachable
 // and writable, and — on the filesystem — the marker under the configured root
 // still identifies the same physical store this process opened. A swapped or

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/Silo-Server/silo-server/internal/s3client"
 )
@@ -21,9 +20,6 @@ type S3Client interface {
 	ObjectMatches(ctx context.Context, bucket, key string, data []byte) (bool, error)
 	DeleteObjects(ctx context.Context, bucket string, keys []string) (int, error)
 	HeadBucket(ctx context.Context, bucket string) error
-	PresignGetURL(ctx context.Context, bucket, key string, expiry time.Duration) (string, error)
-	EffectivePresignTTL(requested time.Duration) time.Duration
-	ReadURLExpires() bool
 	ListObjectInfosPage(ctx context.Context, bucket, prefix, cursor string, limit int) ([]s3client.ObjectInfo, string, bool, error)
 	DeletePrefix(ctx context.Context, bucket, prefix string) (int, error)
 }
@@ -40,10 +36,7 @@ type S3Store struct {
 	bucket string
 }
 
-var (
-	_ Store             = (*S3Store)(nil)
-	_ DirectURLProvider = (*S3Store)(nil)
-)
+var _ Store = (*S3Store)(nil)
 
 // NewS3Store returns an artwork store over an S3 bucket client.
 func NewS3Store(client S3Client) (*S3Store, error) {
@@ -76,7 +69,7 @@ func (s *S3Store) WriteImmutable(ctx context.Context, key string, data []byte, _
 
 // Open streams the object at key. The body is a network stream, so it does not
 // implement io.ReadSeeker and delivery streams it rather than serving ranges
-// from it; S3-backed artwork is normally fetched directly by the client anyway.
+// from it.
 func (s *S3Store) Open(ctx context.Context, key string) (*Object, error) {
 	if err := ValidateKey(key); err != nil {
 		return nil, err
@@ -181,26 +174,6 @@ func (s *S3Store) DeletePrefixMaintenance(ctx context.Context, prefix string) (i
 		return 0, err
 	}
 	return s.client.DeletePrefix(ctx, s.bucket, prefix)
-}
-
-// ReadURL mints a URL the client fetches straight from the bucket or CDN,
-// bypassing Silo entirely. That direct delivery is the reason an operator
-// selects S3, so the API returns these URLs instead of proxying bytes.
-func (s *S3Store) ReadURL(ctx context.Context, key string, ttl time.Duration) (ResolvedURL, error) {
-	if err := ValidateKey(key); err != nil {
-		return ResolvedURL{}, err
-	}
-	effective := s.client.EffectivePresignTTL(ttl)
-	url, err := s.client.PresignGetURL(ctx, s.bucket, key, effective)
-	if err != nil {
-		return ResolvedURL{}, fmt.Errorf("artworkstore: minting a read URL for %s: %w", key, err)
-	}
-	resolved := ResolvedURL{URL: url}
-	if s.client.ReadURLExpires() && effective > 0 {
-		expiresAt := time.Now().Add(effective)
-		resolved.ExpiresAt = &expiresAt
-	}
-	return resolved, nil
 }
 
 // translate maps client errors onto the store's sentinels so callers can treat

@@ -726,16 +726,6 @@ func TestOperationsRespectContextCancellation(t *testing.T) {
 	}
 }
 
-// TestFilesystemStoreProvidesNoDirectURLs pins the delivery contract: local
-// objects are served through the signed artwork route, never as a direct URL,
-// so no local path can leak into a client URL.
-func TestFilesystemStoreProvidesNoDirectURLs(t *testing.T) {
-	var store Store = &FilesystemStore{}
-	if _, ok := store.(DirectURLProvider); ok {
-		t.Fatal("FilesystemStore implements DirectURLProvider; local stores must not mint direct URLs")
-	}
-}
-
 func TestClosedStoreFailsCleanly(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.Close(); err != nil {

@@ -61,13 +61,7 @@ const PRIVATE_S3_KEYS = [
 
 const META_KEYS = ["metadata.cache_images"];
 
-const ARTWORK_KEYS = [
-  "artwork.storage_backend",
-  "artwork.local_path",
-  "artwork.delivery_policy",
-  "artwork.url_auth",
-  "artwork.local_ownership",
-];
+const ARTWORK_KEYS = ["artwork.storage_backend", "artwork.local_path", "artwork.local_ownership"];
 
 const ALL_KEYS = [
   ...SERVER_KEYS,
@@ -282,7 +276,6 @@ export function ServerStorageStep() {
   }
 
   const publicURLAuth = form.getValue("s3.public_url_auth") || "presigned";
-  const artworkDeliveryPolicy = form.getValue("artwork.delivery_policy") || "resilient";
   const jellyfinEnabledValue = form.getValue("jellyfin_compat.enabled");
   const jellyfinStatus = jellyfinStatusQuery.data;
   const jellyfinAPIEnabled =
@@ -591,44 +584,10 @@ export function ServerStorageStep() {
             <option value="s3">Shared S3 storage</option>
           </select>
           <p className="text-muted-foreground text-xs">
-            Uses your public S3 bucket when one is configured; otherwise local disk.
+            Uses your public S3 bucket when one is configured; otherwise local disk. Artwork is
+            served through Silo with verified fallbacks and background repair.
           </p>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="setup-artwork-delivery" className="text-xs">
-            Delivery policy
-          </Label>
-          <select
-            id="setup-artwork-delivery"
-            className="border-border bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={artworkDeliveryPolicy}
-            onChange={(event) => form.setValue("artwork.delivery_policy", event.target.value)}
-          >
-            <option value="resilient">Resilient through Silo (Recommended)</option>
-            <option value="direct">Direct from storage/source</option>
-          </select>
-          <p className="text-muted-foreground text-xs">
-            Resilient delivery survives artwork-store outages with verified source fallbacks and
-            background repair. Direct delivery can reduce Silo bandwidth, but gives up automatic
-            recovery and may expose permanent public URLs.
-          </p>
-        </div>
-        {artworkDeliveryPolicy === "direct" && (
-          <div className="space-y-1.5">
-            <Label htmlFor="setup-artwork-url-auth" className="text-xs">
-              Local direct URL authentication
-            </Label>
-            <select
-              id="setup-artwork-url-auth"
-              className="border-border bg-background h-9 w-full rounded-md border px-3 text-sm"
-              value={form.getValue("artwork.url_auth") || "signed"}
-              onChange={(event) => form.setValue("artwork.url_auth", event.target.value)}
-            >
-              <option value="signed">Expiring signed URLs (Recommended)</option>
-              <option value="public">Permanent public URLs</option>
-            </select>
-          </div>
-        )}
       </Section>
 
       <StorageBlock

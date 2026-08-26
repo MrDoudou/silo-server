@@ -60,7 +60,6 @@ var (
 	seedEvents       = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_seed_events_total", Help: "Portable artwork seed import, adoption, and expiry events."}, []string{labelOutcome})
 	variantBytes     = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_variant_bytes_total", Help: "Artwork variant bytes written or matched."}, []string{labelOutcome})
 	deliveryBytes    = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_delivery_bytes_total", Help: "Artwork bytes served by delivery route."}, []string{"route"})
-	directURLs       = promauto.NewCounter(prometheus.CounterOpts{Name: "silo_artwork_direct_urls_minted_total", Help: "Direct S3 or CDN artwork URLs minted."})
 	manifestErrors   = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_manifest_validation_failures_total", Help: "Portable manifest validation failures."}, []string{"operation"})
 	tempCleaned      = promauto.NewCounter(prometheus.CounterOpts{Name: "silo_artwork_abandoned_temp_files_cleaned_total", Help: "Abandoned artwork temporary files removed."})
 	seedExpired      = promauto.NewGauge(prometheus.GaugeOpts{Name: "silo_artwork_seed_expired_bytes", Help: "Expired unused portable seed bytes."})
@@ -133,7 +132,6 @@ func DeliveryBytes(route string, bytes int64) {
 	}
 }
 
-func DirectURLMinted() { directURLs.Inc() }
 func ManifestFailure(operation string) {
 	manifestErrors.WithLabelValues(boundedLabel(operation, manifestOperations)).Inc()
 }

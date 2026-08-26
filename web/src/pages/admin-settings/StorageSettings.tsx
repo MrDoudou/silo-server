@@ -52,8 +52,6 @@ const KEYS = [
   "artwork.storage_backend",
   "artwork.local_path",
   "artwork.seed_adoption_grace",
-  "artwork.delivery_policy",
-  "artwork.url_auth",
   "artwork.local_ownership",
   "s3.user_db_endpoint",
   "s3.user_db_region",
@@ -278,7 +276,6 @@ export default function StorageSettings() {
     );
 
   const publicURLAuth = form.getValue("s3.public_url_auth") || "presigned";
-  const artworkDeliveryPolicy = form.getValue("artwork.delivery_policy") || "resilient";
 
   return (
     <div className="flex h-full flex-col">
@@ -304,7 +301,8 @@ export default function StorageSettings() {
           <TabsContent value="artwork" className="space-y-1 pt-4">
             <p className="text-muted-foreground mb-4 text-sm">
               Automatic mode uses your public S3 bucket when one is configured; otherwise it uses
-              local disk.
+              local disk. Artwork is served through Silo with verified fallbacks and background
+              repair.
             </p>
             <SettingField
               label="Artwork Backend"
@@ -323,30 +321,6 @@ export default function StorageSettings() {
               onChange={(v) => form.setValue("artwork.local_path", v)}
               hint="Used when automatic mode resolves to local disk and by explicit local mode. A restart is required after changing the path."
             />
-            <SettingField
-              label="Artwork delivery"
-              type="select"
-              value={artworkDeliveryPolicy}
-              onChange={(v) => form.setValue("artwork.delivery_policy", v)}
-              options={[
-                { value: "resilient", label: "Resilient through Silo (Recommended)" },
-                { value: "direct", label: "Direct from storage/source" },
-              ]}
-              hint="Resilient delivery keeps images available during storage outages by serving verified fallbacks and repairing in the background. Direct delivery can reduce Silo bandwidth, but gives up automatic recovery and may expose permanent public URLs."
-            />
-            {artworkDeliveryPolicy === "direct" && (
-              <SettingField
-                label="Local direct URL authentication"
-                type="select"
-                value={form.getValue("artwork.url_auth") || "signed"}
-                onChange={(v) => form.setValue("artwork.url_auth", v)}
-                options={[
-                  { value: "signed", label: "Expiring signed URLs (Recommended)" },
-                  { value: "public", label: "Permanent public URLs" },
-                ]}
-                hint="Only affects the local backend in Direct mode. Public URLs are permanent and cacheable for one year."
-              />
-            )}
             <SettingField
               label="Local storage ownership"
               type="select"

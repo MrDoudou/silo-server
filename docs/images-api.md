@@ -3,8 +3,8 @@
 Silo caches artwork at a fixed ladder of widths and returns an opaque artwork
 URL for one of them. By default the server picks the width from context — card
 rows get narrow images, hero areas get wide ones. A client that knows better can
-ask for a specific size instead. Under resilient delivery the requested rung is
-bound to the target capability; direct policy mints that rung's object URL.
+ask for a specific size instead. The requested rung is bound to the resilient
+target capability.
 
 Commands and paths in this document are relative to the repository root.
 

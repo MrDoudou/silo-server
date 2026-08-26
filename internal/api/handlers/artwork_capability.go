@@ -11,10 +11,7 @@ import (
 const (
 	// artworkDeliveryAPI means clients fetch artwork from this server through
 	// short-lived signed URLs on the native artwork route.
-	artworkDeliveryAPI = "api"
-	// artworkDeliveryDirect means clients fetch artwork straight from the
-	// object store or CDN and the bytes never pass through Silo.
-	artworkDeliveryDirect    = "direct"
+	artworkDeliveryAPI       = "api"
 	artworkDeliveryResilient = "resilient"
 )
 
@@ -36,11 +33,9 @@ type artworkCapabilityResponse struct {
 	// PortableStorage reports that the stored tree can be copied between
 	// roots, buckets, and backends without rewriting catalog references.
 	PortableStorage bool `json:"portable_storage"`
-	// DeliveryModes are how artwork URLs are fetched: "api" for signed URLs
-	// served by this server, "direct" for object-store or CDN URLs.
+	// DeliveryModes is retained for compatibility and always contains "api".
 	DeliveryModes []string `json:"delivery_modes"`
-	// DeliveryPolicy is resilient by default; direct is an explicit
-	// administrator opt-out from request-time recovery.
+	// DeliveryPolicy is retained for compatibility and is always "resilient".
 	DeliveryPolicy string `json:"delivery_policy"`
 	StoreHealth    string `json:"store_health"`
 	// AutomaticRecovery reports whether target-bound loss detection and the
@@ -76,28 +71,23 @@ type artworkPortabilityCapability struct {
 // ArtworkCapabilityHandler answers the artwork capability probe.
 type ArtworkCapabilityHandler struct {
 	backend         string
-	directDelivery  func() bool
 	materialization func() string
-	deliveryPolicy  func() string
 	storeHealth     func() string
 }
 
-func (h *ArtworkCapabilityHandler) SetResilientStatus(deliveryPolicy, storeHealth func() string) {
+func (h *ArtworkCapabilityHandler) SetResilientStatus(storeHealth func() string) {
 	if h == nil {
 		return
 	}
-	h.deliveryPolicy = deliveryPolicy
 	h.storeHealth = storeHealth
 }
 
 // NewArtworkCapabilityHandler builds the capability handler. backend is the
-// pinned store backend and directDelivery reports whether clients currently
-// fetch from that backend themselves. Delivery and materialization are read per
-// request because both policies are hot-reloadable.
-func NewArtworkCapabilityHandler(backend string, directDelivery func() bool, materialization func() string) *ArtworkCapabilityHandler {
+// pinned store backend. Materialization is read per request because the policy
+// is hot-reloadable.
+func NewArtworkCapabilityHandler(backend string, materialization func() string) *ArtworkCapabilityHandler {
 	return &ArtworkCapabilityHandler{
 		backend:         backend,
-		directDelivery:  directDelivery,
 		materialization: materialization,
 	}
 }
@@ -107,14 +97,6 @@ func (h *ArtworkCapabilityHandler) HandleCapability(w http.ResponseWriter, r *ht
 	materialization := ""
 	if h.materialization != nil {
 		materialization = h.materialization()
-	}
-	deliveryPolicy := artworkDeliveryResilient
-	if h.deliveryPolicy != nil && h.deliveryPolicy() == artworkDeliveryDirect {
-		deliveryPolicy = artworkDeliveryDirect
-	}
-	deliveryMode := artworkDeliveryAPI
-	if deliveryPolicy == artworkDeliveryDirect && h.directDelivery != nil && h.directDelivery() {
-		deliveryMode = artworkDeliveryDirect
 	}
 	storeHealth := "healthy"
 	if h.storeHealth != nil && h.storeHealth() != "" {
@@ -133,10 +115,10 @@ func (h *ArtworkCapabilityHandler) HandleCapability(w http.ResponseWriter, r *ht
 		StorageBackend:        h.backend,
 		StorageFormat:         artworkkey.PortableStorageFormat,
 		PortableStorage:       true,
-		DeliveryModes:         []string{deliveryMode},
-		DeliveryPolicy:        deliveryPolicy,
+		DeliveryModes:         []string{artworkDeliveryAPI},
+		DeliveryPolicy:        artworkDeliveryResilient,
 		StoreHealth:           storeHealth,
-		AutomaticRecovery:     deliveryPolicy == artworkDeliveryResilient,
+		AutomaticRecovery:     true,
 		RemoteMaterialization: materialization,
 		LocalSourcePolicy:     "materialize",
 		StorageManagement: artworkStorageManagementCapability{

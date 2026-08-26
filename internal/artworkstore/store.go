@@ -32,7 +32,7 @@ import (
 // Store is the contract the artwork pipeline and lifecycle code depend on. It
 // is deliberately small: everything an adapter needs beyond this (bucket names,
 // prefix sweeps, public-URL policy) stays private to that adapter or lives on an
-// optional interface such as DirectURLProvider.
+// optional interface.
 type Store interface {
 	// WriteImmutable stores data at key. Writing the same key twice with the
 	// same bytes succeeds; writing different bytes to an existing key returns
@@ -70,14 +70,6 @@ type Store interface {
 	// legacy per-item directories. It rejects portable artwork/v1 prefixes;
 	// ordinary lifecycle code must use DeleteObjects with exact keys.
 	DeletePrefixMaintenance(ctx context.Context, prefix string) (int, error)
-}
-
-// DirectURLProvider is implemented by stores that can hand a client a URL it
-// fetches without routing bytes through Silo (S3 presigned, public, or
-// CDN-token URLs). The filesystem store deliberately does not implement it;
-// its objects are delivered through the signed native artwork route instead.
-type DirectURLProvider interface {
-	ReadURL(ctx context.Context, key string, ttl time.Duration) (ResolvedURL, error)
 }
 
 // CapacityProvider is implemented when the backend has a meaningful bounded

@@ -8,8 +8,8 @@ Native clients should treat artwork URLs returned by catalog responses as opaque
 
 - the effective `storage_backend` and portable `storage_format`;
 - whether storage is portable;
-- `delivery_modes` (`api` or `direct`), the effective `delivery_policy`, live
-  `store_health`, and whether `automatic_recovery` is active;
+- live `store_health`; compatibility fields `delivery_policy`, `delivery_modes`,
+  and `automatic_recovery` are constant `"resilient"`, `["api"]`, and `true`;
 - selected provider-art materialization and local-source policies;
 - storage-management support for accounting, safe purge, and direct-library fallback;
 - portability support for copied trees, source-adoption indexes, and verified seed import;
@@ -51,21 +51,5 @@ revision's manifest and serves its nearest smaller listed rung instead. This is
 compatibility selection, not object loss: it does not mark inventory missing,
 enqueue repair, or return a placeholder. Legacy revisions without manifests use
 bounded object-existence checks for the same walk-down behavior.
-
-## Direct policy
-
-`artwork.delivery_policy=direct` opts out of automatic request-time recovery.
-S3 uses its configured presigned, public, or tokenized object URLs and remote
-sources retain passthrough behavior. Local storage uses raw portable-key URLs at
-`/api/v1/artwork/{image-type}/{shard}/{revision}/{variant.ext}`; the constant
-`artwork/v1/objects/` storage prefix is omitted. With
-`artwork.url_auth=signed`, the raw key has a quantized expiry and signature. With `public`, the URL is permanent,
-unsigned, and served with `public, max-age=31536000, immutable`. Any percent
-escape in this route is rejected before decoding; the logical-key grammar is
-the path gate. Unsigned requests return `404` unless public mode is active,
-while previously minted signed URLs remain valid across mode changes.
-The direct URL is minted for the `image_size` variant selected by the portable
-manifest (or by the bounded legacy walk-down), so it never points at a
-newly-added rung an older revision does not contain.
 
 After safe purge transitions an accessible sidecar out of canonical storage, catalog responses may instead contain a signed direct-library artwork URL. It has the same opaque-client contract and conditional/range support. Silo revalidates the current catalog reference, owning library root, confinement, file type, and size on every cache miss. Clients must never persist or interpret its embedded identity.

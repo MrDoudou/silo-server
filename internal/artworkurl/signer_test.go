@@ -110,41 +110,6 @@ func TestTargetCapabilityRoundTripBindsTargetRevisionAndVariant(t *testing.T) {
 	}
 }
 
-func TestDirectKeyURLIsRawAndRejectsEscapes(t *testing.T) {
-	signer := testSigner(t, time.Hour)
-	now := time.Now()
-	signed, err := signer.SignDirectKey(testKey, now)
-	if err != nil {
-		t.Fatalf("SignDirectKey: %v", err)
-	}
-	directPath, err := DirectPathFromKey(testKey)
-	if err != nil {
-		t.Fatalf("DirectPathFromKey: %v", err)
-	}
-	if !strings.HasPrefix(signed.URL, DirectRoutePrefix+directPath+"?") {
-		t.Fatalf("URL = %q, want the portable key without its constant storage prefix", signed.URL)
-	}
-	parsed, err := url.Parse(signed.URL)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if _, err := signer.VerifyDirectKey(testKey, parsed.Query().Get(ExpiresParam), parsed.Query().Get(SignatureParam), now); err != nil {
-		t.Fatalf("VerifyDirectKey: %v", err)
-	}
-	if _, err := signer.VerifyDirectKey("artwork%2Fv1/objects/poster/ab/abcdef/original.webp", parsed.Query().Get(ExpiresParam), parsed.Query().Get(SignatureParam), now); !errors.Is(err, ErrInvalidSignature) {
-		t.Fatalf("escaped key = %v, want ErrInvalidSignature", err)
-	}
-	if got, err := DirectKeyFromPath(directPath); err != nil || got != testKey {
-		t.Fatalf("direct path round trip = %q, %v, want %q", got, err, testKey)
-	}
-	if _, err := DirectPathFromKey("tmdb/movie/1/poster/original.webp"); !errors.Is(err, artworkstore.ErrInvalidKey) {
-		t.Fatalf("legacy direct key error = %v, want ErrInvalidKey", err)
-	}
-	if _, err := DirectKeyFromPath("v2/poster/ab/abcdef/original.webp"); !errors.Is(err, artworkstore.ErrInvalidKey) {
-		t.Fatalf("reserved future-version path error = %v, want ErrInvalidKey", err)
-	}
-}
-
 func TestDirectLibraryReferenceIsOpaquePathFreeAndRevisionBound(t *testing.T) {
 	signer := testSigner(t, time.Hour)
 	identity := LibraryIdentity{Surface: "item posters", Keys: []string{"movie-1"}, Fingerprint: strings.Repeat("a", 64)}

@@ -637,13 +637,14 @@ paths themselves appear only here, behind admin auth.
 ## Settings updates
 
 `PUT /api/v1/admin/settings` accepts setting changes under the `values`
-envelope. For example, enabling permanent local direct artwork URLs uses:
+envelope. For example, configuring artwork materialization and local-root
+ownership uses:
 
 ```json
 {
   "values": {
-    "artwork.delivery_policy": "direct",
-    "artwork.url_auth": "public"
+    "artwork.remote_materialization": "selected",
+    "artwork.local_ownership": "shared"
   }
 }
 ```

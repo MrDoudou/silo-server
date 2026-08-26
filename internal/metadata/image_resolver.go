@@ -87,9 +87,8 @@ func NewPluginImageResolver() *PluginImageResolver {
 
 // artworkURLResolver mints fetchable URLs for logical artwork keys — the
 // scheme-less paths stored in the catalog's image columns. It hides which
-// backend holds the object: an S3 store returns a presigned, public, or CDN
-// URL the client fetches directly, and a filesystem store returns a short-lived
-// signed URL on Silo's own artwork route. *artworkurl.Resolver implements it.
+// backend holds the object. *artworkurl.Resolver implements it with
+// short-lived signed URLs on Silo's artwork routes.
 type artworkURLResolver interface {
 	ResolveArtworkURLs(ctx context.Context, keys []string) map[string]artworkstore.ResolvedURL
 }
@@ -97,7 +96,6 @@ type artworkURLResolver interface {
 type targetArtworkURLResolver interface {
 	ResolveTargetURLs(ctx context.Context, targets []artworkurl.Target, variant string) map[string]artworkstore.ResolvedURL
 	ResolveTargetRequests(ctx context.Context, requests []artworkurl.TargetRequest) map[string]artworkstore.ResolvedURL
-	DeliveryPolicy() string
 }
 
 // RegisterSource registers a plugin provider as a source for resolving images
@@ -311,19 +309,6 @@ func (r *PluginImageResolver) ResolveArtworkTargetsWithExpiry(
 		}
 		return result
 	}
-	if targetResolver.DeliveryPolicy() == artworkurl.DeliveryPolicyDirect {
-		for _, target := range targets {
-			if strings.Contains(target.Reference, "://") && !strings.HasPrefix(target.Reference, artworkurl.LibraryReferencePrefix) {
-				result[target.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, target.Reference, providerVariantForTarget(target.Slot, variant))
-				continue
-			}
-			resolved, found := targetResolver.ResolveTargetURLs(ctx, []artworkurl.Target{target}, variant)[target.CacheKey()]
-			if found && resolved.URL != "" {
-				result[target.CacheKey()] = catalog.ResolvedImageURL{URL: resolved.URL, ExpiresAt: resolved.ExpiresAt}
-			}
-		}
-		return result
-	}
 	for key, resolved := range targetResolver.ResolveTargetURLs(ctx, targets, variant) {
 		result[key] = catalog.ResolvedImageURL{URL: resolved.URL, ExpiresAt: resolved.ExpiresAt}
 	}
@@ -363,18 +348,6 @@ func (r *PluginImageResolver) ResolveArtworkTargetRequestsWithExpiry(ctx context
 			result[request.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, request.Target.Reference, providerVariantForTarget(request.Target.Slot, request.Variant))
 		}
 		return result
-	}
-	if targetResolver.DeliveryPolicy() == artworkurl.DeliveryPolicyDirect {
-		stored := make([]artworkurl.TargetRequest, 0, len(requests))
-		for _, request := range requests {
-			reference := request.Target.Reference
-			if strings.Contains(reference, "://") && !strings.HasPrefix(reference, artworkurl.LibraryReferencePrefix) {
-				result[request.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, reference, providerVariantForTarget(request.Target.Slot, request.Variant))
-				continue
-			}
-			stored = append(stored, request)
-		}
-		requests = stored
 	}
 	for key, resolved := range targetResolver.ResolveTargetRequests(ctx, requests) {
 		result[key] = catalog.ResolvedImageURL{URL: resolved.URL, ExpiresAt: resolved.ExpiresAt}
@@ -429,10 +402,9 @@ func (r *PluginImageResolver) resolvePluginBatchWithFallback(
 	return resolved
 }
 
-// resolveStoredArtworkBatch resolves the schemeless paths: keys of objects
-// already held in the canonical artwork store. Whether that produces an
-// object-store URL the client fetches directly or a signed URL served by Silo
-// is the store's decision, not this resolver's.
+// resolveStoredArtworkBatch resolves signed direct-library references. Other
+// schemeless paths require target context and are omitted by the artwork URL
+// resolver.
 //
 // Unresolvable keys are omitted rather than mapped to an empty URL, so callers
 // fall back to whatever they show for missing artwork.

@@ -2,7 +2,6 @@ package metadata
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
@@ -11,24 +10,22 @@ import (
 	"github.com/Silo-Server/silo-server/internal/imagesize"
 )
 
-type directTargetResolver struct {
+type recordingTargetResolver struct {
 	requests []artworkurl.TargetRequest
 }
 
-func (*directTargetResolver) ResolveArtworkURLs(context.Context, []string) map[string]artworkstore.ResolvedURL {
+func (*recordingTargetResolver) ResolveArtworkURLs(context.Context, []string) map[string]artworkstore.ResolvedURL {
 	return nil
 }
 
-func (*directTargetResolver) ResolveTargetURLs(context.Context, []artworkurl.Target, string) map[string]artworkstore.ResolvedURL {
+func (*recordingTargetResolver) ResolveTargetURLs(context.Context, []artworkurl.Target, string) map[string]artworkstore.ResolvedURL {
 	return nil
 }
 
-func (r *directTargetResolver) ResolveTargetRequests(_ context.Context, requests []artworkurl.TargetRequest) map[string]artworkstore.ResolvedURL {
+func (r *recordingTargetResolver) ResolveTargetRequests(_ context.Context, requests []artworkurl.TargetRequest) map[string]artworkstore.ResolvedURL {
 	r.requests = append(r.requests, requests...)
 	return nil
 }
-
-func (*directTargetResolver) DeliveryPolicy() string { return artworkurl.DeliveryPolicyDirect }
 
 func TestProviderVariantForTargetUsesImageTypeLadder(t *testing.T) {
 	tests := []struct {
@@ -54,24 +51,23 @@ func TestProviderVariantForTargetUsesImageTypeLadder(t *testing.T) {
 	}
 }
 
-func TestDirectTargetRequestsKeepProviderImageSizeSemantics(t *testing.T) {
+func TestTargetRequestsKeepProviderReferencesAndVariants(t *testing.T) {
 	resolver := NewPluginImageResolver()
 	t.Cleanup(resolver.Close)
-	resolver.RegisterSource("plug", &fakeExpiringImageSource{})
-	direct := &directTargetResolver{}
-	resolver.SetArtworkURLResolver(direct)
+	recording := &recordingTargetResolver{}
+	resolver.SetArtworkURLResolver(recording)
 
 	requests := []artworkurl.TargetRequest{
 		{Target: artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{"movie-1"}, Slot: artworkkey.ImageTypePoster}.WithReference("plug://poster.jpg"), Variant: artworkkey.VariantW780},
 		{Target: artworkurl.Target{Surface: artworkurl.SurfaceItemLogos, Keys: []string{"movie-1"}, Slot: artworkkey.ImageTypeLogo}.WithReference("plug://logo.png"), Variant: artworkkey.VariantW1280},
 	}
-	resolved := resolver.ResolveArtworkTargetRequestsWithExpiry(t.Context(), requests)
-	for _, request := range requests {
-		if got := resolved[request.CacheKey()].URL; got != "plugin:large:"+strings.TrimPrefix(request.Target.Reference, "plug://") {
-			t.Errorf("resolved %s = %q, want large provider hint", request.Target.Slot, got)
-		}
+	resolver.ResolveArtworkTargetRequestsWithExpiry(t.Context(), requests)
+	if len(recording.requests) != len(requests) {
+		t.Fatalf("target resolver received %d requests, want %d", len(recording.requests), len(requests))
 	}
-	if len(direct.requests) != 0 {
-		t.Fatalf("provider references reached the raw-key resolver: %+v", direct.requests)
+	for i := range requests {
+		if got, want := recording.requests[i], requests[i]; got.Target.Reference != want.Target.Reference || got.Variant != want.Variant {
+			t.Errorf("request %d = reference %q variant %q, want reference %q variant %q", i, got.Target.Reference, got.Variant, want.Target.Reference, want.Variant)
+		}
 	}
 }

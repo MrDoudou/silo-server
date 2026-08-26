@@ -1,5 +1,5 @@
 // Package artworkurl mints and verifies target-bound resilient delivery
-// capabilities and the explicit direct-policy URLs for stored artwork.
+// capabilities for stored artwork.
 //
 // Resilient delivery uses the same signed Silo route for every backend. The
 // capability names the catalog target rather than a physical object so the
@@ -18,9 +18,7 @@
 // configured separately, which keeps artwork tokens cryptographically separate
 // from login and playback tokens while adding no setup step. Rotating the
 // cluster secret invalidates outstanding artwork URLs along with every other
-// derived token family; the short lifetime bounds that to one refresh. Direct
-// policy is the opt-out: S3 may mint its existing direct URL, while local
-// storage uses a strictly validated raw portable path (signed by default).
+// derived token family; the short lifetime bounds that to one refresh.
 package artworkurl
 
 import (
@@ -36,7 +34,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
@@ -47,7 +44,6 @@ const (
 	// configured public origin would not be, and they stay cacheable by the
 	// resolver across those origins.
 	RoutePrefix            = "/api/v1/artwork/"
-	DirectRoutePrefix      = RoutePrefix
 	LibraryRoutePrefix     = "/api/v1/artwork-library/"
 	LibraryReferencePrefix = "library-artwork://"
 
@@ -355,84 +351,6 @@ func (s *Signer) Sign(key string, now time.Time) (artworkstore.ResolvedURL, erro
 		"?" + ExpiresParam + "=" + strconv.FormatInt(unix, 10) +
 		"&" + SignatureParam + "=" + s.signature(key, unix)
 	return artworkstore.ResolvedURL{URL: url, ExpiresAt: &expiresAt}, nil
-}
-
-// SignDirectKey mints the explicit direct-policy local route. The logical key
-// is intentionally raw for CDN friendliness; ValidateKey is the sole grammar
-// gate and the handler rejects every percent escape before a single decode.
-func (s *Signer) SignDirectKey(key string, now time.Time) (artworkstore.ResolvedURL, error) {
-	if s == nil {
-		return artworkstore.ResolvedURL{}, errors.New("artworkurl: signer is not configured")
-	}
-	if err := artworkstore.ValidateKey(key); err != nil {
-		return artworkstore.ResolvedURL{}, err
-	}
-	expiresAt := quantizedExpiry(now, s.TTL())
-	unix := expiresAt.Unix()
-	directPath, err := DirectPathFromKey(key)
-	if err != nil {
-		return artworkstore.ResolvedURL{}, err
-	}
-	url := DirectRoutePrefix + directPath + "?" + ExpiresParam + "=" + strconv.FormatInt(unix, 10) +
-		"&" + SignatureParam + "=" + s.signature(key, unix)
-	return artworkstore.ResolvedURL{URL: url, ExpiresAt: &expiresAt}, nil
-}
-
-const portableObjectPrefix = "artwork/v1/objects/"
-
-// DirectPathFromKey removes the constant portable storage prefix from a raw
-// direct-policy URL. Direct mode deliberately exposes only portable objects:
-// its first segment is therefore always a fixed image-type token, leaving a
-// future leading v2 segment unambiguous.
-func DirectPathFromKey(key string) (string, error) {
-	if err := artworkstore.ValidateKey(key); err != nil {
-		return "", err
-	}
-	if strings.HasPrefix(key, portableObjectPrefix) {
-		path := strings.TrimPrefix(key, portableObjectPrefix)
-		info, ok := artworkkey.ParsePortableKey(key)
-		if path == "" || !ok || info.IsManifest {
-			return "", artworkstore.ErrInvalidKey
-		}
-		return path, nil
-	}
-	return "", artworkstore.ErrInvalidKey
-}
-
-// DirectKeyFromPath reverses DirectPathFromKey before ValidateKey remains the
-// sole gate into a store adapter.
-func DirectKeyFromPath(path string) (string, error) {
-	if path == "" || strings.Contains(path, "%") {
-		return "", artworkstore.ErrInvalidKey
-	}
-	key := portableObjectPrefix + path
-	if err := artworkstore.ValidateKey(key); err != nil {
-		return "", err
-	}
-	info, ok := artworkkey.ParsePortableKey(key)
-	if !ok || info.IsManifest {
-		return "", artworkstore.ErrInvalidKey
-	}
-	return key, nil
-}
-
-func (s *Signer) VerifyDirectKey(key, expires, signature string, now time.Time) (time.Time, error) {
-	if strings.Contains(key, "%") || artworkstore.ValidateKey(key) != nil {
-		return time.Time{}, ErrInvalidSignature
-	}
-	unix, err := strconv.ParseInt(expires, 10, 64)
-	if err != nil || unix <= 0 || signature == "" {
-		return time.Time{}, ErrInvalidSignature
-	}
-	expected := s.signature(key, unix)
-	if len(expected) != len(signature) || subtle.ConstantTimeCompare([]byte(expected), []byte(signature)) != 1 {
-		return time.Time{}, ErrInvalidSignature
-	}
-	expiresAt := time.Unix(unix, 0).UTC()
-	if now.After(expiresAt) {
-		return expiresAt, ErrExpired
-	}
-	return expiresAt, nil
 }
 
 // Verify authenticates a signed artwork URL and returns the logical key it

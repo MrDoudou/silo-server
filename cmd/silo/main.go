@@ -1363,37 +1363,19 @@ func main() {
 			}
 			return cfg.Artwork.URLTTL
 		}
-		directURLs, _ := deps.ArtworkStore.DirectURL()
 		signer, signerErr := artworkurl.NewSigner(cfg.Auth.JWTSecret, artworkURLTTL)
 		if signerErr != nil {
 			// Target capabilities and direct-library fallbacks require signing
-			// on every backend, including S3 and explicit direct policy.
+			// on every backend, including S3.
 			log.Fatalf("artwork storage: %v", signerErr)
 		} else {
 			artworkURLSigner = signer
 		}
-		resolver, resolverErr := artworkurl.NewResolver(directURLs, artworkURLSigner, artworkURLTTL)
+		resolver, resolverErr := artworkurl.NewResolver(artworkURLSigner)
 		if resolverErr != nil {
 			log.Fatalf("artwork storage: %v", resolverErr)
 		}
 		artworkURLs = resolver
-		resolver.SetStore(deps.ArtworkStore.Store)
-		resolver.SetDeliveryPolicy(func() string {
-			if deps.LiveConfig != nil {
-				if live := deps.LiveConfig(); live != nil {
-					return live.Artwork.DeliveryPolicy
-				}
-			}
-			return cfg.Artwork.DeliveryPolicy
-		})
-		resolver.SetLocalURLAuth(func() string {
-			if deps.LiveConfig != nil {
-				if live := deps.LiveConfig(); live != nil {
-					return live.Artwork.URLAuth
-				}
-			}
-			return cfg.Artwork.URLAuth
-		})
 		deps.ArtworkURLSigner = artworkURLSigner
 		deps.ArtworkURLs = artworkURLs
 

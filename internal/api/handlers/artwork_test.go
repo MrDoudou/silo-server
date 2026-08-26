@@ -46,12 +46,6 @@ var artworkTestTarget = artworkurl.Target{
 	Slot:    "poster",
 }.WithReference(artworkTestKey)
 
-type capabilityDirectURLProvider struct{}
-
-func (capabilityDirectURLProvider) ReadURL(context.Context, string, time.Duration) (artworkstore.ResolvedURL, error) {
-	return artworkstore.ResolvedURL{URL: "https://objects.example/artwork"}, nil
-}
-
 type fakeArtworkTargets struct {
 	state       metadata.ArtworkTargetState
 	signals     int
@@ -642,8 +636,8 @@ func TestServeArtworkURLServesOnlyArtworkRouteURLs(t *testing.T) {
 }
 
 func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
-	handler := NewArtworkCapabilityHandler("local", func() bool { return false }, func() string { return "selected" })
-	handler.SetResilientStatus(func() string { return "resilient" }, func() string { return "degraded" })
+	handler := NewArtworkCapabilityHandler("local", func() string { return "selected" })
+	handler.SetResilientStatus(func() string { return "degraded" })
 
 	rec := httptest.NewRecorder()
 	handler.HandleCapability(rec, httptest.NewRequest(http.MethodGet, "/api/v1/artwork/capability", nil))
@@ -686,100 +680,6 @@ func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
 	}
 	if want := []string{"original", "w1920", "w1280", "w300"}; !equalStrings(got.Variants["backdrop"], want) {
 		t.Fatalf("backdrop variants = %v, want %v", got.Variants["backdrop"], want)
-	}
-
-	// A bucket-backed store keeps delivering directly; the capability has to
-	// say so, because that is the difference clients and operators observe.
-	policy := artworkurl.DeliveryPolicyResilient
-	resolver, err := artworkurl.NewResolver(capabilityDirectURLProvider{}, nil, nil)
-	if err != nil {
-		t.Fatalf("NewResolver: %v", err)
-	}
-	resolver.SetDeliveryPolicy(func() string { return policy })
-	direct := NewArtworkCapabilityHandler("s3", resolver.DirectDelivery, nil)
-	direct.SetResilientStatus(resolver.DeliveryPolicy, func() string { return "healthy" })
-	rec = httptest.NewRecorder()
-	direct.HandleCapability(rec, httptest.NewRequest(http.MethodGet, "/api/v1/artwork/capability", nil))
-	var startupResponse artworkCapabilityResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &startupResponse); err != nil {
-		t.Fatalf("decoding startup capability %q: %v", rec.Body.String(), err)
-	}
-	if len(startupResponse.DeliveryModes) != 1 || startupResponse.DeliveryModes[0] != artworkDeliveryAPI {
-		t.Fatalf("startup delivery_modes = %v, want [%s]", startupResponse.DeliveryModes, artworkDeliveryAPI)
-	}
-
-	policy = artworkurl.DeliveryPolicyDirect
-	rec = httptest.NewRecorder()
-	direct.HandleCapability(rec, httptest.NewRequest(http.MethodGet, "/api/v1/artwork/capability", nil))
-	var directResponse artworkCapabilityResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &directResponse); err != nil {
-		t.Fatalf("decoding %q: %v", rec.Body.String(), err)
-	}
-	if len(directResponse.DeliveryModes) != 1 || directResponse.DeliveryModes[0] != artworkDeliveryDirect {
-		t.Fatalf("delivery_modes = %v, want [%s]", directResponse.DeliveryModes, artworkDeliveryDirect)
-	}
-	if directResponse.AutomaticRecovery {
-		t.Fatal("direct policy reported automatic recovery")
-	}
-}
-
-func TestDirectArtworkHandlerEnforcesSignedAndPublicModes(t *testing.T) {
-	store, err := artworkstore.NewFilesystemStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewFilesystemStore: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	if err := store.WriteImmutable(t.Context(), artworkTestKey, artworkTestBytes, artworkstore.ObjectMetadata{}); err != nil {
-		t.Fatalf("WriteImmutable: %v", err)
-	}
-	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return time.Hour })
-	if err != nil {
-		t.Fatalf("NewSigner: %v", err)
-	}
-	auth := "signed"
-	handler := NewDirectArtworkHandler(store, signer, func() string { return auth })
-	router := chi.NewRouter()
-	router.Get("/api/v1/artwork/*", handler.ServeHTTP)
-
-	directPath, err := artworkurl.DirectPathFromKey(artworkTestKey)
-	if err != nil {
-		t.Fatalf("DirectPathFromKey: %v", err)
-	}
-	unsigned := artworkurl.DirectRoutePrefix + directPath
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, unsigned, nil))
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("signed mode unsigned status = %d, want 404", rec.Code)
-	}
-
-	signed, err := signer.SignDirectKey(artworkTestKey, time.Now())
-	if err != nil {
-		t.Fatalf("SignDirectKey: %v", err)
-	}
-	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signed.URL, nil))
-	if rec.Code != http.StatusOK || rec.Body.String() != string(artworkTestBytes) {
-		t.Fatalf("signed status/body = %d/%q", rec.Code, rec.Body.String())
-	}
-
-	auth = "public"
-	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, unsigned, nil))
-	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
-		t.Fatalf("public status/cache = %d/%q", rec.Code, rec.Header().Get("Cache-Control"))
-	}
-	// Signed URLs remain accepted after a mode flip.
-	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signed.URL, nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("old signed URL after public flip = %d", rec.Code)
-	}
-
-	escaped := artworkurl.DirectRoutePrefix + strings.Replace(directPath, "/", "%2F", 1)
-	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, escaped, nil))
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("percent-escaped key status = %d, want 404", rec.Code)
 	}
 }
 

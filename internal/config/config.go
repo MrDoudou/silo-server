@@ -357,10 +357,6 @@ type ArtworkConfig struct {
 	RemoteMaterialization string `yaml:"-"`
 	// URLTTL bounds how long a minted artwork read URL stays valid.
 	URLTTL time.Duration `yaml:"-"`
-	// DeliveryPolicy is resilient (Silo target capabilities) or direct.
-	DeliveryPolicy string `yaml:"-"`
-	// URLAuth controls direct local key routes: signed or public.
-	URLAuth string `yaml:"-"`
 	// LocalOwnership is owned or shared and controls root recreation safety.
 	LocalOwnership string `yaml:"-"`
 }

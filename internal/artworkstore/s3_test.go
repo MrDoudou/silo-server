@@ -19,20 +19,16 @@ import (
 // is keyed by the *logical* key, which is exactly the point: the adapter must
 // never pass a bucket-prefixed or otherwise decorated key down.
 type fakeS3 struct {
-	mu           sync.Mutex
-	bucket       string
-	objects      map[string][]byte
-	puts         []string
-	putErr       error
-	statErr      error
-	contentType  string
-	headErr      error
-	presignErr   error
-	urlExpires   bool
-	presignedTTL time.Duration
-	presignedKey string
-	bucketsSeen  map[string]int
-	listCalls    int
+	mu          sync.Mutex
+	bucket      string
+	objects     map[string][]byte
+	puts        []string
+	putErr      error
+	statErr     error
+	contentType string
+	headErr     error
+	bucketsSeen map[string]int
+	listCalls   int
 }
 
 type longArtworkListingS3 struct {
@@ -62,7 +58,6 @@ func newFakeS3() *fakeS3 {
 		bucket:      "artwork",
 		objects:     map[string][]byte{},
 		contentType: "image/webp",
-		urlExpires:  true,
 		bucketsSeen: map[string]int{},
 	}
 }
@@ -237,22 +232,6 @@ func (f *fakeS3) HeadBucket(_ context.Context, bucket string) error {
 	f.note(bucket)
 	return f.headErr
 }
-
-func (f *fakeS3) PresignGetURL(_ context.Context, bucket, key string, expiry time.Duration) (string, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.note(bucket)
-	if f.presignErr != nil {
-		return "", f.presignErr
-	}
-	f.presignedKey = key
-	f.presignedTTL = expiry
-	return "https://cdn.example/" + key, nil
-}
-
-func (f *fakeS3) EffectivePresignTTL(requested time.Duration) time.Duration { return requested }
-
-func (f *fakeS3) ReadURLExpires() bool { return f.urlExpires }
 
 func newTestS3Store(t *testing.T) (*S3Store, *fakeS3) {
 	t.Helper()
@@ -469,11 +448,6 @@ func TestS3StoreSurfacesBackendErrors(t *testing.T) {
 	}
 	client.statErr = nil
 
-	client.presignErr = errors.New("no credentials")
-	if _, err := store.ReadURL(ctx, testKey, time.Hour); err == nil ||
-		!strings.Contains(err.Error(), "no credentials") {
-		t.Fatalf("ReadURL = %v, want the backend failure", err)
-	}
 }
 
 func TestS3StoreProbeReportsBucketFailure(t *testing.T) {
@@ -482,59 +456,6 @@ func TestS3StoreProbeReportsBucketFailure(t *testing.T) {
 	err := store.Probe(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "no such bucket") {
 		t.Fatalf("Probe = %v, want the bucket failure", err)
-	}
-}
-
-func TestS3StoreReadURLReportsExpiry(t *testing.T) {
-	store, client := newTestS3Store(t)
-	before := time.Now()
-
-	resolved, err := store.ReadURL(context.Background(), testKey, 30*time.Minute)
-	if err != nil {
-		t.Fatalf("ReadURL: %v", err)
-	}
-	if resolved.URL != "https://cdn.example/"+testKey {
-		t.Fatalf("URL = %q", resolved.URL)
-	}
-	if client.presignedKey != testKey {
-		t.Fatalf("presigned key = %q, want the logical key", client.presignedKey)
-	}
-	if client.presignedTTL != 30*time.Minute {
-		t.Fatalf("presign TTL = %v, want 30m", client.presignedTTL)
-	}
-	if resolved.ExpiresAt == nil {
-		t.Fatal("ExpiresAt is nil for an expiring URL")
-	}
-	if resolved.ExpiresAt.Before(before.Add(30*time.Minute)) ||
-		resolved.ExpiresAt.After(time.Now().Add(31*time.Minute)) {
-		t.Fatalf("ExpiresAt = %v, want roughly 30m out", resolved.ExpiresAt)
-	}
-}
-
-// An unsigned public-endpoint URL never stops working; advertising an expiry
-// would make the resolver's URL cache discard a perfectly good URL.
-func TestS3StoreReadURLOmitsExpiryForPermanentURLs(t *testing.T) {
-	store, client := newTestS3Store(t)
-	client.urlExpires = false
-
-	resolved, err := store.ReadURL(context.Background(), testKey, time.Hour)
-	if err != nil {
-		t.Fatalf("ReadURL: %v", err)
-	}
-	if resolved.ExpiresAt != nil {
-		t.Fatalf("ExpiresAt = %v, want nil for a permanent URL", resolved.ExpiresAt)
-	}
-}
-
-func TestS3StoreImplementsDirectURLProvider(t *testing.T) {
-	store, _ := newTestS3Store(t)
-	if _, ok := any(store).(DirectURLProvider); !ok {
-		t.Fatal("S3Store does not implement DirectURLProvider")
-	}
-	// The filesystem store must not: its objects go through the signed
-	// artwork route, never a URL a client fetches from somewhere else.
-	if _, ok := any(newTestStore(t)).(DirectURLProvider); ok {
-		t.Fatal("FilesystemStore implements DirectURLProvider")
 	}
 }
 

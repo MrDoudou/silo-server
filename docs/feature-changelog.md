@@ -11,11 +11,11 @@ previous defaults. Posters and stills gain a 780px rung and logos gain a 1280px
 rung, all reported live by `GET /api/v1/images/capability` and the artwork
 capability ladder. Jellyfin width requests use the same mapping.
 
-Target-bound resilient URLs carry the selected variant, and direct policy mints
-the corresponding raw object key. When an immutable revision predates the wider
-rungs, its manifest selects the nearest smaller stored image without reporting
-loss, scheduling repair, or showing a placeholder; legacy keys use a bounded
-existence cache for the same compatibility fallback.
+Target-bound resilient URLs carry the selected variant. When an immutable
+revision predates the wider rungs, its manifest selects the nearest smaller
+stored image without reporting loss, scheduling repair, or showing a
+placeholder; legacy keys use a bounded existence cache for the same
+compatibility fallback.
 
 ### Keep artwork available while storage is missing or rebuilding
 
@@ -33,9 +33,8 @@ and wrong-mount states. Transient startup outages no longer crash-loop the
 server, destructive collection pauses during outages, owned local roots can be
 rebuilt, and shared roots refuse every write when their mount sentinel is
 absent. Storage accounting and the admin card show missing bytes and recovery
-progress. Operators who explicitly choose direct delivery retain S3/provider
-URLs; local direct delivery can use expiring signed raw-key URLs or permanent
-public immutable URLs with the trade-off shown in settings.
+progress. Artwork delivery is resilient-only: every backend uses target-bound
+Silo URLs with verified fallback serving and automatic background recovery.
 
 ### Copy and adopt portable artwork stores
 Portable artwork revisions now carry optional non-secret source-adoption hints. When another server resolves the same stable plugin reference or source bytes, it validates the copied manifest and object digests and reuses the existing revision without downloading or encoding it again.
