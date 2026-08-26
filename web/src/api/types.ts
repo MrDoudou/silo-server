@@ -3489,10 +3489,15 @@ export interface AdminJobsResponse {
 export interface ArtworkStorageTotal {
   physical_bytes: number;
   pending_gc_bytes: number;
+  missing_bytes: number;
+  repair_pending_bytes: number;
   protected_bytes: number;
   reclaimable_bytes: number;
   object_count: number;
   revision_count: number;
+  missing_revision_count: number;
+  repairing_revision_count: number;
+  protected_loss_count: number;
 }
 
 export interface ArtworkLibraryAccounting {
@@ -3504,13 +3509,26 @@ export interface ArtworkLibraryAccounting {
   protected_bytes: number;
   object_count: number;
   revision_count: number;
+  missing_bytes: number;
+  repair_pending_bytes: number;
+  protected_loss_bytes: number;
+  missing_revisions: number;
+  repairing_revisions: number;
+  protected_losses: number;
 }
 
 export interface ArtworkStorageAccounting {
   snapshot_at?: string;
   backend: "local" | "s3" | string;
   resolved_path?: string;
-  health: string;
+  store_health:
+    | "healthy"
+    | "degraded"
+    | "unavailable"
+    | "empty_rebuilding"
+    | "wrong_mount"
+    | string;
+  store_health_changed_at?: string;
   free_space_bytes?: number;
   unsupported_topology_warnings?: string[];
   complete: boolean;

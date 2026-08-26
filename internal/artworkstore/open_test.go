@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // fakeSettings is an in-memory server_settings stand-in with the same
@@ -45,6 +46,17 @@ func (s *fakeSettings) SetIfAbsent(_ context.Context, key, value string) (bool, 
 	}
 	s.values[key] = value
 	return true, nil
+}
+
+func (s *fakeSettings) Set(_ context.Context, key, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.setCall++
+	if s.setErr != nil {
+		return s.setErr
+	}
+	s.values[key] = value
+	return nil
 }
 
 func (s *fakeSettings) pin(t *testing.T) Pin {
@@ -116,8 +128,8 @@ func TestOpenAutoSelectsS3WhenConfigured(t *testing.T) {
 	if handle.Backend != BackendS3 {
 		t.Fatalf("Backend = %q, want %q", handle.Backend, BackendS3)
 	}
-	if handle.Generation != "" {
-		t.Fatalf("Generation = %q, want empty for S3 (bucket identity is the reconcile task's)", handle.Generation)
+	if handle.Generation == "" {
+		t.Fatal("S3 store has no copy generation")
 	}
 	if _, ok := handle.DirectURL(); !ok {
 		t.Fatal("the S3 backend offered no direct URL provider")
@@ -167,9 +179,10 @@ func TestOpenRejectsUnknownBackend(t *testing.T) {
 	}
 }
 
-// An unwritable canonical store is an operational failure, never a reason to
-// quietly fall back to another backend or to upstream sources.
-func TestOpenFailsOnUnwritableLocalRootWithoutFallingBack(t *testing.T) {
+// An unwritable canonical store is an operational outage: startup continues
+// degraded, and the health wrapper rejects writes instead of choosing another
+// configured backend.
+func TestOpenReportsUnwritableLocalRootWithoutFallingBack(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores directory permissions")
 	}
@@ -181,14 +194,21 @@ func TestOpenFailsOnUnwritableLocalRootWithoutFallingBack(t *testing.T) {
 
 	// A configured bucket is deliberately present: selecting local must fail
 	// rather than quietly serving artwork from somewhere else.
-	_, err := Open(context.Background(), Options{
+	handle, err := Open(context.Background(), Options{
 		Backend:   BackendLocal,
 		LocalPath: filepath.Join(parent, "artwork"),
 		S3:        newFakeS3(),
 		Settings:  newFakeSettings(),
 	})
-	if err == nil {
-		t.Fatal("Open succeeded on an unwritable root")
+	if err != nil {
+		t.Fatalf("Open = %v, want an operational health state", err)
+	}
+	t.Cleanup(func() { _ = handle.Close() })
+	if state, _ := handle.Health(); state != HealthUnavailable {
+		t.Fatalf("health = %q, want %q", state, HealthUnavailable)
+	}
+	if err := handle.Store.WriteImmutable(context.Background(), testKey, []byte("bytes"), ObjectMetadata{}); !errors.Is(err, ErrBackendUnavailable) {
+		t.Fatalf("WriteImmutable = %v, want ErrBackendUnavailable", err)
 	}
 }
 
@@ -293,9 +313,9 @@ func TestPinnedLocalStoreRefusesToSwitchToS3(t *testing.T) {
 	}
 }
 
-// Pointing a node at a different (or freshly emptied) directory must be caught
-// rather than silently reinterpreting live catalog keys against empty storage.
-func TestPinnedLocalStoreRefusesADifferentStoreCopy(t *testing.T) {
+// An owned local store that is authoritatively empty is recreated under a new
+// generation and enters bulk recovery instead of crash-looping.
+func TestPinnedOwnedLocalStoreRecreatesAnEmptyRoot(t *testing.T) {
 	settings := newFakeSettings()
 	handle := openLocal(t, t.TempDir(), settings)
 	if err := handle.Store.WriteImmutable(context.Background(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
@@ -303,17 +323,140 @@ func TestPinnedLocalStoreRefusesADifferentStoreCopy(t *testing.T) {
 	}
 	_ = handle.Close()
 
-	_, err := Open(context.Background(), Options{
+	reopened, err := Open(context.Background(), Options{
 		Backend:   BackendLocal,
 		LocalPath: t.TempDir(),
 		Settings:  settings,
 	})
+	if err != nil {
+		t.Fatalf("Open = %v, want recovery", err)
+	}
+	t.Cleanup(func() { _ = reopened.Close() })
+	if state, _ := reopened.Health(); state != HealthEmptyRebuilding {
+		t.Fatalf("health = %q, want %q", state, HealthEmptyRebuilding)
+	}
+	if reopened.Generation == handle.Generation {
+		t.Fatal("recreated owned store retained the lost copy generation")
+	}
+}
+
+func TestRunningOwnedLocalStoreRecreatesDeletedRootAndRotatesGeneration(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "artwork")
+	settings := newFakeSettings()
+	handle := openLocal(t, root, settings)
+	if err := handle.Store.WriteImmutable(t.Context(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	oldGeneration := handle.Generation
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	handle.expireCheckCacheForTest()
+	if err := handle.Check(t.Context()); err != nil {
+		t.Fatalf("Check after root deletion: %v", err)
+	}
+	if state, _ := handle.Health(); state != HealthEmptyRebuilding {
+		t.Fatalf("health = %q, want empty_rebuilding", state)
+	}
+	if handle.Generation == "" || handle.Generation == oldGeneration {
+		t.Fatalf("generation = %q, want a new physical-store identity", handle.Generation)
+	}
+	if err := handle.Store.WriteImmutable(t.Context(), testKey, []byte("rebuilt"), ObjectMetadata{}); err != nil {
+		t.Fatalf("write into safely recreated owned root: %v", err)
+	}
+}
+
+func TestPinnedLocalStoreRefusesAReachableDifferentCopy(t *testing.T) {
+	settings := newFakeSettings()
+	first := openLocal(t, t.TempDir(), settings)
+	if err := first.Store.WriteImmutable(context.Background(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
+		t.Fatalf("WriteImmutable: %v", err)
+	}
+	_ = first.Close()
+
+	otherSettings := newFakeSettings()
+	otherRoot := t.TempDir()
+	other := openLocal(t, otherRoot, otherSettings)
+	if err := other.Store.WriteImmutable(context.Background(), testKey, []byte("other"), ObjectMetadata{}); err != nil {
+		t.Fatalf("other WriteImmutable: %v", err)
+	}
+	_ = other.Close()
+
+	_, err := Open(context.Background(), Options{Backend: BackendLocal, LocalPath: otherRoot, Settings: settings})
 	var mismatch *PinMismatchError
 	if !errors.As(err, &mismatch) {
-		t.Fatalf("Open = %v, want a PinMismatchError", err)
+		t.Fatalf("Open = %v, want PinMismatchError", err)
 	}
-	if !strings.Contains(err.Error(), "different store copy") {
-		t.Fatalf("error %q does not describe a store-copy mismatch", err)
+}
+
+func TestPinnedSharedLocalStoreRefusesMissingSentinelsWithoutWriting(t *testing.T) {
+	settings := newFakeSettings()
+	root := t.TempDir()
+	first := openLocal(t, root, settings)
+	if err := first.Store.WriteImmutable(context.Background(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
+		t.Fatalf("WriteImmutable: %v", err)
+	}
+	_ = first.Close()
+
+	uncovered := filepath.Join(t.TempDir(), "missing-mount")
+	handle, err := Open(context.Background(), Options{
+		Backend: BackendLocal, LocalPath: uncovered, LocalShared: true, Settings: settings,
+	})
+	if err != nil {
+		t.Fatalf("Open = %v, want wrong_mount health", err)
+	}
+	t.Cleanup(func() { _ = handle.Close() })
+	if state, _ := handle.Health(); state != HealthWrongMount {
+		t.Fatalf("health = %q, want %q", state, HealthWrongMount)
+	}
+	if _, err := os.Stat(uncovered); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("uncovered mountpoint was created: %v", err)
+	}
+	if err := handle.Store.WriteImmutable(context.Background(), testKey, []byte("bad"), ObjectMetadata{}); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("WriteImmutable = %v, want ErrWrongMount", err)
+	}
+}
+
+func TestRunningSharedStoreRefusesToPopulateDroppedMount(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "shared-artwork")
+	settings := newFakeSettings()
+	owned := openLocal(t, root, settings)
+	if err := owned.Store.WriteImmutable(t.Context(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := owned.Close(); err != nil {
+		t.Fatal(err)
+	}
+	shared, err := Open(t.Context(), Options{Backend: BackendLocal, LocalPath: root, LocalShared: true, Settings: settings})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = shared.Close() })
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	shared.expireCheckCacheForTest()
+	if err := shared.Check(t.Context()); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("Check = %v, want ErrWrongMount", err)
+	}
+	if err := shared.Store.WriteImmutable(t.Context(), testKey, []byte("wrong disk"), ObjectMetadata{}); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("write = %v, want ErrWrongMount", err)
+	}
+	if err := shared.Store.Probe(t.Context()); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("wrapped probe = %v, want ErrWrongMount", err)
+	}
+	if cleaner, ok := shared.Store.(interface {
+		CleanTempFiles(context.Context, time.Duration) (int, error)
+	}); !ok {
+		t.Fatal("health store does not expose guarded temp cleanup")
+	} else if _, err := cleaner.CleanTempFiles(t.Context(), time.Hour); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("temp cleanup = %v, want ErrWrongMount", err)
+	}
+	if _, err := shared.local.Open(t.Context(), testKey); !errors.Is(err, ErrWrongMount) {
+		t.Fatalf("raw shared open = %v, want ErrWrongMount", err)
+	}
+	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("shared mountpoint was recreated: %v", err)
 	}
 }
 
@@ -428,6 +571,57 @@ func TestCheckProbesTheBucket(t *testing.T) {
 	handle.expireCheckCacheForTest()
 	if err := handle.Check(context.Background()); err == nil {
 		t.Fatal("Check succeeded against an unreachable bucket")
+	}
+}
+
+func TestOpenUpgradesLegacyPinnedNonEmptyS3StoreMarkers(t *testing.T) {
+	client := newFakeS3()
+	client.objects[testKey] = []byte("existing artwork")
+	settings := newFakeSettings()
+	legacyPin, err := encodePin(Pin{Backend: BackendS3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.values[StorePinSettingKey] = legacyPin
+
+	handle, err := Open(t.Context(), Options{Backend: BackendS3, S3: client, Settings: settings})
+	if err != nil {
+		t.Fatalf("Open legacy S3: %v", err)
+	}
+	t.Cleanup(func() { _ = handle.Close() })
+	if handle.Generation == "" {
+		t.Fatal("legacy S3 pin was not upgraded to a copy generation")
+	}
+	if got := settings.pin(t).Generation; got != handle.Generation {
+		t.Fatalf("recorded generation = %q, want %q", got, handle.Generation)
+	}
+	if string(client.objects[formatMarkerFileName]) != formatMarkerContents {
+		t.Fatal("legacy S3 upgrade did not create the format marker")
+	}
+	if len(client.objects[markerFileName]) == 0 {
+		t.Fatal("legacy S3 upgrade did not create the copy marker")
+	}
+	if state, _ := handle.Health(); state != HealthHealthy {
+		t.Fatalf("legacy S3 health = %q, want healthy", state)
+	}
+}
+
+func TestOpenAdoptsZeroPinS3WithUnrelatedAndLegacyArtworkObjects(t *testing.T) {
+	client := newFakeS3()
+	client.objects["subtitles/movie/en.srt"] = []byte("subtitle")
+	client.objects["tmdb/movie/1/poster/original.abc.webp"] = []byte("legacy artwork")
+	settings := newFakeSettings()
+
+	handle, err := Open(t.Context(), Options{Backend: BackendS3, S3: client, Settings: settings})
+	if err != nil {
+		t.Fatalf("Open upgrade store: %v", err)
+	}
+	t.Cleanup(func() { _ = handle.Close() })
+	if handle.GenerationID() == "" || settings.pin(t).Generation != handle.GenerationID() {
+		t.Fatalf("zero-pin store was not adopted: generation=%q pin=%+v", handle.GenerationID(), settings.pin(t))
+	}
+	if string(client.objects[formatMarkerFileName]) != formatMarkerContents || len(client.objects[markerFileName]) == 0 {
+		t.Fatal("upgrade adoption did not create both sentinels")
 	}
 }
 

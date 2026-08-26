@@ -2,6 +2,26 @@
 
 ## 2026-08-25
 
+### Keep artwork available while storage is missing or rebuilding
+
+Artwork URLs now identify the catalog target instead of one storage key. The
+default resilient route follows the target's current selection, detects an
+authoritative missing revision, durably deduplicates repair, and temporarily
+serves a validated provider or confined sidecar source. A bounded emergency
+cache and per-source singleflight absorb cold request bursts; when no verified
+fallback is available, image requests receive a small no-store placeholder
+instead of a broken HTML response. Non-reconstructible selections remain
+protected and raise a persistent data-loss warning.
+
+Artwork stores now report healthy, degraded, unavailable, empty-rebuilding,
+and wrong-mount states. Transient startup outages no longer crash-loop the
+server, destructive collection pauses during outages, owned local roots can be
+rebuilt, and shared roots refuse every write when their mount sentinel is
+absent. Storage accounting and the admin card show missing bytes and recovery
+progress. Operators who explicitly choose direct delivery retain S3/provider
+URLs; local direct delivery can use expiring signed raw-key URLs or permanent
+public immutable URLs with the trade-off shown in settings.
+
 ### Copy and adopt portable artwork stores
 Portable artwork revisions now carry optional non-secret source-adoption hints. When another server resolves the same stable plugin reference or source bytes, it validates the copied manifest and object digests and reuses the existing revision without downloading or encoding it again.
 

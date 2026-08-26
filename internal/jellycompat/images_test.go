@@ -67,6 +67,15 @@ func TestHandleItemImageAcceptsSignedTagWithoutSessionOrCache(t *testing.T) {
 	}
 }
 
+func TestImageURLForItemRetainsHTTPFallbackWithoutDetailService(t *testing.T) {
+	h := &ImagesHandler{}
+	const poster = "https://cdn.example.test/poster.jpg"
+	resolved := h.imageURLForItem(context.Background(), itemTargetSet("movie-1", poster, "", ""), "Primary", compatCardImageSize)
+	if resolved.URL != poster {
+		t.Fatalf("resolved URL = %q, want %q", resolved.URL, poster)
+	}
+}
+
 func TestHandleItemImageProxiesInfuseSignedTagWithoutSessionOrCache(t *testing.T) {
 	upstreamCalled := false
 	var gotIfNoneMatch string

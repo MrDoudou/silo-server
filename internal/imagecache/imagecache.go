@@ -13,11 +13,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"strings"
 	"sync"
@@ -26,17 +23,16 @@ import (
 	"github.com/Silo-Server/silo-server/internal/artworkadopt"
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkmetrics"
+	"github.com/Silo-Server/silo-server/internal/artworksource"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/imageutil"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 )
 
 const (
-	maxDownloadBytes = 25 * 1024 * 1024 // allow oversized provider originals; cached variants are dimension-capped
-	downloadTimeout  = 30 * time.Second
-	sourceGenerated  = "generated"
-	urlSchemeHTTP    = "http"
-	urlSchemeHTTPS   = "https"
+	sourceGenerated = "generated"
+	urlSchemeHTTP   = "http"
+	urlSchemeHTTPS  = "https"
 )
 
 // ObjectStore is the subset of artworkstore.Store the image pipeline needs:
@@ -109,7 +105,7 @@ type Cacher struct {
 
 // New creates a Cacher that materializes artwork through the given store.
 func New(store ObjectStore) *Cacher {
-	return &Cacher{store: store, httpClient: newSecureHTTPClient(), enforcePublicURLs: true}
+	return &Cacher{store: store, httpClient: artworksource.NewSecureHTTPClient(), enforcePublicURLs: true}
 }
 
 // SetArtworkRevisionTracker wires durable revision lifecycle tracking. The
@@ -577,125 +573,5 @@ func (c *Cacher) writeObject(ctx context.Context, key string, data []byte, media
 // downloadImage fetches the image at the given URL, enforcing size, timeout,
 // and public-network limits.
 func (c *Cacher) downloadImage(ctx context.Context, rawURL string) ([]byte, error) {
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, fmt.Errorf("parse URL: %w", err)
-	}
-	if c.enforcePublicURLs {
-		if err := validatePublicImageURL(parsed); err != nil {
-			return nil, err
-		}
-	}
-	ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-
-	client := c.httpClient
-	if client == nil {
-		client = newSecureHTTPClient()
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("http get: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
-	}
-
-	limited := io.LimitReader(resp.Body, maxDownloadBytes+1)
-	data, err := io.ReadAll(limited)
-	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
-	}
-	if int64(len(data)) > maxDownloadBytes {
-		return nil, fmt.Errorf("image exceeds %d byte limit", maxDownloadBytes)
-	}
-
-	return data, nil
-}
-
-func newSecureHTTPClient() *http.Client {
-	transport := &http.Transport{
-		Proxy:               nil,
-		DialContext:         secureImageDialContext,
-		TLSHandshakeTimeout: 10 * time.Second,
-	}
-	return &http.Client{
-		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return http.ErrUseLastResponse
-			}
-			return validatePublicImageURL(req.URL)
-		},
-	}
-}
-
-func validatePublicImageURL(u *url.URL) error {
-	if u == nil {
-		return fmt.Errorf("empty URL")
-	}
-	if u.Scheme != urlSchemeHTTP && u.Scheme != urlSchemeHTTPS {
-		return fmt.Errorf("unsupported URL scheme %q", u.Scheme)
-	}
-	host := u.Hostname()
-	if host == "" {
-		return fmt.Errorf("URL host is required")
-	}
-	if addr, err := netip.ParseAddr(host); err == nil && !isPublicAddr(addr) {
-		return fmt.Errorf("private image host %q is not allowed", host)
-	}
-	return nil
-}
-
-func secureImageDialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, err
-	}
-	addr, err := resolvePublicAddr(ctx, host)
-	if err != nil {
-		return nil, err
-	}
-	dialer := &net.Dialer{Timeout: downloadTimeout}
-	return dialer.DialContext(ctx, network, net.JoinHostPort(addr.String(), port))
-}
-
-func resolvePublicAddr(ctx context.Context, host string) (netip.Addr, error) {
-	if addr, err := netip.ParseAddr(host); err == nil {
-		if isPublicAddr(addr) {
-			return addr, nil
-		}
-		return netip.Addr{}, fmt.Errorf("private image host %q is not allowed", host)
-	}
-	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-	if err != nil {
-		return netip.Addr{}, fmt.Errorf("resolve image host %q: %w", host, err)
-	}
-	for _, ip := range ips {
-		addr, ok := netip.AddrFromSlice(ip.IP)
-		if ok && isPublicAddr(addr) {
-			return addr, nil
-		}
-	}
-	return netip.Addr{}, fmt.Errorf("image host %q did not resolve to a public address", host)
-}
-
-func isPublicAddr(addr netip.Addr) bool {
-	if addr.Is4In6() {
-		addr = addr.Unmap()
-	}
-	return addr.IsGlobalUnicast() &&
-		!addr.IsPrivate() &&
-		!addr.IsLoopback() &&
-		!addr.IsLinkLocalUnicast() &&
-		!addr.IsLinkLocalMulticast() &&
-		!addr.IsMulticast() &&
-		!addr.IsUnspecified()
+	return artworksource.Fetch(ctx, c.httpClient, c.enforcePublicURLs, rawURL)
 }

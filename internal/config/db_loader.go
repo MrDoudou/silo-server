@@ -359,6 +359,22 @@ func LoadFromDB(m map[string]string) (*Config, error) {
 	}
 	cfg.Artwork.URLTTL = artworkURLTTL
 
+	artworkDelivery := strings.ToLower(strings.TrimSpace(stringOr(m, ArtworkDeliveryPolicyKey, ArtworkDeliveryResilient)))
+	if artworkDelivery != ArtworkDeliveryResilient && artworkDelivery != ArtworkDeliveryDirect {
+		return nil, fmt.Errorf("invalid value for %q: must be one of %s, %s", ArtworkDeliveryPolicyKey, ArtworkDeliveryResilient, ArtworkDeliveryDirect)
+	}
+	cfg.Artwork.DeliveryPolicy = artworkDelivery
+	artworkURLAuth := strings.ToLower(strings.TrimSpace(stringOr(m, ArtworkURLAuthKey, ArtworkURLAuthSigned)))
+	if artworkURLAuth != ArtworkURLAuthSigned && artworkURLAuth != ArtworkURLAuthPublic {
+		return nil, fmt.Errorf("invalid value for %q: must be one of %s, %s", ArtworkURLAuthKey, ArtworkURLAuthSigned, ArtworkURLAuthPublic)
+	}
+	cfg.Artwork.URLAuth = artworkURLAuth
+	artworkOwnership := strings.ToLower(strings.TrimSpace(stringOr(m, ArtworkLocalOwnershipKey, ArtworkLocalOwned)))
+	if artworkOwnership != ArtworkLocalOwned && artworkOwnership != ArtworkLocalShared {
+		return nil, fmt.Errorf("invalid value for %q: must be one of %s, %s", ArtworkLocalOwnershipKey, ArtworkLocalOwned, ArtworkLocalShared)
+	}
+	cfg.Artwork.LocalOwnership = artworkOwnership
+
 	// Playback
 	cfg.Playback.FFmpegPath = stringOr(m, "playback.ffmpeg_path", "")
 	cfg.Playback.TranscodeDir = stringOr(m, playbackTranscodeDirSettingKey, DefaultTranscodeDir)

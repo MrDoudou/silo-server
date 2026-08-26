@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/recommendations"
 	"github.com/Silo-Server/silo-server/internal/sections"
@@ -254,19 +255,23 @@ func groupEventsByDate(events []catalog.CalendarEvent, r *http.Request, detailSv
 
 	posterURLs := map[string]string{}
 	if detailSvc != nil {
-		posterPaths := make([]string, 0, len(events))
-		seenPosterPaths := make(map[string]struct{}, len(events))
+		targets := make([]artworkurl.Target, 0, len(events))
 		for _, ev := range events {
 			if ev.PosterPath == "" {
 				continue
 			}
-			if _, ok := seenPosterPaths[ev.PosterPath]; ok {
-				continue
+			contentID := ev.ContentID
+			if ev.SeriesID != nil && *ev.SeriesID != "" {
+				contentID = *ev.SeriesID
 			}
-			seenPosterPaths[ev.PosterPath] = struct{}{}
-			posterPaths = append(posterPaths, ev.PosterPath)
+			targets = append(targets, artworkurl.Target{
+				Surface: artworkurl.SurfaceItemPosters, Keys: []string{contentID}, Slot: artworkImagePoster,
+			}.WithReference(ev.PosterPath))
 		}
-		posterURLs = detailSvc.PresignImageURLs(r.Context(), posterPaths, "poster", "small")
+		resolved := detailSvc.PresignArtworkTargetsWithExpiry(r.Context(), targets, catalog.ArtworkVariantForSize("poster", "small"))
+		for _, target := range targets {
+			posterURLs[target.Reference] = resolved[target.CacheKey()].URL
+		}
 	}
 
 	type preparedCalendarEvent struct {

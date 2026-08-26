@@ -21,7 +21,12 @@ import (
 	"strings"
 )
 
-const OriginalVariant = "original"
+const (
+	OriginalVariant = "original"
+	VariantW300     = "w300"
+	VariantW500     = "w500"
+	VariantW1280    = "w1280"
+)
 
 // defaultVariantExt is the extension assumed when a caller builds a key
 // without naming one. Every encode the pipeline performs today outputs WebP.
@@ -120,6 +125,49 @@ const (
 // types are reported separately by UploadImageTypes.
 func ImageTypes() []string {
 	return []string{ImageTypePoster, ImageTypeBackdrop, ImageTypeLogo, ImageTypeStill, ImageTypeProfile}
+}
+
+// IsStoredArtworkKey distinguishes artwork objects from unrelated objects in
+// the shared public bucket. It recognizes the portable tree, adoption hints,
+// the legacy upload namespaces, and provider/local legacy ladders whose parent
+// directory is one of the fixed image types.
+func IsStoredArtworkKey(key string) bool {
+	key = strings.TrimSpace(key)
+	if _, ok := ParsePortableKey(key); ok || IsAdoptionIndexKey(key) {
+		return true
+	}
+	for _, prefix := range []string{"library-posters/", "collection-images/", "user-collection-images/", "profile-avatars/"} {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	dir, filename := path.Dir(key), path.Base(key)
+	if dir == "." || filename == "." || filename == "" {
+		return false
+	}
+	imageType := path.Base(dir)
+	if !isKnownImageType(imageType) {
+		return false
+	}
+	stem := strings.TrimSuffix(filename, path.Ext(filename))
+	variant := strings.SplitN(stem, ".", 2)[0]
+	if variant == OriginalVariant {
+		return true
+	}
+	if !strings.HasPrefix(variant, "w") {
+		return false
+	}
+	_, err := strconv.Atoi(strings.TrimPrefix(variant, "w"))
+	return err == nil
+}
+
+func isKnownImageType(imageType string) bool {
+	for _, candidate := range append(ImageTypes(), UploadImageTypes()...) {
+		if imageType == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 // VariantWidths returns the resize widths generated for an artwork type. This

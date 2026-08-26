@@ -52,6 +52,9 @@ const KEYS = [
   "artwork.storage_backend",
   "artwork.local_path",
   "artwork.seed_adoption_grace",
+  "artwork.delivery_policy",
+  "artwork.url_auth",
+  "artwork.local_ownership",
   "s3.user_db_endpoint",
   "s3.user_db_region",
   "s3.user_db_path_style",
@@ -275,6 +278,7 @@ export default function StorageSettings() {
     );
 
   const publicURLAuth = form.getValue("s3.public_url_auth") || "presigned";
+  const artworkDeliveryPolicy = form.getValue("artwork.delivery_policy") || "resilient";
 
   return (
     <div className="flex h-full flex-col">
@@ -318,6 +322,41 @@ export default function StorageSettings() {
               value={form.getValue("artwork.local_path")}
               onChange={(v) => form.setValue("artwork.local_path", v)}
               hint="Used by automatic and local modes. A restart is required after changing the path."
+            />
+            <SettingField
+              label="Artwork delivery"
+              type="select"
+              value={artworkDeliveryPolicy}
+              onChange={(v) => form.setValue("artwork.delivery_policy", v)}
+              options={[
+                { value: "resilient", label: "Resilient through Silo (Recommended)" },
+                { value: "direct", label: "Direct from storage/source" },
+              ]}
+              hint="Resilient delivery keeps images available during storage outages by serving verified fallbacks and repairing in the background. Direct delivery can reduce Silo bandwidth, but gives up automatic recovery and may expose permanent public URLs."
+            />
+            {artworkDeliveryPolicy === "direct" && (
+              <SettingField
+                label="Local direct URL authentication"
+                type="select"
+                value={form.getValue("artwork.url_auth") || "signed"}
+                onChange={(v) => form.setValue("artwork.url_auth", v)}
+                options={[
+                  { value: "signed", label: "Expiring signed URLs (Recommended)" },
+                  { value: "public", label: "Permanent public URLs" },
+                ]}
+                hint="Only affects the local backend in Direct mode. Public URLs are permanent and cacheable for one year."
+              />
+            )}
+            <SettingField
+              label="Local storage ownership"
+              type="select"
+              value={form.getValue("artwork.local_ownership") || "owned"}
+              onChange={(v) => form.setValue("artwork.local_ownership", v)}
+              options={[
+                { value: "owned", label: "Private server-owned root" },
+                { value: "shared", label: "Shared/NAS mount" },
+              ]}
+              hint="Shared/NAS mode refuses writes when its mount sentinels disappear, preventing data from landing on an uncovered host directory."
             />
             <SettingField
               label="Copied-store adoption grace"

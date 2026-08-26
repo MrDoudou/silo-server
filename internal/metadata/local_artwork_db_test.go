@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/models"
 )
 
@@ -103,5 +104,82 @@ func TestEnqueueBatchAcceptsLocalSourceDB(t *testing.T) {
 	}
 	if providerID != "local" {
 		t.Fatalf("provider_id = %q, want local", providerID)
+	}
+}
+
+func TestArtworkRepairPublicationDrainsRebuildState(t *testing.T) {
+	pool := localArtworkTestPool(t)
+	ctx := context.Background()
+	suffix := time.Now().UnixNano()
+	contentID := fmt.Sprintf("artwork-repair-%d", suffix)
+	oldPath := fmt.Sprintf("tmdb/movies/%s/poster/original.old.webp", contentID)
+	revision := fmt.Sprintf("%064x", suffix)
+	newPath := fmt.Sprintf("artwork/v1/objects/poster/%s/%s/original.webp", revision[:2], revision)
+	workerID := fmt.Sprintf("repair-worker-%d", suffix)
+	targetKeys := []string{contentID}
+
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM artwork_storage_alerts WHERE target_keys = $1`, targetKeys)
+		_, _ = pool.Exec(ctx, `DELETE FROM metadata_image_cache_jobs WHERE target_content_id = $1`, contentID)
+		_, _ = pool.Exec(ctx, `DELETE FROM artwork_revision_gc_candidates WHERE original_path = ANY($1)`, []string{oldPath, newPath})
+	})
+
+	for _, path := range []string{oldPath, newPath} {
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO artwork_revision_gc_candidates (
+				original_path, object_keys, missing_at, repair_state,
+				repair_queued_at, protected_loss_at
+			) VALUES ($1, ARRAY[$1], NOW(), 'protected_loss', NOW(), NOW())`, path); err != nil {
+			t.Fatalf("seed missing revision %q: %v", path, err)
+		}
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO artwork_storage_alerts (
+			kind, surface_name, target_keys, image_slot, original_path, message
+		) VALUES ('protected_data_loss', $1, $2, 'poster', $3, 'test loss')`,
+		artworkurl.SurfaceItemPosters, targetKeys, oldPath); err != nil {
+		t.Fatalf("seed protected-loss alert: %v", err)
+	}
+
+	repo := NewImageCacheJobRepository(pool)
+	if _, err := repo.EnqueueRepair(ctx, EnqueueImageCacheJobInput{
+		TargetType:        ImageCacheTargetItem,
+		TargetContentID:   contentID,
+		SeriesID:          contentID,
+		SourcePath:        "tmdb://movie/repair-test",
+		ProviderID:        "tmdb",
+		ProviderContentID: contentID,
+		ContentType:       "movie",
+		ImageType:         ImageCacheImagePoster,
+	}); err != nil {
+		t.Fatalf("enqueue repair: %v", err)
+	}
+	jobs, err := repo.claimDue(ctx, workerID, contentID, 1)
+	if err != nil || len(jobs) != 1 {
+		t.Fatalf("claim repair: jobs=%d err=%v", len(jobs), err)
+	}
+
+	coordinator := NewArtworkDeliveryCoordinator(pool, nil)
+	if err := coordinator.ArtworkPublished(ctx, jobs[0], oldPath, newPath); err != nil {
+		t.Fatalf("record publication: %v", err)
+	}
+	if err := repo.MarkSucceeded(ctx, jobs[0].ID, workerID); err != nil {
+		t.Fatalf("complete repair: %v", err)
+	}
+
+	var outstanding, missing, unresolved int64
+	if err := pool.QueryRow(ctx, `
+		SELECT
+			(SELECT count(*) FROM metadata_image_cache_jobs
+			 WHERE target_content_id = $1 AND repair_requested AND status IN ('queued', 'running')),
+			(SELECT count(*) FROM artwork_revision_gc_candidates
+			 WHERE original_path = ANY($2) AND missing_at IS NOT NULL AND tombstoned_at IS NULL),
+			(SELECT count(*) FROM artwork_storage_alerts
+			 WHERE target_keys = $3 AND resolved_at IS NULL)`,
+		contentID, []string{oldPath, newPath}, targetKeys).Scan(&outstanding, &missing, &unresolved); err != nil {
+		t.Fatalf("read rebuild completion gate: %v", err)
+	}
+	if outstanding != 0 || missing != 0 || unresolved != 0 {
+		t.Fatalf("completion gate did not drain: outstanding=%d missing=%d unresolved_alerts=%d", outstanding, missing, unresolved)
 	}
 }

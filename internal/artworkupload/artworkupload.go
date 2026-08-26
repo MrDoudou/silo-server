@@ -250,10 +250,10 @@ func (m *Materializer) tryAdopt(ctx context.Context, req Request, fingerprint st
 	}
 	if req.Track && m.tracker != nil {
 		if err := m.tracker.TrackArtworkRevision(ctx, adopted.OriginalKey, req.ImageType, adopted.Manifest.ObjectKeys()); err != nil {
-			return nil, false, nil
+			return nil, false, fmt.Errorf("artworkupload: track adopted revision: %w", err)
 		}
 		if err := m.tracker.RecordArtworkRevision(ctx, adopted.OriginalKey, "upload", adopted.Objects); err != nil {
-			return nil, false, nil
+			return nil, false, fmt.Errorf("artworkupload: record adopted revision: %w", err)
 		}
 	} else if !req.Track && m.tracker != nil {
 		retainer, ok := m.tracker.(UntrackedSeedRetainer)
@@ -264,9 +264,9 @@ func (m *Materializer) tryAdopt(ctx context.Context, req Request, fingerprint st
 			return nil, false, fmt.Errorf("artworkupload: retain untracked adopted seed: %w", err)
 		}
 	}
-	thumbhash, err := imageutil.Thumbhash(adopted.OriginalData)
-	if err != nil {
-		return nil, false, nil
+	thumbhash, thumbhashErr := imageutil.Thumbhash(adopted.OriginalData)
+	if thumbhashErr != nil {
+		return nil, false, fmt.Errorf("artworkupload: thumbhash adopted revision: %w", thumbhashErr)
 	}
 	artworkmetrics.Materialization("upload", "adopted")
 	variantKeys := make(map[string]string, len(adopted.Manifest.Variants))

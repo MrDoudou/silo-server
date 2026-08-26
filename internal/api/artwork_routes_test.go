@@ -65,7 +65,7 @@ func TestArtworkRouteIsPublicAndSignedWhenArtworkIsStoredLocally(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = handle.Close() })
 
-	const key = "artwork/v1/objects/poster/ab/abcdef0123/original.webp"
+	const key = "artwork/v1/objects/poster/ab/abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789/original.webp"
 	payload := []byte("stored artwork bytes")
 	if err := handle.Store.WriteImmutable(t.Context(), key, payload, artworkstore.ObjectMetadata{}); err != nil {
 		t.Fatalf("WriteImmutable: %v", err)
@@ -87,12 +87,19 @@ func TestArtworkRouteIsPublicAndSignedWhenArtworkIsStoredLocally(t *testing.T) {
 		ArtworkURLs:      resolver,
 	})
 
-	signed, err := resolver.ResolveArtworkURL(t.Context(), key)
+	resolver.SetDeliveryPolicy(func() string { return artworkurl.DeliveryPolicyDirect })
+	signed, err := resolver.ResolveTargetURL(t.Context(), artworkurl.Target{
+		Surface: artworkurl.SurfaceItemPosters, Keys: []string{"movie-1"}, Slot: "poster",
+	}.WithReference(key), "original")
 	if err != nil {
-		t.Fatalf("ResolveArtworkURL: %v", err)
+		t.Fatalf("ResolveTargetURL: %v", err)
 	}
-	if !strings.HasPrefix(signed.URL, artworkurl.RoutePrefix) {
-		t.Fatalf("resolved URL = %q, want a native signed artwork URL", signed.URL)
+	directPath, err := artworkurl.DirectPathFromKey(key)
+	if err != nil {
+		t.Fatalf("DirectPathFromKey: %v", err)
+	}
+	if !strings.HasPrefix(signed.URL, artworkurl.DirectRoutePrefix+directPath) {
+		t.Fatalf("resolved URL = %q, want a signed raw-key artwork URL", signed.URL)
 	}
 
 	rec := httptest.NewRecorder()
@@ -167,8 +174,10 @@ func TestArtworkCapabilityAndDeliveryRoutesCoexist(t *testing.T) {
 
 	for _, want := range []string{
 		"GET /api/v1/artwork/capability",
-		"GET /api/v1/artwork/{key}",
-		"HEAD /api/v1/artwork/{key}",
+		"GET /api/v1/artwork/{capability}/{variant}",
+		"HEAD /api/v1/artwork/{capability}/{variant}",
+		"GET /api/v1/artwork/*",
+		"HEAD /api/v1/artwork/*",
 	} {
 		if !registered[want] {
 			t.Fatalf("route %q is not registered", want)
@@ -176,14 +185,7 @@ func TestArtworkCapabilityAndDeliveryRoutesCoexist(t *testing.T) {
 	}
 }
 
-// A bucket-backed store delivers directly, so the API must not stand up a route
-// that proxies its bytes.
-func TestArtworkRouteIsAbsentWhenTheBackendDeliversDirectly(t *testing.T) {
-	cfg, err := config.LoadFromDB(map[string]string{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func TestS3ResolverDefaultsToTargetBoundResilientRoute(t *testing.T) {
 	signer, err := artworkurl.NewSigner("cluster-secret", func() time.Duration { return time.Hour })
 	if err != nil {
 		t.Fatalf("NewSigner: %v", err)
@@ -193,21 +195,15 @@ func TestArtworkRouteIsAbsentWhenTheBackendDeliversDirectly(t *testing.T) {
 		t.Fatalf("NewResolver: %v", err)
 	}
 
-	router := NewRouter(Dependencies{
-		Config:           cfg,
-		ArtworkStore:     &artworkstore.Handle{Backend: artworkstore.BackendS3},
-		ArtworkURLSigner: signer,
-		ArtworkURLs:      resolver,
-	})
-
-	signed, err := signer.Sign("artwork/v1/objects/poster/ab/abcdef0123/original.webp", time.Now())
+	const key = "artwork/v1/objects/poster/ab/abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789/original.webp"
+	signed, err := resolver.ResolveTargetURL(t.Context(), artworkurl.Target{
+		Surface: artworkurl.SurfaceItemPosters, Keys: []string{"movie-1"}, Slot: "poster",
+	}.WithReference(key), "original")
 	if err != nil {
-		t.Fatalf("Sign: %v", err)
+		t.Fatalf("ResolveTargetURL: %v", err)
 	}
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signed.URL, nil))
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404 (no artwork route registered)", rec.Code)
+	if !strings.HasPrefix(signed.URL, artworkurl.RoutePrefix) {
+		t.Fatalf("URL = %q, want resilient route", signed.URL)
 	}
 }
 

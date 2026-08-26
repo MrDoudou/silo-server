@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/discord"
 	evt "github.com/Silo-Server/silo-server/internal/events"
 	"github.com/Silo-Server/silo-server/internal/mail"
@@ -30,6 +32,10 @@ type UserLister interface {
 // Satisfied by *catalog.DetailService.
 type ImageURLResolver interface {
 	PresignImageURL(ctx context.Context, path, imageType, size string) string
+}
+
+type targetImageURLResolver interface {
+	PresignArtworkTargetImageURL(ctx context.Context, target artworkurl.Target, path, imageType, size string) string
 }
 
 // System bundles the user-facing release-notification services: availability
@@ -279,7 +285,7 @@ func (s *System) SetImageResolver(resolver ImageURLResolver) {
 // public provider CDN URLs when derivable, and — only on the explicit
 // "server" opt-in — a presigned URL from this server's own image storage.
 // Wired into the Discord send paths as their posterURL hook.
-func (s *System) discordPosterURL(ctx context.Context, posterPath, posterSourcePath string) string {
+func (s *System) discordPosterURL(ctx context.Context, posterPath, posterSourcePath, targetID string) string {
 	mode := s.Settings.DiscordPosterMode(ctx)
 	if mode == DiscordPostersOff {
 		return ""
@@ -287,10 +293,16 @@ func (s *System) discordPosterURL(ctx context.Context, posterPath, posterSourceP
 	if url := embedPosterURL(posterPath, posterSourcePath); url != "" {
 		return url
 	}
-	if mode != DiscordPostersServer || s.images == nil || posterPath == "" {
+	if mode != DiscordPostersServer || s.images == nil || posterPath == "" || targetID == "" {
 		return ""
 	}
-	return s.images.PresignImageURL(ctx, posterPath, "poster", "")
+	targeted, ok := s.images.(targetImageURLResolver)
+	if !ok {
+		return ""
+	}
+	return targeted.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
+		Surface: artworkurl.SurfaceItemPosters, Keys: []string{targetID}, Slot: artworkkey.ImageTypePoster,
+	}, posterPath, artworkkey.ImageTypePoster, "")
 }
 
 // PayloadForRow converts a row to its wire shape, attaching a presigned
@@ -298,7 +310,11 @@ func (s *System) discordPosterURL(ctx context.Context, posterPath, posterSourceP
 func (s *System) PayloadForRow(ctx context.Context, row DeliveryRow) DeliveryRowPayload {
 	payload := PayloadForRow(row)
 	if s != nil && s.images != nil && row.PosterPath != "" {
-		payload.PosterURL = s.images.PresignImageURL(ctx, row.PosterPath, "poster", "")
+		if targeted, ok := s.images.(targetImageURLResolver); ok && row.SeriesID != nil && *row.SeriesID != "" {
+			payload.PosterURL = targeted.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
+				Surface: artworkurl.SurfaceItemPosters, Keys: []string{*row.SeriesID}, Slot: "poster",
+			}, row.PosterPath, "poster", "")
+		}
 	}
 	return payload
 }

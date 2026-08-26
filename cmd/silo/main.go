@@ -1316,32 +1316,31 @@ func main() {
 	// artwork storage is not, so this is the single place that decides which
 	// backend the whole image pipeline, revision GC, and delivery use.
 	//
-	// Every failure here is fatal on purpose. An unwritable local root, or a
-	// store that disagrees with the recorded pin, must stop the server rather
-	// than fall back — falling back would either serve missing artwork from an
-	// empty backend or start a second divergent copy of every image. A bucket
-	// that is merely unreachable right now is not a startup failure; it
-	// degrades /ready, exactly as before. See internal/artworkstore.
+	// Reachable store-copy mismatches remain fatal configuration errors. An
+	// operationally unavailable or unwritable backend starts degraded so
+	// resilient delivery can render verified fallbacks while probes recover.
 	if needsS3 && deps.DB != nil {
 		var s3ArtworkClient artworkstore.S3Client
 		if deps.S3Public != nil {
 			s3ArtworkClient = deps.S3Public
 		}
 		artworkHandle, artworkErr := artworkstore.Open(appCtx, artworkstore.Options{
-			Backend:   cfg.Artwork.StorageBackend,
-			LocalPath: cfg.Artwork.LocalPath,
-			S3:        s3ArtworkClient,
-			Settings:  settingsRepo,
+			Backend:     cfg.Artwork.StorageBackend,
+			LocalPath:   cfg.Artwork.LocalPath,
+			LocalShared: cfg.Artwork.LocalOwnership == config.ArtworkLocalShared,
+			S3:          s3ArtworkClient,
+			Settings:    settingsRepo,
 		})
 		if artworkErr != nil {
 			log.Fatalf("artwork storage: %v", artworkErr)
 		}
 		defer func() { _ = artworkHandle.Close() }()
 		deps.ArtworkStore = artworkHandle
+		artworkHandle.StartHealthProbes(appCtx)
 		slog.Info("artwork storage opened",
 			"backend", artworkHandle.Backend,
 			"root", artworkHandle.LocalRoot(),
-			"generation", artworkHandle.Generation)
+			"generation", artworkHandle.GenerationID())
 	}
 
 	// Step 3c: Artwork URL minting. One resolver decides for every delivery
@@ -1364,18 +1363,13 @@ func main() {
 			}
 			return cfg.Artwork.URLTTL
 		}
-		directURLs, directDelivery := deps.ArtworkStore.DirectURL()
+		directURLs, _ := deps.ArtworkStore.DirectURL()
 		signer, signerErr := artworkurl.NewSigner(cfg.Auth.JWTSecret, artworkURLTTL)
-		switch {
-		case signerErr != nil && !directDelivery:
-			// A filesystem store has no other way to reach a client, so an
-			// unusable signer means no artwork at all rather than degraded
-			// artwork.
+		if signerErr != nil {
+			// Target capabilities and direct-library fallbacks require signing
+			// on every backend, including S3 and explicit direct policy.
 			log.Fatalf("artwork storage: %v", signerErr)
-		case signerErr != nil:
-			slog.Warn("artwork url signing unavailable; artwork is delivered directly by the object store",
-				"component", "app", "error", signerErr)
-		default:
+		} else {
 			artworkURLSigner = signer
 		}
 		resolver, resolverErr := artworkurl.NewResolver(directURLs, artworkURLSigner, artworkURLTTL)
@@ -1383,6 +1377,22 @@ func main() {
 			log.Fatalf("artwork storage: %v", resolverErr)
 		}
 		artworkURLs = resolver
+		resolver.SetDeliveryPolicy(func() string {
+			if deps.LiveConfig != nil {
+				if live := deps.LiveConfig(); live != nil {
+					return live.Artwork.DeliveryPolicy
+				}
+			}
+			return cfg.Artwork.DeliveryPolicy
+		})
+		resolver.SetLocalURLAuth(func() string {
+			if deps.LiveConfig != nil {
+				if live := deps.LiveConfig(); live != nil {
+					return live.Artwork.URLAuth
+				}
+			}
+			return cfg.Artwork.URLAuth
+		})
 		deps.ArtworkURLSigner = artworkURLSigner
 		deps.ArtworkURLs = artworkURLs
 
@@ -1393,7 +1403,7 @@ func main() {
 		uploads := artworkupload.NewMaterializer(deps.ArtworkStore.Store)
 		if deps.DB != nil {
 			uploads.SetRevisionTracker(catalog.NewArtworkRevisionTracker(
-				deps.DB, deps.ArtworkStore.Backend+":"+deps.ArtworkStore.Generation,
+				deps.DB, deps.ArtworkStore.Backend+":"+deps.ArtworkStore.GenerationID(),
 			))
 		}
 		deps.ArtworkUploads = uploads
@@ -1725,6 +1735,7 @@ func main() {
 		}
 		deps.ImageResolver = imageResolver
 		deps.PluginImageResolver = imageResolver
+		deps.ArtworkSourceResolver = imageResolver
 
 		staleIDRepo := metadata.NewStaleMediaIDRepository(deps.DB)
 		providerIDRepo := catalog.NewProviderIDRepository(deps.DB)
@@ -1835,7 +1846,7 @@ func main() {
 		if deps.ArtworkStore != nil {
 			imageCacher := imagecache.New(deps.ArtworkStore.Store)
 			imageCacher.SetArtworkRevisionTracker(catalog.NewArtworkRevisionTracker(
-				deps.DB, deps.ArtworkStore.Backend+":"+deps.ArtworkStore.Generation,
+				deps.DB, deps.ArtworkStore.Backend+":"+deps.ArtworkStore.GenerationID(),
 			))
 			metadataService.SetImageCacher(imageCacher)
 			imageCacheJobs := metadata.NewImageCacheJobRepository(deps.DB)
@@ -1857,6 +1868,9 @@ func main() {
 			// library's roots and sweep stale hashed local/ prefixes on re-cache.
 			// The processor host must mount the libraries, like the metadata worker.
 			metadataImageCacheProcessor.SetLibraryRootResolver(deps.FolderRepo)
+			publicationCoordinator := metadata.NewArtworkDeliveryCoordinator(deps.DB, metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.UserStoreProvider)
+			publicationCoordinator.SetStoreHealth(deps.ArtworkStore)
+			metadataImageCacheProcessor.SetArtworkPublicationObserver(publicationCoordinator)
 			// Prefix sweeps only ever apply to the legacy S3 local/ key scheme.
 			// Portable revisions are content-addressed and shared between rows,
 			// so they are never prefix-deleted; the reference-aware revision GC
@@ -2534,8 +2548,8 @@ func main() {
 			// The temp-file sweeper only exists on the filesystem backend; the
 			// nil check avoids handing the task a typed-nil interface.
 			var artworkTempSweeper tasks.ArtworkTempFileSweeper
-			if local := deps.ArtworkStore.Local(); local != nil {
-				artworkTempSweeper = local
+			if sweeper, ok := deps.ArtworkStore.Store.(tasks.ArtworkTempFileSweeper); ok {
+				artworkTempSweeper = sweeper
 			}
 			taskMgr.Register(tasks.NewCleanupArtworkRevisionsTask(
 				metadata.NewArtworkRevisionGarbageCollector(deps.DB, deps.ArtworkStore.Store),
@@ -2640,7 +2654,7 @@ func main() {
 			taskMgr.Register(tasks.NewBackfillMetadataImagesTask(metadataImageCacheProcessor))
 		}
 		if deps.ArtworkStore != nil {
-			identity := tasks.LocalArtworkStorageIdentity(deps.ArtworkStore.Generation)
+			identity := tasks.LocalArtworkStorageIdentity(deps.ArtworkStore.GenerationID())
 			if deps.ArtworkStore.Backend == artworkstore.BackendS3 {
 				identity = tasks.ArtworkStorageIdentity(cfg.S3.Public.Endpoint, cfg.S3.Public.Bucket, cfg.S3.Public.KeyPrefix)
 			}
@@ -2777,6 +2791,88 @@ func main() {
 		defer taskMgr.Stop()
 		deps.TaskManager = taskMgr
 		slog.Info("task manager started")
+		if deps.ArtworkStore != nil {
+			coordinator := metadata.NewArtworkDeliveryCoordinator(deps.DB, metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.UserStoreProvider)
+			coordinator.SetStoreHealth(deps.ArtworkStore)
+			go func() {
+				backoff := 5 * time.Second
+				for {
+					state, _ := deps.ArtworkStore.Health()
+					var persistedHealth, rebuildGeneration string
+					var enqueueComplete bool
+					err := deps.DB.QueryRow(appCtx, `SELECT store_health, rebuild_generation,
+						rebuild_enqueued_at IS NOT NULL FROM artwork_storage_accounting_state WHERE singleton`).Scan(
+						&persistedHealth, &rebuildGeneration, &enqueueComplete,
+					)
+					generation := deps.ArtworkStore.GenerationID()
+					if err == nil && persistedHealth == string(artworkstore.HealthEmptyRebuilding) && rebuildGeneration == generation && state != artworkstore.HealthEmptyRebuilding && state != artworkstore.HealthUnavailable && state != artworkstore.HealthWrongMount {
+						if probeErr := deps.ArtworkStore.ProbeNow(appCtx); probeErr == nil {
+							deps.ArtworkStore.BeginRebuild()
+							state = artworkstore.HealthEmptyRebuilding
+						}
+					}
+					if state == artworkstore.HealthEmptyRebuilding {
+						if rebuildGeneration != generation {
+							_, err = deps.DB.Exec(appCtx, `UPDATE artwork_storage_accounting_state SET
+								store_health = 'empty_rebuilding', health_changed_at = NOW(),
+								rebuild_generation = $1, rebuild_surface_name = '', rebuild_enqueued_at = NULL
+								WHERE singleton`, generation)
+							enqueueComplete = false
+						}
+						if err == nil && !enqueueComplete {
+							queued, enqueueErr := coordinator.EnqueueBulkRecovery(appCtx)
+							if enqueueErr != nil {
+								err = enqueueErr
+							} else {
+								enqueueComplete = true
+								slog.Info("artwork bulk recovery queued", "targets", queued, "generation", generation)
+							}
+						}
+						if err == nil && enqueueComplete {
+							var outstanding, protected, missing int64
+							err = deps.DB.QueryRow(appCtx, `
+								SELECT
+									(SELECT count(*) FROM metadata_image_cache_jobs WHERE repair_requested AND status IN ('queued', 'running')),
+									(SELECT count(*) FROM artwork_revision_gc_candidates WHERE repair_state = 'protected_loss' AND tombstoned_at IS NULL),
+									(SELECT count(*) FROM artwork_revision_gc_candidates WHERE missing_at IS NOT NULL AND tombstoned_at IS NULL)
+							`).Scan(&outstanding, &protected, &missing)
+							if err == nil && outstanding == 0 {
+								degraded := protected > 0 || missing > 0
+								deps.ArtworkStore.CompleteRebuild(degraded)
+								finalHealth := artworkstore.HealthHealthy
+								if degraded {
+									finalHealth = artworkstore.HealthDegraded
+								}
+								_, err = deps.DB.Exec(appCtx, `UPDATE artwork_storage_accounting_state SET
+									store_health = $1, health_changed_at = NOW() WHERE singleton`, string(finalHealth))
+							}
+						}
+					}
+					if err != nil {
+						slog.Warn("artwork recovery coordinator iteration failed", "error", err)
+					} else {
+						backoff = 5 * time.Second
+					}
+					wait := 30 * time.Second
+					if state == artworkstore.HealthEmptyRebuilding || err != nil {
+						wait = backoff
+						if backoff < 5*time.Minute {
+							backoff *= 2
+							if backoff > 5*time.Minute {
+								backoff = 5 * time.Minute
+							}
+						}
+					}
+					timer := time.NewTimer(wait)
+					select {
+					case <-appCtx.Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+				}
+			}()
+		}
 	}
 
 	// Build the ABS-compatible REST + Socket.io handler when a DB pool is
@@ -2964,6 +3060,14 @@ func main() {
 	deps.BrandingService = brandingSvc
 	server.Branding = brandingSvc
 
+	if deps.ArtworkStore != nil && artworkURLSigner != nil && deps.DB != nil {
+		deps.ArtworkDelivery = handlers.NewArtworkHandler(deps.ArtworkStore.Store, artworkURLSigner)
+		if deps.ArtworkDelivery != nil {
+			coordinator := metadata.NewArtworkDeliveryCoordinator(deps.DB, metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.UserStoreProvider)
+			coordinator.SetStoreHealth(deps.ArtworkStore)
+			deps.ArtworkDelivery.SetResilientDependencies(coordinator, deps.ArtworkSourceResolver, deps.ArtworkStore.ReportFailure)
+		}
+	}
 	router := api.NewRouter(deps)
 
 	// Step 8: Expose Prometheus metrics endpoint (not behind auth).
@@ -3056,7 +3160,7 @@ func main() {
 		var artworkStorageService *metadata.ArtworkStorageService
 		if deps.ArtworkStore != nil && artworkURLSigner != nil {
 			artworkStorageService = metadata.NewArtworkStorageService(
-				deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.Generation,
+				deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.GenerationID(),
 				!deps.UserArtworkTracked,
 			)
 			directLibraryArtwork := metadata.NewDirectLibraryArtworkResolver(deps.DB)
@@ -3198,9 +3302,7 @@ func main() {
 				compatDeps.ArtworkURLs = artworkURLs
 			}
 			if deps.ArtworkStore != nil {
-				if artworkDelivery := handlers.NewArtworkHandler(deps.ArtworkStore.Store, artworkURLSigner); artworkDelivery != nil {
-					compatDeps.ArtworkDelivery = artworkDelivery
-				}
+				compatDeps.ArtworkDelivery = deps.ArtworkDelivery
 			}
 
 			if deps.S3Public != nil {

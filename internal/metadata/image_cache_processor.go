@@ -96,6 +96,14 @@ type imageCacheBacklogReader interface {
 	GetBacklog(ctx context.Context) (ImageCacheBacklog, error)
 }
 
+type artworkPublicationObserver interface {
+	ArtworkPublished(ctx context.Context, job *models.MetadataImageCacheJob, previousPath, publishedPath string) error
+}
+
+type currentTargetCachedPathReader interface {
+	CurrentTargetCachedPath(ctx context.Context, job *models.MetadataImageCacheJob) (string, error)
+}
+
 // LibraryRootResolver reports the media folder root paths a piece of content
 // belongs to (media_folders.Paths via media_item_libraries). The processor
 // confines local file:// sources to these roots before reading them.
@@ -148,7 +156,8 @@ type ImageCacheProcessor struct {
 	// Local file:// artwork support. libraryRoots confines reads to the
 	// owning library's roots.
 	// The processor host must mount the libraries, like the metadata worker.
-	libraryRoots LibraryRootResolver
+	libraryRoots        LibraryRootResolver
+	publicationObserver artworkPublicationObserver
 
 	enabled atomic.Bool
 
@@ -161,6 +170,12 @@ type ImageCacheProcessor struct {
 	// prevent them from racing each other through the shared durable queue. A
 	// channel gate keeps waiting cancellable, unlike a sync.Mutex.
 	runGate chan struct{}
+}
+
+func (p *ImageCacheProcessor) SetArtworkPublicationObserver(observer artworkPublicationObserver) {
+	if p != nil {
+		p.publicationObserver = observer
+	}
 }
 
 // SetLibraryRootResolver wires the folder repository used to confine local
@@ -783,16 +798,28 @@ func (p *ImageCacheProcessor) processOne(ctx context.Context, job *models.Metada
 // finishJobWithTargetUpdate persists the cached path/thumbhash to the job's
 // target row and marks the job terminal, setting processResult.outcome.
 func (p *ImageCacheProcessor) finishJobWithTargetUpdate(ctx context.Context, job *models.MetadataImageCacheJob, cachedPath, thumbhash string, processResult *imageCacheProcessResult) {
+	previousPath := ""
+	if reader, ok := p.jobs.(currentTargetCachedPathReader); ok {
+		previousPath, _ = reader.CurrentTargetCachedPath(ctx, job)
+	}
 	updated, err := p.updateTargetArtwork(ctx, job, cachedPath, thumbhash)
 	if err != nil {
 		p.markFailed(ctx, job, err.Error())
 		processResult.outcome = "failed"
 		return
 	}
-	p.markSucceeded(ctx, job)
 	if updated {
+		if p.publicationObserver != nil {
+			if err := p.publicationObserver.ArtworkPublished(ctx, job, previousPath, cachedPath); err != nil {
+				p.markFailed(ctx, job, "reconcile artwork repair state: "+err.Error())
+				processResult.outcome = "failed"
+				return
+			}
+		}
+		p.markSucceeded(ctx, job)
 		processResult.outcome = "succeeded"
 	} else {
+		p.markSucceeded(ctx, job)
 		processResult.outcome = "skipped"
 	}
 }
@@ -1023,6 +1050,9 @@ type ConfinedLocalArtwork struct {
 	Data        []byte
 	Fingerprint string
 	MediaType   string
+	Path        string
+	ModTime     time.Time
+	Size        int64
 }
 
 type ConfinedLocalArtworkFile struct {
@@ -1094,6 +1124,9 @@ func ReadConfinedLocalArtwork(source string, roots []string) (ConfinedLocalArtwo
 		Data:        data,
 		Fingerprint: hex.EncodeToString(digest[:]),
 		MediaType:   firstNonEmpty(opened.MediaType, http.DetectContentType(data)),
+		Path:        opened.Path,
+		ModTime:     opened.Info.ModTime(),
+		Size:        opened.Info.Size(),
 	}, nil
 }
 

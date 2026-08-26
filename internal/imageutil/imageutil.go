@@ -10,11 +10,33 @@ import (
 	"image/color"
 	_ "image/jpeg"
 	_ "image/png"
+	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/h2non/bimg"
 	"go.n16f.net/thumbhash"
 )
+
+// ValidateImage performs the same bounded dimension validation used before
+// encoding and returns a safe image media type for resilient source delivery.
+func ValidateImage(data []byte) (string, error) {
+	if len(data) == 0 {
+		return "", fmt.Errorf("imageutil: empty image")
+	}
+	size, err := bimg.NewImage(data).Size()
+	if err != nil {
+		return "", fmt.Errorf("imageutil: invalid image: %w", err)
+	}
+	if err := checkSourceDimensions(size.Width, size.Height); err != nil {
+		return "", err
+	}
+	mediaType := strings.ToLower(strings.TrimSpace(http.DetectContentType(data)))
+	if !strings.HasPrefix(mediaType, "image/") || mediaType == "image/svg+xml" {
+		return "", fmt.Errorf("imageutil: unsupported image media type %q", mediaType)
+	}
+	return mediaType, nil
+}
 
 const (
 	webpQuality                = 90

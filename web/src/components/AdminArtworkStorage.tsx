@@ -78,6 +78,7 @@ export default function AdminArtworkStorage() {
     );
 
   const data = storage.data;
+  const storeHealth = data.store_health ?? "unknown";
   const libraryNames = new Map(libraries.map((library) => [library.id, library.name]));
   const snapshotAge = data.snapshot_at
     ? `${Math.max(0, Math.round((Date.now() - Date.parse(data.snapshot_at)) / 60_000))} minutes ago`
@@ -99,8 +100,8 @@ export default function AdminArtworkStorage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Badge variant={data.health === "ready" ? "secondary" : "destructive"}>
-            {data.health}
+          <Badge variant={storeHealth === "healthy" ? "secondary" : "destructive"}>
+            {storeHealth.replaceAll("_", " ")}
           </Badge>
           <Badge variant={data.complete ? "secondary" : "outline"}>
             {data.complete ? "Complete" : "Incomplete"}
@@ -126,6 +127,11 @@ export default function AdminArtworkStorage() {
         <Metric label="Free space" value={formatArtworkBytes(data.free_space_bytes)} />
         <Metric label="Protected" value={formatArtworkBytes(data.total.protected_bytes)} />
         <Metric label="Pending GC" value={formatArtworkBytes(data.total.pending_gc_bytes)} />
+        <Metric label="Missing" value={formatArtworkBytes(data.total.missing_bytes)} />
+        <Metric
+          label="Repair pending"
+          value={formatArtworkBytes(data.total.repair_pending_bytes)}
+        />
         <Metric label="Reclaimable" value={formatArtworkBytes(data.total.reclaimable_bytes)} />
         <Metric
           label="Retained unverifiable"
@@ -135,6 +141,15 @@ export default function AdminArtworkStorage() {
         <Metric label="Objects" value={data.total.object_count.toLocaleString()} />
         <Metric label="Snapshot" value={snapshotAge} />
       </div>
+
+      {(storeHealth !== "healthy" || (data.total.missing_revision_count ?? 0) > 0) && (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+          <strong>Artwork recovery status.</strong>{" "}
+          {(data.total.repairing_revision_count ?? 0).toLocaleString()} revision(s) queued or
+          repairing; {(data.total.protected_loss_count ?? 0).toLocaleString()} protected
+          selection(s) need restoration or replacement.
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <Button
@@ -168,6 +183,7 @@ export default function AdminArtworkStorage() {
               <th>Exclusive</th>
               <th>Shared (non-additive)</th>
               <th>Reclaimable</th>
+              <th>Recovery</th>
             </tr>
           </thead>
           <tbody>
@@ -180,6 +196,10 @@ export default function AdminArtworkStorage() {
                 <td>{formatArtworkBytes(library.exclusive_bytes)}</td>
                 <td>{formatArtworkBytes(library.shared_bytes)}</td>
                 <td>{formatArtworkBytes(library.reclaimable_bytes)}</td>
+                <td>
+                  {library.repairing_revisions ?? 0} repairing · {library.protected_losses ?? 0}{" "}
+                  protected loss
+                </td>
               </tr>
             ))}
           </tbody>

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkupload"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/collectionutil"
 	"github.com/Silo-Server/silo-server/internal/s3client"
@@ -1094,8 +1096,12 @@ func (h *CollectionHandler) processCollectionPoster(
 
 // userCollectionPosterURL resolves the card-sized variant of a stored user
 // collection poster, mirroring the admin pipeline. Empty paths return "".
-func (h *CollectionHandler) userCollectionPosterURL(ctx context.Context, path string) string {
-	return resolveStoredCardImageURL(ctx, h.ArtworkURLs, path)
+func (h *CollectionHandler) userCollectionPosterURL(ctx context.Context, userID int, collectionID, path string) string {
+	return resolveTargetStoredImageURL(ctx, h.ArtworkURLs, artworkurl.Target{
+		Surface: artworkurl.SurfaceUserCollectionPosters,
+		Keys:    []string{strconv.Itoa(userID), collectionID},
+		Slot:    "collection-poster",
+	}, path, "w300")
 }
 
 // toCollectionResponse mirrors the package-level helper but presigns artwork
@@ -1104,6 +1110,6 @@ func (h *CollectionHandler) userCollectionPosterURL(ctx context.Context, path st
 // presign capability.
 func (h *CollectionHandler) toCollectionResponse(r *http.Request, c userstore.Collection) collectionResponse {
 	resp := toCollectionResponse(c)
-	resp.PosterURL = h.userCollectionPosterURL(r.Context(), c.PosterURL)
+	resp.PosterURL = h.userCollectionPosterURL(r.Context(), apimw.GetUserID(r.Context()), c.ID, c.PosterURL)
 	return resp
 }

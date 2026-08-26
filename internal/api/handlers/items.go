@@ -15,11 +15,10 @@ import (
 
 	"github.com/Silo-Server/silo-server/internal/access"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
-	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/auth"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	evt "github.com/Silo-Server/silo-server/internal/events"
-	"github.com/Silo-Server/silo-server/internal/imagesize"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 	"github.com/Silo-Server/silo-server/internal/models"
 	"github.com/Silo-Server/silo-server/internal/overlays"
@@ -940,7 +939,7 @@ func (h *ItemsHandler) writeCatalogBrowseResponse(w http.ResponseWriter, r *http
 	episodeMetadata := h.listEpisodeBrowseMetadata(r.Context(), result.Items)
 	items := make([]itemListResponse, 0, len(result.Items))
 	for _, item := range result.Items {
-		resp := h.toItemListResponseWithOverlay(r, item, overlaySummaries[item.ContentID], userStates[item.ContentID], filter.ImageSize)
+		resp := h.toItemListResponseWithOverlay(r, item, overlaySummaries[item.ContentID], userStates[item.ContentID])
 		// The resolver validated the item's own hint against this profile, so
 		// its answer replaces the unvalidated one carried by the item.
 		resp.PlayContentID = playTargets[playableTargetKeyForItem(item)]
@@ -1087,22 +1086,20 @@ func (h *ItemsHandler) writeCatalogFiltersResponse(w http.ResponseWriter, r *htt
 	return true
 }
 
-// toItemListResponse converts a MediaItem to an itemListResponse with presigned
-// URLs at the size the caller's request asked for.
-func (h *ItemsHandler) toItemListResponse(r *http.Request, item *models.MediaItem, size imagesize.Size) itemListResponse {
-	return h.toItemListResponseWithOverlay(r, item, nil, nil, size)
+// toItemListResponse converts a MediaItem to an itemListResponse with presigned URLs.
+func (h *ItemsHandler) toItemListResponse(r *http.Request, item *models.MediaItem) itemListResponse {
+	return h.toItemListResponseWithOverlay(r, item, nil, nil)
 }
 
-func (h *ItemsHandler) toItemListResponseWithOverlay(r *http.Request, item *models.MediaItem, overlaySummary *models.OverlaySummary, userState *itemUserStateResponse, size imagesize.Size) itemListResponse {
+func (h *ItemsHandler) toItemListResponseWithOverlay(r *http.Request, item *models.MediaItem, overlaySummary *models.OverlaySummary, userState *itemUserStateResponse) itemListResponse {
 	if h.detailSvc != nil {
 		if localized, err := h.detailSvc.LocalizeItemModel(r.Context(), item, h.accessFilterOrDeny(r)); err == nil && localized != nil {
 			item = localized
 		}
 	}
 	resp := itemListResponseShell(item, overlaySummary, userState)
-	hint := requestVariantHint("card", size)
-	resp.PosterURL = h.presignURL(r, sizedCardPath(item.PosterPath, artworkkey.ImagePoster, size), hint)
-	resp.BackdropURL = h.presignURL(r, sizedCardBackdropPath(item.BackdropPath, size), hint)
+	resp.PosterURL = h.itemArtworkURL(r, item.ContentID, artworkurl.SurfaceItemPosters, "poster", item.PosterPath, "w300")
+	resp.BackdropURL = h.itemArtworkURL(r, item.ContentID, artworkurl.SurfaceItemBackdrops, "backdrop", item.BackdropPath, "w300")
 	return resp
 }
 
@@ -1159,51 +1156,43 @@ func (h *ItemsHandler) localizeItemListModels(ctx context.Context, items []*mode
 	return localized
 }
 
-func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, items []*models.MediaItem, size imagesize.Size) map[string]itemListImageURLs {
+func (h *ItemsHandler) itemListCardImageURLs(ctx context.Context, items []*models.MediaItem) map[string]itemListImageURLs {
 	urls := make(map[string]itemListImageURLs, len(items))
 	if h == nil || h.detailSvc == nil || len(items) == 0 {
 		return urls
 	}
 
 	type pendingImages struct {
-		contentID    string
-		posterPath   string
-		backdropPath string
+		contentID string
+		poster    artworkurl.Target
+		backdrop  artworkurl.Target
 	}
 
 	pending := make([]pendingImages, 0, len(items))
-	paths := make([]string, 0, len(items)*2)
-	seenPaths := make(map[string]struct{}, len(items)*2)
-	addPath := func(path string) {
-		if path == "" || path == "-" {
-			return
-		}
-		if _, ok := seenPaths[path]; ok {
-			return
-		}
-		seenPaths[path] = struct{}{}
-		paths = append(paths, path)
-	}
+	targets := make([]artworkurl.Target, 0, len(items)*2)
 
 	for _, item := range items {
 		if item == nil || item.ContentID == "" {
 			continue
 		}
 		images := pendingImages{
-			contentID:    item.ContentID,
-			posterPath:   sizedCardPath(item.PosterPath, artworkkey.ImagePoster, size),
-			backdropPath: sizedCardBackdropPath(item.BackdropPath, size),
+			contentID: item.ContentID,
+			poster: artworkurl.Target{
+				Surface: artworkurl.SurfaceItemPosters, Keys: []string{item.ContentID}, Slot: artworkImagePoster,
+			}.WithReference(item.PosterPath),
+			backdrop: artworkurl.Target{
+				Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{item.ContentID}, Slot: artworkImageBackdrop,
+			}.WithReference(item.BackdropPath),
 		}
 		pending = append(pending, images)
-		addPath(images.posterPath)
-		addPath(images.backdropPath)
+		targets = append(targets, images.poster, images.backdrop)
 	}
 
-	resolved := h.detailSvc.PresignURLsWithExpiry(ctx, paths, requestVariantHint("card", size))
+	resolved := h.detailSvc.PresignArtworkTargetsWithExpiry(ctx, targets, "w300")
 	for _, images := range pending {
 		urls[images.contentID] = itemListImageURLs{
-			posterURL:   resolved[images.posterPath].URL,
-			backdropURL: resolved[images.backdropPath].URL,
+			posterURL:   resolved[images.poster.CacheKey()].URL,
+			backdropURL: resolved[images.backdrop.CacheKey()].URL,
 		}
 	}
 	return urls
@@ -1297,9 +1286,25 @@ func (h *ItemsHandler) listItemUserStates(r *http.Request, items []*models.Media
 	return states
 }
 
+// toEpisodeResponse converts an Episode model to an API response.
+func (h *ItemsHandler) toEpisodeResponse(r *http.Request, ep *models.Episode) episodeResponse {
+	return h.toEpisodeResponseWithFallback(r, ep, episodeImageFallback{})
+}
+
+func (h *ItemsHandler) toEpisodeResponseWithFallback(r *http.Request, ep *models.Episode, fallback episodeImageFallback) episodeResponse {
+	if h.detailSvc != nil {
+		if localized, err := h.detailSvc.LocalizeEpisodeModel(r.Context(), ep, h.accessFilterOrDeny(r)); err == nil && localized != nil {
+			ep = localized
+		}
+	}
+	resp, stillPath := episodeResponseShell(ep, fallback)
+	resp.StillURL = h.itemArtworkURL(r, ep.ContentID, artworkurl.SurfaceEpisodeStills, "still", stillPath, "w300")
+	return resp
+}
+
 // episodeResponseShell maps an already-localized episode onto the response
 // shape, returning the card-variant still path for the caller to presign.
-func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback, size imagesize.Size) (episodeResponse, string) {
+func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback) (episodeResponse, string) {
 	stillPath := ep.StillPath
 	stillThumbhash := ep.StillThumbhash
 	if strings.TrimSpace(stillPath) == "" && strings.TrimSpace(fallback.Path) != "" {
@@ -1323,7 +1328,7 @@ func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback, siz
 		resp.AirDate = ep.AirDate.Format("2006-01-02")
 	}
 
-	return resp, sizedCardPath(stillPath, artworkkey.ImageStill, size)
+	return resp, cardThumbnailPath(stillPath)
 }
 
 // buildEpisodeResponses converts episodes to API responses using batched
@@ -1332,7 +1337,6 @@ func episodeResponseShell(ep *models.Episode, fallback episodeImageFallback, siz
 func (h *ItemsHandler) buildEpisodeResponses(r *http.Request, episodes []*models.Episode) []episodeResponse {
 	ctx := r.Context()
 	filter := h.accessFilterOrDeny(r)
-	size := filter.ImageSize
 
 	if h.detailSvc != nil {
 		if localized, err := h.detailSvc.LocalizeEpisodeModels(ctx, episodes, filter); err == nil && len(localized) == len(episodes) {
@@ -1357,14 +1361,25 @@ func (h *ItemsHandler) buildEpisodeResponses(r *http.Request, episodes []*models
 		if ep == nil {
 			continue
 		}
-		shell, stillPath := episodeResponseShell(ep, fallbacks[ep.SeriesID], size)
+		shell, stillPath := episodeResponseShell(ep, fallbacks[ep.SeriesID])
 		resp = append(resp, shell)
 		stillPaths = append(stillPaths, stillPath)
 	}
 
 	stillURLs := map[string]catalog.ResolvedImageURL{}
 	if h.detailSvc != nil {
-		stillURLs = h.detailSvc.PresignURLsWithExpiry(ctx, stillPaths, requestVariantHint("card", size))
+		targets := make([]artworkurl.Target, 0, len(resp))
+		for i := range resp {
+			targets = append(targets, artworkurl.Target{
+				Surface: artworkurl.SurfaceEpisodeStills,
+				Keys:    []string{resp[i].ContentID},
+				Slot:    artworkImageStill,
+			}.WithReference(stillPaths[i]))
+		}
+		stillURLs = h.detailSvc.PresignArtworkTargetsWithExpiry(ctx, targets, "w300")
+		for i := range resp {
+			stillPaths[i] = targets[i].CacheKey()
+		}
 	}
 	for i := range resp {
 		resp[i].StillURL = stillURLs[stillPaths[i]].URL
@@ -1868,20 +1883,25 @@ func maxFileBitrate(files []*models.MediaFile) int {
 	return maxBitrate
 }
 
+// toSeasonResponse converts a Season model to an API response.
+func (h *ItemsHandler) toSeasonResponse(r *http.Request, seriesID string, s *models.Season) seasonResponse {
+	episodes, _ := h.episodeRepo.ListBySeason(r.Context(), seriesID, s.SeasonNumber)
+	return h.toSeasonResponseFromEpisodes(r, seriesID, s, episodes, h.getAggregateUserData(r, episodes))
+}
+
 func (h *ItemsHandler) toSeasonResponseFromEpisodes(
 	r *http.Request,
 	seriesID string,
 	s *models.Season,
 	episodes []*models.Episode,
 	userData *catalog.SeasonUserData,
-	size imagesize.Size,
 ) seasonResponse {
 	if h.detailSvc != nil {
 		if localized, err := h.detailSvc.LocalizeSeasonModel(r.Context(), s, h.accessFilterOrDeny(r)); err == nil && localized != nil {
 			s = localized
 		}
 	}
-	return h.seasonResponseFromEpisodes(r, s, episodes, userData, size)
+	return h.seasonResponseFromEpisodes(r, s, episodes, userData)
 }
 
 // seasonResponseFromEpisodes maps a season that has already been localized.
@@ -1892,7 +1912,6 @@ func (h *ItemsHandler) seasonResponseFromEpisodes(
 	s *models.Season,
 	episodes []*models.Episode,
 	userData *catalog.SeasonUserData,
-	size imagesize.Size,
 ) seasonResponse {
 	resp := seasonResponse{
 		ContentID:       s.ContentID,
@@ -1906,7 +1925,7 @@ func (h *ItemsHandler) seasonResponseFromEpisodes(
 	if s.AirDate != nil {
 		resp.AirDate = s.AirDate.Format("2006-01-02")
 	}
-	resp.PosterURL = h.presignURL(r, sizedPosterPath(s.PosterPath, size), requestVariantHint("featured", size))
+	resp.PosterURL = h.itemArtworkURL(r, s.ContentID, artworkurl.SurfaceSeasonPosters, "poster", s.PosterPath, "w500")
 	resp.UserData = userData
 
 	return resp
@@ -2164,6 +2183,17 @@ func (h *ItemsHandler) presignURL(r *http.Request, path string, variant string) 
 	return ""
 }
 
+func (h *ItemsHandler) itemArtworkURL(r *http.Request, contentID, surface, slot, path, variant string) string {
+	if h.detailSvc == nil {
+		return ""
+	}
+	return h.detailSvc.PresignArtworkTargetImageURL(r.Context(), artworkurl.Target{
+		Surface: surface,
+		Keys:    []string{contentID},
+		Slot:    slot,
+	}, path, slot, variant)
+}
+
 // HandleFilterItems handles POST /items/filter with a full rule-group filter body.
 func (h *ItemsHandler) HandleFilterItems(w http.ResponseWriter, r *http.Request) {
 	writeDeprecatedReadHeaders(w, "/api/v1/catalog/query")
@@ -2284,24 +2314,12 @@ func (h *ItemsHandler) accessFilter(r *http.Request) (catalog.AccessFilter, erro
 // accessFilterOrError resolves the viewer's access filter for a handler that
 // owns the response. An unresolvable policy is answered with 500 rather than
 // an unrestricted listing.
-//
-// It is also where the request's image_size preference is read, because it is
-// the single choke point every catalog read handler already goes through, and
-// the size applies to the whole response. An unrecognized size is a 400: a
-// client that sends one has a bug, and silently serving the default size would
-// hide it.
 func (h *ItemsHandler) accessFilterOrError(w http.ResponseWriter, r *http.Request) (catalog.AccessFilter, bool) {
 	filter, err := h.accessFilter(r)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to resolve user access")
 		return catalog.AccessFilter{}, false
 	}
-	size, err := imagesize.FromRequest(r)
-	if err != nil {
-		writeInvalidImageSize(w)
-		return catalog.AccessFilter{}, false
-	}
-	filter.ImageSize = size
 	return filter, true
 }
 
@@ -2309,16 +2327,11 @@ func (h *ItemsHandler) accessFilterOrError(w http.ResponseWriter, r *http.Reques
 // channel (localization, per-item file listings). An unresolvable policy
 // yields a filter that allows nothing, so the enrichment degrades instead of
 // widening access; the request's primary query has already failed closed.
-//
-// The image size is carried too, so a helper holding a filter never has to
-// re-read the query string. An unparseable value reads as no preference here;
-// the entrypoint that owns the response has already answered 400.
 func (h *ItemsHandler) accessFilterOrDeny(r *http.Request) catalog.AccessFilter {
 	filter, err := h.accessFilter(r)
 	if err != nil {
-		return catalog.AccessFilter{AllowedLibraryIDs: []int{}, ImageSize: requestImageSize(r)}
+		return catalog.AccessFilter{AllowedLibraryIDs: []int{}}
 	}
-	filter.ImageSize = requestImageSize(r)
 	return filter
 }
 

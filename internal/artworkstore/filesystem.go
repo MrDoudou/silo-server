@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -59,9 +60,23 @@ const (
 type FilesystemStore struct {
 	rootPath string
 
-	mu     sync.Mutex
-	root   *os.Root
-	closed bool
+	mu               sync.Mutex
+	root             *os.Root
+	closed           bool
+	shared           bool
+	sharedGeneration string
+}
+
+func (s *FilesystemStore) configureShared() {
+	s.mu.Lock()
+	s.shared = true
+	s.mu.Unlock()
+}
+
+func (s *FilesystemStore) setSharedGeneration(generation string) {
+	s.mu.Lock()
+	s.sharedGeneration = generation
+	s.mu.Unlock()
 }
 
 var _ Store = (*FilesystemStore)(nil)
@@ -122,8 +137,50 @@ func (s *FilesystemStore) openRoot() (*os.Root, error) {
 	if s.root != nil {
 		return s.root, nil
 	}
-	if err := os.MkdirAll(s.rootPath, storeDirPerm); err != nil {
+	if s.shared {
+		if _, err := os.Stat(s.rootPath); err != nil {
+			return nil, fmt.Errorf("%w: opening shared store root %s: %w", ErrWrongMount, s.rootPath, err)
+		}
+	} else if err := os.MkdirAll(s.rootPath, storeDirPerm); err != nil {
 		return nil, fmt.Errorf("artworkstore: creating store root %s: %w", s.rootPath, err)
+	}
+	root, err := os.OpenRoot(s.rootPath)
+	if err != nil {
+		return nil, fmt.Errorf("artworkstore: opening store root %s: %w", s.rootPath, err)
+	}
+	if s.shared && s.sharedGeneration != "" {
+		marker, markerErr := readMarker(root)
+		if markerErr != nil || marker.ID != s.sharedGeneration {
+			_ = root.Close()
+			return nil, ErrWrongMount
+		}
+		file, _, formatErr := openRegular(root, formatMarkerFileName)
+		if formatErr != nil {
+			_ = root.Close()
+			return nil, ErrWrongMount
+		}
+		data, readErr := io.ReadAll(io.LimitReader(file, 128))
+		_ = file.Close()
+		if readErr != nil || string(data) != formatMarkerContents {
+			_ = root.Close()
+			return nil, ErrWrongMount
+		}
+	}
+	s.root = root
+	return root, nil
+}
+
+func (s *FilesystemStore) openRootExisting() (*os.Root, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil, errors.New("artworkstore: filesystem store is closed")
+	}
+	if _, err := os.Stat(s.rootPath); err != nil {
+		return nil, fmt.Errorf("artworkstore: opening existing store root %s: %w", s.rootPath, err)
+	}
+	if s.root != nil {
+		return s.root, nil
 	}
 	root, err := os.OpenRoot(s.rootPath)
 	if err != nil {
@@ -131,6 +188,15 @@ func (s *FilesystemStore) openRoot() (*os.Root, error) {
 	}
 	s.root = root
 	return root, nil
+}
+
+func (s *FilesystemStore) resetRoot() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.root != nil {
+		_ = s.root.Close()
+	}
+	s.root = nil
 }
 
 // Probe creates the root if needed and proves it is a writable directory. An

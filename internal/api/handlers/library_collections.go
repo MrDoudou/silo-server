@@ -27,6 +27,7 @@ import (
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/artworkupload"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/collage"
 	"github.com/Silo-Server/silo-server/internal/collections/templates"
@@ -853,7 +854,7 @@ func (h *LibraryCollectionHandler) HandleListLibraryUserCollections(w http.Respo
 		collections = []usercollections.ServerVisibleCollection{}
 	}
 	for i := range collections {
-		collections[i].PosterURL = h.collectionArtworkURL(r, collections[i].PosterPath)
+		collections[i].PosterURL = h.userCollectionArtworkURL(r, userID, collections[i].ID, collections[i].PosterPath)
 	}
 	writeJSON(w, http.StatusOK, serverUserCollectionsListResponse{Collections: collections})
 }
@@ -914,7 +915,7 @@ func (h *LibraryCollectionHandler) HandleListLibraryCollections(w http.ResponseW
 			}
 			sorted := applyUserCollectionSort(userCollections, g.DefaultSortMode)
 			for i := range sorted {
-				posterURL := h.collectionArtworkURL(r, sorted[i].PosterPath)
+				posterURL := h.userCollectionArtworkURL(r, userID, sorted[i].ID, sorted[i].PosterPath)
 				creatorProfileID := sorted[i].CreatorProfileID
 				colls = append(colls, libraryTabCollection{
 					ID:               sorted[i].ID,
@@ -932,7 +933,7 @@ func (h *LibraryCollectionHandler) HandleListLibraryCollections(w http.ResponseW
 				colls = append(colls, libraryTabCollection{
 					ID:              c.ID,
 					Title:           c.Title,
-					PosterURL:       h.collectionArtworkURL(r, c.PosterURL),
+					PosterURL:       h.collectionArtworkURL(r, c.ID, c.PosterURL, "collection-poster"),
 					PosterThumbhash: c.PosterThumbhash,
 					ItemCount:       c.ItemCount,
 					Featured:        c.Featured,
@@ -959,7 +960,7 @@ func (h *LibraryCollectionHandler) HandleListLibraryCollections(w http.ResponseW
 			uColls = append(uColls, libraryTabCollection{
 				ID:              c.ID,
 				Title:           c.Title,
-				PosterURL:       h.collectionArtworkURL(r, c.PosterURL),
+				PosterURL:       h.collectionArtworkURL(r, c.ID, c.PosterURL, "collection-poster"),
 				PosterThumbhash: c.PosterThumbhash,
 				ItemCount:       c.ItemCount,
 				Featured:        c.Featured,
@@ -3307,8 +3308,10 @@ func (h *LibraryCollectionHandler) toItemListResponse(r *http.Request, item *mod
 		PosterThumbhash:   item.PosterThumbhash,
 		BackdropThumbhash: item.BackdropThumbhash,
 	}
-	resp.PosterURL = h.presignURL(r, cardThumbnailPath(item.PosterPath), "card")
-	resp.BackdropURL = h.presignURL(r, cardThumbnailPath(item.BackdropPath), "card")
+	if h.detailSvc != nil {
+		resp.PosterURL = h.detailSvc.PresignArtworkTargetImageURL(r.Context(), artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{item.ContentID}, Slot: "poster"}, item.PosterPath, "poster", "small")
+		resp.BackdropURL = h.detailSvc.PresignArtworkTargetImageURL(r.Context(), artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{item.ContentID}, Slot: "backdrop"}, item.BackdropPath, "backdrop", "small")
+	}
 	return resp
 }
 
@@ -3320,8 +3323,22 @@ func (h *LibraryCollectionHandler) presignURL(r *http.Request, path string, vari
 }
 
 // collectionArtworkURL resolves stored collection artwork at card size.
-func (h *LibraryCollectionHandler) collectionArtworkURL(r *http.Request, path string) string {
-	return resolveStoredCardImageURL(r.Context(), h.ArtworkURLs, path)
+func (h *LibraryCollectionHandler) collectionArtworkURL(r *http.Request, collectionID, path, slot string) string {
+	surface := artworkurl.SurfaceCollectionPosters
+	if slot == "collection-backdrop" {
+		surface = artworkurl.SurfaceCollectionBackdrops
+	}
+	return resolveTargetStoredImageURL(r.Context(), h.ArtworkURLs, artworkurl.Target{
+		Surface: surface, Keys: []string{collectionID}, Slot: slot,
+	}, path, "w300")
+}
+
+func (h *LibraryCollectionHandler) userCollectionArtworkURL(r *http.Request, userID int, collectionID, path string) string {
+	return resolveTargetStoredImageURL(r.Context(), h.ArtworkURLs, artworkurl.Target{
+		Surface: artworkurl.SurfaceUserCollectionPosters,
+		Keys:    []string{strconv.Itoa(userID), collectionID},
+		Slot:    artworkImageCollectionPoster,
+	}, path, "w300")
 }
 
 func (h *LibraryCollectionHandler) toLibraryCollectionResponse(r *http.Request, collection *models.LibraryCollection) libraryCollectionResponse {
@@ -3337,8 +3354,8 @@ func (h *LibraryCollectionHandler) toLibraryCollectionResponse(r *http.Request, 
 		SortOrder:         collection.SortOrder,
 		GroupID:           collection.GroupID,
 		Featured:          collection.Featured,
-		PosterURL:         h.collectionArtworkURL(r, collection.PosterURL),
-		BackdropURL:       h.collectionArtworkURL(r, collection.BackdropURL),
+		PosterURL:         h.collectionArtworkURL(r, collection.ID, collection.PosterURL, "collection-poster"),
+		BackdropURL:       h.collectionArtworkURL(r, collection.ID, collection.BackdropURL, "collection-backdrop"),
 		PosterThumbhash:   collection.PosterThumbhash,
 		BackdropThumbhash: collection.BackdropThumbhash,
 		SourceURL:         collection.SourceURL,

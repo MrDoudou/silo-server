@@ -50,6 +50,18 @@ const (
 	ArtworkRemoteMaterializationKey = "artwork.remote_materialization"
 	ArtworkURLTTLKey                = "artwork.url_ttl"
 	ArtworkSeedAdoptionGraceKey     = "artwork.seed_adoption_grace"
+	ArtworkDeliveryPolicyKey        = "artwork.delivery_policy"
+	ArtworkURLAuthKey               = "artwork.url_auth"
+	ArtworkLocalOwnershipKey        = "artwork.local_ownership"
+)
+
+const (
+	ArtworkDeliveryResilient = "resilient"
+	ArtworkDeliveryDirect    = "direct"
+	ArtworkURLAuthSigned     = "signed"
+	ArtworkURLAuthPublic     = "public"
+	ArtworkLocalOwned        = "owned"
+	ArtworkLocalShared       = "shared"
 )
 
 // Accepted artwork.storage_backend values. "auto" prefers a configured public
@@ -138,6 +150,9 @@ var adminSettingDefaults = map[string]string{
 	ArtworkLocalPathKey:         DefaultArtworkLocalPath,
 	ArtworkURLTTLKey:            "4h",
 	ArtworkSeedAdoptionGraceKey: "30d",
+	ArtworkDeliveryPolicyKey:    ArtworkDeliveryResilient,
+	ArtworkURLAuthKey:           ArtworkURLAuthSigned,
+	ArtworkLocalOwnershipKey:    ArtworkLocalOwned,
 	// artwork.remote_materialization has no static default: an installation
 	// that explicitly stored metadata.cache_images=false adopts passthrough
 	// instead. The upgrade mapping lives in LoadFromDB, and the effective
@@ -571,6 +586,21 @@ func NormalizeAdminSetting(key, raw string) (string, error) {
 			return "", nil
 		}
 		return normalizeAdminEnum(key, value, ArtworkMaterializationSelected, ArtworkMaterializationPassthrough)
+	case ArtworkDeliveryPolicyKey:
+		if value == "" {
+			return "", nil
+		}
+		return normalizeAdminEnum(key, value, ArtworkDeliveryResilient, ArtworkDeliveryDirect)
+	case ArtworkURLAuthKey:
+		if value == "" {
+			return "", nil
+		}
+		return normalizeAdminEnum(key, value, ArtworkURLAuthSigned, ArtworkURLAuthPublic)
+	case ArtworkLocalOwnershipKey:
+		if value == "" {
+			return "", nil
+		}
+		return normalizeAdminEnum(key, value, ArtworkLocalOwned, ArtworkLocalShared)
 	case ArtworkURLTTLKey, ArtworkSeedAdoptionGraceKey:
 		if value == "" {
 			return "", nil

@@ -220,6 +220,24 @@ func TestArtworkSeedAdoptionMigrationPinsLifecycleAndSerialization(t *testing.T)
 	}
 }
 
+func TestArtworkResilientDeliveryMigrationPinsLossAndRebuildState(t *testing.T) {
+	body, err := os.ReadFile("../../migrations/sql/20260826000100_artwork_resilient_delivery.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := string(body)
+	for _, want := range []string{
+		"missing_at TIMESTAMPTZ", "repair_state TEXT", "protected_loss_at TIMESTAMPTZ",
+		"store_health TEXT", "missing_bytes BIGINT", "repair_pending_bytes BIGINT",
+		"rebuild_generation TEXT", "rebuild_surface_name TEXT", "rebuild_enqueued_at TIMESTAMPTZ",
+		"artwork_storage_alerts",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("resilient-delivery migration is missing %q", want)
+		}
+	}
+}
+
 func TestSafePurgeSourceRevalidationDoesNotRequireRemoteHEAD(t *testing.T) {
 	if !strings.Contains(nonProviderImageSchemesSQL, "'embedded://%'") {
 		t.Fatalf("SQL protected-source list omits embedded artwork: %s", nonProviderImageSchemesSQL)

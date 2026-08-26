@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 )
 
 // mapSettingReader is a SettingReader fake; missing keys read as unset.
@@ -266,6 +268,10 @@ func (fakePresigner) PresignImageURL(_ context.Context, path, _, _ string) strin
 	return "https://s3.example.com/" + path + "?sig=abc"
 }
 
+func (fakePresigner) PresignArtworkTargetImageURL(_ context.Context, _ artworkurl.Target, path, _, _ string) string {
+	return "https://s3.example.com/" + path + "?sig=abc"
+}
+
 func TestDiscordPosterURLModes(t *testing.T) {
 	const cachedKey = "tmdb/series/95396/poster/original.jpg"
 	system := func(mode string, images ImageURLResolver) *System {
@@ -277,25 +283,25 @@ func TestDiscordPosterURLModes(t *testing.T) {
 	ctx := context.Background()
 
 	// Off: nothing renders, even provider-CDN-resolvable artwork.
-	if got := system("off", fakePresigner{}).discordPosterURL(ctx, testSeriesPosterPath, ""); got != "" {
+	if got := system("off", fakePresigner{}).discordPosterURL(ctx, testSeriesPosterPath, "", "series-1"); got != "" {
 		t.Fatalf("mode off must drop posters, got %q", got)
 	}
 	// Provider (default): public CDN URLs only; cached keys never presign.
-	if got := system("", fakePresigner{}).discordPosterURL(ctx, testSeriesPosterPath, ""); got != testSeriesPosterCDN {
+	if got := system("", fakePresigner{}).discordPosterURL(ctx, testSeriesPosterPath, "", "series-1"); got != testSeriesPosterCDN {
 		t.Fatalf("provider mode CDN resolution failed, got %q", got)
 	}
-	if got := system("", fakePresigner{}).discordPosterURL(ctx, cachedKey, ""); got != "" {
+	if got := system("", fakePresigner{}).discordPosterURL(ctx, cachedKey, "", "series-1"); got != "" {
 		t.Fatalf("provider mode must not presign cached keys, got %q", got)
 	}
 	// Server: provider CDN still wins; cached keys presign as the fallback.
-	if got := system("server", fakePresigner{}).discordPosterURL(ctx, cachedKey, testSeriesPosterPath); got != testSeriesPosterCDN {
+	if got := system("server", fakePresigner{}).discordPosterURL(ctx, cachedKey, testSeriesPosterPath, "series-1"); got != testSeriesPosterCDN {
 		t.Fatalf("server mode must still prefer provider CDN, got %q", got)
 	}
-	if got := system("server", fakePresigner{}).discordPosterURL(ctx, cachedKey, ""); got != "https://s3.example.com/"+cachedKey+"?sig=abc" {
+	if got := system("server", fakePresigner{}).discordPosterURL(ctx, cachedKey, "", "series-1"); got != "https://s3.example.com/"+cachedKey+"?sig=abc" {
 		t.Fatalf("server mode presign fallback failed, got %q", got)
 	}
 	// Server without a wired resolver degrades to no image.
-	if got := system("server", nil).discordPosterURL(ctx, cachedKey, ""); got != "" {
+	if got := system("server", nil).discordPosterURL(ctx, cachedKey, "", "series-1"); got != "" {
 		t.Fatalf("server mode without resolver must render no image, got %q", got)
 	}
 }

@@ -1,33 +1,161 @@
 package handlers
 
 import (
-	"encoding/base64"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
+	"github.com/Silo-Server/silo-server/internal/metadata"
 	"github.com/go-chi/chi/v5"
 )
 
 const (
 	artworkTestSecret = "cluster-authentication-secret"
-	artworkTestKey    = "artwork/v1/objects/poster/ab/abcdef0123/original.webp"
 	artworkTestTTL    = time.Hour
 )
 
 var artworkTestBytes = []byte("not really webp, but immutable bytes")
 
+var artworkTestRevision = func() *artworkkey.PortableRevision {
+	revision, err := artworkkey.BuildPortableRevision(artworkkey.RevisionInput{
+		ImageType: "poster", MediaType: "image/webp", Ext: ".webp",
+		Variants: []artworkkey.VariantBytes{{Name: artworkkey.OriginalVariant, Data: artworkTestBytes}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return revision
+}()
+
+var artworkTestKey = artworkTestRevision.OriginalKey
+
+var artworkTestTarget = artworkurl.Target{
+	Surface: artworkurl.SurfaceItemPosters,
+	Keys:    []string{"movie-1"},
+	Slot:    "poster",
+}.WithReference(artworkTestKey)
+
+type fakeArtworkTargets struct {
+	state       metadata.ArtworkTargetState
+	signals     int
+	markHealthy int
+	signalCh    chan struct{}
+}
+
+type coldBurstArtworkTargets struct {
+	mu       sync.Mutex
+	state    metadata.ArtworkTargetState
+	reads    int
+	signals  int
+	signalCh chan struct{}
+}
+
+type unavailableArtworkStore struct{}
+
+type countingArtworkStore struct {
+	ArtworkObjectStore
+	key       string
+	readBytes int
+}
+
+type countingReadCloser struct {
+	io.ReadCloser
+	count *int
+}
+
+func (r *countingReadCloser) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+	*r.count += n
+	return n, err
+}
+
+func (s *countingArtworkStore) Open(ctx context.Context, key string) (*artworkstore.Object, error) {
+	object, err := s.ArtworkObjectStore.Open(ctx, key)
+	if err == nil && key == s.key {
+		object.Body = &countingReadCloser{ReadCloser: object.Body, count: &s.readBytes}
+	}
+	return object, err
+}
+
+func (unavailableArtworkStore) Open(context.Context, string) (*artworkstore.Object, error) {
+	return nil, errors.New("backend transport unavailable")
+}
+func (unavailableArtworkStore) Health() (artworkstore.HealthState, time.Time) {
+	return artworkstore.HealthUnavailable, time.Now()
+}
+
+func (f *coldBurstArtworkTargets) LoadTarget(_ context.Context, target artworkurl.Target) (metadata.ArtworkTargetState, error) {
+	state := f.state
+	state.Target = target
+	return state, nil
+}
+
+func (f *coldBurstArtworkTargets) SignalMissing(context.Context, metadata.ArtworkTargetState) error {
+	f.mu.Lock()
+	f.signals++
+	f.mu.Unlock()
+	if f.signalCh != nil {
+		select {
+		case f.signalCh <- struct{}{}:
+		default:
+		}
+	}
+	return nil
+}
+
+func (f *coldBurstArtworkTargets) ReadSidecar(context.Context, metadata.ArtworkTargetState) (metadata.ConfinedLocalArtwork, error) {
+	f.mu.Lock()
+	f.reads++
+	f.mu.Unlock()
+	return metadata.ConfinedLocalArtwork{Data: artworkPlaceholder("poster"), MediaType: "image/png"}, nil
+}
+
+func (f *coldBurstArtworkTargets) MarkHealthy(context.Context, string) error { return nil }
+
+func (f *fakeArtworkTargets) LoadTarget(_ context.Context, target artworkurl.Target) (metadata.ArtworkTargetState, error) {
+	if target.Surface != artworkTestTarget.Surface || target.Keys[0] != artworkTestTarget.Keys[0] {
+		return metadata.ArtworkTargetState{}, errors.New("unknown target")
+	}
+	state := f.state
+	state.Target = target
+	return state, nil
+}
+
+func (f *fakeArtworkTargets) SignalMissing(context.Context, metadata.ArtworkTargetState) error {
+	f.signals++
+	if f.signalCh != nil {
+		select {
+		case f.signalCh <- struct{}{}:
+		default:
+		}
+	}
+	return nil
+}
+
+func (f *fakeArtworkTargets) ReadSidecar(context.Context, metadata.ArtworkTargetState) (metadata.ConfinedLocalArtwork, error) {
+	return metadata.ConfinedLocalArtwork{}, errors.New("no sidecar")
+}
+
+func (f *fakeArtworkTargets) MarkHealthy(context.Context, string) error {
+	f.markHealthy++
+	return nil
+}
+
 // newArtworkTestRig stands up the real filesystem store behind the real route,
 // so the assertions below cover key validation, media typing, and entity tags
 // exactly as production does.
-func newArtworkTestRig(t *testing.T) (http.Handler, *ArtworkHandler, *artworkurl.Signer) {
+func newArtworkTestRig(t *testing.T) (http.Handler, *ArtworkHandler, *artworkurl.Signer, *fakeArtworkTargets) {
 	t.Helper()
 
 	store, err := artworkstore.NewFilesystemStore(t.TempDir())
@@ -41,6 +169,9 @@ func newArtworkTestRig(t *testing.T) (http.Handler, *ArtworkHandler, *artworkurl
 	if err := store.WriteImmutable(t.Context(), artworkTestKey, artworkTestBytes, artworkstore.ObjectMetadata{}); err != nil {
 		t.Fatalf("WriteImmutable: %v", err)
 	}
+	if err := store.WriteImmutable(t.Context(), artworkTestRevision.ManifestKey, artworkTestRevision.ManifestJSON, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatalf("WriteImmutable(manifest): %v", err)
+	}
 
 	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return artworkTestTTL })
 	if err != nil {
@@ -52,26 +183,40 @@ func newArtworkTestRig(t *testing.T) (http.Handler, *ArtworkHandler, *artworkurl
 		t.Fatal("NewArtworkHandler returned nil")
 	}
 
+	targets := &fakeArtworkTargets{signalCh: make(chan struct{}, 1), state: metadata.ArtworkTargetState{
+		SelectedPath: artworkTestKey, ImageType: "poster", Recoverable: false, Protected: true,
+	}}
+	handler.SetResilientDependencies(targets, nil, nil)
+
 	router := chi.NewRouter()
-	router.Get("/api/v1/artwork/{"+ArtworkKeyParam+"}", handler.ServeHTTP)
-	router.Head("/api/v1/artwork/{"+ArtworkKeyParam+"}", handler.ServeHTTP)
-	return router, handler, signer
+	router.Get("/api/v1/artwork/{"+ArtworkCapabilityParam+"}/{"+ArtworkVariantParam+"}", handler.ServeHTTP)
+	router.Head("/api/v1/artwork/{"+ArtworkCapabilityParam+"}/{"+ArtworkVariantParam+"}", handler.ServeHTTP)
+	return router, handler, signer, targets
 }
 
-func signArtworkURL(t *testing.T, signer *artworkurl.Signer, key string, at time.Time) string {
+func waitForRepairSignal(t *testing.T, ch <-chan struct{}) {
 	t.Helper()
-	signed, err := signer.Sign(key, at)
+	select {
+	case <-ch:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for durable repair signal")
+	}
+}
+
+func signArtworkURL(t *testing.T, signer *artworkurl.Signer, at time.Time) string {
+	t.Helper()
+	signed, err := signer.SignTarget(artworkTestTarget, "original", at)
 	if err != nil {
-		t.Fatalf("Sign(%q): %v", key, err)
+		t.Fatalf("SignTarget: %v", err)
 	}
 	return signed.URL
 }
 
 func TestArtworkHandlerServesSignedObject(t *testing.T) {
-	router, _, signer := newArtworkTestRig(t)
+	router, _, signer, _ := newArtworkTestRig(t)
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signArtworkURL(t, signer, artworkTestKey, time.Now()), nil))
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signArtworkURL(t, signer, time.Now()), nil))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
@@ -109,8 +254,8 @@ func TestArtworkHandlerServesSignedObject(t *testing.T) {
 }
 
 func TestArtworkHandlerHonorsHeadAndConditionalRequests(t *testing.T) {
-	router, _, signer := newArtworkTestRig(t)
-	signedURL := signArtworkURL(t, signer, artworkTestKey, time.Now())
+	router, _, signer, _ := newArtworkTestRig(t)
+	signedURL := signArtworkURL(t, signer, time.Now())
 
 	head := httptest.NewRecorder()
 	router.ServeHTTP(head, httptest.NewRequest(http.MethodHead, signedURL, nil))
@@ -141,9 +286,9 @@ func TestArtworkHandlerHonorsHeadAndConditionalRequests(t *testing.T) {
 // them from the standard serving primitives, and a client that asks for one
 // must not receive the whole object with a 200.
 func TestArtworkHandlerServesRangesFromASeekableStore(t *testing.T) {
-	router, _, signer := newArtworkTestRig(t)
+	router, _, signer, _ := newArtworkTestRig(t)
 
-	req := httptest.NewRequest(http.MethodGet, signArtworkURL(t, signer, artworkTestKey, time.Now()), nil)
+	req := httptest.NewRequest(http.MethodGet, signArtworkURL(t, signer, time.Now()), nil)
 	req.Header.Set("Range", "bytes=0-3")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -159,24 +304,20 @@ func TestArtworkHandlerServesRangesFromASeekableStore(t *testing.T) {
 // Every rejection has to look the same, or the route becomes a way to ask
 // which artwork a server holds.
 func TestArtworkHandlerHidesKeyExistence(t *testing.T) {
-	router, _, signer := newArtworkTestRig(t)
+	router, _, signer, _ := newArtworkTestRig(t)
 
-	valid := signArtworkURL(t, signer, artworkTestKey, time.Now())
-	unstoredKey := signArtworkURL(t, signer, "artwork/v1/objects/poster/cd/cdef456789/original.webp", time.Now())
-	encodedTraversal := base64.RawURLEncoding.EncodeToString([]byte("../../etc/passwd"))
+	valid := signArtworkURL(t, signer, time.Now())
 
 	cases := []struct {
 		name string
 		url  string
 	}{
-		{"unsigned", artworkurl.RoutePrefix + base64.RawURLEncoding.EncodeToString([]byte(artworkTestKey))},
-		{"forged signature", strings.Replace(valid, "&signature=", "&signature=AAAA", 1)},
-		{"missing expiry", strings.SplitN(valid, "?", 2)[0] + "?signature=AAAA"},
-		{"escaping key", artworkurl.RoutePrefix + encodedTraversal + "?expires=99999999999&signature=AAAA"},
-		{"valid signature, unstored object", unstoredKey},
+		{"unsigned", artworkurl.RoutePrefix + "unsigned/original"},
+		{"forged signature", strings.Replace(valid, ".", ".AAAA", 1)},
+		{"missing capability", artworkurl.RoutePrefix + "/original"},
+		{"invalid variant", strings.TrimSuffix(valid, "/original") + "/../../secret"},
 	}
 
-	var bodies []string
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
@@ -184,21 +325,194 @@ func TestArtworkHandlerHidesKeyExistence(t *testing.T) {
 			if rec.Code != http.StatusNotFound {
 				t.Fatalf("status = %d, want 404 (body %q)", rec.Code, rec.Body.String())
 			}
-			bodies = append(bodies, rec.Body.String())
 		})
 	}
-	for _, body := range bodies {
-		if body != bodies[0] {
-			t.Fatalf("rejection bodies differ: %q vs %q", body, bodies[0])
+}
+
+func TestArtworkHandlerReturnsPlaceholderAndSignalsRepairForValidMissingTarget(t *testing.T) {
+	router, _, signer, targets := newArtworkTestRig(t)
+	targets.state.SelectedPath = "artwork/v1/objects/poster/cd/cdef456789/original.webp"
+	targets.state.Protected = true
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signArtworkURL(t, signer, time.Now()), nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want placeholder 200 (body %q)", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); got != "image/png" {
+		t.Fatalf("Content-Type = %q, want image/png", got)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store", got)
+	}
+	if got := rec.Header().Get("X-Silo-Artwork"); got != "placeholder" {
+		t.Fatalf("diagnostic header = %q, want placeholder", got)
+	}
+	waitForRepairSignal(t, targets.signalCh)
+	if targets.signals != 1 {
+		t.Fatalf("repair signals = %d, want exactly one", targets.signals)
+	}
+}
+
+func TestArtworkHandlerColdBurstSingleflightsSourceFallback(t *testing.T) {
+	router, handler, signer, _ := newArtworkTestRig(t)
+	targets := &coldBurstArtworkTargets{signalCh: make(chan struct{}, 1), state: metadata.ArtworkTargetState{
+		SelectedPath: "artwork/v1/objects/poster/cd/cdef456789/original.webp",
+		SourcePath:   "file:///library/movie/poster.png",
+		ImageType:    "poster",
+		Recoverable:  true,
+	}}
+	handler.SetResilientDependencies(targets, nil, nil)
+	signedURL := signArtworkURL(t, signer, time.Now())
+
+	const requests = 24
+	start := make(chan struct{})
+	results := make(chan *httptest.ResponseRecorder, requests)
+	var wg sync.WaitGroup
+	for range requests {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signedURL, nil))
+			results <- rec
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+	for rec := range results {
+		if rec.Code != http.StatusOK || rec.Header().Get("X-Silo-Artwork") != "source_fallback" {
+			t.Fatalf("status/route = %d/%q", rec.Code, rec.Header().Get("X-Silo-Artwork"))
 		}
+	}
+	targets.mu.Lock()
+	reads := targets.reads
+	targets.mu.Unlock()
+	if reads != 1 {
+		t.Fatalf("confined source reads = %d, want one", reads)
+	}
+	targets.mu.Lock()
+	signals := targets.signals
+	targets.mu.Unlock()
+	if signals != 1 {
+		t.Fatalf("cold burst repair signals = %d, want one", signals)
+	}
+}
+
+func TestArtworkHandlerDoesNotDeclareStoredRevisionMissingDuringBackendOutage(t *testing.T) {
+	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return artworkTestTTL })
+	if err != nil {
+		t.Fatal(err)
+	}
+	targets := &coldBurstArtworkTargets{signalCh: make(chan struct{}, 1), state: metadata.ArtworkTargetState{
+		SelectedPath: artworkTestKey,
+		SourcePath:   "file:///library/poster.png",
+		ImageType:    "poster",
+		Recoverable:  true,
+	}}
+	handler := NewArtworkHandler(unavailableArtworkStore{}, signer)
+	handler.SetResilientDependencies(targets, nil, nil)
+	signed, err := signer.SignTarget(artworkTestTarget, "original", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := httptest.NewRecorder()
+	handler.serve(recorder, httptest.NewRequest(http.MethodGet, signed.URL, nil),
+		strings.Split(strings.TrimPrefix(signed.URL, artworkurl.RoutePrefix), "/")[0], "original")
+	if recorder.Code != http.StatusOK || recorder.Header().Get("X-Silo-Artwork") != "source_fallback" {
+		t.Fatalf("response = %d %q, want verified source fallback", recorder.Code, recorder.Header().Get("X-Silo-Artwork"))
+	}
+	targets.mu.Lock()
+	signals := targets.signals
+	targets.mu.Unlock()
+	if signals != 0 {
+		t.Fatalf("durable missing signals = %d, want zero for a transport outage", signals)
+	}
+}
+
+func TestArtworkHandlerTreatsPortableDigestMismatchAsAuthoritativeLoss(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.WriteImmutable(t.Context(), artworkTestKey, []byte("corrupted immutable bytes"), artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteImmutable(t.Context(), artworkTestRevision.ManifestKey, artworkTestRevision.ManifestJSON, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return artworkTestTTL })
+	if err != nil {
+		t.Fatal(err)
+	}
+	targets := &coldBurstArtworkTargets{signalCh: make(chan struct{}, 1), state: metadata.ArtworkTargetState{
+		SelectedPath: artworkTestKey, SourcePath: "file:///library/poster.png", ImageType: "poster", Recoverable: true,
+	}}
+	handler := NewArtworkHandler(store, signer)
+	handler.SetResilientDependencies(targets, nil, nil)
+	signed, err := signer.SignTarget(artworkTestTarget, "original", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(strings.TrimPrefix(signed.URL, artworkurl.RoutePrefix), "/")
+	recorder := httptest.NewRecorder()
+	handler.serve(recorder, httptest.NewRequest(http.MethodGet, signed.URL, nil), parts[0], parts[1])
+	if recorder.Code != http.StatusOK || recorder.Header().Get("X-Silo-Artwork") != "source_fallback" {
+		t.Fatalf("response = %d %q, want verified fallback", recorder.Code, recorder.Header().Get("X-Silo-Artwork"))
+	}
+	waitForRepairSignal(t, targets.signalCh)
+	targets.mu.Lock()
+	signals := targets.signals
+	targets.mu.Unlock()
+	if signals != 1 {
+		t.Fatalf("durable missing signals = %d, want one", signals)
+	}
+}
+
+func TestOpenVerifiedWarmHitDoesNotRehashObject(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.WriteImmutable(t.Context(), artworkTestKey, artworkTestBytes, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteImmutable(t.Context(), artworkTestRevision.ManifestKey, artworkTestRevision.ManifestJSON, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	counting := &countingArtworkStore{ArtworkObjectStore: store, key: artworkTestKey}
+	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return artworkTestTTL })
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewArtworkHandler(counting, signer)
+	first, err := handler.openVerified(t.Context(), artworkTestKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = first.Close()
+	if counting.readBytes != len(artworkTestBytes) {
+		t.Fatalf("cold verification read %d bytes, want %d", counting.readBytes, len(artworkTestBytes))
+	}
+	second, err := handler.openVerified(t.Context(), artworkTestKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = second.Close()
+	if counting.readBytes != len(artworkTestBytes) {
+		t.Fatalf("warm verification re-read object: bytes=%d", counting.readBytes)
 	}
 }
 
 func TestArtworkHandlerRejectsExpiredURL(t *testing.T) {
-	router, _, signer := newArtworkTestRig(t)
+	router, _, signer, _ := newArtworkTestRig(t)
 
 	// Signed three windows ago, so the quantized expiry is already behind us.
-	expired := signArtworkURL(t, signer, artworkTestKey, time.Now().Add(-3*artworkTestTTL))
+	expired := signArtworkURL(t, signer, time.Now().Add(-3*artworkTestTTL))
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, expired, nil))
@@ -213,14 +527,14 @@ func TestArtworkHandlerRejectsExpiredURL(t *testing.T) {
 }
 
 func TestArtworkHandlerRejectsForeignSecret(t *testing.T) {
-	router, _, _ := newArtworkTestRig(t)
+	router, _, _, _ := newArtworkTestRig(t)
 
 	foreign, err := artworkurl.NewSigner("a different cluster secret", func() time.Duration { return artworkTestTTL })
 	if err != nil {
 		t.Fatalf("NewSigner: %v", err)
 	}
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signArtworkURL(t, foreign, artworkTestKey, time.Now()), nil))
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signArtworkURL(t, foreign, time.Now()), nil))
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", rec.Code)
@@ -230,7 +544,7 @@ func TestArtworkHandlerRejectsForeignSecret(t *testing.T) {
 // The compat surface listens on its own port and cannot redirect a client to a
 // root-relative native URL, so it serves those bytes through this entry point.
 func TestServeArtworkURLServesOnlyArtworkRouteURLs(t *testing.T) {
-	_, handler, signer := newArtworkTestRig(t)
+	_, handler, signer, _ := newArtworkTestRig(t)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/Items/abc/Images/Primary", nil)
@@ -242,7 +556,7 @@ func TestServeArtworkURLServesOnlyArtworkRouteURLs(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	if !handler.ServeArtworkURL(rec, req, signArtworkURL(t, signer, artworkTestKey, time.Now())) {
+	if !handler.ServeArtworkURL(rec, req, signArtworkURL(t, signer, time.Now())) {
 		t.Fatal("ServeArtworkURL declined a signed artwork URL")
 	}
 	if rec.Code != http.StatusOK {
@@ -255,6 +569,7 @@ func TestServeArtworkURLServesOnlyArtworkRouteURLs(t *testing.T) {
 
 func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
 	handler := NewArtworkCapabilityHandler("local", false, func() string { return "selected" })
+	handler.SetResilientStatus(func() string { return "resilient" }, func() string { return "degraded" })
 
 	rec := httptest.NewRecorder()
 	handler.HandleCapability(rec, httptest.NewRequest(http.MethodGet, "/api/v1/artwork/capability", nil))
@@ -283,6 +598,9 @@ func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
 	if got.RemoteMaterialization != "selected" {
 		t.Fatalf("remote_materialization = %q, want selected", got.RemoteMaterialization)
 	}
+	if got.DeliveryPolicy != "resilient" || got.StoreHealth != "degraded" || !got.AutomaticRecovery {
+		t.Fatalf("resilient status = policy %q, health %q, recovery %v", got.DeliveryPolicy, got.StoreHealth, got.AutomaticRecovery)
+	}
 	if got.LocalSourcePolicy != "materialize" {
 		t.Fatalf("local_source_policy = %q, want materialize", got.LocalSourcePolicy)
 	}
@@ -299,6 +617,7 @@ func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
 	// A bucket-backed store keeps delivering directly; the capability has to
 	// say so, because that is the difference clients and operators observe.
 	direct := NewArtworkCapabilityHandler("s3", true, nil)
+	direct.SetResilientStatus(func() string { return "direct" }, func() string { return "healthy" })
 	rec = httptest.NewRecorder()
 	direct.HandleCapability(rec, httptest.NewRequest(http.MethodGet, "/api/v1/artwork/capability", nil))
 	var directResponse artworkCapabilityResponse
@@ -307,6 +626,69 @@ func TestArtworkCapabilityReportsDeliveryFacts(t *testing.T) {
 	}
 	if len(directResponse.DeliveryModes) != 1 || directResponse.DeliveryModes[0] != artworkDeliveryDirect {
 		t.Fatalf("delivery_modes = %v, want [%s]", directResponse.DeliveryModes, artworkDeliveryDirect)
+	}
+	if directResponse.AutomaticRecovery {
+		t.Fatal("direct policy reported automatic recovery")
+	}
+}
+
+func TestDirectArtworkHandlerEnforcesSignedAndPublicModes(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFilesystemStore: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.WriteImmutable(t.Context(), artworkTestKey, artworkTestBytes, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatalf("WriteImmutable: %v", err)
+	}
+	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return time.Hour })
+	if err != nil {
+		t.Fatalf("NewSigner: %v", err)
+	}
+	auth := "signed"
+	handler := NewDirectArtworkHandler(store, signer, func() string { return auth })
+	router := chi.NewRouter()
+	router.Get("/api/v1/artwork/*", handler.ServeHTTP)
+
+	directPath, err := artworkurl.DirectPathFromKey(artworkTestKey)
+	if err != nil {
+		t.Fatalf("DirectPathFromKey: %v", err)
+	}
+	unsigned := artworkurl.DirectRoutePrefix + directPath
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, unsigned, nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("signed mode unsigned status = %d, want 404", rec.Code)
+	}
+
+	signed, err := signer.SignDirectKey(artworkTestKey, time.Now())
+	if err != nil {
+		t.Fatalf("SignDirectKey: %v", err)
+	}
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signed.URL, nil))
+	if rec.Code != http.StatusOK || rec.Body.String() != string(artworkTestBytes) {
+		t.Fatalf("signed status/body = %d/%q", rec.Code, rec.Body.String())
+	}
+
+	auth = "public"
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, unsigned, nil))
+	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
+		t.Fatalf("public status/cache = %d/%q", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+	// Signed URLs remain accepted after a mode flip.
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, signed.URL, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("old signed URL after public flip = %d", rec.Code)
+	}
+
+	escaped := artworkurl.DirectRoutePrefix + strings.Replace(directPath, "/", "%2F", 1)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, escaped, nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("percent-escaped key status = %d, want 404", rec.Code)
 	}
 }
 

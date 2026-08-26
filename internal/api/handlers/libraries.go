@@ -24,6 +24,7 @@ import (
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkupload"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/auth"
 	"github.com/Silo-Server/silo-server/internal/cache"
 	"github.com/Silo-Server/silo-server/internal/catalog"
@@ -403,7 +404,9 @@ func toLibraryResponse(f *models.MediaFolder) libraryResponse {
 func (h *LibraryHandler) toLibraryResponseWithPoster(ctx context.Context, f *models.MediaFolder) libraryResponse {
 	resp := toLibraryResponse(f)
 	resp.ChapterThumbnailsSupported = h.S3Meta != nil
-	resp.PosterURL = resolveStoredImageURL(ctx, h.ArtworkURLs, f.PosterPath)
+	resp.PosterURL = resolveTargetStoredImageURL(ctx, h.ArtworkURLs, artworkurl.Target{
+		Surface: artworkurl.SurfaceLibraryPosters, Keys: []string{strconv.Itoa(f.ID)}, Slot: artworkImageLibraryPoster,
+	}, f.PosterPath, "original")
 	return resp
 }
 
@@ -470,7 +473,9 @@ func (h *LibraryHandler) HandleListUserLibraries(w http.ResponseWriter, r *http.
 			Name:      f.Name,
 			Type:      f.Type,
 			SortOrder: f.SortOrder,
-			PosterURL: resolveStoredImageURL(r.Context(), h.ArtworkURLs, f.PosterPath),
+			PosterURL: resolveTargetStoredImageURL(r.Context(), h.ArtworkURLs, artworkurl.Target{
+				Surface: artworkurl.SurfaceLibraryPosters, Keys: []string{strconv.Itoa(f.ID)}, Slot: "library-poster",
+			}, f.PosterPath, "original"),
 		}
 		resp = append(resp, entry)
 	}

@@ -18,6 +18,8 @@ func TestArtworkMetricLabelsAreBounded(t *testing.T) {
 		{"store operation", storeOperations, "maintenance_delete"},
 		{"delivery route", deliveryRoutes, "direct_library"},
 		{"delivery result", deliveryResults, "conditional_hit"},
+		{"store health", storeHealthStates, "wrong_mount"},
+		{"repair result", repairResults, "protected_loss"},
 		{"purge result", purgeResults, "completed"},
 		{"seed result", seedResults, "retained_unverifiable"},
 		{"variant result", variantResults, "matched"},
@@ -48,4 +50,9 @@ func TestArtworkMetricRecordingAcceptsZeroAndNilInputs(t *testing.T) {
 	ManifestFailure("")
 	TempFilesCleaned(0)
 	SeedExpiredBytes(0)
+	StoreHealth("", "", "")
+	Repair("")
+	RepairPending(0, 0)
+	ObserveDeliveryLatency("", time.Time{})
+	StoreHealthDuration("", "", 0)
 }

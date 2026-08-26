@@ -415,6 +415,10 @@ const artworkInventoryUpsertSQL = `
 		END,
 		store_generation = EXCLUDED.store_generation,
 		inventory_complete = EXCLUDED.inventory_complete,
+		missing_at = CASE WHEN EXCLUDED.inventory_complete THEN NULL ELSE artwork_revision_gc_candidates.missing_at END,
+		repair_state = CASE WHEN EXCLUDED.inventory_complete THEN '' ELSE artwork_revision_gc_candidates.repair_state END,
+		repair_queued_at = CASE WHEN EXCLUDED.inventory_complete THEN NULL ELSE artwork_revision_gc_candidates.repair_queued_at END,
+		protected_loss_at = CASE WHEN EXCLUDED.inventory_complete THEN NULL ELSE artwork_revision_gc_candidates.protected_loss_at END,
 		last_verified_at = NOW()`
 
 func artworkSourceClassFromReference(source string) string {
@@ -475,18 +479,24 @@ type ArtworkStorageAccounting struct {
 	AdoptionIndexBytes   int64                      `json:"adoption_index_bytes"`
 	AdoptionIndexObjects int64                      `json:"adoption_index_objects"`
 	ResolvedPath         string                     `json:"resolved_path,omitempty"`
-	Health               string                     `json:"health"`
+	StoreHealth          string                     `json:"store_health"`
+	StoreHealthChangedAt *time.Time                 `json:"store_health_changed_at,omitempty"`
 	FreeSpaceBytes       *int64                     `json:"free_space_bytes,omitempty"`
 	TopologyWarnings     []string                   `json:"unsupported_topology_warnings,omitempty"`
 }
 
 type ArtworkStorageTotal struct {
-	PhysicalBytes    int64 `json:"physical_bytes"`
-	PendingGCBytes   int64 `json:"pending_gc_bytes"`
-	ProtectedBytes   int64 `json:"protected_bytes"`
-	ReclaimableBytes int64 `json:"reclaimable_bytes"`
-	ObjectCount      int64 `json:"object_count"`
-	RevisionCount    int64 `json:"revision_count"`
+	PhysicalBytes          int64 `json:"physical_bytes"`
+	PendingGCBytes         int64 `json:"pending_gc_bytes"`
+	MissingBytes           int64 `json:"missing_bytes"`
+	RepairPendingBytes     int64 `json:"repair_pending_bytes"`
+	ProtectedBytes         int64 `json:"protected_bytes"`
+	ReclaimableBytes       int64 `json:"reclaimable_bytes"`
+	ObjectCount            int64 `json:"object_count"`
+	RevisionCount          int64 `json:"revision_count"`
+	MissingRevisionCount   int64 `json:"missing_revision_count"`
+	RepairingRevisionCount int64 `json:"repairing_revision_count"`
+	ProtectedLossCount     int64 `json:"protected_loss_count"`
 }
 
 type ArtworkSeedAccounting struct {
@@ -509,6 +519,12 @@ type ArtworkLibraryAccounting struct {
 	ObjectCount           int64            `json:"object_count"`
 	RevisionCount         int64            `json:"revision_count"`
 	MaterializedRevisions int64            `json:"materialized_revisions"`
+	MissingBytes          int64            `json:"missing_bytes"`
+	RepairPendingBytes    int64            `json:"repair_pending_bytes"`
+	ProtectedLossBytes    int64            `json:"protected_loss_bytes"`
+	MissingRevisions      int64            `json:"missing_revisions"`
+	RepairingRevisions    int64            `json:"repairing_revisions"`
+	ProtectedLosses       int64            `json:"protected_losses"`
 	SourceClasses         map[string]int64 `json:"source_classes"`
 }
 
@@ -535,8 +551,18 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	result := ArtworkStorageAccounting{
-		Backend: s.backend, Health: "ready", UntrackedUserArtwork: s.untrackedUserArtwork,
+		Backend: s.backend, StoreHealth: string(artworkstore.HealthHealthy), UntrackedUserArtwork: s.untrackedUserArtwork,
 		Libraries: make([]ArtworkLibraryAccounting, 0),
+	}
+	if health, ok := s.store.(interface {
+		Health() (artworkstore.HealthState, time.Time)
+	}); ok {
+		state, changedAt := health.Health()
+		result.StoreHealth = string(state)
+		if !changedAt.IsZero() {
+			changedAt = changedAt.UTC()
+			result.StoreHealthChangedAt = &changedAt
+		}
 	}
 	if s.backend == artworkstore.BackendLocal {
 		result.TopologyWarnings = []string{"Local artwork storage requires one API node or an identically mounted shared POSIX root on every API node."}
@@ -548,7 +574,7 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 		if free, err := capacity.FreeSpaceBytes(ctx); err == nil {
 			result.FreeSpaceBytes = &free
 		} else if !errors.Is(err, artworkstore.ErrNotFound) {
-			result.Health = "degraded"
+			result.StoreHealth = string(artworkstore.HealthDegraded)
 		}
 	}
 	if err := tx.QueryRow(ctx, artworkAccountingStateSQL).Scan(
@@ -575,6 +601,8 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 		&result.Total.ReclaimableBytes, &result.Total.ObjectCount, &result.Total.RevisionCount,
 		&result.Seed.Bytes, &result.Seed.ExpiredBytes, &result.Seed.Revisions,
 		&result.Seed.RetainedUnverifiableBytes, &result.Seed.RetainedUnverifiableRevisions,
+		&result.Total.MissingBytes, &result.Total.RepairPendingBytes,
+		&result.Total.MissingRevisionCount, &result.Total.RepairingRevisionCount, &result.Total.ProtectedLossCount,
 	); err != nil {
 		return result, fmt.Errorf("artwork accounting: total: %w", err)
 	}
@@ -582,6 +610,7 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 	result.Total.ObjectCount += result.AdoptionIndexObjects
 	result.KnownBytes = result.Total.PhysicalBytes
 	artworkmetrics.SeedExpiredBytes(result.Seed.ExpiredBytes)
+	artworkmetrics.RepairPending(result.Total.RepairingRevisionCount, result.Total.ProtectedLossCount)
 
 	rows, err := tx.Query(ctx, artworkLibraryAccountingSQL())
 	if err != nil {
@@ -594,6 +623,8 @@ func (s *ArtworkStorageService) Accounting(ctx context.Context) (ArtworkStorageA
 			&library.LibraryID, &library.ReferencedBytes, &library.ExclusiveBytes, &library.SharedBytes,
 			&library.ReclaimableBytes, &library.ReconstructibleBytes, &library.ProtectedBytes,
 			&library.ObjectCount, &library.RevisionCount, &library.MaterializedRevisions,
+			&library.MissingBytes, &library.RepairPendingBytes, &library.ProtectedLossBytes,
+			&library.MissingRevisions, &library.RepairingRevisions, &library.ProtectedLosses,
 		); err != nil {
 			return result, fmt.Errorf("artwork accounting: scan library: %w", err)
 		}
@@ -737,6 +768,11 @@ func artworkStorageTotalSQL() string {
 		count(*) FILTER (WHERE source_class = 'seed' AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')),
 		COALESCE(sum(total_physical_bytes) FILTER (WHERE source_class = 'seed' AND seed_imported_at IS NOT NULL AND seed_expires_at IS NULL AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0),
 		count(*) FILTER (WHERE source_class = 'seed' AND seed_imported_at IS NOT NULL AND seed_expires_at IS NULL AND lifecycle_state IN ('parked', 'pending_gc', 'deleting'))
+		, COALESCE(sum(total_physical_bytes) FILTER (WHERE missing_at IS NOT NULL AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0)
+		, COALESCE(sum(total_physical_bytes) FILTER (WHERE repair_state IN ('queued', 'repairing') AND lifecycle_state IN ('parked', 'pending_gc', 'deleting')), 0)
+		, count(*) FILTER (WHERE missing_at IS NOT NULL AND lifecycle_state IN ('parked', 'pending_gc', 'deleting'))
+		, count(*) FILTER (WHERE repair_state IN ('queued', 'repairing') AND lifecycle_state IN ('parked', 'pending_gc', 'deleting'))
+		, count(*) FILTER (WHERE protected_loss_at IS NOT NULL AND lifecycle_state IN ('parked', 'pending_gc', 'deleting'))
 		FROM artwork_revision_gc_candidates`
 }
 
@@ -751,7 +787,13 @@ func artworkLibraryAccountingSQL() string {
 		COALESCE(sum(i.total_physical_bytes) FILTER (WHERE NOT lr.reconstructible), 0) AS protected_bytes,
 		COALESCE(sum((SELECT count(*) FROM unnest(i.object_sizes_bytes) size WHERE size > 0)), 0) AS object_count,
 		count(i.id) AS revision_count,
-		count(*) FILTER (WHERE i.inventory_complete) AS materialized_revisions
+		count(*) FILTER (WHERE i.inventory_complete) AS materialized_revisions,
+		COALESCE(sum(i.total_physical_bytes) FILTER (WHERE i.missing_at IS NOT NULL), 0) AS missing_bytes,
+		COALESCE(sum(i.total_physical_bytes) FILTER (WHERE i.repair_state IN ('queued', 'repairing')), 0) AS repair_pending_bytes,
+		COALESCE(sum(i.total_physical_bytes) FILTER (WHERE i.protected_loss_at IS NOT NULL), 0) AS protected_loss_bytes,
+		count(i.id) FILTER (WHERE i.missing_at IS NOT NULL) AS missing_revisions,
+		count(i.id) FILTER (WHERE i.repair_state IN ('queued', 'repairing')) AS repairing_revisions,
+		count(i.id) FILTER (WHERE i.protected_loss_at IS NOT NULL) AS protected_losses
 	FROM library_refs lr
 	JOIN revision_scope rs ON rs.path = lr.path
 	LEFT JOIN artwork_revision_gc_candidates i ON i.original_path = lr.path AND i.lifecycle_state IN ('parked', 'pending_gc', 'deleting')

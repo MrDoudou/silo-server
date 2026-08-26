@@ -5,9 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Silo-Server/silo-server/internal/artworkkey"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
-	"github.com/Silo-Server/silo-server/internal/imagesize"
 )
 
 type audiobookGroupResponse struct {
@@ -106,7 +105,7 @@ func (h *CatalogHandler) HandleGetAudiobookGroups(w http.ResponseWriter, r *http
 		return
 	}
 
-	resolvedPosters := h.resolveAudiobookGroupPosterURLs(r, result.Groups, filter.ImageSize)
+	resolvedPosters := h.resolveAudiobookGroupPosterURLs(r, result.Groups)
 	resp := audiobookGroupsResponse{
 		Total:      result.Total,
 		TotalExact: result.TotalExact,
@@ -115,8 +114,12 @@ func (h *CatalogHandler) HandleGetAudiobookGroups(w http.ResponseWriter, r *http
 	}
 	for _, g := range result.Groups {
 		posterURLs := make([]string, 0, len(g.PosterPaths))
-		for _, path := range g.PosterPaths {
-			if resolved := resolvedPosters[sizedCardPath(path, artworkkey.ImagePoster, filter.ImageSize)]; resolved.URL != "" {
+		for i, path := range g.PosterPaths {
+			if i >= len(g.PosterContentIDs) {
+				continue
+			}
+			target := artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{g.PosterContentIDs[i]}, Slot: artworkImagePoster}.WithReference(path)
+			if resolved := resolvedPosters[target.CacheKey()]; resolved.URL != "" {
 				posterURLs = append(posterURLs, resolved.URL)
 			}
 		}
@@ -133,29 +136,25 @@ func (h *CatalogHandler) HandleGetAudiobookGroups(w http.ResponseWriter, r *http
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// resolveAudiobookGroupPosterURLs presigns the cover-stack posters for a page of
-// groups. size is the already-validated size off the request's access filter, so
-// the ladder rung and the plugin hint match the rest of the response instead of
-// being re-derived per item.
-func (h *CatalogHandler) resolveAudiobookGroupPosterURLs(r *http.Request, groups []catalog.AudiobookGroup, size imagesize.Size) map[string]catalog.ResolvedImageURL {
+func (h *CatalogHandler) resolveAudiobookGroupPosterURLs(r *http.Request, groups []catalog.AudiobookGroup) map[string]catalog.ResolvedImageURL {
 	if h == nil || h.itemsH == nil || h.itemsH.detailSvc == nil || len(groups) == 0 {
 		return map[string]catalog.ResolvedImageURL{}
 	}
 
-	paths := make([]string, 0, len(groups)*4)
+	targets := make([]artworkurl.Target, 0, len(groups)*4)
 	seen := make(map[string]struct{}, len(groups)*4)
 	for _, group := range groups {
-		for _, path := range group.PosterPaths {
-			normalized := sizedCardPath(path, artworkkey.ImagePoster, size)
-			if normalized == "" {
+		for i, path := range group.PosterPaths {
+			if i >= len(group.PosterContentIDs) || strings.TrimSpace(path) == "" {
 				continue
 			}
-			if _, ok := seen[normalized]; ok {
+			target := artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{group.PosterContentIDs[i]}, Slot: artworkImagePoster}.WithReference(path)
+			if _, ok := seen[target.CacheKey()]; ok {
 				continue
 			}
-			seen[normalized] = struct{}{}
-			paths = append(paths, normalized)
+			seen[target.CacheKey()] = struct{}{}
+			targets = append(targets, target)
 		}
 	}
-	return h.itemsH.detailSvc.PresignURLsWithExpiry(r.Context(), paths, requestVariantHint("card", size))
+	return h.itemsH.detailSvc.PresignArtworkTargetsWithExpiry(r.Context(), targets, "w300")
 }

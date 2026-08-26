@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 // ErrNotFound is returned when the requested S3 object does not exist.
@@ -203,6 +204,34 @@ func (c *Client) PutObject(ctx context.Context, bucket, key string, data []byte)
 	}
 
 	return nil
+}
+
+// PutObjectIfAbsent creates key only when it does not already exist. Artwork
+// store sentinels use this to make first-start initialization converge across
+// API nodes without one node overwriting another node's random copy UUID.
+func (c *Client) PutObjectIfAbsent(ctx context.Context, bucket, key string, data []byte) (bool, error) {
+	body := newBytesReadSeeker(data)
+	input := &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(c.prefixedKey(key)),
+		Body:        body,
+		IfNoneMatch: aws.String("*"),
+		Metadata: map[string]string{
+			"silo-sha256": objectSHA256(data),
+		},
+	}
+	if ct := contentTypeFromKey(key); ct != "" {
+		input.ContentType = aws.String(ct)
+	}
+	_, err := c.s3Client.PutObject(ctx, input)
+	if err == nil {
+		return true, nil
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) && (apiErr.ErrorCode() == "PreconditionFailed" || apiErr.ErrorCode() == "ConditionalRequestConflict") {
+		return false, nil
+	}
+	return false, fmt.Errorf("s3 conditional PutObject %s/%s: %w", bucket, key, err)
 }
 
 // PutObjectStream uploads a streaming body to the given key. When contentType is

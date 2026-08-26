@@ -15,7 +15,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 )
 
 // Retry parameters for the bulk-reset UPDATEs below. They run concurrently
@@ -138,20 +140,20 @@ const (
 	artworkReconcileChapterSurface    = "chapter thumbnails"
 	artworkReconcileCompleteSurface   = "complete"
 
-	artworkSurfaceItemPosters            = "item posters"
-	artworkSurfaceItemBackdrops          = "item backdrops"
-	artworkSurfaceItemLogos              = "item logos"
-	artworkSurfaceLocalizedItemPosters   = "localized item posters"
-	artworkSurfaceLocalizedItemBackdrops = "localized item backdrops"
-	artworkSurfaceLocalizedItemLogos     = "localized item logos"
-	artworkSurfaceSeasonPosters          = "season posters"
-	artworkSurfaceLocalizedSeasonPosters = "localized season posters"
-	artworkSurfaceEpisodeStills          = "episode stills"
-	artworkSurfacePersonPhotos           = "person photos"
-	artworkSurfaceCollectionPosters      = "collection posters"
-	artworkSurfaceCollectionBackdrops    = "collection backdrops"
-	artworkSurfaceUserCollectionPosters  = "user collection posters"
-	artworkSurfaceLibraryPosters         = "library posters"
+	artworkSurfaceItemPosters            = artworkurl.SurfaceItemPosters
+	artworkSurfaceItemBackdrops          = artworkurl.SurfaceItemBackdrops
+	artworkSurfaceItemLogos              = artworkurl.SurfaceItemLogos
+	artworkSurfaceLocalizedItemPosters   = artworkurl.SurfaceLocalizedItemPosters
+	artworkSurfaceLocalizedItemBackdrops = artworkurl.SurfaceLocalizedItemBackdrops
+	artworkSurfaceLocalizedItemLogos     = artworkurl.SurfaceLocalizedItemLogos
+	artworkSurfaceSeasonPosters          = artworkurl.SurfaceSeasonPosters
+	artworkSurfaceLocalizedSeasonPosters = artworkurl.SurfaceLocalizedSeasonPosters
+	artworkSurfaceEpisodeStills          = artworkurl.SurfaceEpisodeStills
+	artworkSurfacePersonPhotos           = artworkurl.SurfacePersonPhotos
+	artworkSurfaceCollectionPosters      = artworkurl.SurfaceCollectionPosters
+	artworkSurfaceCollectionBackdrops    = artworkurl.SurfaceCollectionBackdrops
+	artworkSurfaceUserCollectionPosters  = artworkurl.SurfaceUserCollectionPosters
+	artworkSurfaceLibraryPosters         = artworkurl.SurfaceLibraryPosters
 	artworkSourceClassProvider           = "provider"
 	artworkSourceClassUnknown            = "unknown"
 	artworkSourceSchemeFile              = "file"
@@ -409,7 +411,7 @@ func artworkSweepSurfaces() []artworkSweepSurface {
 		// (user collections), or the default tile (library posters); admins
 		// re-upload anything they want back. alwaysVerify protects surviving
 		// uploads from blind bulk resets.
-		{name: artworkSurfaceCollectionPosters, table: libraryCollectionsTable, keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: posterURLColumn, imageType: "collection-poster", thumbhashCol: posterThumbhashColumn, clearSet: `poster_url = '', poster_thumbhash = '', poster_auto_generated = FALSE, poster_from_template = FALSE, updated_at = NOW()`, alwaysVerify: true},
+		{name: artworkSurfaceCollectionPosters, table: libraryCollectionsTable, keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: posterURLColumn, imageType: artworkkey.ImageTypeCollectionPoster, thumbhashCol: posterThumbhashColumn, clearSet: `poster_url = '', poster_thumbhash = '', poster_auto_generated = FALSE, poster_from_template = FALSE, updated_at = NOW()`, alwaysVerify: true},
 		{name: artworkSurfaceCollectionBackdrops, table: libraryCollectionsTable, keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: "backdrop_url", imageType: "collection-backdrop", thumbhashCol: backdropThumbhashColumn, clearSet: `backdrop_url = '', backdrop_thumbhash = '', updated_at = NOW()`, alwaysVerify: true},
 		{name: artworkSurfaceUserCollectionPosters, table: "user_personal_collections", keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: posterURLColumn, imageType: "collection-poster", thumbhashCol: posterThumbhashColumn, clearSet: `poster_url = '', poster_thumbhash = '', updated_at = NOW()`, alwaysVerify: true},
 		{name: artworkSurfaceLibraryPosters, table: "media_folders", keyCols: []artworkSweepKey{int32SweepKey("id")}, pathCol: posterPathColumn, imageType: "library-poster", noUpdatedAt: true, clearSet: `poster_path = ''`, alwaysVerify: true},

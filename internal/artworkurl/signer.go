@@ -1,12 +1,11 @@
-// Package artworkurl mints and verifies the short-lived signed URLs that
-// deliver locally stored artwork, and resolves a logical artwork key to
-// whatever URL its backend serves it through.
+// Package artworkurl mints and verifies target-bound resilient delivery
+// capabilities and the explicit direct-policy URLs for stored artwork.
 //
-// Artwork held in an S3 bucket is fetched directly by the client from a
-// presigned, public, or CDN-token URL. Artwork held on the filesystem has no
-// such URL, so it is delivered by Silo itself through
+// Resilient delivery uses the same signed Silo route for every backend. The
+// capability names the catalog target rather than a physical object so the
+// handler can reload the current selection and fall back or repair after loss:
 //
-//	GET /api/v1/artwork/{base64url-logical-key}?expires={unix}&signature={hmac}
+//	GET /api/v1/artwork/{base64url-target-json}.{hmac}/{variant}
 //
 // The signature is a bearer capability, exactly like a presigned S3 URL:
 // access is authorized when the surrounding catalog response is built, and the
@@ -19,7 +18,9 @@
 // configured separately, which keeps artwork tokens cryptographically separate
 // from login and playback tokens while adding no setup step. Rotating the
 // cluster secret invalidates outstanding artwork URLs along with every other
-// derived token family; the short lifetime bounds that to one refresh.
+// derived token family; the short lifetime bounds that to one refresh. Direct
+// policy is the opt-out: S3 may mint its existing direct URL, while local
+// storage uses a strictly validated raw portable path (signed by default).
 package artworkurl
 
 import (
@@ -35,6 +36,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
@@ -45,6 +47,7 @@ const (
 	// configured public origin would not be, and they stay cacheable by the
 	// resolver across those origins.
 	RoutePrefix            = "/api/v1/artwork/"
+	DirectRoutePrefix      = RoutePrefix
 	LibraryRoutePrefix     = "/api/v1/artwork-library/"
 	LibraryReferencePrefix = "library-artwork://"
 
@@ -62,6 +65,7 @@ const (
 	// grammar invalidates outstanding URLs instead of letting an old signature
 	// authenticate a new meaning.
 	routeVersion        = "v1"
+	targetRouteVersion  = "target-v1"
 	libraryRouteVersion = "library-v1"
 
 	// DefaultTTL is the artwork URL lifetime used when none is configured. It
@@ -74,6 +78,87 @@ const (
 	minTTL = time.Minute
 	maxTTL = 24 * time.Hour
 )
+
+type targetCapability struct {
+	Version   string `json:"version"`
+	Target    Target `json:"target"`
+	Variant   string `json:"variant"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+// SignTarget mints the default resilient route. The capability is one
+// canonical base64url JSON payload plus an HMAC, while variant remains a
+// readable bounded path component and is covered inside the payload.
+func (s *Signer) SignTarget(target Target, variant string, now time.Time) (artworkstore.ResolvedURL, error) {
+	if s == nil {
+		return artworkstore.ResolvedURL{}, errors.New("artworkurl: signer is not configured")
+	}
+	if err := target.Validate(); err != nil {
+		return artworkstore.ResolvedURL{}, err
+	}
+	if err := ValidateVariant(target.Slot, variant); err != nil {
+		return artworkstore.ResolvedURL{}, err
+	}
+	target.Reference = ""
+	expiresAt := quantizedExpiry(now, s.TTL())
+	capability := targetCapability{Version: targetRouteVersion, Target: target, Variant: variant, ExpiresAt: expiresAt.Unix()}
+	payload, err := json.Marshal(capability)
+	if err != nil {
+		return artworkstore.ResolvedURL{}, fmt.Errorf("artworkurl: encode target capability: %w", err)
+	}
+	encoded := base64.RawURLEncoding.EncodeToString(payload)
+	signature := s.capabilitySignature(payload)
+	return artworkstore.ResolvedURL{URL: RoutePrefix + encoded + "." + signature + "/" + variant, ExpiresAt: &expiresAt}, nil
+}
+
+// VerifyTarget authenticates a target-bound resilient route and rejects
+// non-canonical payloads before any catalog or store access.
+func (s *Signer) VerifyTarget(encodedCapability, variant string, now time.Time) (Target, time.Time, error) {
+	if s == nil || encodedCapability == "" || variant == "" {
+		return Target{}, time.Time{}, ErrInvalidSignature
+	}
+	encoded, signature, ok := strings.Cut(encodedCapability, ".")
+	if !ok || encoded == "" || signature == "" || strings.Contains(signature, ".") {
+		return Target{}, time.Time{}, ErrInvalidSignature
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil || base64.RawURLEncoding.EncodeToString(payload) != encoded {
+		return Target{}, time.Time{}, ErrInvalidSignature
+	}
+	expected := s.capabilitySignature(payload)
+	if len(expected) != len(signature) || subtle.ConstantTimeCompare([]byte(expected), []byte(signature)) != 1 {
+		return Target{}, time.Time{}, ErrInvalidSignature
+	}
+	var capability targetCapability
+	decoder := json.NewDecoder(strings.NewReader(string(payload)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&capability); err != nil {
+		return Target{}, time.Time{}, ErrInvalidSignature
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return Target{}, time.Time{}, ErrInvalidSignature
+	}
+	canonical, err := json.Marshal(capability)
+	if err != nil || subtle.ConstantTimeCompare(canonical, payload) != 1 || capability.Version != targetRouteVersion || capability.Variant != variant {
+		return Target{}, time.Time{}, ErrInvalidSignature
+	}
+	if err := capability.Target.Validate(); err != nil || ValidateVariant(capability.Target.Slot, variant) != nil || capability.ExpiresAt <= 0 {
+		return Target{}, time.Time{}, ErrInvalidSignature
+	}
+	expiresAt := time.Unix(capability.ExpiresAt, 0).UTC()
+	if now.After(expiresAt) {
+		return capability.Target, expiresAt, ErrExpired
+	}
+	return capability.Target, expiresAt, nil
+}
+
+func (s *Signer) capabilitySignature(payload []byte) string {
+	mac := hmac.New(sha256.New, s.secret)
+	_, _ = mac.Write([]byte(targetRouteVersion))
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write(payload)
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
 
 var (
 	// ErrInvalidSignature reports a URL that this server did not mint: a
@@ -270,6 +355,84 @@ func (s *Signer) Sign(key string, now time.Time) (artworkstore.ResolvedURL, erro
 		"?" + ExpiresParam + "=" + strconv.FormatInt(unix, 10) +
 		"&" + SignatureParam + "=" + s.signature(key, unix)
 	return artworkstore.ResolvedURL{URL: url, ExpiresAt: &expiresAt}, nil
+}
+
+// SignDirectKey mints the explicit direct-policy local route. The logical key
+// is intentionally raw for CDN friendliness; ValidateKey is the sole grammar
+// gate and the handler rejects every percent escape before a single decode.
+func (s *Signer) SignDirectKey(key string, now time.Time) (artworkstore.ResolvedURL, error) {
+	if s == nil {
+		return artworkstore.ResolvedURL{}, errors.New("artworkurl: signer is not configured")
+	}
+	if err := artworkstore.ValidateKey(key); err != nil {
+		return artworkstore.ResolvedURL{}, err
+	}
+	expiresAt := quantizedExpiry(now, s.TTL())
+	unix := expiresAt.Unix()
+	directPath, err := DirectPathFromKey(key)
+	if err != nil {
+		return artworkstore.ResolvedURL{}, err
+	}
+	url := DirectRoutePrefix + directPath + "?" + ExpiresParam + "=" + strconv.FormatInt(unix, 10) +
+		"&" + SignatureParam + "=" + s.signature(key, unix)
+	return artworkstore.ResolvedURL{URL: url, ExpiresAt: &expiresAt}, nil
+}
+
+const portableObjectPrefix = "artwork/v1/objects/"
+
+// DirectPathFromKey removes the constant portable storage prefix from a raw
+// direct-policy URL. Direct mode deliberately exposes only portable objects:
+// its first segment is therefore always a fixed image-type token, leaving a
+// future leading v2 segment unambiguous.
+func DirectPathFromKey(key string) (string, error) {
+	if err := artworkstore.ValidateKey(key); err != nil {
+		return "", err
+	}
+	if strings.HasPrefix(key, portableObjectPrefix) {
+		path := strings.TrimPrefix(key, portableObjectPrefix)
+		info, ok := artworkkey.ParsePortableKey(key)
+		if path == "" || !ok || info.IsManifest {
+			return "", artworkstore.ErrInvalidKey
+		}
+		return path, nil
+	}
+	return "", artworkstore.ErrInvalidKey
+}
+
+// DirectKeyFromPath reverses DirectPathFromKey before ValidateKey remains the
+// sole gate into a store adapter.
+func DirectKeyFromPath(path string) (string, error) {
+	if path == "" || strings.Contains(path, "%") {
+		return "", artworkstore.ErrInvalidKey
+	}
+	key := portableObjectPrefix + path
+	if err := artworkstore.ValidateKey(key); err != nil {
+		return "", err
+	}
+	info, ok := artworkkey.ParsePortableKey(key)
+	if !ok || info.IsManifest {
+		return "", artworkstore.ErrInvalidKey
+	}
+	return key, nil
+}
+
+func (s *Signer) VerifyDirectKey(key, expires, signature string, now time.Time) (time.Time, error) {
+	if strings.Contains(key, "%") || artworkstore.ValidateKey(key) != nil {
+		return time.Time{}, ErrInvalidSignature
+	}
+	unix, err := strconv.ParseInt(expires, 10, 64)
+	if err != nil || unix <= 0 || signature == "" {
+		return time.Time{}, ErrInvalidSignature
+	}
+	expected := s.signature(key, unix)
+	if len(expected) != len(signature) || subtle.ConstantTimeCompare([]byte(expected), []byte(signature)) != 1 {
+		return time.Time{}, ErrInvalidSignature
+	}
+	expiresAt := time.Unix(unix, 0).UTC()
+	if now.After(expiresAt) {
+		return expiresAt, ErrExpired
+	}
+	return expiresAt, nil
 }
 
 // Verify authenticates a signed artwork URL and returns the logical key it

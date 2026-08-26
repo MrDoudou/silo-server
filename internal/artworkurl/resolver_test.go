@@ -34,36 +34,53 @@ func TestNewResolverRequiresADeliveryPath(t *testing.T) {
 	}
 }
 
-// A bucket-backed store keeps delivering directly: that is the reason an
-// operator chose it, and proxying its bytes through Silo would be a regression.
-func TestResolverPrefersDirectDelivery(t *testing.T) {
+func TestResolverDefaultsToTargetBoundResilientDeliveryForS3(t *testing.T) {
 	direct := &fakeDirectURLs{}
 	resolver, err := NewResolver(direct, testSigner(t, time.Hour), func() time.Duration { return 30 * time.Minute })
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
 
-	if !resolver.DirectDelivery() {
-		t.Fatal("DirectDelivery = false, want true")
+	if resolver.DirectDelivery() {
+		t.Fatal("DirectDelivery = true under resilient policy")
 	}
-	resolved, err := resolver.ResolveArtworkURL(context.Background(), testKey)
+	target := Target{Surface: SurfaceItemPosters, Keys: []string{"movie-1"}, Slot: "poster"}.WithReference(testKey)
+	resolved, err := resolver.ResolveTargetURL(context.Background(), target, "w300")
 	if err != nil {
-		t.Fatalf("ResolveArtworkURL: %v", err)
+		t.Fatalf("ResolveTargetURL: %v", err)
 	}
-	if !strings.HasPrefix(resolved.URL, "https://cdn.test/") {
-		t.Fatalf("URL = %q, want the backend's own URL", resolved.URL)
+	if !strings.HasPrefix(resolved.URL, RoutePrefix) {
+		t.Fatalf("URL = %q, want the resilient API route", resolved.URL)
 	}
-	if direct.requestedTTL != 30*time.Minute {
-		t.Fatalf("requested TTL = %s, want 30m", direct.requestedTTL)
+	if direct.calls != 0 {
+		t.Fatalf("direct backend calls = %d, want zero", direct.calls)
 	}
 }
 
-func TestResolverSignsWhenTheBackendHasNoDirectURL(t *testing.T) {
+func TestResolverDirectPolicyUsesBackendURL(t *testing.T) {
+	direct := &fakeDirectURLs{}
+	resolver, err := NewResolver(direct, testSigner(t, time.Hour), func() time.Duration { return 30 * time.Minute })
+	if err != nil {
+		t.Fatalf("NewResolver: %v", err)
+	}
+	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
+	target := Target{Surface: SurfaceItemPosters, Keys: []string{"movie-1"}, Slot: "poster"}.WithReference(testKey)
+	resolved, err := resolver.ResolveTargetURL(context.Background(), target, "w300")
+	if err != nil {
+		t.Fatalf("ResolveTargetURL: %v", err)
+	}
+	if !strings.HasPrefix(resolved.URL, "https://cdn.test/") || direct.requestedTTL != 30*time.Minute {
+		t.Fatalf("resolved = %#v, ttl %s", resolved, direct.requestedTTL)
+	}
+}
+
+func TestResolverDirectPolicySignsRawKeyWhenBackendHasNoDirectURL(t *testing.T) {
 	resolver, err := NewResolver(nil, testSigner(t, time.Hour), nil)
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
 
+	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
 	if resolver.DirectDelivery() {
 		t.Fatal("DirectDelivery = true, want false")
 	}
@@ -71,8 +88,12 @@ func TestResolverSignsWhenTheBackendHasNoDirectURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveArtworkURL: %v", err)
 	}
-	if !strings.HasPrefix(resolved.URL, RoutePrefix) {
-		t.Fatalf("URL = %q, want a signed native artwork URL", resolved.URL)
+	directPath, err := DirectPathFromKey(testKey)
+	if err != nil {
+		t.Fatalf("DirectPathFromKey: %v", err)
+	}
+	if !strings.HasPrefix(resolved.URL, DirectRoutePrefix+directPath) {
+		t.Fatalf("URL = %q, want a signed raw-key artwork URL", resolved.URL)
 	}
 	if resolved.ExpiresAt == nil {
 		t.Fatal("signed URL reports no expiry; the resolver cache would never store it")
@@ -84,6 +105,7 @@ func TestResolveArtworkURLRejectsNonKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
+	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
 
 	// Bundled asset paths and other non-key references reach this resolver
 	// too; none of them may become a signed URL.
@@ -99,6 +121,7 @@ func TestResolveArtworkURLsOmitsFailures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
+	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
 
 	resolved := resolver.ResolveArtworkURLs(context.Background(), []string{
 		testKey,
@@ -118,6 +141,7 @@ func TestResolveArtworkURLsSkipsBackendErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
+	resolver.SetDeliveryPolicy(func() string { return DeliveryPolicyDirect })
 
 	if resolved := resolver.ResolveArtworkURLs(context.Background(), []string{testKey}); len(resolved) != 0 {
 		t.Fatalf("resolved = %v, want no entries when the backend fails", resolved)

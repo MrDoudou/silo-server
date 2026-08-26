@@ -40,17 +40,33 @@ type SettingsStore interface {
 	SetIfAbsent(ctx context.Context, key, value string) (bool, error)
 }
 
+type settingsUpdater interface {
+	Set(ctx context.Context, key, value string) error
+}
+
+func replacePin(ctx context.Context, settings SettingsStore, pin Pin) error {
+	updater, ok := settings.(settingsUpdater)
+	if !ok {
+		return errors.New("artworkstore: settings store cannot record a recreated store generation")
+	}
+	encoded, err := encodePin(pin)
+	if err != nil {
+		return err
+	}
+	if err := updater.Set(ctx, StorePinSettingKey, encoded); err != nil {
+		return fmt.Errorf("artworkstore: updating recreated store generation: %w", err)
+	}
+	return nil
+}
+
 // Pin is the recorded binding between the catalog's artwork keys and one
 // physical store. It is written once, by the first successful materialization,
 // and from then on every node verifies it at startup.
 //
 // Generation identifies the physical copy for backends that have one: the
-// filesystem store records its store-marker id, so pointing a node at a
-// different (or freshly emptied) directory is detected instead of silently
-// reinterpreting live catalog keys against empty storage. S3 leaves it empty —
-// bucket identity is already fingerprinted by the artwork reconcile task, and a
-// second competing identity mechanism would produce two contradictory errors
-// for the same event.
+// filesystem and S3 stores both record a random copy-marker id. A reachable
+// non-empty store with a different id is a fatal configuration mismatch; an
+// authoritatively empty owned store receives a new generation and is rebuilt.
 type Pin struct {
 	Version    int    `json:"version"`
 	Backend    string `json:"backend"`

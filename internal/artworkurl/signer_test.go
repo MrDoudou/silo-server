@@ -14,7 +14,7 @@ import (
 
 const (
 	testSecret = "cluster-authentication-secret"
-	testKey    = "artwork/v1/objects/poster/ab/abcdef/original.webp"
+	testKey    = "artwork/v1/objects/poster/ab/abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd/original.webp"
 )
 
 func testSigner(t *testing.T, ttl time.Duration) *Signer {
@@ -75,6 +75,73 @@ func TestSignMintsRootRelativeURL(t *testing.T) {
 	// The key is carried in the URL, never a filesystem path.
 	if strings.Contains(signed.URL, testKey) {
 		t.Fatalf("URL = %q, want the key encoded rather than embedded", signed.URL)
+	}
+}
+
+func TestTargetCapabilityRoundTripBindsTargetRevisionAndVariant(t *testing.T) {
+	signer := testSigner(t, time.Hour)
+	now := time.Now()
+	target := Target{
+		Surface: SurfaceItemPosters,
+		Keys:    []string{"movie-1"},
+		Slot:    "poster",
+	}.WithReference(testKey)
+	signed, err := signer.SignTarget(target, "w300", now)
+	if err != nil {
+		t.Fatalf("SignTarget: %v", err)
+	}
+	path := strings.TrimPrefix(signed.URL, RoutePrefix)
+	capability, variant, ok := strings.Cut(path, "/")
+	if !ok {
+		t.Fatalf("signed target URL has no variant: %q", signed.URL)
+	}
+	verified, expiresAt, err := signer.VerifyTarget(capability, variant, now)
+	if err != nil {
+		t.Fatalf("VerifyTarget: %v", err)
+	}
+	if verified.Surface != target.Surface || verified.Keys[0] != "movie-1" || verified.ExpectedRevision != target.ExpectedRevision || variant != "w300" {
+		t.Fatalf("verified target = %#v, variant %q", verified, variant)
+	}
+	if !expiresAt.Equal(*signed.ExpiresAt) {
+		t.Fatalf("expiry = %s, want %s", expiresAt, signed.ExpiresAt)
+	}
+	if _, _, err := signer.VerifyTarget(capability, "w500", now); !errors.Is(err, ErrInvalidSignature) {
+		t.Fatalf("variant substitution = %v, want ErrInvalidSignature", err)
+	}
+}
+
+func TestDirectKeyURLIsRawAndRejectsEscapes(t *testing.T) {
+	signer := testSigner(t, time.Hour)
+	now := time.Now()
+	signed, err := signer.SignDirectKey(testKey, now)
+	if err != nil {
+		t.Fatalf("SignDirectKey: %v", err)
+	}
+	directPath, err := DirectPathFromKey(testKey)
+	if err != nil {
+		t.Fatalf("DirectPathFromKey: %v", err)
+	}
+	if !strings.HasPrefix(signed.URL, DirectRoutePrefix+directPath+"?") {
+		t.Fatalf("URL = %q, want the portable key without its constant storage prefix", signed.URL)
+	}
+	parsed, err := url.Parse(signed.URL)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if _, err := signer.VerifyDirectKey(testKey, parsed.Query().Get(ExpiresParam), parsed.Query().Get(SignatureParam), now); err != nil {
+		t.Fatalf("VerifyDirectKey: %v", err)
+	}
+	if _, err := signer.VerifyDirectKey("artwork%2Fv1/objects/poster/ab/abcdef/original.webp", parsed.Query().Get(ExpiresParam), parsed.Query().Get(SignatureParam), now); !errors.Is(err, ErrInvalidSignature) {
+		t.Fatalf("escaped key = %v, want ErrInvalidSignature", err)
+	}
+	if got, err := DirectKeyFromPath(directPath); err != nil || got != testKey {
+		t.Fatalf("direct path round trip = %q, %v, want %q", got, err, testKey)
+	}
+	if _, err := DirectPathFromKey("tmdb/movie/1/poster/original.webp"); !errors.Is(err, artworkstore.ErrInvalidKey) {
+		t.Fatalf("legacy direct key error = %v, want ErrInvalidKey", err)
+	}
+	if _, err := DirectKeyFromPath("v2/poster/ab/abcdef/original.webp"); !errors.Is(err, artworkstore.ErrInvalidKey) {
+		t.Fatalf("reserved future-version path error = %v, want ErrInvalidKey", err)
 	}
 }
 

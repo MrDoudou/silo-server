@@ -16,21 +16,22 @@ import (
 )
 
 const (
-	defaultArtworkGCGracePeriod = 24 * time.Hour
-	artworkTargetSeason         = "season"
-	artworkTargetEpisode        = "episode"
-	artworkImagePoster          = "poster"
-	artworkImageBackdrop        = "backdrop"
-	artworkImageLogo            = "logo"
-	artworkImageStill           = "still"
-	artworkPosterPathColumn     = "poster_path"
-	artworkBackdropPathColumn   = "backdrop_path"
-	artworkLogoPathColumn       = "logo_path"
-	artworkPosterSourceColumn   = "poster_source_path"
-	artworkBackdropSourceColumn = "backdrop_source_path"
-	artworkLogoSourceColumn     = "logo_source_path"
-	artworkPosterThumbColumn    = "poster_thumbhash"
-	artworkBackdropThumbColumn  = "backdrop_thumbhash"
+	defaultArtworkGCGracePeriod    = 24 * time.Hour
+	artworkTargetSeason            = "season"
+	artworkTargetEpisode           = "episode"
+	artworkImagePoster             = "poster"
+	artworkImageBackdrop           = "backdrop"
+	artworkImageLogo               = "logo"
+	artworkImageStill              = "still"
+	artworkProviderVariantFeatured = "featured"
+	artworkPosterPathColumn        = "poster_path"
+	artworkBackdropPathColumn      = "backdrop_path"
+	artworkLogoPathColumn          = "logo_path"
+	artworkPosterSourceColumn      = "poster_source_path"
+	artworkBackdropSourceColumn    = "backdrop_source_path"
+	artworkLogoSourceColumn        = "logo_source_path"
+	artworkPosterThumbColumn       = "poster_thumbhash"
+	artworkBackdropThumbColumn     = "backdrop_thumbhash"
 )
 
 // ErrUnsupportedArtworkSelection reports a target/image-type combination that

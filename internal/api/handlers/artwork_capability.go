@@ -14,7 +14,8 @@ const (
 	artworkDeliveryAPI = "api"
 	// artworkDeliveryDirect means clients fetch artwork straight from the
 	// object store or CDN and the bytes never pass through Silo.
-	artworkDeliveryDirect = "direct"
+	artworkDeliveryDirect    = "direct"
+	artworkDeliveryResilient = "resilient"
 )
 
 // artworkCapabilityResponse describes how this server stores and delivers
@@ -38,6 +39,13 @@ type artworkCapabilityResponse struct {
 	// DeliveryModes are how artwork URLs are fetched: "api" for signed URLs
 	// served by this server, "direct" for object-store or CDN URLs.
 	DeliveryModes []string `json:"delivery_modes"`
+	// DeliveryPolicy is resilient by default; direct is an explicit
+	// administrator opt-out from request-time recovery.
+	DeliveryPolicy string `json:"delivery_policy"`
+	StoreHealth    string `json:"store_health"`
+	// AutomaticRecovery reports whether target-bound loss detection and the
+	// durable repair coordinator are active.
+	AutomaticRecovery bool `json:"automatic_recovery"`
 	// RemoteMaterialization is "selected" when remote provider artwork is
 	// copied into the store on selection, or "passthrough" when catalog
 	// responses keep pointing at the provider.
@@ -70,6 +78,16 @@ type ArtworkCapabilityHandler struct {
 	backend         string
 	directDelivery  bool
 	materialization func() string
+	deliveryPolicy  func() string
+	storeHealth     func() string
+}
+
+func (h *ArtworkCapabilityHandler) SetResilientStatus(deliveryPolicy, storeHealth func() string) {
+	if h == nil {
+		return
+	}
+	h.deliveryPolicy = deliveryPolicy
+	h.storeHealth = storeHealth
 }
 
 // NewArtworkCapabilityHandler builds the capability handler. backend is the
@@ -87,14 +105,21 @@ func NewArtworkCapabilityHandler(backend string, directDelivery bool, materializ
 
 // HandleCapability reports the artwork storage and delivery capability.
 func (h *ArtworkCapabilityHandler) HandleCapability(w http.ResponseWriter, r *http.Request) {
-	deliveryMode := artworkDeliveryAPI
-	if h.directDelivery {
-		deliveryMode = artworkDeliveryDirect
-	}
-
 	materialization := ""
 	if h.materialization != nil {
 		materialization = h.materialization()
+	}
+	deliveryPolicy := artworkDeliveryResilient
+	if h.deliveryPolicy != nil && h.deliveryPolicy() == artworkDeliveryDirect {
+		deliveryPolicy = artworkDeliveryDirect
+	}
+	deliveryMode := artworkDeliveryAPI
+	if deliveryPolicy == artworkDeliveryDirect && h.directDelivery {
+		deliveryMode = artworkDeliveryDirect
+	}
+	storeHealth := "healthy"
+	if h.storeHealth != nil && h.storeHealth() != "" {
+		storeHealth = h.storeHealth()
 	}
 
 	imageTypes := artworkkey.ImageTypes()
@@ -110,6 +135,9 @@ func (h *ArtworkCapabilityHandler) HandleCapability(w http.ResponseWriter, r *ht
 		StorageFormat:         artworkkey.PortableStorageFormat,
 		PortableStorage:       true,
 		DeliveryModes:         []string{deliveryMode},
+		DeliveryPolicy:        deliveryPolicy,
+		StoreHealth:           storeHealth,
+		AutomaticRecovery:     deliveryPolicy == artworkDeliveryResilient,
 		RemoteMaterialization: materialization,
 		LocalSourcePolicy:     "materialize",
 		StorageManagement: artworkStorageManagementCapability{

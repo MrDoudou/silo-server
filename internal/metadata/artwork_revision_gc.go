@@ -71,6 +71,14 @@ func (g *ArtworkRevisionGarbageCollector) Run(ctx context.Context) (ArtworkRevis
 	if g == nil || g.pool == nil || g.store == nil {
 		return stats, fmt.Errorf("artwork revision GC is not configured")
 	}
+	if health, ok := g.store.(interface {
+		Health() (artworkstore.HealthState, time.Time)
+	}); ok {
+		state, _ := health.Health()
+		if state == artworkstore.HealthUnavailable || state == artworkstore.HealthWrongMount {
+			return stats, nil
+		}
+	}
 
 	workerID := uuid.NewString()
 	candidates, err := g.claim(ctx, workerID, artworkRevisionGCBatchSize)
@@ -406,6 +414,10 @@ func (g *ArtworkRevisionGarbageCollector) processCandidate(
 		UPDATE artwork_revision_gc_candidates
 		SET tombstoned_at = NOW(),
 			next_attempt_at = NULL,
+			missing_at = NULL,
+			repair_state = '',
+			repair_queued_at = NULL,
+			protected_loss_at = NULL,
 			locked_at = NULL,
 			locked_by = '',
 			last_error = '',

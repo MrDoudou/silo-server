@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/metadata"
 	"github.com/Silo-Server/silo-server/internal/models"
@@ -358,7 +359,9 @@ func (h *PeopleHandler) toResponse(ctx context.Context, p models.Person) personR
 		resp.DeathDate = &s
 	}
 	if p.PhotoPath != "" && p.PhotoPath != "-" && h.detailSvc != nil {
-		resp.PhotoURL = h.detailSvc.PresignURL(ctx, featuredPosterPath(p.PhotoPath), "featured")
+		resp.PhotoURL = h.detailSvc.PresignArtworkTargetImageURL(ctx, artworkurl.Target{
+			Surface: artworkurl.SurfacePersonPhotos, Keys: []string{strconv.FormatInt(p.ID, 10)}, Slot: artworkImageProfile,
+		}, p.PhotoPath, "profile", "")
 	}
 	if p.PhotoThumbhash != "" && p.PhotoThumbhash != "-" {
 		resp.PhotoThumbhash = p.PhotoThumbhash

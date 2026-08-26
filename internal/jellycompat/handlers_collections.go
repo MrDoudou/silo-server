@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/models"
 )
@@ -192,7 +193,7 @@ func (h *ItemsHandler) loadVisibleCollection(ctx context.Context, session *Sessi
 func (h *ItemsHandler) boxSetFromCollection(ctx context.Context, c *models.LibraryCollection) baseItemDTO {
 	routeID := h.codec.EncodeStringID(EncodedIDCollection, c.ID)
 	imgTags := map[string]string{}
-	if posterURL := h.presignCollectionPoster(ctx, c.PosterURL); posterURL != "" {
+	if posterURL := h.presignCollectionPoster(ctx, c.ID, c.PosterURL, "collection-poster"); posterURL != "" {
 		if h.images != nil {
 			h.images.RememberSized(routeID, "Primary", posterURL, compatCardImageSize)
 		}
@@ -227,7 +228,7 @@ func (h *ItemsHandler) boxSetFromCollection(ctx context.Context, c *models.Libra
 			ItemID: routeID,
 		},
 	}
-	if backdropURL := h.presignCollectionPoster(ctx, c.BackdropURL); backdropURL != "" {
+	if backdropURL := h.presignCollectionPoster(ctx, c.ID, c.BackdropURL, "collection-backdrop"); backdropURL != "" {
 		if h.images != nil {
 			h.images.RememberSized(routeID, "Backdrop", backdropURL, compatCardImageSize)
 		}
@@ -243,7 +244,7 @@ func (h *ItemsHandler) boxSetFromCollection(ctx context.Context, c *models.Libra
 // fetchable URL. Collection posters are stored as artwork keys (the same
 // storage library posters use); absolute and app-relative references pass
 // through untouched (matching the main API's presignGPURL semantics).
-func (h *ItemsHandler) presignCollectionPoster(ctx context.Context, path string) string {
+func (h *ItemsHandler) presignCollectionPoster(ctx context.Context, collectionID, path, slot string) string {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return ""
@@ -254,7 +255,13 @@ func (h *ItemsHandler) presignCollectionPoster(ctx context.Context, path string)
 	if h.artworkURLs == nil {
 		return ""
 	}
-	resolved, err := h.artworkURLs.ResolveArtworkURL(ctx, path)
+	surface := artworkurl.SurfaceCollectionPosters
+	if slot == "collection-backdrop" {
+		surface = artworkurl.SurfaceCollectionBackdrops
+	}
+	resolved, err := resolveCompatArtworkTarget(ctx, h.artworkURLs, artworkurl.Target{
+		Surface: surface, Keys: []string{collectionID}, Slot: slot,
+	}, path, "w300")
 	if err != nil {
 		return ""
 	}

@@ -12,6 +12,9 @@ const (
 	labelOperation = "operation"
 	labelOutcome   = "outcome"
 	labelUnknown   = "unknown"
+	labelBackend   = "backend"
+	labelRoute     = "route"
+	labelKind      = "kind"
 )
 
 var (
@@ -19,9 +22,11 @@ var (
 	materializationResults = labelSet("materialized", "adopted", "failed", labelUnknown)
 	storeBackends          = labelSet("local", "s3", labelUnknown)
 	storeOperations        = labelSet("write", "open", "stat", "matches", "delete", "probe", "list", "maintenance_delete", labelUnknown)
-	deliveryRoutes         = labelSet("store", "direct_library", labelUnknown)
-	deliveryResults        = labelSet("served", "conditional_hit", "invalid_signature", "expired_signature", "miss", labelUnknown)
-	purgeResults           = labelSet("completed", "failed", "cancelled", labelUnknown)
+	deliveryRoutes         = labelSet("store", "source_fallback", "placeholder", "direct", "direct_library", labelUnknown)
+	deliveryResults        = labelSet("served", "conditional_hit", "invalid_signature", "expired_signature", "miss", "emergency_cache_hit", "singleflight_join", labelUnknown)
+	storeHealthStates      = labelSet("healthy", "degraded", "unavailable", "empty_rebuilding", "wrong_mount", labelUnknown)
+	repairResults          = labelSet("missing", "queued", "repairing", "recovered", "protected_loss", "throttled", labelUnknown)
+	purgeResults           = labelSet("completed", "failed", "canceled", labelUnknown)
 	seedResults            = labelSet("imported", "adopted", "skipped", "retained_unverifiable", "expired", labelUnknown)
 	variantResults         = labelSet("written", "matched", labelUnknown)
 	manifestOperations     = labelSet("adoption_index", "adoption_manifest_digest", "adoption_manifest", "adoption_objects", labelUnknown)
@@ -45,11 +50,11 @@ func boundedLabel(value string, allowed map[string]struct{}) string {
 
 var (
 	materializations = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_materializations_total", Help: "Artwork materialization outcomes."}, []string{"source_class", labelOutcome})
-	storeDuration    = promauto.NewHistogramVec(prometheus.HistogramOpts{Name: "silo_artwork_store_operation_duration_seconds", Help: "Artwork store operation latency.", Buckets: prometheus.DefBuckets}, []string{"backend", labelOperation})
-	storeFailures    = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_store_operation_failures_total", Help: "Artwork store operation failures."}, []string{"backend", labelOperation})
-	delivery         = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_delivery_requests_total", Help: "Artwork delivery requests by bounded outcome."}, []string{"route", labelOutcome})
+	storeDuration    = promauto.NewHistogramVec(prometheus.HistogramOpts{Name: "silo_artwork_store_operation_duration_seconds", Help: "Artwork store operation latency.", Buckets: prometheus.DefBuckets}, []string{labelBackend, labelOperation})
+	storeFailures    = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_store_operation_failures_total", Help: "Artwork store operation failures."}, []string{labelBackend, labelOperation})
+	delivery         = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_delivery_requests_total", Help: "Artwork delivery requests by bounded outcome."}, []string{labelRoute, labelOutcome})
 	purgeJobs        = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_purge_jobs_total", Help: "Artwork purge job outcomes."}, []string{"dry_run", labelOutcome})
-	purgeBytes       = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_purge_bytes_total", Help: "Bytes reported by artwork purge plans and jobs."}, []string{"kind"})
+	purgeBytes       = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_purge_bytes_total", Help: "Bytes reported by artwork purge plans and jobs."}, []string{labelKind})
 	inventoryAge     = promauto.NewGauge(prometheus.GaugeOpts{Name: "silo_artwork_inventory_snapshot_age_seconds", Help: "Age of the latest artwork inventory snapshot."})
 	inventoryDrift   = promauto.NewGaugeVec(prometheus.GaugeOpts{Name: "silo_artwork_inventory_drift_objects", Help: "Artwork inventory drift counters."}, []string{"kind"})
 	seedEvents       = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_seed_events_total", Help: "Portable artwork seed import, adoption, and expiry events."}, []string{labelOutcome})
@@ -59,6 +64,13 @@ var (
 	manifestErrors   = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_manifest_validation_failures_total", Help: "Portable manifest validation failures."}, []string{"operation"})
 	tempCleaned      = promauto.NewCounter(prometheus.CounterOpts{Name: "silo_artwork_abandoned_temp_files_cleaned_total", Help: "Abandoned artwork temporary files removed."})
 	seedExpired      = promauto.NewGauge(prometheus.GaugeOpts{Name: "silo_artwork_seed_expired_bytes", Help: "Expired unused portable seed bytes."})
+	storeHealth      = promauto.NewGaugeVec(prometheus.GaugeOpts{Name: "silo_artwork_store_health", Help: "Current artwork store health state (one active state per backend)."}, []string{labelBackend, "state"})
+	storeTransitions = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_store_health_transitions_total", Help: "Debounced artwork store health transitions."}, []string{labelBackend, "from", "to"})
+	repairEvents     = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_repair_events_total", Help: "Artwork loss detection and repair coordinator events."}, []string{labelOutcome})
+	repairPending    = promauto.NewGaugeVec(prometheus.GaugeOpts{Name: "silo_artwork_repair_pending", Help: "Artwork revisions awaiting repair by bounded class."}, []string{"kind"})
+	deliveryLatency  = promauto.NewHistogramVec(prometheus.HistogramOpts{Name: "silo_artwork_delivery_time_to_first_verified_byte_seconds", Help: "Time from artwork request start to a verified stored, fallback, or placeholder response.", Buckets: prometheus.DefBuckets}, []string{"route"})
+	healthStateTime  = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_store_health_state_seconds_total", Help: "Time accumulated in artwork store operational states."}, []string{"backend", "state"})
+	wrongMounts      = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_store_wrong_mount_detections_total", Help: "Artwork shared-mount sentinel failures."}, []string{"backend"})
 )
 
 func Materialization(sourceClass, outcome string) {
@@ -131,3 +143,45 @@ func TempFilesCleaned(count int) {
 	}
 }
 func SeedExpiredBytes(bytes int64) { seedExpired.Set(float64(bytes)) }
+
+func StoreHealth(backend, from, to string) {
+	backend = boundedLabel(backend, storeBackends)
+	from = boundedLabel(from, storeHealthStates)
+	to = boundedLabel(to, storeHealthStates)
+	for state := range storeHealthStates {
+		if state != labelUnknown {
+			storeHealth.WithLabelValues(backend, state).Set(0)
+		}
+	}
+	storeHealth.WithLabelValues(backend, to).Set(1)
+	if from != to {
+		storeTransitions.WithLabelValues(backend, from, to).Inc()
+	}
+}
+
+func Repair(outcome string) {
+	repairEvents.WithLabelValues(boundedLabel(outcome, repairResults)).Inc()
+}
+
+func RepairPending(repairing, protected int64) {
+	repairPending.WithLabelValues("repairing").Set(float64(repairing))
+	repairPending.WithLabelValues("protected_loss").Set(float64(protected))
+}
+
+func ObserveDeliveryLatency(route string, started time.Time) {
+	if started.IsZero() {
+		started = time.Now()
+	}
+	deliveryLatency.WithLabelValues(boundedLabel(route, deliveryRoutes)).Observe(time.Since(started).Seconds())
+}
+
+func StoreHealthDuration(backend, state string, duration time.Duration) {
+	backend = boundedLabel(backend, storeBackends)
+	state = boundedLabel(state, storeHealthStates)
+	if duration > 0 {
+		healthStateTime.WithLabelValues(backend, state).Add(duration.Seconds())
+	}
+	if state == "wrong_mount" {
+		wrongMounts.WithLabelValues(backend).Inc()
+	}
+}

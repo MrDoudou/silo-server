@@ -119,6 +119,15 @@ type Dependencies struct {
 	// ArtworkURLs resolves a logical artwork key to a fetchable URL on
 	// whichever backend holds it. Nil on nodes without artwork storage.
 	ArtworkURLs *artworkurl.Resolver
+	// ArtworkDelivery is shared by native and jellycompat routes so source
+	// singleflight, emergency-cache, and repair-signal budgets are process-wide.
+	ArtworkDelivery *handlers.ArtworkHandler
+	// ArtworkSourceResolver resolves retained plugin references for resilient
+	// request-time fallback. It is the same resolver durable materialization
+	// uses, so SSRF and provider routing behavior cannot drift.
+	ArtworkSourceResolver interface {
+		ResolveImageURL(ctx context.Context, path string, variant string) string
+	}
 	// ArtworkUploads materializes administrator- and user-supplied images —
 	// library posters, collection artwork, profile avatars — into the artwork
 	// store. Nil on nodes without artwork storage, which is what makes those
@@ -292,6 +301,15 @@ func (deps Dependencies) invalidateNodeCapabilities(playbackHandler *handlers.Pl
 func NewRouter(deps Dependencies) chi.Router {
 	declareNativeMediaRoutes()
 	r := chi.NewRouter()
+	if deps.ArtworkDelivery == nil && deps.ArtworkStore != nil && deps.ArtworkURLSigner != nil && deps.DB != nil {
+		// Main constructs this once and also gives it to jellycompat. Keep the
+		// router constructor complete for embedded/test callers while still
+		// creating exactly one handler for every Dependencies value.
+		coordinator := metadata.NewArtworkDeliveryCoordinator(deps.DB, metadata.NewDirectLibraryArtworkResolver(deps.DB), deps.UserStoreProvider)
+		coordinator.SetStoreHealth(deps.ArtworkStore)
+		deps.ArtworkDelivery = handlers.NewArtworkHandler(deps.ArtworkStore.Store, deps.ArtworkURLSigner)
+		deps.ArtworkDelivery.SetResilientDependencies(coordinator, deps.ArtworkSourceResolver, deps.ArtworkStore.ReportFailure)
+	}
 
 	useBaseMiddleware(r, deps)
 
@@ -1298,7 +1316,7 @@ func NewRouter(deps Dependencies) chi.Router {
 		if deps.ArtworkStore != nil {
 			adminArtworkStorageHandler = handlers.NewAdminArtworkStorageHandler(
 				metadata.NewArtworkStorageService(
-					deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.Generation,
+					deps.DB, deps.ArtworkStore.Store, deps.ArtworkStore.Backend, deps.ArtworkStore.GenerationID(),
 					!deps.UserArtworkTracked,
 				),
 				jobRepo,
@@ -1908,14 +1926,29 @@ func NewRouter(deps Dependencies) chi.Router {
 		// attach a bearer header: the signature in the URL is the capability,
 		// minted only while building an authenticated catalog response.
 		//
-		// Registered only when clients cannot fetch artwork from the backend
-		// themselves, which keeps the route and the capability's
-		// delivery_modes describing the same thing: a bucket-backed store
-		// delivers directly and never proxies bytes through the API.
-		if deps.ArtworkStore != nil && deps.ArtworkURLs != nil && !deps.ArtworkURLs.DirectDelivery() {
-			if artworkHandler := handlers.NewArtworkHandler(deps.ArtworkStore.Store, deps.ArtworkURLSigner); artworkHandler != nil {
-				r.Get("/artwork/{"+handlers.ArtworkKeyParam+"}", artworkHandler.ServeHTTP)
-				r.Head("/artwork/{"+handlers.ArtworkKeyParam+"}", artworkHandler.ServeHTTP)
+		if deps.ArtworkStore != nil && deps.ArtworkURLs != nil && deps.DB != nil {
+			if artworkHandler := deps.ArtworkDelivery; artworkHandler != nil {
+				r.Get("/artwork/{"+handlers.ArtworkCapabilityParam+"}/{"+handlers.ArtworkVariantParam+"}", artworkHandler.ServeHTTP)
+				r.Head("/artwork/{"+handlers.ArtworkCapabilityParam+"}/{"+handlers.ArtworkVariantParam+"}", artworkHandler.ServeHTTP)
+			}
+		}
+		if deps.ArtworkStore != nil && deps.ArtworkURLSigner != nil {
+			directHandler := handlers.NewDirectArtworkHandler(
+				deps.ArtworkStore.Store,
+				deps.ArtworkURLSigner,
+				func() string {
+					if cfg := deps.CurrentConfig(); cfg != nil {
+						if cfg.Artwork.DeliveryPolicy != config.ArtworkDeliveryDirect {
+							return config.ArtworkURLAuthSigned
+						}
+						return cfg.Artwork.URLAuth
+					}
+					return config.ArtworkURLAuthSigned
+				},
+			)
+			if directHandler != nil {
+				r.Get("/artwork/*", directHandler.ServeHTTP)
+				r.Head("/artwork/*", directHandler.ServeHTTP)
 			}
 		}
 		// Direct-library fallbacks always traverse Silo, even when canonical
@@ -2900,6 +2933,13 @@ func NewRouter(deps Dependencies) chi.Router {
 						deps.ArtworkStore.Backend,
 						deps.ArtworkURLs.DirectDelivery(),
 						func() string { return deps.CurrentConfig().Artwork.RemoteMaterialization },
+					)
+					artworkCapabilityHandler.SetResilientStatus(
+						deps.ArtworkURLs.DeliveryPolicy,
+						func() string {
+							state, _ := deps.ArtworkStore.Health()
+							return string(state)
+						},
 					)
 					r.Get("/artwork/capability", artworkCapabilityHandler.HandleCapability)
 				}

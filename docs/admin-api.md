@@ -656,7 +656,14 @@ are attribution, not additive usage: do not sum library rows to calculate the
 server total. Artwork outside a media-folder ownership graph is reported in
 `server_scoped` instead.
 
-`backend`, `health`, and optional `resolved_path` report the effective store.
+`backend`, `store_health`, `store_health_changed_at`, and optional
+`resolved_path` report the effective store. Health is `healthy`, `degraded`,
+`unavailable`, `empty_rebuilding`, or `wrong_mount`. `total` additionally
+reports `missing_bytes`, `repair_pending_bytes`, and
+`missing_revision_count`, `repairing_revision_count`, and
+`protected_loss_count`. A protected loss remains selected and renders a
+placeholder until an administrator restores or replaces it; a transport outage
+does not increment missing counts.
 `free_space_bytes` is present only for a backend with meaningful bounded local
 capacity. Adoption-index objects are included in the unique physical/object
 totals. `seed` reports verified copied-store revisions, including expired bytes

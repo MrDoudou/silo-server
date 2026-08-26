@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+
+	"github.com/Silo-Server/silo-server/internal/artworkstore"
 )
 
 // PGPinger is the interface used to check PostgreSQL connectivity.
@@ -80,7 +82,9 @@ func (h *HealthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ReadyHandler checks the health of PostgreSQL, S3, and artwork storage.
+// ReadyHandler checks the health of PostgreSQL and S3. Artwork storage is
+// reported as a degradable dependency: resilient delivery can still return a
+// source fallback or placeholder while that backend recovers.
 type ReadyHandler struct {
 	pg      PGPinger
 	s3      S3HealthChecker
@@ -96,9 +100,8 @@ func NewReadyHandler(pg PGPinger, s3 S3HealthChecker) *ReadyHandler {
 
 // SetArtworkStorage wires the canonical artwork store into readiness. Nodes
 // that do not own artwork storage leave it unset and are reported as healthy;
-// where it is set, an unwritable store or one that no longer matches the
-// pinned store generation fails readiness rather than silently serving
-// missing artwork.
+// where it is set, an unwritable store is reported without taking the API node
+// out of service. Reachable pin mismatches are rejected earlier by store Open.
 func (h *ReadyHandler) SetArtworkStorage(checker ArtworkStorageChecker) {
 	if h != nil {
 		h.artwork = checker
@@ -106,7 +109,8 @@ func (h *ReadyHandler) SetArtworkStorage(checker ArtworkStorageChecker) {
 }
 
 // ServeHTTP checks PostgreSQL, S3, and artwork storage health and responds
-// with the combined status. Returns 200 if all checks pass, 503 if any fail.
+// with the combined status. Artwork failure produces a 200 degraded response;
+// core database dependencies still produce 503.
 func (h *ReadyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -118,7 +122,7 @@ func (h *ReadyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Status: "ok",
 	}
 
-	if !pgOK || !s3OK || !artworkOK {
+	if !pgOK || !s3OK {
 		status.Status = "error"
 		status.Postgres = new(pgOK)
 		status.S3 = new(s3OK)
@@ -128,6 +132,10 @@ func (h *ReadyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_ = json.NewEncoder(w).Encode(status)
 		return
+	}
+	if !artworkOK {
+		status.Status = string(artworkstore.HealthDegraded)
+		status.Artwork = new(false)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -155,9 +163,8 @@ func (h *ReadyHandler) checkS3(ctx context.Context) bool {
 }
 
 // checkArtwork verifies the canonical artwork store. Returns true when this
-// node owns no artwork storage. A failure is deliberately not recoverable by
-// falling back to another backend: the store either is the one the catalog is
-// pinned to or the node must not serve artwork from it.
+// node owns no artwork storage. A failure is recoverable by resilient source
+// fallback and is exposed in the response without failing node readiness.
 func (h *ReadyHandler) checkArtwork(ctx context.Context) bool {
 	if h.artwork == nil {
 		return true

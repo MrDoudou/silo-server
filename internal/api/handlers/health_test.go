@@ -48,21 +48,21 @@ func TestReadyWithHealthyArtworkStorage(t *testing.T) {
 	}
 }
 
-// An unwritable store, or one that no longer matches the pinned generation,
-// fails readiness instead of silently serving missing artwork.
-func TestReadyFailsWhenArtworkStorageIsUnusable(t *testing.T) {
+// An unwritable store leaves the API ready so resilient artwork fallback can
+// continue, while exposing the degraded dependency to operators.
+func TestReadyDegradesWhenArtworkStorageIsUnusable(t *testing.T) {
 	handler := NewReadyHandler(stubPinger{}, nil)
 	handler.SetArtworkStorage(stubArtworkChecker{err: errors.New("artwork root is not writable")})
 
 	code, status := readyResponse(t, handler)
-	if code != http.StatusServiceUnavailable {
-		t.Fatalf("status code = %d, want 503", code)
+	if code != http.StatusOK || status.Status != "degraded" {
+		t.Fatalf("ready = %d %+v, want 200 degraded", code, status)
 	}
 	if status.Artwork == nil || *status.Artwork {
 		t.Fatalf("Artwork = %v, want false", status.Artwork)
 	}
-	if status.Postgres == nil || !*status.Postgres {
-		t.Fatalf("Postgres = %v, want true — only artwork failed", status.Postgres)
+	if status.Postgres != nil {
+		t.Fatalf("Postgres = %v, want omitted on a degradable artwork-only failure", status.Postgres)
 	}
 }
 

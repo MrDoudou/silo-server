@@ -200,6 +200,20 @@ func (r *ImageCacheJobRepository) EnqueueBatch(ctx context.Context, inputs []Enq
 	return r.enqueueBatch(ctx, inputs, false)
 }
 
+// EnqueueRepair re-admits a previously succeeded target after authoritative
+// storage loss. The existing unique target key provides cluster-wide durable
+// deduplication for request bursts.
+func (r *ImageCacheJobRepository) EnqueueRepair(ctx context.Context, in EnqueueImageCacheJobInput) (int, error) {
+	return r.enqueueBatch(ctx, []EnqueueImageCacheJobInput{in}, true)
+}
+
+// EnqueueRepairBatch is the bulk-recovery counterpart to EnqueueRepair. It
+// retains the same cluster-wide unique target key and re-admits previously
+// completed jobs without creating a parallel repair queue.
+func (r *ImageCacheJobRepository) EnqueueRepairBatch(ctx context.Context, inputs []EnqueueImageCacheJobInput) (int, error) {
+	return r.enqueueBatch(ctx, inputs, true)
+}
+
 func (r *ImageCacheJobRepository) enqueueBatch(ctx context.Context, inputs []EnqueueImageCacheJobInput, requeueSucceeded bool) (int, error) {
 	if r == nil || r.pool == nil {
 		return 0, nil
@@ -251,27 +265,27 @@ func normalizeImageCacheJobInput(in EnqueueImageCacheJobInput) (EnqueueImageCach
 
 func (r *ImageCacheJobRepository) enqueueBatchChunk(ctx context.Context, inputs []EnqueueImageCacheJobInput, requeueSucceeded bool) (int, error) {
 	var sql strings.Builder
-	args := make([]any, 0, len(inputs)*11+1)
+	args := make([]any, 0, len(inputs)*12+1)
 	sql.WriteString(`
 		INSERT INTO metadata_image_cache_jobs (
 			target_type, target_content_id, target_language, series_id, source_path,
 			provider_id, provider_content_id, content_type, image_type,
 			season_number, episode_number, status, attempt_count,
 			next_attempt_at, locked_at, locked_by, last_error,
-			created_at, updated_at, completed_at
+			created_at, updated_at, completed_at, repair_requested
 		) VALUES `)
 	for i, in := range inputs {
 		if i > 0 {
 			sql.WriteString(", ")
 		}
 		base := len(args)
-		fmt.Fprintf(&sql, `($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, 'queued', 0, NOW(), NULL, '', '', NOW(), NOW(), NULL)`,
+		fmt.Fprintf(&sql, `($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, 'queued', 0, NOW(), NULL, '', '', NOW(), NOW(), NULL, $%d)`,
 			base+1, base+2, base+3, base+4, base+5,
-			base+6, base+7, base+8, base+9, base+10, base+11)
+			base+6, base+7, base+8, base+9, base+10, base+11, base+12)
 		args = append(args,
 			in.TargetType, in.TargetContentID, strings.TrimSpace(in.TargetLanguage), in.SeriesID, in.SourcePath,
 			in.ProviderID, in.ProviderContentID, in.ContentType, in.ImageType,
-			in.SeasonNumber, in.EpisodeNumber,
+			in.SeasonNumber, in.EpisodeNumber, requeueSucceeded,
 		)
 	}
 	requeueSucceededArg := len(args) + 1
@@ -285,6 +299,7 @@ func (r *ImageCacheJobRepository) enqueueBatchChunk(ctx context.Context, inputs 
 			content_type = EXCLUDED.content_type,
 			season_number = EXCLUDED.season_number,
 			episode_number = EXCLUDED.episode_number,
+			repair_requested = metadata_image_cache_jobs.repair_requested OR EXCLUDED.repair_requested,
 			status = CASE
 				WHEN metadata_image_cache_jobs.source_path IS DISTINCT FROM EXCLUDED.source_path
 					THEN 'queued'
@@ -553,7 +568,7 @@ func (r *ImageCacheJobRepository) claimDue(ctx context.Context, workerID, target
 			j.source_path, j.provider_id, j.provider_content_id,
 			j.content_type, j.image_type, j.season_number, j.episode_number,
 			j.status, j.attempt_count, j.next_attempt_at, j.locked_at,
-			j.locked_by, j.last_error, j.created_at, j.updated_at, j.completed_at
+			j.locked_by, j.last_error, j.created_at, j.updated_at, j.completed_at, j.repair_requested
 	`
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -569,7 +584,7 @@ func (r *ImageCacheJobRepository) claimDue(ctx context.Context, workerID, target
 			&job.SourcePath, &job.ProviderID, &job.ProviderContentID,
 			&job.ContentType, &job.ImageType, &job.SeasonNumber, &job.EpisodeNumber,
 			&job.Status, &job.AttemptCount, &job.NextAttemptAt, &job.LockedAt,
-			&job.LockedBy, &job.LastError, &job.CreatedAt, &job.UpdatedAt, &job.CompletedAt,
+			&job.LockedBy, &job.LastError, &job.CreatedAt, &job.UpdatedAt, &job.CompletedAt, &job.RepairRequested,
 		); err != nil {
 			return nil, fmt.Errorf("scanning metadata image cache job: %w", err)
 		}
@@ -594,6 +609,7 @@ func (r *ImageCacheJobRepository) MarkSucceeded(ctx context.Context, id int64, l
 			locked_at = NULL,
 			locked_by = '',
 			last_error = '',
+			repair_requested = FALSE,
 			updated_at = NOW()
 		WHERE id = $1
 		  AND status = 'running'
@@ -619,6 +635,7 @@ func (r *ImageCacheJobRepository) MarkFailed(ctx context.Context, id int64, atte
 			locked_at = NULL,
 			locked_by = '',
 			last_error = left($5, 2000),
+			repair_requested = CASE WHEN $2 = 'queued' THEN repair_requested ELSE FALSE END,
 			updated_at = NOW()
 		WHERE id = $1
 		  AND status = 'running'

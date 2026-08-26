@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkupload"
+	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/userstore"
 )
 
@@ -155,6 +157,29 @@ func resolveProfileAvatar(
 		return avatarSourcePreset, bundledProfileAvatarURL(trimmed)
 	}
 	return avatarSourceNone, ""
+}
+
+func resolveProfileAvatarTarget(
+	ctx context.Context,
+	resolver ArtworkURLResolver,
+	legacy profileAvatarStore,
+	ttl time.Duration,
+	userID int,
+	profileID string,
+	ref string,
+) (source string, url string) {
+	trimmed := strings.TrimSpace(ref)
+	if strings.HasPrefix(trimmed, profileAvatarUploadPrefix) {
+		displayKey := uploadedAvatarDisplayKey(strings.TrimPrefix(trimmed, profileAvatarUploadPrefix))
+		if artworkkey.IsPortableKey(displayKey) {
+			return avatarSourceUpload, resolveTargetStoredImageURL(ctx, resolver, artworkurl.Target{
+				Surface: artworkurl.SurfaceProfileAvatars,
+				Keys:    []string{strconv.Itoa(userID), profileID},
+				Slot:    "avatar",
+			}, displayKey, "original")
+		}
+	}
+	return resolveProfileAvatar(ctx, resolver, legacy, ttl, ref)
 }
 
 func bundledProfileAvatarURL(id string) string {
@@ -346,7 +371,7 @@ func (h *ProfileHandler) HandleUploadAvatar(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	writeJSON(w, http.StatusOK, h.toProfileResponse(r.Context(), store, *updatedProfile))
+	writeJSON(w, http.StatusOK, h.toProfileResponse(r.Context(), store, userID, *updatedProfile))
 }
 
 func (h *ProfileHandler) HandleDeleteAvatar(w http.ResponseWriter, r *http.Request) {
@@ -388,5 +413,5 @@ func (h *ProfileHandler) HandleDeleteAvatar(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	writeJSON(w, http.StatusOK, h.toProfileResponse(r.Context(), store, *updatedProfile))
+	writeJSON(w, http.StatusOK, h.toProfileResponse(r.Context(), store, userID, *updatedProfile))
 }

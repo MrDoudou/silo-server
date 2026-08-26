@@ -89,6 +89,12 @@ type artworkURLResolver interface {
 	ResolveArtworkURLs(ctx context.Context, keys []string) map[string]artworkstore.ResolvedURL
 }
 
+type targetArtworkURLResolver interface {
+	ResolveTargetURLs(ctx context.Context, targets []artworkurl.Target, variant string) map[string]artworkstore.ResolvedURL
+	ResolveTargetRequests(ctx context.Context, requests []artworkurl.TargetRequest) map[string]artworkstore.ResolvedURL
+	DeliveryPolicy() string
+}
+
 // RegisterSource registers a plugin provider as a source for resolving images
 // with the given plugin ID prefix.
 func (r *PluginImageResolver) RegisterSource(pluginID string, source PluginImageResolverSource) {
@@ -269,6 +275,68 @@ func (r *PluginImageResolver) ResolveImageURLsWithExpiry(ctx context.Context, pa
 		}
 	}
 
+	return result
+}
+
+// ResolveArtworkTargetsWithExpiry is the owning resilient-delivery path.
+// Target identity, not a logical path, keys both signing and the result map so
+// shared revisions retain distinct fallback provenance.
+func (r *PluginImageResolver) ResolveArtworkTargetsWithExpiry(
+	ctx context.Context,
+	targets []artworkurl.Target,
+	variant string,
+) map[string]catalog.ResolvedImageURL {
+	result := make(map[string]catalog.ResolvedImageURL, len(targets))
+	if len(targets) == 0 {
+		return result
+	}
+	r.mu.RLock()
+	artwork := r.artwork
+	r.mu.RUnlock()
+	targetResolver, ok := artwork.(targetArtworkURLResolver)
+	if !ok {
+		for _, target := range targets {
+			result[target.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, target.Reference, variant)
+		}
+		return result
+	}
+	if targetResolver.DeliveryPolicy() == artworkurl.DeliveryPolicyDirect {
+		for _, target := range targets {
+			if strings.Contains(target.Reference, "://") && !strings.HasPrefix(target.Reference, artworkurl.LibraryReferencePrefix) {
+				result[target.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, target.Reference, variant)
+				continue
+			}
+			resolved, found := targetResolver.ResolveTargetURLs(ctx, []artworkurl.Target{target}, variant)[target.CacheKey()]
+			if found && resolved.URL != "" {
+				result[target.CacheKey()] = catalog.ResolvedImageURL{URL: resolved.URL, ExpiresAt: resolved.ExpiresAt}
+			}
+		}
+		return result
+	}
+	for key, resolved := range targetResolver.ResolveTargetURLs(ctx, targets, variant) {
+		result[key] = catalog.ResolvedImageURL{URL: resolved.URL, ExpiresAt: resolved.ExpiresAt}
+	}
+	return result
+}
+
+func (r *PluginImageResolver) ResolveArtworkTargetRequestsWithExpiry(ctx context.Context, requests []artworkurl.TargetRequest) map[string]catalog.ResolvedImageURL {
+	result := make(map[string]catalog.ResolvedImageURL, len(requests))
+	if len(requests) == 0 {
+		return result
+	}
+	r.mu.RLock()
+	artwork := r.artwork
+	r.mu.RUnlock()
+	targetResolver, ok := artwork.(targetArtworkURLResolver)
+	if !ok {
+		for _, request := range requests {
+			result[request.CacheKey()] = r.ResolveImageURLWithExpiry(ctx, request.Target.Reference, request.Variant)
+		}
+		return result
+	}
+	for key, resolved := range targetResolver.ResolveTargetRequests(ctx, requests) {
+		result[key] = catalog.ResolvedImageURL{URL: resolved.URL, ExpiresAt: resolved.ExpiresAt}
+	}
 	return result
 }
 
