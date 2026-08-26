@@ -59,7 +59,10 @@ const FIELD_LOCK_MAP: Record<string, number> = {
   title: FIELD_NAME,
   sort_title: FIELD_NAME,
   original_title: FIELD_NAME,
-  tagline: FIELD_NAME,
+  // Tagline shares FieldOverview with overview in MergeMetadata — locking the
+  // wrong field (FieldName) left curated taglines unprotected on refresh while
+  // the UI still showed them as locked whenever the title was locked.
+  tagline: FIELD_OVERVIEW,
   overview: FIELD_OVERVIEW,
   genres: FIELD_GENRES,
   studios: FIELD_STUDIOS,

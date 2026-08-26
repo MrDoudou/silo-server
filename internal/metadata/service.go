@@ -2301,6 +2301,25 @@ func (s *MetadataService) mergeAndPersist(
 	}
 	isCanonicalWrite := existingItem == nil || strings.EqualFold(req.Language, canonicalLanguage)
 
+	// Non-canonical refreshes only merge provider-invariant fields into the base
+	// row (MergeGlobalMetadata). Snapshot the provider's language-bearing text
+	// first — otherwise assigning accumulator = existingResult below would feed
+	// the canonical-language title/overview into the localization upsert and
+	// wipe a correct translation (e.g. French localization gets the English
+	// base title on every manual multi-library refresh).
+	var localizationText *MetadataResult
+	if !isCanonicalWrite && accumulator != nil {
+		localizationText = &MetadataResult{
+			Title:        accumulator.Title,
+			SortTitle:    accumulator.SortTitle,
+			Overview:     accumulator.Overview,
+			Tagline:      accumulator.Tagline,
+			PosterPath:   accumulator.PosterPath,
+			BackdropPath: accumulator.BackdropPath,
+			LogoPath:     accumulator.LogoPath,
+		}
+	}
+
 	if existingItem != nil {
 		existingResult := itemToMetadataResult(existingItem)
 		suppressProviderIDValues(existingResult.ProviderIDs, accumulator.recordedStaleProviderIDs)
@@ -2400,9 +2419,15 @@ func (s *MetadataService) mergeAndPersist(
 		if err != nil {
 			return nil, fmt.Errorf("loading item localization: %w", err)
 		}
+		locSource := localizationText
+		if locSource == nil {
+			locSource = accumulator
+		}
 		loc := buildItemLocalizationRecord(
-			existingLoc, contentID, req.Language, contentType, accumulator, images, mergeMode, req.Language,
+			existingLoc, contentID, req.Language, contentType, locSource, images, mergeMode, req.Language,
 			isFieldLocked(locked, FieldName),
+			isFieldLocked(locked, FieldOverview),
+			isFieldLocked(locked, FieldImages),
 		)
 		if err := s.itemLocalizationRepo.Upsert(ctx, loc); err != nil {
 			return nil, fmt.Errorf("upserting item localization: %w", err)
@@ -4095,6 +4120,8 @@ func buildItemLocalizationRecord(
 	mergeMode MergeMode,
 	preferredLanguage string,
 	titleLocked bool,
+	overviewLocked bool,
+	imagesLocked bool,
 ) *models.MediaItemLocalization {
 	loc := &models.MediaItemLocalization{
 		ContentID: contentID,
@@ -4106,58 +4133,70 @@ func buildItemLocalizationRecord(
 		loc.Language = language
 	}
 
-	mergeScalar(&loc.Title, accumulator.Title, mergeMode)
-	mergeScalar(&loc.SortTitle, accumulator.SortTitle, mergeMode)
-	mergeScalar(&loc.Overview, accumulator.Overview, mergeMode)
-	mergeScalar(&loc.Tagline, accumulator.Tagline, mergeMode)
+	// Locks mirror MergeMetadata: title/sort-title under FieldName, overview/
+	// tagline under FieldOverview, artwork under FieldImages. Without these
+	// gates a locked base-row field still leaked into localization upserts.
+	if accumulator == nil {
+		accumulator = &MetadataResult{}
+	}
+	if !titleLocked {
+		mergeScalar(&loc.Title, accumulator.Title, mergeMode)
+		mergeScalar(&loc.SortTitle, accumulator.SortTitle, mergeMode)
+	}
+	if !overviewLocked {
+		mergeScalar(&loc.Overview, accumulator.Overview, mergeMode)
+		mergeScalar(&loc.Tagline, accumulator.Tagline, mergeMode)
+	}
 
-	existingLocItem := &models.MediaItem{
-		Type:               contentType,
-		PosterPath:         loc.PosterPath,
-		PosterSourcePath:   loc.PosterSourcePath,
-		PosterThumbhash:    loc.PosterThumbhash,
-		BackdropPath:       loc.BackdropPath,
-		BackdropSourcePath: loc.BackdropSourcePath,
-		BackdropThumbhash:  loc.BackdropThumbhash,
-		LogoPath:           loc.LogoPath,
-		LogoSourcePath:     loc.LogoSourcePath,
-	}
-	locItem := &models.MediaItem{
-		Type:               contentType,
-		PosterPath:         loc.PosterPath,
-		PosterSourcePath:   loc.PosterSourcePath,
-		PosterThumbhash:    loc.PosterThumbhash,
-		BackdropPath:       loc.BackdropPath,
-		BackdropSourcePath: loc.BackdropSourcePath,
-		BackdropThumbhash:  loc.BackdropThumbhash,
-		LogoPath:           loc.LogoPath,
-		LogoSourcePath:     loc.LogoSourcePath,
-	}
-	// Local sidecar art is language-neutral: it must not duplicate into every
-	// localization row, so local candidates only compete at the item level.
-	remoteImages := images
-	for _, img := range images {
-		if isLocalImageSourcePath(img.URL) {
-			remoteImages = make([]RemoteImage, 0, len(images))
-			for _, candidate := range images {
-				if !isLocalImageSourcePath(candidate.URL) {
-					remoteImages = append(remoteImages, candidate)
-				}
-			}
-			break
+	if !imagesLocked {
+		existingLocItem := &models.MediaItem{
+			Type:               contentType,
+			PosterPath:         loc.PosterPath,
+			PosterSourcePath:   loc.PosterSourcePath,
+			PosterThumbhash:    loc.PosterThumbhash,
+			BackdropPath:       loc.BackdropPath,
+			BackdropSourcePath: loc.BackdropSourcePath,
+			BackdropThumbhash:  loc.BackdropThumbhash,
+			LogoPath:           loc.LogoPath,
+			LogoSourcePath:     loc.LogoSourcePath,
 		}
-	}
-	applyBestImages(locItem, remoteImages, mergeMode, preferredLanguage)
-	prepareItemImagesForQueue(locItem, existingLocItem)
+		locItem := &models.MediaItem{
+			Type:               contentType,
+			PosterPath:         loc.PosterPath,
+			PosterSourcePath:   loc.PosterSourcePath,
+			PosterThumbhash:    loc.PosterThumbhash,
+			BackdropPath:       loc.BackdropPath,
+			BackdropSourcePath: loc.BackdropSourcePath,
+			BackdropThumbhash:  loc.BackdropThumbhash,
+			LogoPath:           loc.LogoPath,
+			LogoSourcePath:     loc.LogoSourcePath,
+		}
+		// Local sidecar art is language-neutral: it must not duplicate into every
+		// localization row, so local candidates only compete at the item level.
+		remoteImages := images
+		for _, img := range images {
+			if isLocalImageSourcePath(img.URL) {
+				remoteImages = make([]RemoteImage, 0, len(images))
+				for _, candidate := range images {
+					if !isLocalImageSourcePath(candidate.URL) {
+						remoteImages = append(remoteImages, candidate)
+					}
+				}
+				break
+			}
+		}
+		applyBestImages(locItem, remoteImages, mergeMode, preferredLanguage)
+		prepareItemImagesForQueue(locItem, existingLocItem)
 
-	loc.PosterPath = locItem.PosterPath
-	loc.PosterSourcePath = locItem.PosterSourcePath
-	loc.PosterThumbhash = locItem.PosterThumbhash
-	loc.BackdropPath = locItem.BackdropPath
-	loc.BackdropSourcePath = locItem.BackdropSourcePath
-	loc.BackdropThumbhash = locItem.BackdropThumbhash
-	loc.LogoPath = locItem.LogoPath
-	loc.LogoSourcePath = locItem.LogoSourcePath
+		loc.PosterPath = locItem.PosterPath
+		loc.PosterSourcePath = locItem.PosterSourcePath
+		loc.PosterThumbhash = locItem.PosterThumbhash
+		loc.BackdropPath = locItem.BackdropPath
+		loc.BackdropSourcePath = locItem.BackdropSourcePath
+		loc.BackdropThumbhash = locItem.BackdropThumbhash
+		loc.LogoPath = locItem.LogoPath
+		loc.LogoSourcePath = locItem.LogoSourcePath
+	}
 
 	ApplyDefaultSortTitleToLocalization(loc, titleLocked)
 
