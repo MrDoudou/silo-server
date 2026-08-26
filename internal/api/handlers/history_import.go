@@ -10,12 +10,21 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Silo-Server/silo-server/internal/access"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/historyimport"
+	"github.com/Silo-Server/silo-server/internal/userstore"
 )
 
 type HistoryImportHandler struct {
 	service *historyimport.Service
+
+	// StoreProvider, UserRepo, and ProfileTokens gate body profile_id against
+	// the household-parent rule. Missing deps fail closed for cross-profile
+	// imports rather than skipping the check.
+	StoreProvider userstore.UserStoreProvider
+	UserRepo      userLookup
+	ProfileTokens *access.ProfileTokenService
 }
 
 func NewHistoryImportHandler(service *historyimport.Service) *HistoryImportHandler {
@@ -67,6 +76,10 @@ func (h *HistoryImportHandler) HandleCreateRun(w http.ResponseWriter, r *http.Re
 	var req historyimport.CreateRunInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "Invalid request body")
+		return
+	}
+	if !authorizeNamedProfile(w, r, h.StoreProvider, h.UserRepo, h.ProfileTokens, req.ProfileID,
+		"Importing watch history into another profile requires the primary profile or admin access") {
 		return
 	}
 

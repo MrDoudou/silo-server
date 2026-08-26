@@ -1,8 +1,15 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/Silo-Server/silo-server/internal/access"
+	"github.com/Silo-Server/silo-server/internal/models"
+	"github.com/Silo-Server/silo-server/internal/userstore"
 )
 
 func TestHistoryImportUpstreamError(t *testing.T) {
@@ -47,5 +54,38 @@ func TestHistoryImportUpstreamError(t *testing.T) {
 				t.Fatalf("got (%d, %q, %q), want (%d, %q, %q)", gotStatus, gotCode, gotMsg, tt.wantStatus, tt.wantCode, tt.wantMsg)
 			}
 		})
+	}
+}
+
+func TestHandleCreateRun_ChildCannotTargetSibling(t *testing.T) {
+	store := newHouseholdTestStore(t)
+	if err := store.CreateProfile(t.Context(), userstore.Profile{ID: "primary", Name: "Sam", IsPrimary: true}); err != nil {
+		t.Fatalf("create primary: %v", err)
+	}
+	if err := store.CreateProfile(t.Context(), userstore.Profile{ID: "child", Name: "Robin"}); err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+
+	handler := NewHistoryImportHandler(nil)
+	handler.StoreProvider = testUserStoreProvider{store: store}
+	handler.UserRepo = stubUserRepo{user: &models.User{ID: 1}}
+	handler.ProfileTokens = access.NewProfileTokenService("test-secret-value-at-least-32-chars", 0)
+
+	body, err := json.Marshal(map[string]string{
+		"profile_id": "primary",
+		"source":     "jellyfin",
+	})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	req := householdRequest("child", false, "")
+	req.Method = http.MethodPost
+	req.Body = httptest.NewRequest(http.MethodPost, "/history-imports/runs", bytes.NewReader(body)).Body
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	handler.HandleCreateRun(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("child import into primary = %d, want 403: %s", rec.Code, rec.Body.String())
 	}
 }

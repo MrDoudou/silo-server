@@ -1770,10 +1770,20 @@ func NewRouter(deps Dependencies) chi.Router {
 			historyImportSvc.AddObserver(evt.NewHistoryImportObserver(deps.EventsHub))
 		}
 		historyImportHandler = handlers.NewHistoryImportHandler(historyImportSvc)
+		historyImportHandler.StoreProvider = deps.UserStoreProvider
+		if userRepo != nil {
+			historyImportHandler.UserRepo = userRepo
+		}
+		historyImportHandler.ProfileTokens = profileTokenService
 		if deps.UserStoreProvider != nil {
 			webhookSyncSvc := webhooksync.NewService(webhooksync.NewRepository(deps.DB, deps.SecretCipher), historyRepo, deps.UserStoreProvider)
 			webhookSyncSvc.SetStableIdentityResolver(historyIdentity)
 			webhookSyncHandler = handlers.NewWebhookSyncHandler(webhookSyncSvc)
+			webhookSyncHandler.StoreProvider = deps.UserStoreProvider
+			if userRepo != nil {
+				webhookSyncHandler.UserRepo = userRepo
+			}
+			webhookSyncHandler.ProfileTokens = profileTokenService
 		}
 	}
 

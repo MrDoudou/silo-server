@@ -1,9 +1,16 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/access"
+	"github.com/Silo-Server/silo-server/internal/models"
+	"github.com/Silo-Server/silo-server/internal/userstore"
 	"github.com/Silo-Server/silo-server/internal/webhooksync"
 )
 
@@ -50,5 +57,38 @@ func TestToLegacyPlexActorsResponse(t *testing.T) {
 	}
 	if len(resp.DiscoveredActors) != 2 || resp.DiscoveredActors[1].PlexAccountID != 77 {
 		t.Fatalf("unexpected legacy discovered actors: %#v", resp.DiscoveredActors)
+	}
+}
+
+func TestHandleCreateConnection_ChildCannotTargetSibling(t *testing.T) {
+	store := newHouseholdTestStore(t)
+	if err := store.CreateProfile(t.Context(), userstore.Profile{ID: "primary", Name: "Sam", IsPrimary: true}); err != nil {
+		t.Fatalf("create primary: %v", err)
+	}
+	if err := store.CreateProfile(t.Context(), userstore.Profile{ID: "child", Name: "Robin"}); err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+
+	handler := NewWebhookSyncHandler(nil)
+	handler.StoreProvider = testUserStoreProvider{store: store}
+	handler.UserRepo = stubUserRepo{user: &models.User{ID: 1}}
+	handler.ProfileTokens = access.NewProfileTokenService("test-secret-value-at-least-32-chars", 0)
+
+	body, err := json.Marshal(map[string]string{
+		"provider":           "plex",
+		"default_profile_id": "primary",
+	})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	req := householdRequest("child", false, "")
+	req.Method = http.MethodPost
+	req.Body = httptest.NewRequest(http.MethodPost, "/webhook-sync/connections", bytes.NewReader(body)).Body
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	handler.HandleCreateConnection(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("child webhook into primary = %d, want 403: %s", rec.Code, rec.Body.String())
 	}
 }

@@ -163,3 +163,101 @@ func TestCanManageHousehold(t *testing.T) {
 		}
 	})
 }
+
+func TestAuthorizeNamedProfile(t *testing.T) {
+	ctx := context.Background()
+
+	setup := func(t *testing.T, pin string) (userstore.UserStoreProvider, *access.ProfileTokenService) {
+		t.Helper()
+		store := newHouseholdTestStore(t)
+		if err := store.CreateProfile(ctx, userstore.Profile{
+			ID: "primary", Name: "Sam", IsPrimary: true,
+		}); err != nil {
+			t.Fatalf("create primary: %v", err)
+		}
+		if err := store.CreateProfile(ctx, userstore.Profile{
+			ID: "child", Name: "Robin",
+		}); err != nil {
+			t.Fatalf("create child: %v", err)
+		}
+		if pin != "" {
+			if err := store.UpdateProfile(ctx, "primary", userstore.UpdateProfileInput{
+				PIN: &pin,
+			}); err != nil {
+				t.Fatalf("set pin: %v", err)
+			}
+		}
+		return testUserStoreProvider{store: store}, access.NewProfileTokenService("test-secret-value-at-least-32-chars", 0)
+	}
+
+	authorize := func(provider userstore.UserStoreProvider, req *http.Request, target string) *httptest.ResponseRecorder {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		ok := authorizeNamedProfile(rec, req, provider, stubUserRepo{user: &models.User{ID: 1}},
+			access.NewProfileTokenService("test-secret-value-at-least-32-chars", 0),
+			target, "Importing watch history into another profile requires the primary profile or admin access")
+		if !ok && rec.Code == http.StatusOK {
+			t.Fatal("authorizeNamedProfile returned false without writing an error")
+		}
+		return rec
+	}
+
+	t.Run("child targeting self is allowed", func(t *testing.T) {
+		provider, _ := setup(t, "")
+		rec := httptest.NewRecorder()
+		ok := authorizeNamedProfile(rec, householdRequest("child", false, ""), provider, nil, nil, "child", "forbidden")
+		if !ok {
+			t.Fatalf("self target denied: %d %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("child targeting primary is forbidden", func(t *testing.T) {
+		provider, _ := setup(t, "1234")
+		rec := authorize(provider, householdRequest("child", false, ""), "primary")
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("child→primary = %d, want 403: %s", rec.Code, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), "primary profile or admin access") {
+			t.Fatalf("unexpected body: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("primary targeting child is allowed", func(t *testing.T) {
+		provider, _ := setup(t, "")
+		rec := httptest.NewRecorder()
+		ok := authorizeNamedProfile(rec, householdRequest("primary", false, ""), provider,
+			stubUserRepo{user: &models.User{ID: 1}}, nil, "child", "forbidden")
+		if !ok {
+			t.Fatalf("primary→child denied: %d %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("pin-locked primary without token cannot target child", func(t *testing.T) {
+		provider, tokens := setup(t, "1234")
+		rec := httptest.NewRecorder()
+		ok := authorizeNamedProfile(rec, householdRequest("primary", false, ""), provider,
+			stubUserRepo{user: &models.User{ID: 1}}, tokens, "child", "forbidden")
+		if ok || rec.Code != http.StatusForbidden {
+			t.Fatalf("pin without token = ok=%v status=%d body=%s", ok, rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("empty target is deferred", func(t *testing.T) {
+		provider, _ := setup(t, "")
+		rec := httptest.NewRecorder()
+		ok := authorizeNamedProfile(rec, householdRequest("child", false, ""), provider, nil, nil, "", "forbidden")
+		if !ok {
+			t.Fatalf("empty target denied: %d %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("primary targeting missing profile is not found", func(t *testing.T) {
+		provider, _ := setup(t, "")
+		rec := httptest.NewRecorder()
+		ok := authorizeNamedProfile(rec, householdRequest("primary", false, ""), provider,
+			stubUserRepo{user: &models.User{ID: 1}}, nil, "ghost", "forbidden")
+		if ok || rec.Code != http.StatusNotFound {
+			t.Fatalf("missing profile = ok=%v status=%d body=%s", ok, rec.Code, rec.Body.String())
+		}
+	})
+}

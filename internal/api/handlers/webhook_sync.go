@@ -11,13 +11,22 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Silo-Server/silo-server/internal/access"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/historyimport"
+	"github.com/Silo-Server/silo-server/internal/userstore"
 	"github.com/Silo-Server/silo-server/internal/webhooksync"
 )
 
 type WebhookSyncHandler struct {
 	service *webhooksync.Service
+
+	// StoreProvider, UserRepo, and ProfileTokens gate named Silo profile ids
+	// against the household-parent rule. Missing deps fail closed for
+	// cross-profile webhook bindings rather than skipping the check.
+	StoreProvider userstore.UserStoreProvider
+	UserRepo      userLookup
+	ProfileTokens *access.ProfileTokenService
 }
 
 type legacyPlexSyncConnection struct {
@@ -92,6 +101,28 @@ func NewWebhookSyncHandler(service *webhooksync.Service) *WebhookSyncHandler {
 	return &WebhookSyncHandler{service: service}
 }
 
+const webhookOtherProfileForbidden = "Linking webhook sync to another profile requires the primary profile or admin access"
+
+func (h *WebhookSyncHandler) authorizeWebhookProfiles(
+	w http.ResponseWriter,
+	r *http.Request,
+	defaultProfileID string,
+	mappings []webhooksync.UpdateProfileMapping,
+) bool {
+	if !authorizeNamedProfile(w, r, h.StoreProvider, h.UserRepo, h.ProfileTokens, defaultProfileID, webhookOtherProfileForbidden) {
+		return false
+	}
+	for _, mapping := range mappings {
+		if mapping.SiloProfileID == nil {
+			continue
+		}
+		if !authorizeNamedProfile(w, r, h.StoreProvider, h.UserRepo, h.ProfileTokens, *mapping.SiloProfileID, webhookOtherProfileForbidden) {
+			return false
+		}
+	}
+	return true
+}
+
 func (h *WebhookSyncHandler) HandleListConnections(w http.ResponseWriter, r *http.Request) {
 	userID := apimw.GetUserID(r.Context())
 	connections, err := h.service.ListConnections(r.Context(), userID)
@@ -135,6 +166,9 @@ func (h *WebhookSyncHandler) HandleCreateConnection(w http.ResponseWriter, r *ht
 		writeError(w, http.StatusBadRequest, "bad_request", "Invalid request body")
 		return
 	}
+	if !h.authorizeWebhookProfiles(w, r, req.DefaultProfileID, nil) {
+		return
+	}
 	resp, err := h.service.CreateConnection(r.Context(), userID, req, requestBaseURL(r))
 	if err != nil {
 		h.writeError(w, err)
@@ -153,6 +187,9 @@ func (h *WebhookSyncHandler) HandleLegacyCreateConnection(w http.ResponseWriter,
 	var req legacyCreatePlexSyncConnectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "Invalid request body")
+		return
+	}
+	if !h.authorizeWebhookProfiles(w, r, req.DefaultProfileID, nil) {
 		return
 	}
 	resp, err := h.service.CreateConnection(r.Context(), userID, webhooksync.CreateConnectionInput{
@@ -190,6 +227,9 @@ func (h *WebhookSyncHandler) HandleUpdateConnection(w http.ResponseWriter, r *ht
 	var req webhooksync.UpdateConnectionInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "Invalid request body")
+		return
+	}
+	if req.DefaultProfileID != nil && !h.authorizeWebhookProfiles(w, r, *req.DefaultProfileID, nil) {
 		return
 	}
 	conn, err := h.service.UpdateConnection(r.Context(), userID, id, req)
@@ -312,6 +352,9 @@ func (h *WebhookSyncHandler) HandleUpdateProfileMappings(w http.ResponseWriter, 
 		writeError(w, http.StatusBadRequest, "bad_request", "Invalid request body")
 		return
 	}
+	if !h.authorizeWebhookProfiles(w, r, "", req.Mappings) {
+		return
+	}
 	resp, err := h.service.UpdateProfileMappings(r.Context(), userID, id, req)
 	if err != nil {
 		h.writeError(w, err)
@@ -342,6 +385,9 @@ func (h *WebhookSyncHandler) HandleLegacyUpdateActors(w http.ResponseWriter, r *
 			ExternalUserName: mapping.PlexAccountTitle,
 			SiloProfileID:    &profileID,
 		})
+	}
+	if !h.authorizeWebhookProfiles(w, r, "", input.Mappings) {
+		return
 	}
 	resp, err := h.service.UpdateProfileMappings(r.Context(), userID, id, input)
 	if err != nil {
