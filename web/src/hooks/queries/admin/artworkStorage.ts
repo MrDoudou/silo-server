@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import type { AdminJob, ArtworkPurgeRequest, ArtworkStorageAccounting } from "@/api/types";
+import { adminKeys } from "@/hooks/queries/keys";
 import { toast } from "sonner";
 
-const storageKey = ["admin", "artwork-storage"] as const;
+const storageKey = adminKeys.artworkStorage();
 
 export function useArtworkStorage() {
   return useQuery({

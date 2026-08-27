@@ -41,7 +41,7 @@ describe("ScannerSettings artwork materialization", () => {
     expect(useSettingsFormMock.mock.calls[0]?.[0]?.keys).toContain(
       "artwork.remote_materialization",
     );
-    expect(screen.getByRole("switch", { name: "Cache Images to S3" })).toHaveAttribute(
+    expect(screen.getByRole("switch", { name: "Cache remote artwork" })).toHaveAttribute(
       "aria-checked",
       "false",
     );
@@ -51,7 +51,7 @@ describe("ScannerSettings artwork materialization", () => {
     const setValue = mockForm({ "artwork.remote_materialization": "selected" });
 
     render(<ScannerSettings />);
-    await userEvent.click(screen.getByRole("switch", { name: "Cache Images to S3" }));
+    await userEvent.click(screen.getByRole("switch", { name: "Cache remote artwork" }));
 
     expect(setValue).toHaveBeenNthCalledWith(1, "artwork.remote_materialization", "passthrough");
     expect(setValue).toHaveBeenNthCalledWith(2, "metadata.cache_images", "false");

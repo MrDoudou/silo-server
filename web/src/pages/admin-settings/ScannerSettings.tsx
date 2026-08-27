@@ -79,9 +79,9 @@ export default function ScannerSettings() {
 
         <FieldGroup label="Metadata">
           <SettingField
-            label="Cache Images to S3"
+            label="Cache remote artwork"
             type="toggle"
-            hint="Download artwork from metadata providers and store resized variants in public asset S3 storage. Private bucket + presigned URLs is fully supported."
+            hint="Copy the artwork Silo selects from metadata providers into the canonical artwork store instead of handing clients the provider's own URL. Works with either artwork storage backend, local or S3."
             value={cacheImagesEnabled ? "true" : "false"}
             onChange={(v) => {
               form.setValue(REMOTE_MATERIALIZATION_KEY, v === "true" ? "selected" : "passthrough");
