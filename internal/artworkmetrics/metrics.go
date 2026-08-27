@@ -2,6 +2,7 @@ package artworkmetrics
 
 import (
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -55,7 +56,7 @@ var (
 	delivery         = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_delivery_requests_total", Help: "Artwork delivery requests by bounded outcome."}, []string{labelRoute, labelOutcome})
 	purgeJobs        = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_purge_jobs_total", Help: "Artwork purge job outcomes."}, []string{"dry_run", labelOutcome})
 	purgeBytes       = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_purge_bytes_total", Help: "Bytes reported by artwork purge plans and jobs."}, []string{labelKind})
-	inventoryAge     = promauto.NewGauge(prometheus.GaugeOpts{Name: "silo_artwork_inventory_snapshot_age_seconds", Help: "Age of the latest artwork inventory snapshot."})
+	inventoryAge     = promauto.NewGaugeFunc(prometheus.GaugeOpts{Name: "silo_artwork_inventory_snapshot_age_seconds", Help: "Age of the latest artwork inventory snapshot."}, inventorySnapshotAgeSeconds)
 	inventoryDrift   = promauto.NewGaugeVec(prometheus.GaugeOpts{Name: "silo_artwork_inventory_drift_objects", Help: "Artwork inventory drift counters."}, []string{"kind"})
 	seedEvents       = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_seed_events_total", Help: "Portable artwork seed import, adoption, and expiry events."}, []string{labelOutcome})
 	variantBytes     = promauto.NewCounterVec(prometheus.CounterOpts{Name: "silo_artwork_variant_bytes_total", Help: "Artwork variant bytes written or matched."}, []string{labelOutcome})
@@ -105,9 +106,25 @@ func Purge(dryRun bool, outcome string, pending, reclaimable int64) {
 	}
 }
 
+// inventorySnapshotUnixNano holds the wall-clock time of the most recent
+// artwork inventory snapshot, or zero when none has been taken yet.
+var inventorySnapshotUnixNano atomic.Int64
+
+// inventorySnapshotAgeSeconds is evaluated at scrape time rather than at
+// refresh time: the age of a snapshot grows while no refresh runs, which is
+// exactly the condition staleness alerts have to fire on. Reporting it once per
+// successful refresh would pin the gauge near zero forever.
+func inventorySnapshotAgeSeconds() float64 {
+	nanos := inventorySnapshotUnixNano.Load()
+	if nanos == 0 {
+		return 0
+	}
+	return time.Since(time.Unix(0, nanos)).Seconds()
+}
+
 func Inventory(snapshot time.Time, missingRevisions, missingObjects, orphans int64) {
 	if !snapshot.IsZero() {
-		inventoryAge.Set(time.Since(snapshot).Seconds())
+		inventorySnapshotUnixNano.Store(snapshot.UnixNano())
 	}
 	inventoryDrift.WithLabelValues("missing_revisions").Set(float64(missingRevisions))
 	inventoryDrift.WithLabelValues("missing_objects").Set(float64(missingObjects))
@@ -154,6 +171,12 @@ func StoreHealth(backend, from, to string) {
 	storeHealth.WithLabelValues(backend, to).Set(1)
 	if from != to {
 		storeTransitions.WithLabelValues(backend, from, to).Inc()
+		// Count the detection when the store enters wrong_mount. Counting on
+		// exit would leave an ongoing mount-identity failure invisible for as
+		// long as it lasts, which is when operators most need to see it.
+		if to == "wrong_mount" {
+			wrongMounts.WithLabelValues(backend).Inc()
+		}
 	}
 }
 
@@ -178,8 +201,5 @@ func StoreHealthDuration(backend, state string, duration time.Duration) {
 	state = boundedLabel(state, storeHealthStates)
 	if duration > 0 {
 		healthStateTime.WithLabelValues(backend, state).Add(duration.Seconds())
-	}
-	if state == "wrong_mount" {
-		wrongMounts.WithLabelValues(backend).Inc()
 	}
 }

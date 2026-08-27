@@ -61,8 +61,10 @@ const (
 )
 
 // Accepted artwork.remote_materialization values. "selected" copies artwork the
-// server selects into the canonical store; "passthrough" keeps handing clients
-// the provider's own URL.
+// server selects into the canonical store; "passthrough" does not copy
+// provider or plugin images into the store. Either way clients receive Silo's
+// own artwork URLs — under passthrough those URLs fetch from the source at
+// request time instead of serving stored bytes.
 const (
 	ArtworkMaterializationSelected    = "selected"
 	ArtworkMaterializationPassthrough = "passthrough"

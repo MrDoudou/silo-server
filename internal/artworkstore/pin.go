@@ -97,20 +97,30 @@ type PinMismatchError struct {
 	Resolved Pin
 }
 
+// Error names the recovery an operator actually has. The pin's backend is
+// immutable — Open rejects a backend change before anything else runs, the
+// admin settings API refuses writes to this key, and no task or endpoint
+// rebinds it — so the only in-place recovery for a same-backend mismatch is to
+// put the pinned copy back under the configured location. Copying the tree
+// works for that because the copy carries both markers, and therefore the
+// pinned generation, with it.
 func (e *PinMismatchError) Error() string {
 	if e.Recorded.Backend != e.Resolved.Backend {
 		return fmt.Sprintf(
 			"artwork storage is pinned to %s but this node resolved %s; "+
-				"set artwork.storage_backend=%s to keep the pinned backend, or migrate the "+
-				"objects and run the \"Reconcile artwork cache\" task to rebind storage",
+				"set artwork.storage_backend=%s to keep the pinned backend. Changing the "+
+				"artwork backend of a pinned installation is not supported in place: the pin "+
+				"records the backend and nothing rebinds it",
 			e.Recorded.describe(), e.Resolved.describe(), e.Recorded.Backend,
 		)
 	}
 	return fmt.Sprintf(
-		"artwork storage is pinned to %s but this node opened %s; the configured path "+
-			"points at a different store copy — restore the original store, or migrate the "+
-			"objects and run the \"Reconcile artwork cache\" task to rebind storage",
-		e.Recorded.describe(), e.Resolved.describe(),
+		"artwork storage is pinned to %s but this node opened %s; the configured location "+
+			"holds a different store copy — restore the pinned copy, or copy the whole tree "+
+			"including its %s and %s markers to the configured location so the copy keeps the "+
+			"pinned generation. An object-empty local root can instead be re-initialized with "+
+			"POST /api/v1/admin/artwork/rebuild",
+		e.Recorded.describe(), e.Resolved.describe(), markerFileName, formatMarkerFileName,
 	)
 }
 

@@ -1879,12 +1879,23 @@ func (s *DetailService) buildMediaItemDetail(ctx context.Context, item *models.M
 	posterTarget := artworkurl.Target{Surface: artworkurl.SurfaceItemPosters, Keys: []string{contentID}}
 	backdropTarget := artworkurl.Target{Surface: artworkurl.SurfaceItemBackdrops, Keys: []string{contentID}}
 	logoTarget := artworkurl.Target{Surface: artworkurl.SurfaceItemLogos, Keys: []string{contentID}}
+	// Per slot, not all-or-nothing: a localization that overrides only the
+	// poster leaves its backdrop_path and logo_path empty, so pointing those
+	// capabilities at the localization row would dead-end on an empty selection
+	// even though the base row holds a perfectly good backdrop. Only the slots
+	// the localization actually changed move to the localized surface.
 	if baseItem != nil && (item.PosterPath != baseItem.PosterPath || item.BackdropPath != baseItem.BackdropPath || item.LogoPath != baseItem.LogoPath) {
 		if language, err := s.resolvePresentationLanguage(ctx, filter, baseItem.OriginalLanguage); err == nil && language != "" {
 			keys := []string{contentID, language}
-			posterTarget = artworkurl.Target{Surface: artworkurl.SurfaceLocalizedItemPosters, Keys: keys}
-			backdropTarget = artworkurl.Target{Surface: artworkurl.SurfaceLocalizedItemBackdrops, Keys: keys}
-			logoTarget = artworkurl.Target{Surface: artworkurl.SurfaceLocalizedItemLogos, Keys: keys}
+			if item.PosterPath != baseItem.PosterPath {
+				posterTarget = artworkurl.Target{Surface: artworkurl.SurfaceLocalizedItemPosters, Keys: keys}
+			}
+			if item.BackdropPath != baseItem.BackdropPath {
+				backdropTarget = artworkurl.Target{Surface: artworkurl.SurfaceLocalizedItemBackdrops, Keys: keys}
+			}
+			if item.LogoPath != baseItem.LogoPath {
+				logoTarget = artworkurl.Target{Surface: artworkurl.SurfaceLocalizedItemLogos, Keys: keys}
+			}
 		}
 	}
 	detail.PosterURL = s.PresignArtworkTargetImageURL(ctx, posterTarget, item.PosterPath, artworkkey.ImageTypePoster, string(filter.ImageSize))

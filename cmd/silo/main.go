@@ -3120,12 +3120,18 @@ func main() {
 				!deps.UserArtworkTracked,
 			)
 			directLibraryArtwork := metadata.NewDirectLibraryArtworkResolver(deps.DB)
-			adminJobRunner.SetArtworkStorageExecutors(
-				artworkStorageService,
-				metadata.NewArtworkPurgeExecutor(
-					deps.DB, directLibraryArtwork, artworkStorageService,
-				),
+			artworkPurgeExecutor := metadata.NewArtworkPurgeExecutor(
+				deps.DB, directLibraryArtwork, artworkStorageService,
 			)
+			// Purge must prove a source is still retrievable before it lets the
+			// stored revision become collectible. Provider- and plugin-scheme
+			// sources (tmdb://…) need the same resolver materialization and
+			// resilient delivery use; without it every such target stays
+			// protected and a purge reclaims nothing.
+			if deps.ArtworkSourceResolver != nil {
+				artworkPurgeExecutor.SetSourceResolver(deps.ArtworkSourceResolver)
+			}
+			adminJobRunner.SetArtworkStorageExecutors(artworkStorageService, artworkPurgeExecutor)
 		}
 		adminJobRunner.SetCancelRegistry(adminJobCancelRegistry)
 		if artworkStorageService != nil {

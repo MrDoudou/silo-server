@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -50,6 +51,17 @@ const (
 	repairSignalSuppressionEntries = 4096
 	verifiedArtworkCacheBytes      = 64 << 20
 	maxVerifiedStoredObjectBytes   = 32 << 20
+	// The verified-digest validator is metadata only (key + ETag + size +
+	// modTime), and the filesystem backend derives its ETag from that same
+	// metadata, so an in-place byte replacement that preserves size and mtime is
+	// invisible to it. Entries therefore expire and force a periodic re-hash
+	// against the revision manifest instead of being trusted forever.
+	verifiedArtworkCacheTTL = time.Hour
+	// A backend that hands delivery a one-shot stream cannot seek, so a Range
+	// request can only be answered by buffering the object. Stored artwork
+	// variants are bounded well below this ceiling; anything larger is streamed
+	// as a full 200 rather than held in memory.
+	maxRangeBufferedObjectBytes    = maxVerifiedStoredObjectBytes
 	artworkImagePoster             = artworkkey.ImageTypePoster
 	artworkImageBackdrop           = artworkkey.ImageTypeBackdrop
 	artworkImageLogo               = artworkkey.ImageTypeLogo
@@ -388,6 +400,19 @@ func (h *ArtworkHandler) resolveFallback(ctx context.Context, state metadata.Art
 				return cached, nil
 			}
 		} else {
+			// A direct http(s) source resolves to itself, so the key built above
+			// is already the final cache key. Serving those bytes costs no
+			// upstream request, and charging the recovery limiter for them would
+			// let one page of distinct cached targets exhaust it and push later
+			// requests onto placeholders. Plugin-resolved paths still have to
+			// resolve first, so they keep the post-resolution check below.
+			directSource := strings.HasPrefix(state.SourcePath, "http://") || strings.HasPrefix(state.SourcePath, "https://")
+			if directSource {
+				if cached, ok := h.emergency.get(cacheKey); ok {
+					artworkmetrics.Delivery("source_fallback", "emergency_cache_hit")
+					return cached, nil
+				}
+			}
 			if err := h.sourceRate.Wait(requestCtx); err != nil {
 				artworkmetrics.Repair("throttled")
 				return fallbackArtwork{}, err
@@ -400,7 +425,7 @@ func (h *ArtworkHandler) resolveFallback(ctx context.Context, state metadata.Art
 				return fallbackArtwork{}, requestCtx.Err()
 			}
 			resolved := state.SourcePath
-			if !strings.HasPrefix(resolved, "http://") && !strings.HasPrefix(resolved, "https://") {
+			if !directSource {
 				if h.sources == nil {
 					return fallbackArtwork{}, errors.New("artwork source resolver is unavailable")
 				}
@@ -530,14 +555,28 @@ func (h *ArtworkHandler) writeObject(w http.ResponseWriter, r *http.Request, obj
 		header.Set("Cache-Control", artworkCacheControl(expiresAt, now))
 	}
 	if seeker, ok := object.ReadSeeker(); ok {
-		if artworkETagMatches(r.Header.Get("If-None-Match"), info.ETag) {
-			artworkmetrics.Delivery("store", "conditional_hit")
-		} else {
+		serveSeekableArtwork(w, r, info, seeker)
+		return
+	}
+	// Range support is part of the delivery contract on every backend, not just
+	// the seekable ones. A remote body has to be buffered to answer one, so pay
+	// that cost only when the client actually asked for a range and the object
+	// is small enough to hold; everything else keeps streaming untouched.
+	if r.Method != http.MethodHead && r.Header.Get("Range") != "" &&
+		info.SizeBytes > 0 && info.SizeBytes <= maxRangeBufferedObjectBytes {
+		buffered, err := io.ReadAll(io.LimitReader(object.Body, info.SizeBytes))
+		if err != nil {
+			// The backend stream broke mid-object. Writing the bytes that did
+			// arrive matches what the streaming path below does on the same
+			// failure rather than inventing a second truncation behavior.
+			slog.DebugContext(r.Context(), "artwork range buffering interrupted", "component", "api", "error", err)
 			artworkmetrics.Delivery("store", "served")
+			w.WriteHeader(http.StatusOK)
+			written, _ := w.Write(buffered)
+			artworkmetrics.DeliveryBytes("store", int64(written))
+			return
 		}
-		counting := &artworkCountingResponseWriter{ResponseWriter: w}
-		http.ServeContent(counting, r, info.Key, info.ModTime, seeker)
-		artworkmetrics.DeliveryBytes("store", counting.bytes)
+		serveSeekableArtwork(w, r, info, bytes.NewReader(buffered))
 		return
 	}
 	if artworkETagMatches(r.Header.Get("If-None-Match"), info.ETag) {
@@ -559,6 +598,19 @@ func (h *ArtworkHandler) writeObject(w http.ResponseWriter, r *http.Request, obj
 	if err != nil {
 		slog.DebugContext(r.Context(), "artwork response interrupted", "component", "api", "error", err)
 	}
+}
+
+// serveSeekableArtwork answers with http.ServeContent, which owns conditional
+// and range handling once delivery can seek the bytes.
+func serveSeekableArtwork(w http.ResponseWriter, r *http.Request, info artworkstore.ObjectInfo, seeker io.ReadSeeker) {
+	if artworkETagMatches(r.Header.Get("If-None-Match"), info.ETag) {
+		artworkmetrics.Delivery("store", "conditional_hit")
+	} else {
+		artworkmetrics.Delivery("store", "served")
+	}
+	counting := &artworkCountingResponseWriter{ResponseWriter: w}
+	http.ServeContent(counting, r, info.Key, info.ModTime, seeker)
+	artworkmetrics.DeliveryBytes("store", counting.bytes)
 }
 
 func secureArtworkHeaders(header http.Header) {
@@ -624,9 +676,10 @@ type verifiedArtworkCache struct {
 }
 
 type verifiedArtworkEntry struct {
-	usedAt time.Time
-	etag   string
-	size   int64
+	usedAt    time.Time
+	expiresAt time.Time
+	etag      string
+	size      int64
 }
 
 func newVerifiedArtworkCache(maxBytes int64) *verifiedArtworkCache {
@@ -640,11 +693,21 @@ func (c *verifiedArtworkCache) get(key string) (string, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry, ok := c.entries[key]
-	if ok {
-		entry.usedAt = time.Now()
-		c.entries[key] = entry
+	if !ok {
+		return "", false
 	}
-	return entry.etag, ok
+	now := time.Now()
+	// An expired entry is dropped rather than refreshed: the validator alone
+	// cannot prove the stored bytes are still the verified ones, so the caller
+	// has to re-hash them against the manifest.
+	if now.After(entry.expiresAt) {
+		delete(c.entries, key)
+		c.bytes -= entry.size
+		return "", false
+	}
+	entry.usedAt = now
+	c.entries[key] = entry
+	return entry.etag, true
 }
 
 func (c *verifiedArtworkCache) put(key, etag string, size int64) {
@@ -656,7 +719,8 @@ func (c *verifiedArtworkCache) put(key, etag string, size int64) {
 	if old, ok := c.entries[key]; ok {
 		c.bytes -= old.size
 	}
-	c.entries[key] = verifiedArtworkEntry{usedAt: time.Now(), etag: etag, size: size}
+	now := time.Now()
+	c.entries[key] = verifiedArtworkEntry{usedAt: now, expiresAt: now.Add(verifiedArtworkCacheTTL), etag: etag, size: size}
 	c.bytes += size
 	for c.bytes > c.maxBytes {
 		oldestKey := ""

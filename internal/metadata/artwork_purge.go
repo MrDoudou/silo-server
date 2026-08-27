@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"sort"
 	"strings"
@@ -13,18 +15,39 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/Silo-Server/silo-server/internal/artworksource"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 )
 
 const (
-	artworkPurgeCheckpointVersion = 1
+	// Version 2 stopped folding the revalidated fallback/protected flags into
+	// the plan fingerprint, so a version-1 checkpoint is replanned instead of
+	// failing the drift check it can no longer satisfy.
+	artworkPurgeCheckpointVersion = 2
 	artworkPurgeBatchSize         = 200
+	// artworkPurgeSourceProbeTimeout bounds one validation fetch. Purge is an
+	// admin job, so the probes run sequentially; only the per-fetch wait needs
+	// a ceiling.
+	artworkPurgeSourceProbeTimeout = 30 * time.Second
 )
+
+// artworkPurgeSourceResolver turns a provider- or plugin-scheme source path
+// into a fetchable URL. It is the same resolver the delivery and
+// materialization paths use; without one, such a source cannot be proved
+// reachable and its target stays protected.
+type artworkPurgeSourceResolver interface {
+	ResolveImageURL(ctx context.Context, path string, variant string) string
+}
 
 type ArtworkPurgeExecutor struct {
 	pool       *pgxpool.Pool
 	direct     *DirectLibraryArtworkResolver
 	accounting *ArtworkStorageService
+	sources    artworkPurgeSourceResolver
+	// fetchSource is the verified source fetch, injectable for tests. Nil uses
+	// the SSRF-guarded, size-limited, image-validating fetch shared with
+	// materialization and resilient delivery.
+	fetchSource func(ctx context.Context, rawURL string) error
 }
 
 func NewArtworkPurgeExecutor(
@@ -36,6 +59,16 @@ func NewArtworkPurgeExecutor(
 		return nil
 	}
 	return &ArtworkPurgeExecutor{pool: pool, direct: direct, accounting: accounting}
+}
+
+// SetSourceResolver wires the plugin/provider image-URL resolver. Purge needs
+// it to validate non-HTTP provider sources before it makes the stored revision
+// collectible; targets whose scheme needs resolution stay protected while it is
+// absent.
+func (e *ArtworkPurgeExecutor) SetSourceResolver(sources artworkPurgeSourceResolver) {
+	if e != nil {
+		e.sources = sources
+	}
 }
 
 type artworkPurgeTarget struct {
@@ -121,9 +154,10 @@ func (e *ArtworkPurgeExecutor) Execute(
 			return checkpointResult(cp), nil
 		}
 	} else {
-		targets = restoreCheckpointTargets(cp.Targets)
-		if got := purgePlanFingerprint(req, targets); got != cp.PlanFingerprint {
-			return nil, fmt.Errorf("artwork purge: checkpoint plan fingerprint mismatch")
+		var err error
+		targets, err = e.resumeTargets(ctx, req, &cp)
+		if err != nil {
+			return nil, err
 		}
 	}
 	queued := make(map[string]struct{}, len(cp.QueuedPaths))
@@ -265,12 +299,28 @@ func (e *ArtworkPurgeExecutor) plan(ctx context.Context, tx pgx.Tx, req ArtworkP
 	return targets, nil
 }
 
+// revalidateTargets re-proves every fallback a target would be transitioned
+// to. Purge points the catalog at the fallback and lets the stored revision
+// become unreferenced, so revision GC collects it: a fallback that is not
+// actually retrievable turns a reclaim into permanent loss. A file:// sidecar
+// is read, and a remote source is fetched through the same verified fetch
+// materialization and resilient delivery use — a scheme check alone would
+// accept a dead provider URL. Anything that cannot be proved is marked
+// protected, which keeps the reference and the bytes exactly where they are.
 func (e *ArtworkPurgeExecutor) revalidateTargets(ctx context.Context, targets []artworkPurgeTarget) error {
+	// Targets commonly share a source (localizations of one item, versions of
+	// one file). One verdict per distinct source keeps a large plan from
+	// re-fetching the same bytes hundreds of times.
+	verdicts := make(map[string]error)
 	for i := range targets {
 		target := &targets[i]
 		if target.shared {
 			continue
 		}
+		// Verdicts are recomputed, never merged: a resumed target carries the
+		// fallback recorded at planning time, and keeping it alongside a fresh
+		// protected verdict would leave a dead reference in the checkpoint.
+		target.fallback, target.protected = "", false
 		source := strings.TrimSpace(target.source)
 		switch {
 		case strings.HasPrefix(strings.ToLower(source), "file://"):
@@ -284,13 +334,77 @@ func (e *ArtworkPurgeExecutor) revalidateTargets(ctx context.Context, targets []
 				return err
 			}
 			target.fallback = reference
-		case reconstructibleRemoteArtworkSource(source), strings.HasPrefix(source, "/"):
+		case reconstructibleRemoteArtworkSource(source):
+			verdict, seen := verdicts[source]
+			if !seen {
+				verdict = e.probeRemoteArtworkSource(ctx, source)
+				verdicts[source] = verdict
+			}
+			if verdict != nil {
+				if !seen {
+					slog.WarnContext(ctx, "artwork purge: source is not retrievable; keeping the stored revision",
+						"surface", target.surfaceName, "source", source, "error", verdict)
+				}
+				target.protected = true
+				continue
+			}
+			target.fallback = source
+		case strings.HasPrefix(source, "/"):
+			// App-relative bundled asset served by the frontend: there is no
+			// object to fetch and nothing that can rot behind it.
 			target.fallback = source
 		default:
 			target.protected = true
 		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// probeRemoteArtworkSource proves one remote source still yields a usable
+// image. Provider- and plugin-scheme sources are resolved to a URL first, the
+// same way materialization and fallback delivery resolve them.
+func (e *ArtworkPurgeExecutor) probeRemoteArtworkSource(ctx context.Context, source string) error {
+	resolved := source
+	lower := strings.ToLower(source)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+		if e.sources == nil {
+			return errors.New("no image resolver is configured for source scheme")
+		}
+		resolved = strings.TrimSpace(e.sources.ResolveImageURL(ctx, source, "original"))
+		if resolved == "" {
+			return errors.New("source resolved to an empty URL")
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, artworkPurgeSourceProbeTimeout)
+	defer cancel()
+	if e.fetchSource != nil {
+		return e.fetchSource(ctx, resolved)
+	}
+	_, err := artworksource.FetchVerified(ctx, resolved)
+	return err
+}
+
+// resumeTargets restores a checkpoint's plan and re-proves the part of it that
+// has not been applied yet. A sidecar can be deleted or a provider URL can die
+// between the checkpoint and the resume, so the remaining transitions are
+// gated on a fresh verdict rather than on the one recorded at planning time.
+func (e *ArtworkPurgeExecutor) resumeTargets(ctx context.Context, req ArtworkPurgeRequest, cp *ArtworkPurgeCheckpoint) ([]artworkPurgeTarget, error) {
+	targets := restoreCheckpointTargets(cp.Targets)
+	if got := purgePlanFingerprint(req, targets); got != cp.PlanFingerprint {
+		return nil, fmt.Errorf("artwork purge: checkpoint plan fingerprint mismatch")
+	}
+	start := min(max(cp.BatchIndex, 0), len(targets))
+	if err := e.revalidateTargets(ctx, targets[start:]); err != nil {
+		return nil, err
+	}
+	metrics := calculatePurgePlanMetrics(targets)
+	cp.Targets = checkpointTargets(targets)
+	cp.SharedRetained, cp.ProtectedSkipped = metrics.sharedRevisions, metrics.protectedRevisions
+	cp.PendingBytes, cp.ReclaimableBytes = metrics.pendingBytes, metrics.reclaimableBytes
+	return targets, nil
 }
 
 func checkpointTargets(targets []artworkPurgeTarget) []ArtworkPurgeCheckpointTarget {
@@ -507,6 +621,12 @@ func purgeTargetAtFallback(ctx context.Context, tx pgx.Tx, target artworkPurgeTa
 	return exists, err
 }
 
+// purgePlanFingerprint covers what the plan read out of the catalog and the
+// inventory, so a resume still detects rows that changed since planning. The
+// fallback and protected fields are deliberately excluded: they are verdicts
+// revalidation recomputes on every resume, and folding them in would make a
+// source that died mid-purge look like catalog drift instead of the protected
+// target it must become.
 func purgePlanFingerprint(req ArtworkPurgeRequest, targets []artworkPurgeTarget) string {
 	h := sha256.New()
 	scope := "server"
@@ -515,7 +635,7 @@ func purgePlanFingerprint(req ArtworkPurgeRequest, targets []artworkPurgeTarget)
 	}
 	_, _ = fmt.Fprintf(h, "%s:%s\n", scope, req.Mode)
 	for _, target := range targets {
-		_, _ = fmt.Fprintf(h, "%s:%s:%s:%s:%s:%t:%t:%d\n", target.surfaceName, strings.Join(target.keys, "\x00"), target.path, target.source, target.fallback, target.shared, target.protected, target.bytes)
+		_, _ = fmt.Fprintf(h, "%s:%s:%s:%s:%t:%d\n", target.surfaceName, strings.Join(target.keys, "\x00"), target.path, target.source, target.shared, target.bytes)
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

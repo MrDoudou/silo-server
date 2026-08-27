@@ -209,6 +209,11 @@ func (c *ArtworkReconcileCheckpoint) valid(surfaceCount int) bool {
 	if c.Finished != (c.SurfaceName == artworkReconcileCompleteSurface) {
 		return false
 	}
+	// A cursor whose width no longer matches the surface's key columns is a
+	// checkpoint written before the surface's key was widened. Reporting the
+	// checkpoint invalid restarts the run from a fresh probe, which is safe and
+	// idempotent; parsing it would either error permanently or resume from a
+	// position that no longer orders the surface.
 	if position < surfaceCount && len(c.SurfaceCursor) > 0 && len(c.SurfaceCursor) != len(surfaces[position].keyCols) {
 		return false
 	}
@@ -460,7 +465,12 @@ func artworkSweepSurfaces() []artworkSweepSurface {
 		// uploads from blind bulk resets.
 		{name: artworkSurfaceCollectionPosters, table: libraryCollectionsTable, keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: posterURLColumn, imageType: artworkkey.ImageTypeCollectionPoster, thumbhashCol: posterThumbhashColumn, clearSet: `poster_url = '', poster_thumbhash = '', poster_auto_generated = FALSE, poster_from_template = FALSE, updated_at = NOW()`, alwaysVerify: true},
 		{name: artworkSurfaceCollectionBackdrops, table: libraryCollectionsTable, keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: "backdrop_url", imageType: "collection-backdrop", thumbhashCol: backdropThumbhashColumn, clearSet: `backdrop_url = '', backdrop_thumbhash = '', updated_at = NOW()`, alwaysVerify: true},
-		{name: artworkSurfaceUserCollectionPosters, table: "user_personal_collections", keyCols: []artworkSweepKey{textSweepKey("id")}, pathCol: posterURLColumn, imageType: "collection-poster", thumbhashCol: posterThumbhashColumn, clearSet: `poster_url = '', poster_thumbhash = '', updated_at = NOW()`, alwaysVerify: true},
+		// user_personal_collections is keyed by (user_id, id): ids are only
+		// unique within an account, so sweeping on id alone would skip rows at
+		// batch boundaries and let a verify/purge predicate touch another
+		// account's collection. The key order matches the primary key and the
+		// delivery target's (account, collection) keys.
+		{name: artworkSurfaceUserCollectionPosters, table: "user_personal_collections", keyCols: []artworkSweepKey{int32SweepKey("user_id"), textSweepKey("id")}, pathCol: posterURLColumn, imageType: "collection-poster", thumbhashCol: posterThumbhashColumn, clearSet: `poster_url = '', poster_thumbhash = '', updated_at = NOW()`, alwaysVerify: true},
 		{name: artworkSurfaceLibraryPosters, table: "media_folders", keyCols: []artworkSweepKey{int32SweepKey("id")}, pathCol: posterPathColumn, imageType: "library-poster", noUpdatedAt: true, clearSet: `poster_path = ''`, alwaysVerify: true},
 	}
 }

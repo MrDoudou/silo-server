@@ -81,7 +81,7 @@ export default function ScannerSettings() {
           <SettingField
             label="Cache remote artwork"
             type="toggle"
-            hint="Copy the artwork Silo selects from metadata providers into the canonical artwork store instead of handing clients the provider's own URL. Works with either artwork storage backend, local or S3."
+            hint="Copy the artwork Silo selects from metadata providers into the canonical artwork store. Clients always load artwork from Silo either way; with this off, images are not stored and each cold request fetches them from the provider. Works with either artwork storage backend, local or S3."
             value={cacheImagesEnabled ? "true" : "false"}
             onChange={(v) => {
               form.setValue(REMOTE_MATERIALIZATION_KEY, v === "true" ? "selected" : "passthrough");

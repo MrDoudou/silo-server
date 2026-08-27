@@ -73,6 +73,25 @@ type ImageCacheJobClaimer interface {
 	DeleteSucceededBefore(ctx context.Context, before time.Time, limit int) (int, error)
 }
 
+// imageCacheRepairJobClaimer is optional so lightweight stores and fakes need
+// not implement it. A store that can claim repair jobs on their own lets a
+// disabled (passthrough) processor still finish an authoritative-empty store
+// rebuild: that rebuild enqueues repair jobs and blocks until they drain, and
+// nothing else would ever claim them.
+type imageCacheRepairJobClaimer interface {
+	ClaimDueRepairs(ctx context.Context, workerID string, limit int) ([]*models.MetadataImageCacheJob, error)
+}
+
+// imageCacheClaimMode scopes what a run may claim. Repair-only is the
+// passthrough mode: artwork the server would otherwise materialize stays at its
+// source, while artwork already selected from the store is still repaired.
+type imageCacheClaimMode int
+
+const (
+	imageCacheClaimAll imageCacheClaimMode = iota
+	imageCacheClaimRepairOnly
+)
+
 // imageCacheLadderBackfiller is optional so lightweight stores that only serve
 // the normal queue do not have to implement the one-shot ladder sweep. A store
 // that does not implement it simply has no ladder backfill.
@@ -282,9 +301,18 @@ func (s *ImageCacheRunStats) add(other ImageCacheRunStats) {
 // explicit full-catalog backfill.
 func (p *ImageCacheProcessor) RunOnce(ctx context.Context, workerID string, claimLimit int, concurrency int) (ImageCacheRunStats, error) {
 	var stats ImageCacheRunStats
-	if p == nil || p.jobs == nil || p.cacher == nil || !p.enabled.Load() {
+	if p == nil || p.jobs == nil || p.cacher == nil {
 		return stats, nil
 	}
+	mode, ok := p.claimMode()
+	if !ok {
+		return stats, nil
+	}
+	return p.runOnce(ctx, workerID, claimLimit, concurrency, mode)
+}
+
+func (p *ImageCacheProcessor) runOnce(ctx context.Context, workerID string, claimLimit int, concurrency int, mode imageCacheClaimMode) (ImageCacheRunStats, error) {
+	var stats ImageCacheRunStats
 	if claimLimit <= 0 {
 		claimLimit = 100
 	}
@@ -292,7 +320,7 @@ func (p *ImageCacheProcessor) RunOnce(ctx context.Context, workerID string, clai
 		concurrency = 4
 	}
 
-	jobs, err := p.jobs.ClaimDue(ctx, workerID, claimLimit)
+	jobs, err := p.claimDue(ctx, workerID, claimLimit, mode)
 	if err != nil {
 		return stats, err
 	}
@@ -300,9 +328,56 @@ func (p *ImageCacheProcessor) RunOnce(ctx context.Context, workerID string, clai
 		p.cleanupSucceeded(ctx, &stats)
 		return stats, nil
 	}
-	stats = p.processClaimedJobs(ctx, workerID, jobs, concurrency)
+	stats = p.processClaimedJobs(ctx, workerID, jobs, concurrency, mode)
 	p.cleanupSucceeded(ctx, &stats)
 	return stats, nil
+}
+
+// claimMode reports what this processor may claim right now, and whether it may
+// claim at all. A disabled processor is in passthrough: it materializes
+// nothing, but a store that supports repair-scoped claims still drains repair
+// jobs, because an empty-store rebuild waits on exactly those and would
+// otherwise sit in empty_rebuilding forever.
+func (p *ImageCacheProcessor) claimMode() (imageCacheClaimMode, bool) {
+	if p.enabled.Load() {
+		return imageCacheClaimAll, true
+	}
+	if _, ok := p.jobs.(imageCacheRepairJobClaimer); ok {
+		return imageCacheClaimRepairOnly, true
+	}
+	return imageCacheClaimAll, false
+}
+
+// drainMode resolves the claim scope for one iteration of a drain, and reports
+// whether the drain may continue. Discovery is materialization by definition,
+// so a disabled processor still refuses it with ErrImageCachingDisabled rather
+// than recording an explicit backfill as complete.
+func (p *ImageCacheProcessor) drainMode(discover bool) (imageCacheClaimMode, bool, error) {
+	mode, ok := p.claimMode()
+	if ok && (!discover || mode != imageCacheClaimRepairOnly) {
+		return mode, true, nil
+	}
+	if discover {
+		return mode, false, ErrImageCachingDisabled
+	}
+	return mode, false, nil
+}
+
+// mayProcess re-checks mid-run whether work may continue. A repair-only run is
+// already the disabled mode, so toggling materialization never interrupts it.
+func (p *ImageCacheProcessor) mayProcess(mode imageCacheClaimMode) bool {
+	return mode == imageCacheClaimRepairOnly || p.enabled.Load()
+}
+
+func (p *ImageCacheProcessor) claimDue(ctx context.Context, workerID string, claimLimit int, mode imageCacheClaimMode) ([]*models.MetadataImageCacheJob, error) {
+	if mode == imageCacheClaimRepairOnly {
+		claimer, ok := p.jobs.(imageCacheRepairJobClaimer)
+		if !ok {
+			return nil, nil
+		}
+		return claimer.ClaimDueRepairs(ctx, workerID, claimLimit)
+	}
+	return p.jobs.ClaimDue(ctx, workerID, claimLimit)
 }
 
 // ArtworkCachingEnabled reports whether the processor would actually cache
@@ -354,7 +429,7 @@ func (p *ImageCacheProcessor) CacheTargetArtwork(ctx context.Context, targetCont
 			return err
 		}
 		if len(jobs) > 0 {
-			stats := p.processClaimedJobs(ctx, workerID, jobs, immediateImageCacheConcurrency)
+			stats := p.processClaimedJobs(ctx, workerID, jobs, immediateImageCacheConcurrency, imageCacheClaimAll)
 			// Failures are collected rather than returned: the remaining
 			// artwork still gets cached, and a failed job carries its own
 			// backoff so it is not reclaimed by the loop below.
@@ -392,7 +467,7 @@ func (p *ImageCacheProcessor) CacheTargetArtwork(ctx context.Context, targetCont
 	return nil
 }
 
-func (p *ImageCacheProcessor) processClaimedJobs(ctx context.Context, workerID string, jobs []*models.MetadataImageCacheJob, concurrency int) ImageCacheRunStats {
+func (p *ImageCacheProcessor) processClaimedJobs(ctx context.Context, workerID string, jobs []*models.MetadataImageCacheJob, concurrency int, mode imageCacheClaimMode) ImageCacheRunStats {
 	stats := ImageCacheRunStats{Claimed: len(jobs)}
 	if len(jobs) == 0 {
 		return stats
@@ -407,7 +482,7 @@ func (p *ImageCacheProcessor) processClaimedJobs(ctx context.Context, workerID s
 	var unstarted []int64
 loop:
 	for i, job := range jobs {
-		if !p.enabled.Load() {
+		if !p.mayProcess(mode) {
 			for _, rem := range jobs[i:] {
 				unstarted = append(unstarted, rem.ID)
 			}
@@ -425,7 +500,7 @@ loop:
 			}
 			break loop
 		}
-		if !p.enabled.Load() {
+		if !p.mayProcess(mode) {
 			<-sem
 			for _, rem := range jobs[i:] {
 				unstarted = append(unstarted, rem.ID)
@@ -595,11 +670,8 @@ func (p *ImageCacheProcessor) runUntilIdle(ctx context.Context, workerID string,
 	if p.jobs == nil || p.cacher == nil {
 		return total, nil
 	}
-	if !p.enabled.Load() {
-		if discover {
-			return total, ErrImageCachingDisabled
-		}
-		return total, nil
+	if _, ok, err := p.drainMode(discover); !ok {
+		return total, err
 	}
 	total.Backlog = p.sampleBacklog(ctx)
 	reportImageCacheRunProgress(reportProgress, total)
@@ -616,18 +688,16 @@ func (p *ImageCacheProcessor) runUntilIdle(ctx context.Context, workerID string,
 		if err := ctx.Err(); err != nil {
 			return total, err
 		}
-		if !p.enabled.Load() {
-			if discover {
-				return total, ErrImageCachingDisabled
-			}
-			return total, nil
+		mode, ok, err := p.drainMode(discover)
+		if !ok {
+			return total, err
 		}
 		if limited && !time.Now().Before(deadline) {
 			total.RuntimeLimited = true
 			return total, nil
 		}
 
-		stats, err := p.RunOnce(ctx, workerID, claimLimit, concurrency)
+		stats, err := p.runOnce(ctx, workerID, claimLimit, concurrency, mode)
 		total.Batches++
 		total.add(stats)
 		reportImageCacheRunProgress(reportProgress, total)
@@ -637,11 +707,8 @@ func (p *ImageCacheProcessor) runUntilIdle(ctx context.Context, workerID string,
 		// SetEnabled may change while a claimed batch is in flight. Re-check
 		// before looping or discovering so disabling caching cannot turn an
 		// unbounded manual backfill into a rapid enqueue-only catalog sweep.
-		if !p.enabled.Load() {
-			if discover {
-				return total, ErrImageCachingDisabled
-			}
-			return total, nil
+		if _, ok, err = p.drainMode(discover); !ok {
+			return total, err
 		}
 		if stats.Claimed > 0 {
 			// Keep draining the queue before spending a full-table sweep.

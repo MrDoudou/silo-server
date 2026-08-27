@@ -325,19 +325,30 @@ func (r *Runner) executeArtworkPurge(job *models.AdminJob) {
 		return
 	}
 	artworkmetrics.Purge(req.DryRun, "completed", result.PendingBytes, result.ReclaimableBytes)
-	queueRefresh := !req.DryRun && req.Mode == ArtworkPurgeModeSafeMaterialized
-	result.AccountingRefreshQueued = queueRefresh
-	if err := r.repo.Complete(ctx, job.ID, CompleteJobInput{
-		ResultPayload: result, Message: "Artwork purge completed",
-		ProgressCurrent: 1, ProgressTotal: 1, ExpiresAt: time.Now().UTC().Add(r.retention),
-	}); err != nil {
+	completion := func(refreshQueued bool) CompleteJobInput {
+		result.AccountingRefreshQueued = refreshQueued
+		return CompleteJobInput{
+			ResultPayload: result, Message: "Artwork purge completed",
+			ProgressCurrent: 1, ProgressTotal: 1, ExpiresAt: time.Now().UTC().Add(r.retention),
+		}
+	}
+	// The completion and the follow-up refresh go in together, so a completed
+	// purge never reports a refresh that no row backs. If the pair cannot be
+	// written, complete the purge alone and say the refresh was not queued.
+	if !req.DryRun && req.Mode == ArtworkPurgeModeSafeMaterialized {
+		_, err := r.repo.CompleteWithFollowUp(ctx, job.ID, completion(true), CreateJobInput{
+			JobType: JobTypeArtworkStorageRefresh, CreatedByUserID: job.CreatedByUserID,
+			RequestPayload: map[string]any{}, Message: "Queued post-purge artwork storage refresh",
+		})
+		if err == nil {
+			r.publishJobByID(ctx, notifications.TypeJobCompleted, job.ID)
+			return
+		}
+		slog.Warn("admin jobs: failed to queue post-purge artwork refresh", "job_id", job.ID, "error", err)
+	}
+	if err := r.repo.Complete(ctx, job.ID, completion(false)); err != nil {
 		slog.Warn("admin jobs: failed to complete artwork purge", "job_id", job.ID, "error", err)
 		return
-	}
-	if queueRefresh {
-		if _, err := r.repo.Create(context.Background(), CreateJobInput{JobType: JobTypeArtworkStorageRefresh, CreatedByUserID: job.CreatedByUserID, RequestPayload: map[string]any{}, Message: "Queued post-purge artwork storage refresh"}); err != nil {
-			slog.Warn("admin jobs: failed to queue post-purge artwork refresh", "job_id", job.ID, "error", err)
-		}
 	}
 	r.publishJobByID(ctx, notifications.TypeJobCompleted, job.ID)
 }

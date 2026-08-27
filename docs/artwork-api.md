@@ -26,6 +26,13 @@ Artwork storage exposes `artwork.storage_backend`, `artwork.local_path`,
 same cautious mount semantics; there is no ownership-mode setting. Imported,
 unreferenced seed revisions have a fixed 30-day adoption grace.
 
+`artwork.remote_materialization` decides storage, not delivery.
+`"passthrough"` means provider and plugin images are not copied into the
+artwork store; catalog responses still return this server's artwork URLs, and a
+cold request fetches from the source within the request-time budget described
+under [Resilient delivery](#resilient-delivery). `"selected"` copies the artwork
+Silo selects into the store so those requests serve stored bytes.
+
 ## Admin storage controls
 
 The admin-authenticated storage endpoints are documented in

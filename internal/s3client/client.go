@@ -618,7 +618,7 @@ func (c *Client) ListObjects(ctx context.Context, bucket, prefix string) ([]stri
 // ListObjectInfos lists objects with the given prefix and returns summary metadata.
 func (c *Client) ListObjectInfos(ctx context.Context, bucket, prefix string) ([]ObjectInfo, error) {
 	var objects []ObjectInfo
-	prefixedPrefix := c.prefixedKey(prefix)
+	prefixedPrefix := c.listPrefix(prefix)
 
 	paginator := s3.NewListObjectsV2Paginator(c.s3Client, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
@@ -657,7 +657,7 @@ func (c *Client) ListObjectInfosPage(ctx context.Context, bucket, prefix, cursor
 	if limit <= 0 || limit > 1000 {
 		limit = 1000
 	}
-	input := &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(c.prefixedKey(prefix)), MaxKeys: aws.Int32(int32(limit))}
+	input := &s3.ListObjectsV2Input{Bucket: aws.String(bucket), Prefix: aws.String(c.listPrefix(prefix)), MaxKeys: aws.Int32(int32(limit))}
 	if cursor != "" {
 		input.StartAfter = aws.String(c.prefixedKey(cursor))
 	}
@@ -740,6 +740,22 @@ func (c *Client) prefixedKey(key string) string {
 		return c.keyPrefix
 	}
 	return c.keyPrefix + "/" + trimmed
+}
+
+// listPrefix returns the S3 Prefix that scopes a listing to this client's key
+// space. It differs from prefixedKey in exactly one case: an empty logical
+// prefix, where prefixedKey returns the bare key prefix with no separator. As a
+// listing Prefix that also matches sibling keys that merely start with it — key
+// prefix "assets" would list "assets-old/..." too. Those foreign keys are then
+// dropped by stripKeyPrefix, so a truncated page can come back with zero
+// objects and an unchanged cursor, which paging callers read as a listing that
+// refuses to advance. Anchoring on the trailing slash keeps the listing inside
+// the client's own tree.
+func (c *Client) listPrefix(prefix string) string {
+	if c.keyPrefix != "" && strings.TrimLeft(prefix, "/") == "" {
+		return c.keyPrefix + "/"
+	}
+	return c.prefixedKey(prefix)
 }
 
 func (c *Client) stripKeyPrefix(key string) (string, bool) {

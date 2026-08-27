@@ -4,7 +4,28 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 )
+
+func gaugeValue(t testing.TB, gauge prometheus.Metric) float64 {
+	t.Helper()
+	metric := &dto.Metric{}
+	if err := gauge.Write(metric); err != nil {
+		t.Fatalf("read gauge: %v", err)
+	}
+	return metric.GetGauge().GetValue()
+}
+
+func counterValue(t testing.TB, counter prometheus.Metric) float64 {
+	t.Helper()
+	metric := &dto.Metric{}
+	if err := counter.Write(metric); err != nil {
+		t.Fatalf("read counter: %v", err)
+	}
+	return metric.GetCounter().GetValue()
+}
 
 func TestArtworkMetricLabelsAreBounded(t *testing.T) {
 	tests := []struct {
@@ -55,4 +76,43 @@ func TestArtworkMetricRecordingAcceptsZeroAndNilInputs(t *testing.T) {
 	RepairPending(0, 0)
 	ObserveDeliveryLatency("", time.Time{})
 	StoreHealthDuration("", "", 0)
+}
+
+func TestInventorySnapshotAgeIsMeasuredAtScrapeTime(t *testing.T) {
+	previous := inventorySnapshotUnixNano.Load()
+	t.Cleanup(func() { inventorySnapshotUnixNano.Store(previous) })
+
+	inventorySnapshotUnixNano.Store(0)
+	if got := gaugeValue(t, inventoryAge); got != 0 {
+		t.Fatalf("age before any snapshot = %v, want 0", got)
+	}
+
+	Inventory(time.Now().Add(-90*time.Minute), 0, 0, 0)
+	if got := gaugeValue(t, inventoryAge); got < (90 * time.Minute).Seconds() {
+		t.Fatalf("age after a 90m-old snapshot = %v, want >= %v", got, (90 * time.Minute).Seconds())
+	}
+
+	// A refresh that produced no snapshot must not reset the recorded time.
+	Inventory(time.Time{}, 0, 0, 0)
+	if got := gaugeValue(t, inventoryAge); got < (90 * time.Minute).Seconds() {
+		t.Fatalf("age after a snapshotless refresh = %v, want >= %v", got, (90 * time.Minute).Seconds())
+	}
+}
+
+func TestWrongMountDetectionCountsOnEntry(t *testing.T) {
+	before := counterValue(t, wrongMounts.WithLabelValues("local"))
+
+	StoreHealth("local", "healthy", "wrong_mount")
+	if got := counterValue(t, wrongMounts.WithLabelValues("local")); got != before+1 {
+		t.Fatalf("detections after entering wrong_mount = %v, want %v", got, before+1)
+	}
+
+	// Staying in the state, accounting its duration, and leaving it must not
+	// add further detections.
+	StoreHealth("local", "wrong_mount", "wrong_mount")
+	StoreHealthDuration("local", "wrong_mount", time.Second)
+	StoreHealth("local", "wrong_mount", "healthy")
+	if got := counterValue(t, wrongMounts.WithLabelValues("local")); got != before+1 {
+		t.Fatalf("detections after staying in and leaving wrong_mount = %v, want %v", got, before+1)
+	}
 }

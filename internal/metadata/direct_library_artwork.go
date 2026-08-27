@@ -23,9 +23,19 @@ import (
 
 const directLibraryFingerprintCacheEntries = 256
 
+// directLibraryFingerprintTTL bounds how long a cached fingerprint is trusted.
+// The cache key is metadata only (path + mtime + size), which cannot detect a
+// byte-for-byte replacement that preserves all three — a restored backup or a
+// rsync --times copy. Without an expiry such a file would serve a stale ETag,
+// answer 304 forever, and never let healReference rotate the reference, because
+// the hash is never recomputed. Expiring entries forces a periodic re-hash;
+// inode-based keys would be cheaper but are not portable.
+const directLibraryFingerprintTTL = time.Hour
+
 type directLibraryFingerprintEntry struct {
 	fingerprint string
 	usedAt      time.Time
+	hashedAt    time.Time
 }
 
 type DirectLibraryArtworkFile struct {
@@ -128,7 +138,12 @@ func (r *DirectLibraryArtworkResolver) cachedFingerprint(key string) (string, bo
 	if !ok {
 		return "", false
 	}
-	entry.usedAt = time.Now()
+	now := time.Now()
+	if now.Sub(entry.hashedAt) >= directLibraryFingerprintTTL {
+		delete(r.fingerprints, key)
+		return "", false
+	}
+	entry.usedAt = now
 	r.fingerprints[key] = entry
 	return entry.fingerprint, true
 }
@@ -182,7 +197,8 @@ func (r *DirectLibraryArtworkResolver) storeFingerprint(key, fingerprint string)
 		}
 		delete(r.fingerprints, oldestKey)
 	}
-	r.fingerprints[key] = directLibraryFingerprintEntry{fingerprint: fingerprint, usedAt: time.Now()}
+	now := time.Now()
+	r.fingerprints[key] = directLibraryFingerprintEntry{fingerprint: fingerprint, usedAt: now, hashedAt: now}
 }
 
 func (r *DirectLibraryArtworkResolver) healReference(surface artworkSweepSurface, identity artworkurl.LibraryIdentity, oldReference, source, fingerprint string) {

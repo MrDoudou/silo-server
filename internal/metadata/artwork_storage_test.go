@@ -109,6 +109,31 @@ func TestDiscoverOrphansPersistsAdvancedEmptyPageCursor(t *testing.T) {
 	}
 }
 
+func TestArtworkRecoveryReentryIgnoresGenerationMismatch(t *testing.T) {
+	rebuilding := string(artworkstore.HealthEmptyRebuilding)
+	// A crash between an explicit rebuild's durable marker/pin rotation and its
+	// generation write leaves exactly this state: intent recorded against the
+	// old generation, live store empty and probing healthy.
+	crashed := artworkRecoveryState{storeHealth: rebuilding, rebuildGeneration: "generation-before"}
+	if !shouldReenterArtworkRecovery(crashed, artworkstore.HealthHealthy) {
+		t.Fatal("a rebuild intent on a stale generation must still re-enter recovery")
+	}
+	matching := artworkRecoveryState{storeHealth: rebuilding, rebuildGeneration: "generation-after"}
+	if !shouldReenterArtworkRecovery(matching, artworkstore.HealthDegraded) {
+		t.Fatal("a matching rebuild intent must re-enter recovery")
+	}
+	for _, live := range []artworkstore.HealthState{
+		artworkstore.HealthEmptyRebuilding, artworkstore.HealthUnavailable, artworkstore.HealthWrongMount,
+	} {
+		if shouldReenterArtworkRecovery(crashed, live) {
+			t.Fatalf("re-entered recovery while the store reported %q", live)
+		}
+	}
+	if shouldReenterArtworkRecovery(artworkRecoveryState{storeHealth: string(artworkstore.HealthHealthy)}, artworkstore.HealthHealthy) {
+		t.Fatal("re-entered recovery without a persisted rebuild intent")
+	}
+}
+
 func TestArtworkListingLoopsRejectNonAdvancingCursor(t *testing.T) {
 	for _, operation := range []string{"artwork inventory: store", "artwork seed import: portable tree"} {
 		for _, next := range []string{"", "same"} {

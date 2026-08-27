@@ -51,15 +51,28 @@ func (s *ArtworkStorageService) SetRebuilder(handle *artworkstore.Handle) {
 
 // RebuildEmpty recreates an empty local store, persists the recovery
 // generation, and returns the immediately observable admin state.
+//
+// The recovery intent is written *before* the store handle rotates its marker
+// and pin. The rotation is durable the moment it lands, so persisting the
+// intent afterwards leaves a crash window in which the store is empty on a new
+// generation while the accounting row still says healthy — a state in which
+// nothing ever re-enters bulk recovery. Recording the intent first turns that
+// window into the harmless opposite: an empty_rebuilding row whose generation
+// has not caught up yet, which RunRecovery treats as a rebuild to resume.
 func (s *ArtworkStorageService) RebuildEmpty(ctx context.Context) (ArtworkStorageAccounting, error) {
 	if s == nil || s.pool == nil || s.rebuilder == nil {
 		return ArtworkStorageAccounting{}, artworkstore.ErrRebuildUnsupported
+	}
+	if _, err := s.pool.Exec(ctx, `UPDATE artwork_storage_accounting_state SET
+		store_health = 'empty_rebuilding', health_changed_at = NOW(), rebuild_generation = $1,
+		rebuild_surface_name = '', rebuild_enqueued_at = NULL WHERE singleton`, s.rebuilder.GenerationID()); err != nil {
+		return ArtworkStorageAccounting{}, fmt.Errorf("record artwork rebuild intent: %w", err)
 	}
 	if err := s.rebuilder.RebuildEmpty(ctx); err != nil {
 		return ArtworkStorageAccounting{}, err
 	}
 	if _, err := s.pool.Exec(ctx, `UPDATE artwork_storage_accounting_state SET
-		store_health = 'empty_rebuilding', health_changed_at = NOW(), rebuild_generation = $1,
+		store_health = 'empty_rebuilding', rebuild_generation = $1,
 		rebuild_surface_name = '', rebuild_enqueued_at = NULL WHERE singleton`, s.rebuilder.GenerationID()); err != nil {
 		return ArtworkStorageAccounting{}, fmt.Errorf("persist artwork rebuild state: %w", err)
 	}
@@ -249,8 +262,18 @@ const artworkAccountingPublishSQL = `
 		updated_at = NOW()
 	WHERE singleton`
 
+// artworkMissingObjectsSQL counts the object slots the registry itself still
+// records as absent for the live store generation. A revision is written with
+// one zero-sized entry per key the store did not answer for (see
+// statArtworkKeys), so this is the same evidence the published object counts
+// use, read at finalization instead of accumulated while walking.
+const artworkMissingObjectsSQL = `
+	SELECT COALESCE(sum((SELECT count(*) FROM unnest(object_sizes_bytes) size WHERE size <= 0)), 0)
+	FROM artwork_revision_gc_candidates
+	WHERE tombstoned_at IS NULL AND NOT inventory_complete AND store_generation = $1`
+
 func (s *ArtworkStorageService) refreshResult(ctx context.Context, cp ArtworkInventoryCheckpoint) (ArtworkInventoryRefreshResult, error) {
-	var liveMissing, lifecycleMissing int64
+	var liveMissing, lifecycleMissing, missingObjects int64
 	query := `SELECT count(*) FROM (` + artworkInventoryReferenceSQL() + `) refs
 		LEFT JOIN artwork_revision_gc_candidates inventory ON inventory.original_path = refs.path
 		WHERE inventory.id IS NULL OR NOT inventory.inventory_complete OR inventory.store_generation <> $1`
@@ -262,11 +285,27 @@ func (s *ArtworkStorageService) refreshResult(ctx context.Context, cp ArtworkInv
 		WHERE tombstoned_at IS NULL AND (NOT inventory_complete OR store_generation <> $1)`, s.storeGeneration()).Scan(&lifecycleMissing); err != nil {
 		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: count incomplete lifecycle rows: %w", err)
 	}
+	// Missing objects come from the registry, not from cp.MissingObjects. A
+	// resumed refresh restores the pre-interruption count verbatim and then
+	// resumes strictly past its cursor, so those revisions are never looked at
+	// again: repairs that landed in between would stay invisible and the stale
+	// count would hold Complete false until somebody ran a refresh from
+	// scratch. Recomputing here is authoritative for both the fresh and the
+	// resumed run, and for the already-finished checkpoint replay above.
+	//
+	// cp.Failures stays an accumulated observation on purpose: a revision this
+	// run could not inspect leaves no registry trace (its previous inventory
+	// row may still be complete and current), so only the counter records that
+	// the pass was incomplete. It is scoped to one refresh run — a new refresh
+	// starts from an empty checkpoint — so it cannot outlive the failure.
+	if err := s.pool.QueryRow(ctx, artworkMissingObjectsSQL, s.storeGeneration()).Scan(&missingObjects); err != nil {
+		return ArtworkInventoryRefreshResult{}, fmt.Errorf("artwork inventory: count missing objects: %w", err)
+	}
 	return ArtworkInventoryRefreshResult{
 		SnapshotAt:       time.Now().UTC(),
-		Complete:         cp.Failures == 0 && cp.MissingObjects == 0 && liveMissing == 0 && lifecycleMissing == 0,
+		Complete:         cp.Failures == 0 && missingObjects == 0 && liveMissing == 0 && lifecycleMissing == 0,
 		KnownRevisions:   cp.KnownRevisions,
-		MissingObjects:   cp.MissingObjects,
+		MissingObjects:   missingObjects,
 		Failures:         cp.Failures,
 		MissingRevisions: liveMissing,
 		OrphanObjects:    cp.OrphanObjects,

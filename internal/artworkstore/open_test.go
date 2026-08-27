@@ -299,8 +299,8 @@ func TestPinnedLocalStoreRefusesToSwitchToS3(t *testing.T) {
 	if !errors.As(err, &mismatch) {
 		t.Fatalf("Open = %v, want a PinMismatchError", err)
 	}
-	if !strings.Contains(err.Error(), "Reconcile artwork cache") {
-		t.Fatalf("error %q does not name the reconcile workflow", err)
+	if !strings.Contains(err.Error(), "not supported in place") {
+		t.Fatalf("error %q does not say that an in-place backend change is unsupported", err)
 	}
 	if !strings.Contains(err.Error(), "artwork.storage_backend=local") {
 		t.Fatalf("error %q does not tell the operator how to keep the pinned backend", err)

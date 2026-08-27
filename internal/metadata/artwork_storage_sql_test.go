@@ -91,7 +91,7 @@ func TestArtworkSweepSurfaceNamesPinDurableCatalogIdentity(t *testing.T) {
 		"person photos":            {"people", "id", "photo_path", "photo_source_path", "photo_thumbhash", false},
 		"collection posters":       {"library_collections", "id", "poster_url", "", "poster_thumbhash", false},
 		"collection backdrops":     {"library_collections", "id", "backdrop_url", "", "backdrop_thumbhash", false},
-		"user collection posters":  {"user_personal_collections", "id", "poster_url", "", "poster_thumbhash", false},
+		"user collection posters":  {"user_personal_collections", "user_id,id", "poster_url", "", "poster_thumbhash", false},
 		"library posters":          {"media_folders", "id", "poster_path", "", "", true},
 	}
 	surfaces := artworkSweepSurfaces()
@@ -261,7 +261,11 @@ func TestArtworkResilientDeliveryMigrationPinsLossAndRebuildState(t *testing.T) 
 	}
 }
 
-func TestSafePurgeSourceRevalidationDoesNotRequireRemoteHEAD(t *testing.T) {
+// reconstructibleRemoteArtworkSource only classifies a source's scheme; it is
+// the gate that decides which sources are worth probing, not proof that one is
+// retrievable. revalidateTargets fetches every source it lets through (see
+// TestRevalidateTargetsProtectsUnreachableRemoteSource).
+func TestReconstructibleRemoteArtworkSourceClassifiesSchemes(t *testing.T) {
 	if !strings.Contains(nonProviderImageSchemesSQL, "'embedded://%'") {
 		t.Fatalf("SQL protected-source list omits embedded artwork: %s", nonProviderImageSchemesSQL)
 	}

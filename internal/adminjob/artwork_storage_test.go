@@ -23,6 +23,91 @@ func TestDecodeArtworkPurgeRequestNormalizesMode(t *testing.T) {
 	}
 }
 
+// A completed purge that reports a queued accounting refresh must be backed by
+// a real follow-up row: the two writes share one transaction, so neither a
+// crash nor a rejected insert can leave the claim standing alone.
+func TestCompleteWithFollowUpIsAtomic(t *testing.T) {
+	dsn := os.Getenv("SILO_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("SILO_TEST_DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect test database: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	repo := NewRepository(pool)
+	message := fmt.Sprintf("follow-up completion test %d", time.Now().UnixNano())
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM admin_jobs WHERE message = $1 OR message = $2`, message, message+" refresh")
+	})
+	if _, err := pool.Exec(ctx, `
+		DELETE FROM admin_jobs
+		WHERE job_type IN ($1, $2, $3) AND status IN ($4, $5)`,
+		JobTypeArtworkStorageRefresh, JobTypeArtworkPurge, JobTypeArtworkStorageImport, StatusQueued, StatusRunning); err != nil {
+		t.Fatalf("clear pre-existing artwork storage jobs: %v", err)
+	}
+
+	purge, err := repo.Create(ctx, CreateJobInput{
+		JobType: JobTypeArtworkPurge, RequestPayload: map[string]any{"scope": map[string]any{"server": true}, "mode": ArtworkPurgeModeSafeMaterialized}, Message: message,
+	})
+	if err != nil {
+		t.Fatalf("create purge job: %v", err)
+	}
+	if _, err := repo.ClaimNextQueued(ctx, JobTypeArtworkPurge); err != nil {
+		t.Fatalf("claim purge job: %v", err)
+	}
+
+	followUp := CreateJobInput{
+		JobType: JobTypeArtworkStorageRefresh, RequestPayload: map[string]any{}, Message: message + " refresh",
+	}
+	completion := CompleteJobInput{
+		ResultPayload: map[string]any{"accounting_refresh_queued": true},
+		Message:       "Artwork purge completed", ProgressCurrent: 1, ProgressTotal: 1,
+		ExpiresAt: time.Now().UTC().Add(time.Hour),
+	}
+	refresh, err := repo.CompleteWithFollowUp(ctx, purge.ID, completion, followUp)
+	if err != nil {
+		t.Fatalf("CompleteWithFollowUp: %v", err)
+	}
+	if refresh == nil || refresh.JobType != JobTypeArtworkStorageRefresh || refresh.Status != StatusQueued {
+		t.Fatalf("follow-up job = %#v, want a queued artwork storage refresh", refresh)
+	}
+	completed, err := repo.GetByID(ctx, purge.ID)
+	if err != nil {
+		t.Fatalf("reload purge job: %v", err)
+	}
+	if completed.Status != StatusCompleted {
+		t.Fatalf("purge status = %q, want %q", completed.Status, StatusCompleted)
+	}
+	var result struct {
+		AccountingRefreshQueued bool `json:"accounting_refresh_queued"`
+	}
+	if err := json.Unmarshal(completed.ResultPayload, &result); err != nil {
+		t.Fatalf("decode purge result payload: %v", err)
+	}
+	if !result.AccountingRefreshQueued {
+		t.Fatal("completed purge does not report the refresh it queued")
+	}
+
+	// A completion that cannot be written rolls the follow-up back with it.
+	orphanFollowUp := CreateJobInput{
+		JobType: JobTypeArtworkStorageImport, RequestPayload: map[string]any{}, Message: message,
+	}
+	if _, err := repo.CompleteWithFollowUp(ctx, "missing-job-id", completion, orphanFollowUp); err == nil {
+		t.Fatal("CompleteWithFollowUp on a missing job = nil error, want failure")
+	}
+	var orphans int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM admin_jobs WHERE job_type = $1 AND message = $2`, JobTypeArtworkStorageImport, message).Scan(&orphans); err != nil {
+		t.Fatalf("count orphaned follow-up jobs: %v", err)
+	}
+	if orphans != 0 {
+		t.Fatalf("orphaned follow-up jobs = %d, want 0", orphans)
+	}
+}
+
 func TestArtworkStorageJobResumesLatestTimedOutCheckpoint(t *testing.T) {
 	dsn := os.Getenv("SILO_TEST_DATABASE_URL")
 	if dsn == "" {

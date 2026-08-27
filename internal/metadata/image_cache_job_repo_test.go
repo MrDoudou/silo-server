@@ -239,3 +239,45 @@ func TestCurrentTargetSourceQueriesUseSeriesNaturalKeys(t *testing.T) {
 		})
 	}
 }
+
+// The ladder sweep enqueues jobs the processor then looks up by natural key
+// (series id plus season/episode number). Emitting a child row's own content id
+// would queue jobs no lookup can ever match, so they fail "repair target not
+// found" every cooldown and the ladder version is never recorded.
+func TestLadderBackfillCandidatesUseSeriesNaturalKeys(t *testing.T) {
+	rows := collapseSQLWhitespace(ladderCandidateRowsSQL())
+	for _, want := range []string{
+		"'season'::text, s.series_id AS target_content_id,",
+		"'season_localization'::text, s.series_id, loc.language,",
+		"'episode'::text, e.series_id, ''::text, e.series_id,",
+		"s.season_number, NULL::integer AS episode_number,",
+		"e.season_number, e.episode_number,",
+	} {
+		if !strings.Contains(rows, want) {
+			t.Fatalf("ladder candidate rows missing %q:\n%s", want, rows)
+		}
+	}
+	for _, unwanted := range []string{
+		"'season'::text, s.content_id",
+		"'season_localization'::text, s.content_id",
+		"'episode'::text, e.content_id",
+	} {
+		if strings.Contains(rows, unwanted) {
+			t.Fatalf("ladder candidate rows still target a child content id: %q", unwanted)
+		}
+	}
+
+	query := collapseSQLWhitespace(ladderBackfillCandidateQuerySQL())
+	for _, want := range []string{
+		"j.season_number IS NOT DISTINCT FROM ac.season_number",
+		"j.episode_number IS NOT DISTINCT FROM ac.episode_number",
+	} {
+		if !strings.Contains(query, want) {
+			t.Fatalf("ladder dedup join missing %q:\n%s", want, query)
+		}
+	}
+}
+
+func collapseSQLWhitespace(sql string) string {
+	return strings.Join(strings.Fields(sql), " ")
+}

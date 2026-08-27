@@ -42,8 +42,10 @@ type artworkCapabilityResponse struct {
 	// durable repair coordinator are active.
 	AutomaticRecovery bool `json:"automatic_recovery"`
 	// RemoteMaterialization is "selected" when remote provider artwork is
-	// copied into the store on selection, or "passthrough" when catalog
-	// responses keep pointing at the provider.
+	// copied into the store on selection, or "passthrough" when it is not.
+	// Delivery is unaffected: artwork is always served through this server's
+	// signed artwork URLs, and passthrough simply means a cold request fetches
+	// from the source instead of reading stored bytes.
 	RemoteMaterialization string `json:"remote_materialization"`
 	// LocalSourcePolicy is the default selected-artwork policy. Sidecars are
 	// materialized normally; safe purge may transition an accessible one to

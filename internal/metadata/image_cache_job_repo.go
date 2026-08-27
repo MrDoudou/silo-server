@@ -519,7 +519,22 @@ func (r *ImageCacheJobRepository) ClaimDue(ctx context.Context, workerID string,
 	if err := r.recoverExpiredRunning(ctx, ""); err != nil {
 		return nil, err
 	}
-	return r.claimDue(ctx, workerID, "", limit)
+	return r.claimDue(ctx, workerID, "", limit, false)
+}
+
+// ClaimDueRepairs claims only repair-requested jobs. An installation running
+// artwork.remote_materialization=passthrough has ordinary materialization
+// switched off, but an empty-store rebuild still enqueues repair jobs and waits
+// for them to drain — so repair work has to remain claimable while everything
+// else stays off.
+func (r *ImageCacheJobRepository) ClaimDueRepairs(ctx context.Context, workerID string, limit int) ([]*models.MetadataImageCacheJob, error) {
+	if r == nil || r.pool == nil || limit <= 0 {
+		return nil, nil
+	}
+	if err := r.recoverExpiredRunning(ctx, ""); err != nil {
+		return nil, err
+	}
+	return r.claimDue(ctx, workerID, "", limit, true)
 }
 
 func (r *ImageCacheJobRepository) retryTargetNow(ctx context.Context, targetContentID string) error {
@@ -562,7 +577,7 @@ func (r *ImageCacheJobRepository) claimDueForTarget(ctx context.Context, workerI
 	if targetContentID == "" {
 		return nil, nil
 	}
-	return r.claimDue(ctx, workerID, targetContentID, limit)
+	return r.claimDue(ctx, workerID, targetContentID, limit, false)
 }
 
 func (r *ImageCacheJobRepository) targetHasRunningJobs(ctx context.Context, targetContentID string) (bool, error) {
@@ -587,7 +602,7 @@ func (r *ImageCacheJobRepository) targetHasRunningJobs(ctx context.Context, targ
 	return running, nil
 }
 
-func (r *ImageCacheJobRepository) claimDue(ctx context.Context, workerID, targetContentID string, limit int) ([]*models.MetadataImageCacheJob, error) {
+func (r *ImageCacheJobRepository) claimDue(ctx context.Context, workerID, targetContentID string, limit int, repairOnly bool) ([]*models.MetadataImageCacheJob, error) {
 	if r == nil || r.pool == nil || limit <= 0 {
 		return nil, nil
 	}
@@ -598,6 +613,9 @@ func (r *ImageCacheJobRepository) claimDue(ctx context.Context, workerID, target
 			WHERE status = 'queued'
 			  AND next_attempt_at <= NOW()
 	`
+	if repairOnly {
+		query += " AND repair_requested"
+	}
 	args := []any{limit, workerID}
 	if targetContentID != "" {
 		query += " AND " + imageCacheTargetScope("$3")
@@ -1262,7 +1280,7 @@ func ladderCandidateRowsSQL() string {
 			SELECT
 				'poster'::text,
 				'season'::text,
-				s.content_id AS target_content_id,
+				s.series_id AS target_content_id,
 				''::text AS target_language,
 				s.series_id,
 				s.poster_source_path AS source_path,
@@ -1283,7 +1301,7 @@ func ladderCandidateRowsSQL() string {
 			SELECT
 				'poster'::text,
 				'season_localization'::text,
-				s.content_id,
+				s.series_id,
 				loc.language,
 				s.series_id,
 				loc.poster_source_path,
@@ -1305,7 +1323,7 @@ func ladderCandidateRowsSQL() string {
 			SELECT
 				'still'::text,
 				'episode'::text,
-				e.content_id,
+				e.series_id,
 				''::text,
 				e.series_id,
 				e.still_source_path,
@@ -1341,34 +1359,7 @@ func (r *ImageCacheJobRepository) EnqueueLadderBackfill(ctx context.Context, lim
 	if r == nil || r.pool == nil || limit <= 0 {
 		return 0, nil
 	}
-	query := `
-		WITH all_candidates AS (` + ladderCandidateRowsSQL() + `
-		),
-		candidates AS (
-			SELECT ac.*
-			FROM all_candidates ac
-			LEFT JOIN metadata_image_cache_jobs j
-			  ON j.target_type = ac.target_type
-			 AND j.target_content_id = ac.target_content_id
-			 AND j.image_type = ac.image_type
-			 AND j.target_language = ac.target_language
-			WHERE j.id IS NULL
-			   OR j.source_path IS DISTINCT FROM ac.source_path
-			   OR j.status = 'succeeded'
-			   OR (
-				   j.status = 'failed'
-				   AND j.next_attempt_at <= NOW()
-			   )
-			ORDER BY ac.target_type, ac.target_content_id, ac.target_language, ac.image_type
-			LIMIT $1
-		)
-		SELECT image_type, target_type, target_content_id, target_language, series_id, source_path,
-		       content_type, season_number, episode_number,
-		       COALESCE(tmdb_id, '') AS tmdb_id,
-		       COALESCE(tvdb_id, '') AS tvdb_id,
-		       COALESCE(imdb_id, '') AS imdb_id
-		FROM candidates
-	`
+	query := ladderBackfillCandidateQuerySQL()
 
 	rows, err := r.pool.Query(ctx, query, limit)
 	if err != nil {
@@ -1406,6 +1397,44 @@ func (r *ImageCacheJobRepository) EnqueueLadderBackfill(ctx context.Context, lim
 		return 0, fmt.Errorf("iterating artwork ladder backfill candidates: %w", err)
 	}
 	return r.enqueueBatch(ctx, inputs, true)
+}
+
+// ladderBackfillCandidateQuerySQL is the batch query behind EnqueueLadderBackfill.
+// The dedup join matches the queue's natural key — season and episode numbers
+// included — because series children are addressed by series id plus those
+// numbers, so joining on the id alone would collapse every season of a series
+// onto one another.
+func ladderBackfillCandidateQuerySQL() string {
+	return `
+		WITH all_candidates AS (` + ladderCandidateRowsSQL() + `
+		),
+		candidates AS (
+			SELECT ac.*
+			FROM all_candidates ac
+			LEFT JOIN metadata_image_cache_jobs j
+			  ON j.target_type = ac.target_type
+			 AND j.target_content_id = ac.target_content_id
+			 AND j.image_type = ac.image_type
+			 AND j.target_language = ac.target_language
+			 AND j.season_number IS NOT DISTINCT FROM ac.season_number
+			 AND j.episode_number IS NOT DISTINCT FROM ac.episode_number
+			WHERE j.id IS NULL
+			   OR j.source_path IS DISTINCT FROM ac.source_path
+			   OR j.status = 'succeeded'
+			   OR (
+				   j.status = 'failed'
+				   AND j.next_attempt_at <= NOW()
+			   )
+			ORDER BY ac.target_type, ac.target_content_id, ac.target_language, ac.image_type
+			LIMIT $1
+		)
+		SELECT image_type, target_type, target_content_id, target_language, series_id, source_path,
+		       content_type, season_number, episode_number,
+		       COALESCE(tmdb_id, '') AS tmdb_id,
+		       COALESCE(tvdb_id, '') AS tvdb_id,
+		       COALESCE(imdb_id, '') AS imdb_id
+		FROM candidates
+	`
 }
 
 // HasLadderBackfillRemaining reports whether any cached artwork still lacks the

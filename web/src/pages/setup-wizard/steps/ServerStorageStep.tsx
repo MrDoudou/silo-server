@@ -732,8 +732,8 @@ export function ServerStorageStep() {
               Artwork caching
             </p>
             <p className="text-muted-foreground/70 mt-0.5 text-xs">
-              Copy provider artwork into the canonical artwork store instead of handing clients the
-              provider's own URL.
+              Copy provider artwork into the canonical artwork store. Clients always load artwork
+              from Silo either way; with this off, each cold request fetches it from the provider.
             </p>
           </div>
           <Switch

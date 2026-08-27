@@ -378,7 +378,7 @@ func TestArtworkRepairPublicationDrainsRebuildState(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("enqueue repair: %v", err)
 	}
-	jobs, err := repo.claimDue(ctx, workerID, contentID, 1)
+	jobs, err := repo.claimDue(ctx, workerID, contentID, 1, false)
 	if err != nil || len(jobs) != 1 {
 		t.Fatalf("claim repair: jobs=%d err=%v", len(jobs), err)
 	}

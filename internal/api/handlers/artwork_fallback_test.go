@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/h2non/bimg"
+	"golang.org/x/time/rate"
 
 	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
@@ -107,6 +108,45 @@ func TestArtworkFallbackGeneratesSizedWebPAndPreservesOriginal(t *testing.T) {
 	}
 	if passthrough.mediaType != "image/jpeg" || !bytes.Equal(passthrough.data, original) {
 		t.Fatalf("original fallback was transformed: media_type=%q bytes_equal=%v", passthrough.mediaType, bytes.Equal(passthrough.data, original))
+	}
+}
+
+// Recovery bandwidth is scarce and shared: a page of distinct already-cached
+// targets must not spend it, or the requests behind them get placeholders.
+func TestArtworkFallbackServesEmergencyCacheWithoutChargingSourceLimiter(t *testing.T) {
+	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return artworkTestTTL })
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := metadata.ArtworkTargetState{
+		Target:      artworkTestTarget,
+		SourcePath:  "https://images.example.test/poster.jpg",
+		ImageType:   artworkkey.ImageTypePoster,
+		Recoverable: true,
+	}
+	handler := NewArtworkHandler(unavailableArtworkStore{}, signer)
+	handler.SetResilientDependencies(&fixedSidecarArtworkTargets{state: state}, nil, nil)
+	// A limiter that can never issue a token: anything that reaches it fails, so
+	// a successful response can only have come from the emergency cache.
+	handler.sourceRate = rate.NewLimiter(0, 0)
+
+	cached := fallbackArtwork{data: []byte("emergency poster bytes"), mediaType: "image/jpeg", etag: `"source-cached"`}
+	handler.emergency.put(emergencyCacheKey(state.Target.CacheKey(), state.SourcePath, artworkkey.OriginalVariant, ""), cached)
+
+	got, err := handler.resolveFallback(t.Context(), state, artworkkey.OriginalVariant)
+	if err != nil {
+		t.Fatalf("cached fallback was throttled: %v", err)
+	}
+	if !bytes.Equal(got.data, cached.data) || !got.cacheHit {
+		t.Fatalf("fallback = %q cache_hit=%v, want the cached bytes", got.data, got.cacheHit)
+	}
+
+	// Control: an uncached source on the same handler still has to pass the
+	// limiter, so the hit above was not just an unlimited limiter.
+	uncached := state
+	uncached.SourcePath = "https://images.example.test/backdrop.jpg"
+	if _, err := handler.resolveFallback(t.Context(), uncached, artworkkey.OriginalVariant); err == nil {
+		t.Fatal("uncached source bypassed the exhausted recovery limiter")
 	}
 }
 

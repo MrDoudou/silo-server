@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -795,5 +797,227 @@ func assertDirEntries(t *testing.T, dir string, want int) {
 			names = append(names, entry.Name())
 		}
 		t.Fatalf("%s holds %d entries (%s), want %d", dir, len(entries), strings.Join(names, ", "), want)
+	}
+}
+
+// retireRootForTest forces the root swap ReopenRoot performs only when the
+// configured path resolves somewhere new. The steady-state skip is what keeps a
+// healthy deployment from churning handles, so a test that only called
+// ReopenRoot would never exercise the retirement path at all.
+func retireRootForTest(t *testing.T, store *FilesystemStore) {
+	t.Helper()
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if err := store.retireLocked(); err != nil {
+		t.Errorf("retireLocked: %v", err)
+	}
+}
+
+// TestFilesystemStoreRootLeaseSurvivesConcurrentReopen pins the borrow count on
+// the cached confined root. Handle.check calls ReopenRoot on every local probe
+// and the health loop probes every 30 seconds, so a probe regularly lands in
+// the middle of a write, a read, or a listing. Closing the root under one of
+// those failed it with os.ErrClosed, which markPublishRace does not classify as
+// a retryable publish race — so a materialization that raced a probe failed
+// outright and the artwork request behind it returned 500.
+func TestFilesystemStoreRootLeaseSurvivesConcurrentReopen(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	mustWrite(t, store, testKey, []byte("seed"))
+
+	const workers = 6
+	const iterations = 40
+
+	failures := make(chan error, 4*workers*iterations)
+	record := func(op string, err error) {
+		if err != nil {
+			failures <- fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	stop := make(chan struct{})
+	var reopeners sync.WaitGroup
+	reopeners.Add(2)
+	go func() {
+		defer reopeners.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			record("ReopenRoot", store.ReopenRoot())
+		}
+	}()
+	go func() {
+		defer reopeners.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			retireRootForTest(t, store)
+		}
+	}()
+
+	var work sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		work.Add(3)
+		go func(worker int) {
+			defer work.Done()
+			for i := 0; i < iterations; i++ {
+				key := fmt.Sprintf("artwork/v1/objects/poster/%02d/%s/w%d.webp", worker, testRevision, i)
+				record("WriteImmutable", store.WriteImmutable(ctx, key, []byte(key), ObjectMetadata{}))
+			}
+		}(worker)
+		go func() {
+			defer work.Done()
+			for i := 0; i < iterations; i++ {
+				object, err := store.Open(ctx, testKey)
+				record("Open", err)
+				if err == nil {
+					_, err = io.ReadAll(object.Body)
+					record("read body", err)
+					record("close body", object.Body.Close())
+				}
+			}
+		}()
+		go func() {
+			defer work.Done()
+			for i := 0; i < iterations; i++ {
+				_, _, _, err := store.ListPage(ctx, "", "", 100)
+				record("ListPage", err)
+			}
+		}()
+	}
+
+	work.Wait()
+	close(stop)
+	reopeners.Wait()
+	close(failures)
+
+	for err := range failures {
+		if errors.Is(err, os.ErrClosed) {
+			t.Errorf("operation raced a root swap and saw a closed root: %v", err)
+			continue
+		}
+		t.Errorf("concurrent store operation failed: %v", err)
+	}
+}
+
+// TestFilesystemStoreReopenRootKeepsAnUnchangedMount pins the steady state: the
+// health loop must not retire and re-resolve the root on every probe when the
+// configured path still points at the same directory.
+func TestFilesystemStoreReopenRootKeepsAnUnchangedMount(t *testing.T) {
+	store := newTestStore(t)
+	store.mu.Lock()
+	before := store.root
+	store.mu.Unlock()
+	if before == nil {
+		t.Fatal("store has no cached root after Probe")
+	}
+	if err := store.ReopenRoot(); err != nil {
+		t.Fatalf("ReopenRoot: %v", err)
+	}
+	store.mu.Lock()
+	after := store.root
+	store.mu.Unlock()
+	if after != before {
+		t.Fatalf("ReopenRoot swapped the root of an unchanged mount")
+	}
+}
+
+// TestFilesystemStoreListPagePagesIdenticallyAcrossSiblingDirectories pins the
+// structural pruning in skipListSubtree against the unpruned semantics it
+// replaced: paging a tree with many sibling directories must return exactly the
+// keys an ordered full walk would, for every page, prefix, and limit the paging
+// loop actually produces.
+func TestFilesystemStoreListPagePagesIdenticallyAcrossSiblingDirectories(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	otherRevision := strings.Repeat("ab", 32)
+	var written []string
+	for _, imageType := range []string{"backdrop", "poster", "thumb"} {
+		for _, shard := range []string{"0a", "9f", "ff"} {
+			for _, revision := range []string{testRevision, otherRevision} {
+				for _, variant := range []string{"original.webp", "w500.webp"} {
+					key := "artwork/v1/objects/" + imageType + "/" + shard + "/" + revision + "/" + variant
+					mustWrite(t, store, key, []byte(key))
+					written = append(written, key)
+				}
+			}
+		}
+	}
+	sort.Strings(written)
+
+	for _, prefix := range []string{"", "artwork/v1/objects/poster/", "artwork/v1/objects/poster/9f"} {
+		for _, limit := range []int{1, 3, 7} {
+			var want []string
+			for _, key := range written {
+				if strings.HasPrefix(key, prefix) {
+					want = append(want, key)
+				}
+			}
+
+			var got []string
+			cursor := ""
+			for pages := 0; ; pages++ {
+				if pages > len(written)+2 {
+					t.Fatalf("prefix=%q limit=%d: paging did not terminate", prefix, limit)
+				}
+				objects, next, done, err := store.ListPage(ctx, prefix, cursor, limit)
+				if err != nil {
+					t.Fatalf("prefix=%q limit=%d: ListPage: %v", prefix, limit, err)
+				}
+				if len(objects) > limit {
+					t.Fatalf("prefix=%q limit=%d: page returned %d objects", prefix, limit, len(objects))
+				}
+				for _, object := range objects {
+					got = append(got, object.Key)
+				}
+				if len(objects) > 0 && next != objects[len(objects)-1].Key {
+					t.Fatalf("prefix=%q limit=%d: cursor %q is not the last returned key", prefix, limit, next)
+				}
+				if done {
+					break
+				}
+				cursor = next
+			}
+
+			if strings.Join(got, "\n") != strings.Join(want, "\n") {
+				t.Fatalf("prefix=%q limit=%d: paged %d keys, want %d\ngot:  %v\nwant: %v",
+					prefix, limit, len(got), len(want), got, want)
+			}
+		}
+	}
+}
+
+// TestSkipListSubtreeMatchesUnprunedFilter checks the pruning predicate against
+// the per-entry filter it accelerates: a subtree may only be skipped when no
+// key it could hold would have survived the cursor and prefix tests anyway.
+func TestSkipListSubtreeMatchesUnprunedFilter(t *testing.T) {
+	cases := []struct {
+		dir, prefix, cursor string
+		skip                bool
+	}{
+		{dir: "a", skip: false},
+		{dir: "a", cursor: "b/x", skip: true},
+		{dir: "b", cursor: "b/x", skip: false},
+		{dir: "c", cursor: "b/x", skip: false},
+		{dir: "b/c", cursor: "b/c/x", skip: false},
+		{dir: "b/a", cursor: "b/c/x", skip: true},
+		{dir: "b/z", cursor: "b/c/x", skip: false},
+		{dir: "artwork", prefix: "artwork/v1/objects/poster/", skip: false},
+		{dir: "artwork/v1/objects/poster", prefix: "artwork/v1/objects/poster/", skip: false},
+		{dir: "artwork/v1/objects/thumb", prefix: "artwork/v1/objects/poster/", skip: true},
+		{dir: "legacy", prefix: "artwork/", skip: true},
+	}
+	for _, testCase := range cases {
+		if got := skipListSubtree(testCase.dir, testCase.prefix, testCase.cursor); got != testCase.skip {
+			t.Errorf("skipListSubtree(%q, %q, %q) = %v, want %v",
+				testCase.dir, testCase.prefix, testCase.cursor, got, testCase.skip)
+		}
 	}
 }

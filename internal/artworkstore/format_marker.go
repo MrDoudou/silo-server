@@ -18,10 +18,11 @@ func (s *FilesystemStore) EnsureFormatMarker(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return err
 	}
+	defer release()
 	file, _, err := openRegular(root, formatMarkerFileName)
 	if err == nil {
 		defer func() { _ = file.Close() }()
@@ -58,10 +59,11 @@ func (s *FilesystemStore) HasFormatMarker(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	root, err := s.openRootExisting()
+	root, release, err := s.openRootExisting()
 	if err != nil {
 		return err
 	}
+	defer release()
 	file, _, err := openRegular(root, formatMarkerFileName)
 	if err != nil {
 		return err

@@ -109,6 +109,72 @@ func TestBuildSweepBatchQueryUsesNativeNumericKeys(t *testing.T) {
 	}
 }
 
+// user_personal_collections.id is unique only within an account, so the sweep
+// has to paginate and match on the full (user_id, id) primary key. Sweeping on
+// id alone skips rows at batch boundaries and lets an update predicate reach
+// another account's collection.
+func TestUserCollectionSweepUsesAccountScopedKey(t *testing.T) {
+	surface, ok := artworkSweepSurfaceByName(artworkSurfaceUserCollectionPosters)
+	if !ok {
+		t.Fatal("user collection posters surface is missing")
+	}
+	if got := surface.keyColumnNames(); len(got) != 2 || got[0] != "user_id" || got[1] != "id" {
+		t.Fatalf("key columns = %v, want [user_id id]", got)
+	}
+	query, args, err := buildSweepBatchQuery(surface, []string{"7", "collection-a"})
+	if err != nil {
+		t.Fatalf("build user collection query: %v", err)
+	}
+	if !strings.Contains(query, "AND (user_id, id) > ($1, $2)") ||
+		!strings.Contains(query, "ORDER BY user_id, id LIMIT $3") {
+		t.Fatalf("query does not paginate on the composite key: %s", query)
+	}
+	if _, ok := args[0].(int32); !ok {
+		t.Fatalf("user_id cursor type = %T, want int32", args[0])
+	}
+	if got := keyEqualityPredicate(surface.keyCols); got != "user_id = $1 AND id = $2" {
+		t.Fatalf("row predicate = %q, want both key columns", got)
+	}
+}
+
+// A checkpoint written before the key widened carries a one-value cursor for a
+// two-column surface. The run must restart rather than fail permanently.
+func TestArtworkReconcileCheckpointDiscardsStaleNarrowCursor(t *testing.T) {
+	surfaces := artworkSweepSurfaces()
+	position, found := artworkSweepSurfacePosition(surfaces, artworkSurfaceUserCollectionPosters)
+	if !found {
+		t.Fatal("user collection posters surface is missing")
+	}
+	checkpoint := ArtworkReconcileCheckpoint{
+		Version:       artworkReconcileCheckpointVersion,
+		Totals:        make([]int, len(surfaces)),
+		SurfaceName:   surfaces[position].name,
+		SurfaceCursor: []string{"collection-a"},
+		Stats:         ArtworkReconcileStats{Mode: ArtworkReconcileModeVerify},
+	}
+	if checkpoint.valid(len(surfaces)) {
+		t.Fatal("stale one-value cursor was accepted for a two-column surface")
+	}
+	checkpoint.SurfaceCursor = []string{"7", "collection-a"}
+	if !checkpoint.valid(len(surfaces)) {
+		t.Fatal("current-width cursor was rejected")
+	}
+
+	// An invalid checkpoint restarts the run instead of erroring out: with no
+	// pool wired the reconciler stops at its configuration guard, proving the
+	// cursor never reaches parseKeys.
+	reconciler := &ArtworkCacheReconciler{}
+	if _, err := reconciler.RunResumable(context.Background(), &ArtworkReconcileCheckpoint{
+		Version:       artworkReconcileCheckpointVersion,
+		Totals:        make([]int, len(surfaces)),
+		SurfaceName:   surfaces[position].name,
+		SurfaceCursor: []string{"collection-a"},
+		Stats:         ArtworkReconcileStats{Mode: ArtworkReconcileModeVerify},
+	}, nil, nil); err == nil || !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("stale checkpoint error = %v, want the fresh-run configuration guard", err)
+	}
+}
+
 func TestArtworkReconcileVerifySweep(t *testing.T) {
 	dsn := os.Getenv("SILO_TEST_DATABASE_URL")
 	if dsn == "" {

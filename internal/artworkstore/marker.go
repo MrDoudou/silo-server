@@ -60,10 +60,11 @@ func (s *FilesystemStore) ReadMarker(ctx context.Context) (Marker, error) {
 	if err := ctx.Err(); err != nil {
 		return Marker{}, err
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return Marker{}, err
 	}
+	defer release()
 	return readMarker(root)
 }
 
@@ -77,10 +78,11 @@ func (s *FilesystemStore) EnsureMarker(ctx context.Context) (Marker, bool, error
 	if err := ctx.Err(); err != nil {
 		return Marker{}, false, err
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return Marker{}, false, err
 	}
+	defer release()
 	switch marker, err := readMarker(root); {
 	case err == nil:
 		return marker, false, nil

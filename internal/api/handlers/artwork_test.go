@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -365,6 +366,91 @@ func TestArtworkHandlerServesRangesFromASeekableStore(t *testing.T) {
 	}
 }
 
+// nonSeekableArtworkBody hides the seeking a bytes.Reader would otherwise
+// expose, so the handler sees the one-shot stream a remote backend hands it.
+type nonSeekableArtworkBody struct {
+	io.Reader
+}
+
+func (nonSeekableArtworkBody) Close() error { return nil }
+
+type nonSeekableArtworkStore struct {
+	ArtworkObjectStore
+}
+
+func (s nonSeekableArtworkStore) Open(ctx context.Context, key string) (*artworkstore.Object, error) {
+	object, err := s.ArtworkObjectStore.Open(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	data, readErr := io.ReadAll(object.Body)
+	_ = object.Close()
+	if readErr != nil {
+		return nil, readErr
+	}
+	object.Body = nonSeekableArtworkBody{Reader: bytes.NewReader(data)}
+	return object, nil
+}
+
+func newNonSeekableArtworkRig(t *testing.T) (*ArtworkHandler, *artworkurl.Signer) {
+	t.Helper()
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFilesystemStore: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.WriteImmutable(t.Context(), artworkTestKey, artworkTestBytes, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatalf("WriteImmutable: %v", err)
+	}
+	if err := store.WriteImmutable(t.Context(), artworkTestRevision.ManifestKey, artworkTestRevision.ManifestJSON, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatalf("WriteImmutable(manifest): %v", err)
+	}
+	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return artworkTestTTL })
+	if err != nil {
+		t.Fatalf("NewSigner: %v", err)
+	}
+	handler := NewArtworkHandler(nonSeekableArtworkStore{ArtworkObjectStore: store}, signer)
+	handler.SetResilientDependencies(&fakeArtworkTargets{state: metadata.ArtworkTargetState{
+		SelectedPath: artworkTestKey, ImageType: "poster", Protected: true,
+	}}, nil, nil)
+	return handler, signer
+}
+
+// The delivery contract promises ranges on every backend, so a store whose body
+// cannot seek — an object store, in production — still has to answer one
+// instead of replying 200 with the whole object.
+func TestArtworkHandlerServesRangesFromANonSeekableStore(t *testing.T) {
+	handler, signer := newNonSeekableArtworkRig(t)
+	signedURL := signArtworkURL(t, signer, time.Now())
+
+	ranged := httptest.NewRequest(http.MethodGet, signedURL, nil)
+	ranged.Header.Set("Range", "bytes=4-9")
+	rec := httptest.NewRecorder()
+	handler.ServeArtworkURL(rec, ranged, signedURL)
+
+	if rec.Code != http.StatusPartialContent {
+		t.Fatalf("status = %d, want 206 (body %q)", rec.Code, rec.Body.String())
+	}
+	if got, want := rec.Body.String(), string(artworkTestBytes[4:10]); got != want {
+		t.Fatalf("body = %q, want %q", got, want)
+	}
+	want := "bytes 4-9/" + strconv.Itoa(len(artworkTestBytes))
+	if got := rec.Header().Get("Content-Range"); got != want {
+		t.Fatalf("Content-Range = %q, want %q", got, want)
+	}
+
+	// A request without a Range header must keep streaming the body whole,
+	// buying no buffer for a client that never asked for one.
+	full := httptest.NewRecorder()
+	handler.ServeArtworkURL(full, httptest.NewRequest(http.MethodGet, signedURL, nil), signedURL)
+	if full.Code != http.StatusOK || full.Body.String() != string(artworkTestBytes) {
+		t.Fatalf("unranged response = %d %q, want 200 with the stored bytes", full.Code, full.Body.String())
+	}
+	if got := full.Header().Get("Content-Length"); got != strconv.Itoa(len(artworkTestBytes)) {
+		t.Fatalf("unranged Content-Length = %q, want %d", got, len(artworkTestBytes))
+	}
+}
+
 // Every rejection has to look the same, or the route becomes a way to ask
 // which artwork a server holds.
 func TestArtworkHandlerHidesKeyExistence(t *testing.T) {
@@ -573,6 +659,75 @@ func TestOpenVerifiedWarmHitDoesNotRehashObject(t *testing.T) {
 	_ = second.Close()
 	if counting.readBytes != len(artworkTestBytes) {
 		t.Fatalf("warm verification re-read object: bytes=%d", counting.readBytes)
+	}
+}
+
+// expireVerifiedArtworkEntries ages every cached verification out without
+// sleeping through the real TTL.
+func expireVerifiedArtworkEntries(cache *verifiedArtworkCache) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	past := time.Now().Add(-time.Second)
+	for key, entry := range cache.entries {
+		entry.expiresAt = past
+		cache.entries[key] = entry
+	}
+}
+
+func TestVerifiedArtworkCacheDropsExpiredEntries(t *testing.T) {
+	cache := newVerifiedArtworkCache(1 << 20)
+	cache.put("validator", `"digest"`, 128)
+	if etag, ok := cache.get("validator"); !ok || etag != `"digest"` {
+		t.Fatalf("fresh entry = %q/%v, want the stored entity tag", etag, ok)
+	}
+	expireVerifiedArtworkEntries(cache)
+	if _, ok := cache.get("validator"); ok {
+		t.Fatal("expired verification was served")
+	}
+	if len(cache.entries) != 0 || cache.bytes != 0 {
+		t.Fatalf("after expiry: entries=%d bytes=%d, want the entry evicted and its size reclaimed", len(cache.entries), cache.bytes)
+	}
+}
+
+// The cached validator is metadata only, so bytes swapped in place under the
+// same size and mtime would otherwise be trusted forever. Expiry is what
+// forces delivery back to the manifest digest.
+func TestOpenVerifiedRehashesAfterVerificationExpires(t *testing.T) {
+	store, err := artworkstore.NewFilesystemStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.WriteImmutable(t.Context(), artworkTestKey, artworkTestBytes, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteImmutable(t.Context(), artworkTestRevision.ManifestKey, artworkTestRevision.ManifestJSON, artworkstore.ObjectMetadata{}); err != nil {
+		t.Fatal(err)
+	}
+	counting := &countingArtworkStore{ArtworkObjectStore: store, key: artworkTestKey}
+	signer, err := artworkurl.NewSigner(artworkTestSecret, func() time.Duration { return artworkTestTTL })
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewArtworkHandler(counting, signer)
+
+	first, err := handler.openVerified(t.Context(), artworkTestKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = first.Close()
+	if counting.readBytes != len(artworkTestBytes) {
+		t.Fatalf("cold verification read %d bytes, want %d", counting.readBytes, len(artworkTestBytes))
+	}
+
+	expireVerifiedArtworkEntries(handler.verified)
+	second, err := handler.openVerified(t.Context(), artworkTestKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = second.Close()
+	if counting.readBytes != 2*len(artworkTestBytes) {
+		t.Fatalf("expired verification read %d bytes, want a second full re-hash of %d", counting.readBytes, 2*len(artworkTestBytes))
 	}
 }
 

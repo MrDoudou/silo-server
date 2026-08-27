@@ -177,6 +177,30 @@ func (f *loopingImageCacheJobs) DeleteSucceededBefore(context.Context, time.Time
 	return 0, nil
 }
 
+// repairOnlyImageCacheJobs is the passthrough seam: a store that can claim
+// repair-requested jobs on their own, and that records whether the ordinary
+// materialization claim was attempted at all.
+type repairOnlyImageCacheJobs struct {
+	fakeImageCacheJobs
+	repairBatches  [][]*models.MetadataImageCacheJob
+	repairCalls    int
+	ordinaryClaims int
+}
+
+func (f *repairOnlyImageCacheJobs) ClaimDue(context.Context, string, int) ([]*models.MetadataImageCacheJob, error) {
+	f.ordinaryClaims++
+	return f.claimed, nil
+}
+
+func (f *repairOnlyImageCacheJobs) ClaimDueRepairs(context.Context, string, int) ([]*models.MetadataImageCacheJob, error) {
+	var batch []*models.MetadataImageCacheJob
+	if f.repairCalls < len(f.repairBatches) {
+		batch = f.repairBatches[f.repairCalls]
+	}
+	f.repairCalls++
+	return batch, nil
+}
+
 type fakeImageCacher struct {
 	result *CacheImageResult
 	err    error
@@ -1091,6 +1115,102 @@ func TestImageCacheProcessorSkipsWhenTargetSourceChanged(t *testing.T) {
 	}
 	if jobs.succeededID != 40 {
 		t.Fatalf("succeededID = %d, want 40", jobs.succeededID)
+	}
+}
+
+func repairJobFixture(id int64) *models.MetadataImageCacheJob {
+	return &models.MetadataImageCacheJob{
+		ID:                id,
+		TargetType:        ImageCacheTargetItem,
+		TargetContentID:   "movie-1",
+		SourcePath:        "tmdb://poster/movie.jpg",
+		ProviderID:        "tmdb",
+		ProviderContentID: "603",
+		ContentType:       "movie",
+		ImageType:         ImageCacheImagePoster,
+		RepairRequested:   true,
+	}
+}
+
+func repairOnlyProcessorFixture(t *testing.T, batches ...[]*models.MetadataImageCacheJob) (*ImageCacheProcessor, *repairOnlyImageCacheJobs, *fakeItemArtworkUpdater) {
+	t.Helper()
+	jobs := &repairOnlyImageCacheJobs{repairBatches: batches}
+	cacher := &fakeImageCacher{result: &CacheImageResult{
+		BasePath: "tmdb/movie/603/poster", Ext: ".webp", Thumbhash: "thumb",
+	}}
+	items := &fakeItemArtworkUpdater{updated: true}
+	processor := NewImageCacheProcessorWithTargets(jobs, cacher,
+		&fakeImageResolver{url: "https://image.tmdb.org/t/p/original/movie.jpg"},
+		ImageCacheProcessorTargets{Items: items})
+	// artwork.remote_materialization=passthrough.
+	processor.SetEnabled(false)
+	return processor, jobs, items
+}
+
+// A store switched to passthrough still has to finish an authoritative-empty
+// rebuild, and that rebuild blocks until the repair jobs it enqueued drain. A
+// disabled processor therefore claims repair work — and only repair work.
+func TestDisabledImageCacheProcessorRunsRepairJobsOnly(t *testing.T) {
+	processor, jobs, items := repairOnlyProcessorFixture(t, []*models.MetadataImageCacheJob{repairJobFixture(71)})
+
+	stats, err := processor.RunOnce(context.Background(), "repair-worker", 10, 1)
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if stats.Succeeded != 1 || stats.Claimed != 1 {
+		t.Fatalf("stats = %+v, want one claimed and succeeded repair", stats)
+	}
+	if jobs.ordinaryClaims != 0 {
+		t.Fatalf("ordinary claims = %d, want 0 while materialization is off", jobs.ordinaryClaims)
+	}
+	if jobs.succeededID != 71 {
+		t.Fatalf("succeededID = %d, want 71", jobs.succeededID)
+	}
+	if len(jobs.requeuedIDs) != 0 {
+		t.Fatalf("requeued = %v, want the repair job processed rather than handed back", jobs.requeuedIDs)
+	}
+	if items.cachedPath != "tmdb/movie/603/poster/original.webp" {
+		t.Fatalf("cachedPath = %q, want the repaired revision published", items.cachedPath)
+	}
+}
+
+// Without a repair-scoped claim the disabled processor must stay fully off:
+// nothing else in the queue may be materialized behind passthrough's back.
+func TestDisabledImageCacheProcessorClaimsNothingWithoutRepairSupport(t *testing.T) {
+	jobs := &fakeImageCacheJobs{claimed: []*models.MetadataImageCacheJob{repairJobFixture(72)}}
+	cacher := &fakeImageCacher{result: &CacheImageResult{BasePath: "tmdb/movie/603/poster", Ext: ".webp"}}
+	processor := NewImageCacheProcessorWithTargets(jobs, cacher, &fakeImageResolver{},
+		ImageCacheProcessorTargets{Items: &fakeItemArtworkUpdater{updated: true}})
+	processor.SetEnabled(false)
+
+	stats, err := processor.RunOnce(context.Background(), "repair-worker", 10, 1)
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if stats.Claimed != 0 || len(cacher.reqs) != 0 {
+		t.Fatalf("stats = %+v, cache requests = %d, want a fully disabled processor", stats, len(cacher.reqs))
+	}
+}
+
+// The scheduled drain is what actually clears the rebuild's outstanding jobs,
+// so it must reach repairs in passthrough; the explicit backfill is
+// materialization by definition and must still refuse to run.
+func TestPassthroughDrainRunsRepairsButBackfillStaysDisabled(t *testing.T) {
+	processor, jobs, _ := repairOnlyProcessorFixture(t, []*models.MetadataImageCacheJob{repairJobFixture(73)})
+
+	stats, err := processor.DrainUntilIdle(context.Background(), "repair-worker", 10, 1, 0, nil)
+	if err != nil {
+		t.Fatalf("DrainUntilIdle() error = %v", err)
+	}
+	if stats.Succeeded != 1 {
+		t.Fatalf("stats = %+v, want the queued repair drained", stats)
+	}
+	if jobs.ordinaryClaims != 0 {
+		t.Fatalf("ordinary claims = %d, want 0", jobs.ordinaryClaims)
+	}
+
+	if _, err := processor.RunUntilIdle(context.Background(), "backfill-worker", 10, 1, 0, nil); !errors.Is(err, ErrImageCachingDisabled) {
+		t.Fatalf("RunUntilIdle() error = %v, want ErrImageCachingDisabled", err)
 	}
 }
 

@@ -255,6 +255,27 @@ func (c *ArtworkDeliveryCoordinator) completeRecoveryGeneration(ctx context.Cont
 	return nil
 }
 
+// shouldReenterArtworkRecovery reports whether a persisted rebuild intent must
+// be re-adopted by a live store that no longer says it is rebuilding.
+//
+// The persisted generation is deliberately not required to match the live one.
+// An explicit rebuild records its intent, then durably rotates the store's
+// marker and pin, then writes the new generation; a crash in that last gap
+// leaves an empty store on a fresh generation whose accounting row still names
+// the old one. Requiring a match there means the store probes healthy, bulk
+// recovery never runs, and the emptiness is never repaired. A mismatch is
+// adopted by beginRecoveryGeneration, which restarts the enqueue against the
+// live generation.
+func shouldReenterArtworkRecovery(persisted artworkRecoveryState, live artworkstore.HealthState) bool {
+	if persisted.storeHealth != string(artworkstore.HealthEmptyRebuilding) {
+		return false
+	}
+	// An unreachable or wrong-mount root is not evidence of an empty store, and
+	// a handle already rebuilding needs no nudge.
+	return live != artworkstore.HealthEmptyRebuilding &&
+		live != artworkstore.HealthUnavailable && live != artworkstore.HealthWrongMount
+}
+
 // RunRecovery coordinates authoritative-empty store recovery until ctx is
 // canceled. Durable generation/checkpoint state makes restart re-entry and
 // enqueue idempotence converge through the ordinary image-cache queue.
@@ -270,9 +291,7 @@ func (c *ArtworkDeliveryCoordinator) RunRecovery(ctx context.Context) {
 			err = fmt.Errorf("sync artwork store root alert: %w", alertErr)
 		}
 		generation := c.health.GenerationID()
-		if err == nil && persisted.storeHealth == string(artworkstore.HealthEmptyRebuilding) &&
-			persisted.rebuildGeneration == generation && state != artworkstore.HealthEmptyRebuilding &&
-			state != artworkstore.HealthUnavailable && state != artworkstore.HealthWrongMount {
+		if err == nil && shouldReenterArtworkRecovery(persisted, state) {
 			if probeErr := c.health.ProbeNow(ctx); probeErr == nil {
 				c.health.BeginRebuild()
 				state = artworkstore.HealthEmptyRebuilding
@@ -547,6 +566,9 @@ func (c *ArtworkDeliveryCoordinator) SignalMissing(ctx context.Context, state Ar
 	if c == nil || c.pool == nil || state.SelectedPath == "" {
 		return nil
 	}
+	if state.Target.Surface == artworkurl.SurfaceChapterThumbnails {
+		return c.signalMissingChapterThumbnail(ctx, state)
+	}
 	repairState := ArtworkRepairStateProtectedLoss
 	if state.Recoverable {
 		repairState = ArtworkRepairStatePending
@@ -583,6 +605,66 @@ func (c *ArtworkDeliveryCoordinator) SignalMissing(ctx context.Context, state Ar
 		artworkmetrics.Repair("protected_loss")
 	}
 	return err
+}
+
+// signalMissingChapterThumbnail treats a lost chapter still as regenerable
+// rather than as permanent loss. A chapter thumbnail is extracted from the
+// media file, and internal/chapterthumbs re-extracts a chapter exactly when its
+// thumbnail_path is empty — so clearing the selection is the repair signal.
+// There is no image-cache job to enqueue and nothing to alert about: the same
+// clear is what the manual artwork reconciler performs when it finds the bytes
+// gone.
+func (c *ArtworkDeliveryCoordinator) signalMissingChapterThumbnail(ctx context.Context, state ArtworkTargetState) error {
+	if len(state.Target.Keys) != 2 {
+		return errors.New("chapter artwork target is invalid")
+	}
+	fileID, err := strconv.Atoi(state.Target.Keys[0])
+	if err != nil || fileID <= 0 {
+		return errors.New("chapter artwork target has an invalid file key")
+	}
+	chapterIndex, err := strconv.Atoi(state.Target.Keys[1])
+	if err != nil || chapterIndex < 0 {
+		return errors.New("chapter artwork target has an invalid chapter key")
+	}
+	artworkmetrics.Repair("missing")
+	if _, err := c.pool.Exec(ctx, `
+		UPDATE artwork_revision_gc_candidates
+		SET missing_at = COALESCE(missing_at, NOW()), repair_state = $2,
+			repair_queued_at = COALESCE(repair_queued_at, NOW()), updated_at = NOW()
+		WHERE original_path = $1`, state.SelectedPath, ArtworkRepairStatePending); err != nil {
+		return fmt.Errorf("mark missing chapter thumbnail revision: %w", err)
+	}
+	// Guarded on the selection that was actually found missing, so a concurrent
+	// re-extraction that already wrote a new thumbnail wins over this clear.
+	tag, err := c.pool.Exec(ctx, `
+		UPDATE media_files mf
+		SET chapters = rebuilt.chapters, chapter_thumbnail_retry_after = NULL
+		FROM (
+			SELECT jsonb_agg(
+				CASE WHEN (entry.chapter->>'index')::integer = $2
+					AND COALESCE(entry.chapter->>'thumbnail_path', '') = $3
+				THEN (entry.chapter - 'thumbnail_retry_after' - 'thumbnail_failed_at' - 'thumbnail_last_error')
+					|| jsonb_build_object('thumbnail_path', '', 'thumbnail_thumbhash', '')
+				ELSE entry.chapter END
+				ORDER BY entry.ordinality) AS chapters
+			FROM media_files source
+			CROSS JOIN LATERAL jsonb_array_elements(COALESCE(source.chapters, '[]'::jsonb))
+				WITH ORDINALITY AS entry(chapter, ordinality)
+			WHERE source.id = $1
+		) rebuilt
+		WHERE mf.id = $1
+		  AND EXISTS (
+			SELECT 1 FROM jsonb_array_elements(COALESCE(mf.chapters, '[]'::jsonb)) chapter
+			WHERE (chapter->>'index')::integer = $2
+			  AND COALESCE(chapter->>'thumbnail_path', '') = $3)`,
+		fileID, chapterIndex, state.SelectedPath)
+	if err != nil {
+		return fmt.Errorf("clear missing chapter thumbnail: %w", err)
+	}
+	if tag.RowsAffected() > 0 {
+		artworkmetrics.Repair("queued")
+	}
+	return nil
 }
 
 func repairJobForTarget(state ArtworkTargetState) (EnqueueImageCacheJobInput, bool) {

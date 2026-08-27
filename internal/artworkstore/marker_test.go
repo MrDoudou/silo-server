@@ -135,10 +135,11 @@ func TestEnsureMarkerIsSingleWinnerUnderRace(t *testing.T) {
 // generation no store carries).
 func TestWriteMarkerExclusiveIsCreateOnly(t *testing.T) {
 	store := newTestStore(t)
-	root, err := store.openRoot()
+	root, release, err := store.openRoot()
 	if err != nil {
 		t.Fatalf("openRoot: %v", err)
 	}
+	defer release()
 
 	first := []byte(`{"version":1,"id":"11111111111111111111111111111111","created_at":"2026-01-01T00:00:00Z"}` + "\n")
 	if err := writeMarkerExclusive(root, first); err != nil {

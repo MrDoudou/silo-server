@@ -61,9 +61,60 @@ type FilesystemStore struct {
 	rootPath string
 
 	mu               sync.Mutex
-	root             *os.Root
+	root             *rootRef
 	closed           bool
 	pinnedGeneration string
+}
+
+// rootRef is one opened confined root plus the number of store operations
+// currently borrowing it. Every borrower keeps using the *os.Root it took under
+// the lock for the whole operation, so closing the handle out from under one —
+// which ReopenRoot did on every health probe — failed that operation with
+// os.ErrClosed. That is not a shape markPublishRace treats as a retryable
+// publish race, so a mid-flight write surfaced as a hard materialization
+// failure. A retired root is therefore closed by whichever borrower releases it
+// last, and never while a borrow is outstanding.
+//
+// All three fields are owned by FilesystemStore.mu.
+type rootRef struct {
+	root    *os.Root
+	borrows int
+	retired bool
+}
+
+// borrowLocked hands out the cached root and the release func that returns it.
+func (s *FilesystemStore) borrowLocked() (*os.Root, func()) {
+	ref := s.root
+	ref.borrows++
+	return ref.root, func() { s.release(ref) }
+}
+
+func (s *FilesystemStore) release(ref *rootRef) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ref.borrows--
+	_ = s.closeRetiredLocked(ref)
+}
+
+// retireLocked drops the cached root so the next operation resolves rootPath
+// again. The handle itself is closed here only when nobody is using it.
+func (s *FilesystemStore) retireLocked() error {
+	ref := s.root
+	s.root = nil
+	if ref == nil {
+		return nil
+	}
+	ref.retired = true
+	return s.closeRetiredLocked(ref)
+}
+
+func (s *FilesystemStore) closeRetiredLocked(ref *rootRef) error {
+	if ref == nil || !ref.retired || ref.borrows > 0 || ref.root == nil {
+		return nil
+	}
+	root := ref.root
+	ref.root = nil
+	return root.Close()
 }
 
 func (s *FilesystemStore) setPinnedGeneration(generation string) {
@@ -113,70 +164,77 @@ func (s *FilesystemStore) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.closed = true
-	root := s.root
-	s.root = nil
-	if root == nil {
-		return nil
-	}
-	return root.Close()
+	return s.retireLocked()
 }
 
-// ReopenRoot releases the cached confined root without closing the store. The
-// next operation resolves rootPath again, which lets local mounts recover
-// safely after a filesystem is replaced at the same pathname.
+// ReopenRoot drops the cached confined root without closing the store, so the
+// next operation resolves rootPath again. That is what lets a local mount
+// recover after a filesystem is replaced at the same pathname.
+//
+// The health loop calls this on every probe, so the steady state must be free:
+// when the configured path still resolves to the directory the cached root
+// already holds, nothing is retired at all. Only a genuine swap costs a
+// reopen — and even then the retired handle stays open until its last in-flight
+// borrower is done with it.
 func (s *FilesystemStore) ReopenRoot() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	root := s.root
-	s.root = nil
-	if root == nil {
+	if s.root == nil || s.root.root == nil {
 		return nil
 	}
-	return root.Close()
+	if current, err := os.Stat(s.rootPath); err == nil {
+		if cached, statErr := s.root.root.Stat("."); statErr == nil && os.SameFile(current, cached) {
+			return nil
+		}
+	}
+	return s.retireLocked()
 }
 
 // openRoot returns the cached confined root handle, creating the directory on
-// first use.
-func (s *FilesystemStore) openRoot() (*os.Root, error) {
+// first use. The returned func releases the borrow and must be called exactly
+// once, after the caller has finished issuing operations against the root.
+func (s *FilesystemStore) openRoot() (*os.Root, func(), error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return nil, errors.New("artworkstore: filesystem store is closed")
+		return nil, nil, errors.New("artworkstore: filesystem store is closed")
 	}
 	if s.root != nil {
-		return s.root, nil
+		root, release := s.borrowLocked()
+		return root, release, nil
 	}
 	if s.pinnedGeneration != "" {
 		if _, err := os.Stat(s.rootPath); err != nil {
-			return nil, fmt.Errorf("artworkstore: opening pinned store root %s: %w", s.rootPath, err)
+			return nil, nil, fmt.Errorf("artworkstore: opening pinned store root %s: %w", s.rootPath, err)
 		}
 	} else if err := os.MkdirAll(s.rootPath, storeDirPerm); err != nil {
-		return nil, fmt.Errorf("artworkstore: creating store root %s: %w", s.rootPath, err)
+		return nil, nil, fmt.Errorf("artworkstore: creating store root %s: %w", s.rootPath, err)
 	}
 	root, err := os.OpenRoot(s.rootPath)
 	if err != nil {
-		return nil, fmt.Errorf("artworkstore: opening store root %s: %w", s.rootPath, err)
+		return nil, nil, fmt.Errorf("artworkstore: opening store root %s: %w", s.rootPath, err)
 	}
 	if s.pinnedGeneration != "" {
 		marker, markerErr := readMarker(root)
 		if markerErr != nil || marker.ID != s.pinnedGeneration {
 			_ = root.Close()
-			return nil, ErrWrongMount
+			return nil, nil, ErrWrongMount
 		}
 		file, _, formatErr := openRegular(root, formatMarkerFileName)
 		if formatErr != nil {
 			_ = root.Close()
-			return nil, ErrWrongMount
+			return nil, nil, ErrWrongMount
 		}
 		data, readErr := io.ReadAll(io.LimitReader(file, 128))
 		_ = file.Close()
 		if readErr != nil || string(data) != formatMarkerContents {
 			_ = root.Close()
-			return nil, ErrWrongMount
+			return nil, nil, ErrWrongMount
 		}
 	}
-	s.root = root
-	return root, nil
+	s.root = &rootRef{root: root}
+	borrowed, release := s.borrowLocked()
+	return borrowed, release, nil
 }
 
 // prepareEmptyRebuild creates the configured root when absent and removes its
@@ -189,10 +247,7 @@ func (s *FilesystemStore) prepareEmptyRebuild(ctx context.Context) error {
 	if s.closed {
 		return errors.New("artworkstore: filesystem store is closed")
 	}
-	if s.root != nil {
-		_ = s.root.Close()
-		s.root = nil
-	}
+	_ = s.retireLocked()
 	if err := os.MkdirAll(s.rootPath, storeDirPerm); err != nil {
 		return fmt.Errorf("artworkstore: recreating store root %s: %w", s.rootPath, err)
 	}
@@ -224,24 +279,24 @@ func (s *FilesystemStore) prepareEmptyRebuild(ctx context.Context) error {
 	return nil
 }
 
-func (s *FilesystemStore) openRootExisting() (*os.Root, error) {
+func (s *FilesystemStore) openRootExisting() (*os.Root, func(), error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return nil, errors.New("artworkstore: filesystem store is closed")
+		return nil, nil, errors.New("artworkstore: filesystem store is closed")
 	}
 	if _, err := os.Stat(s.rootPath); err != nil {
-		return nil, fmt.Errorf("artworkstore: opening existing store root %s: %w", s.rootPath, err)
+		return nil, nil, fmt.Errorf("artworkstore: opening existing store root %s: %w", s.rootPath, err)
 	}
-	if s.root != nil {
-		return s.root, nil
+	if s.root == nil {
+		root, err := os.OpenRoot(s.rootPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("artworkstore: opening store root %s: %w", s.rootPath, err)
+		}
+		s.root = &rootRef{root: root}
 	}
-	root, err := os.OpenRoot(s.rootPath)
-	if err != nil {
-		return nil, fmt.Errorf("artworkstore: opening store root %s: %w", s.rootPath, err)
-	}
-	s.root = root
-	return root, nil
+	root, release := s.borrowLocked()
+	return root, release, nil
 }
 
 // Probe creates the root if needed and proves it is a writable directory. An
@@ -251,10 +306,11 @@ func (s *FilesystemStore) Probe(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return err
 	}
+	defer release()
 	info, err := root.Stat(".")
 	if err != nil {
 		return fmt.Errorf("artworkstore: inspecting store root %s: %w", s.rootPath, err)
@@ -302,10 +358,11 @@ func (s *FilesystemStore) WriteImmutable(ctx context.Context, key string, data [
 	if len(data) == 0 {
 		return fmt.Errorf("artworkstore: refusing to write an empty object: %s", key)
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return err
 	}
+	defer release()
 	digest := hashBytes(data)
 	// Reference-aware GC prunes directories it empties, so a concurrent delete
 	// can pull the destination directory out from under this write. Every step
@@ -383,10 +440,11 @@ func (s *FilesystemStore) Open(ctx context.Context, key string) (*Object, error)
 	if err := ValidateKey(key); err != nil {
 		return nil, err
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	file, info, err := openRegular(root, key)
 	if err != nil {
 		return nil, err
@@ -402,10 +460,11 @@ func (s *FilesystemStore) Stat(ctx context.Context, key string) (ObjectInfo, err
 	if err := ValidateKey(key); err != nil {
 		return ObjectInfo{}, err
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return ObjectInfo{}, err
 	}
+	defer release()
 	info, err := root.Lstat(key)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -427,10 +486,11 @@ func (s *FilesystemStore) Matches(ctx context.Context, key string, data []byte) 
 	if err := ValidateKey(key); err != nil {
 		return false, err
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return false, err
 	}
+	defer release()
 	exists, matched, err := compareObject(root, key, int64(len(data)), hashBytes(data))
 	if err != nil {
 		return false, err
@@ -446,10 +506,11 @@ func (s *FilesystemStore) DeleteObjects(ctx context.Context, keys []string) (int
 	if len(keys) == 0 {
 		return 0, nil
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return 0, err
 	}
+	defer release()
 	deleted := 0
 	var errs []error
 	for _, key := range keys {
@@ -474,10 +535,11 @@ func (s *FilesystemStore) ListPage(ctx context.Context, prefix, cursor string, l
 	if limit <= 0 || limit > 1000 {
 		limit = 1000
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return nil, cursor, false, err
 	}
+	defer release()
 	var objects []ObjectInfo
 	done := true
 	err = fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, walkErr error) error {
@@ -487,7 +549,13 @@ func (s *FilesystemStore) ListPage(ctx context.Context, prefix, cursor string, l
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if entry.IsDir() || name == "." || strings.HasPrefix(path.Base(name), ".") || name <= cursor || !strings.HasPrefix(name, prefix) {
+		if entry.IsDir() {
+			if name != "." && skipListSubtree(name, prefix, cursor) {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if strings.HasPrefix(path.Base(name), ".") || name <= cursor || !strings.HasPrefix(name, prefix) {
 			return nil
 		}
 		if len(objects) == limit {
@@ -512,6 +580,33 @@ func (s *FilesystemStore) ListPage(ctx context.Context, prefix, cursor string, l
 		next = objects[len(objects)-1].Key
 	}
 	return objects, next, done, nil
+}
+
+// skipListSubtree reports whether a directory can be pruned from a ListPage
+// walk because it cannot contribute a key to this page. Without it, paging
+// re-walked every already-consumed directory from the tree root on every page
+// and only discarded the entries one at a time, which is quadratic in the
+// number of objects — inventory refresh pages at 500 and seed import at 250, so
+// a large store paid that cost thousands of times.
+//
+// Both tests are structural, and both rest on the same lexical ordering the
+// cursor contract already assumes. Every key beneath dir begins with dir+"/":
+//
+//   - Cursor. If the cursor sorts inside the subtree, keys after it may still be
+//     there. Otherwise, a subtree sorting before the cursor has all of its keys
+//     before the cursor too, because they share the subtree's prefix.
+//   - Prefix. The subtree can only intersect the filter if one of the two is a
+//     prefix of the other: prefix ⊑ subtree matches every key below, and
+//     subtree ⊑ prefix leaves deeper keys that may still match.
+func skipListSubtree(dir, prefix, cursor string) bool {
+	subtree := dir + "/"
+	if cursor != "" && !strings.HasPrefix(cursor, subtree) && subtree < cursor {
+		return true
+	}
+	if prefix != "" && !strings.HasPrefix(subtree, prefix) && !strings.HasPrefix(prefix, subtree) {
+		return true
+	}
+	return false
 }
 
 func (s *FilesystemStore) DeletePrefixMaintenance(ctx context.Context, prefix string) (int, error) {
@@ -544,10 +639,11 @@ func (s *FilesystemStore) CleanTempFiles(ctx context.Context, olderThan time.Dur
 	if olderThan <= 0 {
 		olderThan = DefaultTempFileGrace
 	}
-	root, err := s.openRoot()
+	root, release, err := s.openRoot()
 	if err != nil {
 		return 0, err
 	}
+	defer release()
 	cutoff := time.Now().Add(-olderThan)
 	removed := 0
 	var errs []error
