@@ -520,7 +520,7 @@ func assertEpisodeSectionArtworkTarget(t *testing.T, tc episodeSectionArtworkTar
 				LogoOwner:     tc.logoOwner,
 			},
 		},
-	}})
+	}}, nil)
 
 	reference := tc.posterPath
 	if reference == "" {

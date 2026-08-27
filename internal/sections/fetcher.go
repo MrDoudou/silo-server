@@ -1125,25 +1125,50 @@ func (f *Fetcher) FetchEpisodesByContentIDs(ctx context.Context, contentIDs []st
 }
 
 // fetchEpisodeCatalogItemMeta carries artwork ownership out of the catalog
-// episode scope without changing QueryExecutor or its other callers. That
-// scope uses the same poster precedence as episode targets, but keeps the
-// backdrop on the parent series.
+// episode scope without changing QueryExecutor or its other callers. Generic
+// catalog-shaped episode cards keep their backdrop on the parent series.
+// Native recently-added TV episode events retain a PlayContentID and were
+// hydrated with episode-still precedence before entering the shared cache, so
+// cache-hit metadata must use the same policy as the cached image paths.
 func (f *Fetcher) fetchEpisodeCatalogItemMeta(ctx context.Context, items []*models.MediaItem, libraryID *int, libraryIDs []int, filter catalog.AccessFilter) (map[string]SectionItemMeta, error) {
-	contentIDs := make([]string, 0, len(items))
-	for _, item := range items {
-		if item != nil && item.Type == "episode" {
-			contentIDs = append(contentIDs, item.ContentID)
-		}
-	}
-	if len(contentIDs) == 0 {
+	seriesBackdropIDs, episodeStillIDs := episodeCatalogArtworkIDs(items)
+	if len(seriesBackdropIDs) == 0 && len(episodeStillIDs) == 0 {
 		return nil, nil
 	}
 
-	_, meta, err := f.fetchEpisodeTargetsByContentIDsWithBackdropPolicy(ctx, contentIDs, libraryID, libraryIDs, filter, episodeBackdropSeriesOnly)
-	if err != nil {
-		return nil, fmt.Errorf("fetching episode section artwork owners: %w", err)
+	meta := make(map[string]SectionItemMeta, len(seriesBackdropIDs)+len(episodeStillIDs))
+	groups := []struct {
+		contentIDs []string
+		policy     episodeBackdropPolicy
+	}{
+		{contentIDs: seriesBackdropIDs, policy: episodeBackdropSeriesOnly},
+		{contentIDs: episodeStillIDs, policy: episodeBackdropPrefersStill},
+	}
+	for _, group := range groups {
+		if len(group.contentIDs) == 0 {
+			continue
+		}
+		_, groupMeta, err := f.fetchEpisodeTargetsByContentIDsWithBackdropPolicy(ctx, group.contentIDs, libraryID, libraryIDs, filter, group.policy)
+		if err != nil {
+			return nil, fmt.Errorf("fetching episode section artwork owners: %w", err)
+		}
+		maps.Copy(meta, groupMeta)
 	}
 	return meta, nil
+}
+
+func episodeCatalogArtworkIDs(items []*models.MediaItem) (seriesBackdropIDs, episodeStillIDs []string) {
+	for _, item := range items {
+		if item == nil || item.Type != "episode" || item.ContentID == "" {
+			continue
+		}
+		if item.PlayContentID != "" {
+			episodeStillIDs = append(episodeStillIDs, item.ContentID)
+			continue
+		}
+		seriesBackdropIDs = append(seriesBackdropIDs, item.ContentID)
+	}
+	return seriesBackdropIDs, episodeStillIDs
 }
 
 // ListOverlaySummaries batches file lookups for section cards and derives the

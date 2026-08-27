@@ -1,6 +1,26 @@
 package sections
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Silo-Server/silo-server/internal/models"
+)
+
+func TestEpisodeCatalogArtworkIDsPreserveRecentTVBackdropPolicy(t *testing.T) {
+	seriesBackdropIDs, episodeStillIDs := episodeCatalogArtworkIDs([]*models.MediaItem{
+		nil,
+		{ContentID: "movie-1", Type: "movie"},
+		{ContentID: "catalog-episode", Type: "episode"},
+		{ContentID: "recent-tv-episode", Type: "episode", PlayContentID: "recent-tv-episode"},
+	})
+
+	if len(seriesBackdropIDs) != 1 || seriesBackdropIDs[0] != "catalog-episode" {
+		t.Fatalf("series backdrop IDs = %v, want [catalog-episode]", seriesBackdropIDs)
+	}
+	if len(episodeStillIDs) != 1 || episodeStillIDs[0] != "recent-tv-episode" {
+		t.Fatalf("episode still IDs = %v, want [recent-tv-episode]", episodeStillIDs)
+	}
+}
 
 func TestChooseEpisodeArtworkTracksOwningCandidate(t *testing.T) {
 	seasonOwner := SectionArtworkOwner{Kind: SectionArtworkOwnerSeason, ContentID: "season-1"}
