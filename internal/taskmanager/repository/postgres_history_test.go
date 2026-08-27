@@ -102,7 +102,7 @@ func pruneOneKey(
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	bounds, ok, err := repo.loadDoomedBounds(ctx, key, keepPerTask, cutoff)
+	bounds, ok, err := loadDoomedBounds(ctx, repo.pool, key, keepPerTask, cutoff)
 	if err != nil {
 		t.Fatalf("loadDoomedBounds: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestTaskHistoryDoomedPredicateMatchesWindowRanking(t *testing.T) {
 			-96 * time.Hour, -72 * time.Hour, -36 * time.Hour, -24 * time.Hour, 0, 2 * time.Hour,
 		} {
 			cutoff := now.Add(cutoffOffset)
-			bounds, ok, err := repo.loadDoomedBounds(ctx, key, keep, cutoff)
+			bounds, ok, err := loadDoomedBounds(ctx, repo.pool, key, keep, cutoff)
 			if err != nil {
 				t.Fatalf("loadDoomedBounds: %v", err)
 			}
@@ -394,6 +394,44 @@ func TestPgExecutionRepositoryPruneDoesNotReportLimitOnExactMultiple(t *testing.
 	}
 	if result.Deleted != 6 || result.LimitReached || result.Skipped {
 		t.Fatalf("Prune result = %#v, want 6 deleted without limit reached", result)
+	}
+	if got := len(remainingTaskExecutionIDs(t, pool, key)); got != 1 {
+		t.Fatalf("remaining rows = %d, want 1", got)
+	}
+}
+
+func TestPgExecutionRepositoryPruneCompletesWithSingleConnectionPool(t *testing.T) {
+	dsn := os.Getenv("SILO_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("SILO_TEST_DATABASE_URL is not set")
+	}
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatalf("parse test database URL: %v", err)
+	}
+	config.MaxConns = 1
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		t.Fatalf("connect test database: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	repo := NewPgExecutionRepository(pool)
+	clearTaskHistory(t, pool)
+	key := taskKey(t, pool, "single-conn")
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	for i := range 5 {
+		insertTaskExecution(t, pool, key, now.Add(time.Duration(i)*time.Minute))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	result, err := repo.Prune(ctx, 1, now.Add(-24*time.Hour), 10, 10)
+	if err != nil {
+		t.Fatalf("Prune: %v", err)
+	}
+	if result.Skipped || result.LimitReached || result.Deleted != 4 {
+		t.Fatalf("Prune result = %#v, want 4 deleted", result)
 	}
 	if got := len(remainingTaskExecutionIDs(t, pool, key)); got != 1 {
 		t.Fatalf("remaining rows = %d, want 1", got)

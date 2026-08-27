@@ -16,8 +16,14 @@ import (
 
 const taskHistoryCleanupAdvisoryLock int64 = 0x53494C4F48495354 // "SILOHIST"
 
-type taskHistoryExecer interface {
+// taskHistoryQuerier is the subset of *pgxpool.Pool / *pgxpool.Conn used by
+// prune. Work runs on the connection that holds the advisory lock so a pool
+// sized to database.max_connections=1 cannot deadlock waiting for a second
+// checkout while that lock is held.
+type taskHistoryQuerier interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 // PgExecutionRepository implements taskmanager.ExecutionRepository using PostgreSQL.
@@ -101,6 +107,10 @@ func (r *PgExecutionRepository) List(ctx context.Context, taskKey string, limit 
 // idx_task_executions_key_completed (task_key, completed_at DESC). A run with
 // nothing to delete costs two index probes per task, where ranking the whole
 // table cost a full-table window sort per batch — up to maxBatches of them.
+//
+// List, boundary, probe, and delete all run on the connection that holds the
+// advisory lock. Taking a second pool connection while that session is checked
+// out deadlocks when database.max_connections is 1, which the admin UI allows.
 func (r *PgExecutionRepository) Prune(
 	ctx context.Context,
 	keepPerTask int,
@@ -122,7 +132,8 @@ func (r *PgExecutionRepository) Prune(
 		}
 	}()
 
-	keys, err := r.listTaskKeys(ctx)
+	conn := lock.Conn()
+	keys, err := listTaskKeys(ctx, conn)
 	if err != nil {
 		return pruneResult, err
 	}
@@ -132,7 +143,7 @@ func (r *PgExecutionRepository) Prune(
 		if err := ctx.Err(); err != nil {
 			return pruneResult, err
 		}
-		doomed, ok, err := r.loadDoomedBounds(ctx, key, keepPerTask, cutoff)
+		doomed, ok, err := loadDoomedBounds(ctx, conn, key, keepPerTask, cutoff)
 		if err != nil {
 			return pruneResult, err
 		}
@@ -145,14 +156,14 @@ func (r *PgExecutionRepository) Prune(
 				// report the cap when work actually remains, so a doomed count
 				// that happens to be an exact multiple of batchSize does not
 				// look like a truncated run.
-				remaining, err := r.anyDoomedRemaining(ctx, keys[i:], keepPerTask, cutoff)
+				remaining, err := anyDoomedRemaining(ctx, conn, keys[i:], keepPerTask, cutoff)
 				if err != nil {
 					return pruneResult, err
 				}
 				pruneResult.LimitReached = remaining
 				return pruneResult, nil
 			}
-			deleted, err := deleteTaskHistoryBatch(ctx, r.pool, doomed, batchSize)
+			deleted, err := deleteTaskHistoryBatch(ctx, conn, doomed, batchSize)
 			batches++
 			pruneResult.Deleted += deleted
 			if err != nil {
@@ -166,8 +177,8 @@ func (r *PgExecutionRepository) Prune(
 	return pruneResult, nil
 }
 
-func (r *PgExecutionRepository) listTaskKeys(ctx context.Context) ([]string, error) {
-	rows, err := r.pool.Query(ctx, `SELECT DISTINCT task_key FROM task_executions`)
+func listTaskKeys(ctx context.Context, q taskHistoryQuerier) ([]string, error) {
+	rows, err := q.Query(ctx, `SELECT DISTINCT task_key FROM task_executions`)
 	if err != nil {
 		return nil, fmt.Errorf("listing task history keys: %w", err)
 	}
@@ -230,14 +241,15 @@ func (b taskHistoryDoomedBounds) where() (string, []any) {
 
 // loadDoomedBounds resolves the two boundary rows for a task key. It reports
 // false when the task has no executions at all.
-func (r *PgExecutionRepository) loadDoomedBounds(
+func loadDoomedBounds(
 	ctx context.Context,
+	q taskHistoryQuerier,
 	taskKey string,
 	keepPerTask int,
 	cutoff time.Time,
 ) (taskHistoryDoomedBounds, bool, error) {
 	bounds := taskHistoryDoomedBounds{taskKey: taskKey, cutoff: cutoff}
-	err := r.pool.QueryRow(ctx, `
+	err := q.QueryRow(ctx, `
 		SELECT completed_at, id
 		FROM task_executions
 		WHERE task_key = $1
@@ -254,7 +266,7 @@ func (r *PgExecutionRepository) loadDoomedBounds(
 	// keepPerTask is clamped by the settings reader; guard the OFFSET anyway so
 	// a stray zero degrades to "keep the newest one" rather than erroring.
 	offset := max(keepPerTask-1, 0)
-	err = r.pool.QueryRow(ctx, `
+	err = q.QueryRow(ctx, `
 		SELECT completed_at, id
 		FROM task_executions
 		WHERE task_key = $1
@@ -276,14 +288,15 @@ func (r *PgExecutionRepository) loadDoomedBounds(
 // anyDoomedRemaining probes the given keys for leftover work. The key list is
 // bounded by the number of task keys ever recorded, so this stays a handful of
 // index probes even in the worst case.
-func (r *PgExecutionRepository) anyDoomedRemaining(
+func anyDoomedRemaining(
 	ctx context.Context,
+	q taskHistoryQuerier,
 	taskKeys []string,
 	keepPerTask int,
 	cutoff time.Time,
 ) (bool, error) {
 	for _, key := range taskKeys {
-		doomed, ok, err := r.loadDoomedBounds(ctx, key, keepPerTask, cutoff)
+		doomed, ok, err := loadDoomedBounds(ctx, q, key, keepPerTask, cutoff)
 		if err != nil {
 			return false, err
 		}
@@ -292,7 +305,7 @@ func (r *PgExecutionRepository) anyDoomedRemaining(
 		}
 		clause, args := doomed.where()
 		var exists bool
-		if err := r.pool.QueryRow(ctx,
+		if err := q.QueryRow(ctx,
 			`SELECT EXISTS (SELECT 1 FROM task_executions WHERE `+clause+` LIMIT 1)`,
 			args...,
 		).Scan(&exists); err != nil {
@@ -311,13 +324,13 @@ func (r *PgExecutionRepository) anyDoomedRemaining(
 // subset converges in the same number of batches.
 func deleteTaskHistoryBatch(
 	ctx context.Context,
-	execer taskHistoryExecer,
+	q taskHistoryQuerier,
 	doomed taskHistoryDoomedBounds,
 	batchSize int,
 ) (int64, error) {
 	clause, args := doomed.where()
 	args = append(args, batchSize)
-	result, err := execer.Exec(ctx, fmt.Sprintf(`
+	result, err := q.Exec(ctx, fmt.Sprintf(`
 		DELETE FROM task_executions
 		WHERE id IN (
 			SELECT id
