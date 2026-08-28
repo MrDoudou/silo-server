@@ -21,7 +21,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Silo-Server/silo-server/internal/access"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/config"
 	"github.com/Silo-Server/silo-server/internal/logredact"
@@ -824,8 +823,19 @@ func (h *PlaybackHandler) allow4KVideoTranscode(ctx context.Context) bool {
 	return v == "true"
 }
 
-func is4KResolution(res string) bool {
-	return access.CompareQuality(res, "2160p") >= 0
+// is4KCompatSource reports whether this compatibility source is 4K or higher.
+// It uses the same classifier as the native planner (4K/UHD/8K labels and
+// probed track dimensions), not CompareQuality, which only ranks 2160p/4320p
+// and would let a 4K-labeled or dimension-4K file transcode when the setting
+// forbids it.
+func is4KCompatSource(version catalog.FileVersion, file *models.MediaFile) bool {
+	if file != nil {
+		return playback.Is4KMediaFileV3(file)
+	}
+	return playback.Is4KMediaFileV3(&models.MediaFile{
+		Resolution:  version.Resolution,
+		VideoTracks: version.VideoTracks,
+	})
 }
 
 // compatVideoToolboxToneMapBitrateKbps chooses a resolution-aware bitrate for
@@ -1142,7 +1152,7 @@ func (h *PlaybackHandler) startRemoteTranscodeWithToneMapMode(
 			return fmt.Errorf("bind transcode node: %w", err)
 		}
 	}
-	if !source.TranscodeAudio && is4KResolution(source.Version.Resolution) && !h.allow4KVideoTranscode(ctx) {
+	if !source.TranscodeAudio && is4KCompatSource(source.Version, file) && !h.allow4KVideoTranscode(ctx) {
 		return errTranscode4KDisallowed
 	}
 	if d := float64(source.Version.Duration); d > 0 && initialSeekSeconds > d {
@@ -1878,7 +1888,7 @@ func (h *PlaybackHandler) buildPlaybackSource(
 	// Don't offer full video encodes of 4K sources when allow_4k_transcode is
 	// off. Audio-only transcodes (transcodeAudio) stream-copy the video and
 	// stay available.
-	if supportsTranscoding && !transcodeAudio && !allow4KTranscode && is4KResolution(version.Resolution) {
+	if supportsTranscoding && !transcodeAudio && !allow4KTranscode && is4KCompatSource(version, nil) {
 		supportsTranscoding = false
 	}
 

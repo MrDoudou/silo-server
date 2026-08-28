@@ -55,17 +55,45 @@ func TestToneMapPolicyResultPreservesStoreFailure(t *testing.T) {
 	}
 }
 
-func TestIs4KResolution(t *testing.T) {
-	for res, want := range map[string]bool{
-		"2160p": true,
-		"4320p": true,
-		"1080p": false,
-		"720p":  false,
-		"":      false,
-	} {
-		if got := is4KResolution(res); got != want {
-			t.Errorf("is4KResolution(%q) = %v, want %v", res, got, want)
-		}
+func TestIs4KCompatSource(t *testing.T) {
+	tests := []struct {
+		name    string
+		version catalog.FileVersion
+		file    *models.MediaFile
+		want    bool
+	}{
+		{name: "2160p", version: catalog.FileVersion{Resolution: "2160p"}, want: true},
+		{name: "4320p", version: catalog.FileVersion{Resolution: "4320p"}, want: true},
+		{name: "4K label", version: catalog.FileVersion{Resolution: "4K"}, want: true},
+		{name: "UHD label", version: catalog.FileVersion{Resolution: "UHD"}, want: true},
+		{name: "8K label", version: catalog.FileVersion{Resolution: "8K"}, want: true},
+		{name: "1080p", version: catalog.FileVersion{Resolution: "1080p"}, want: false},
+		{name: "720p", version: catalog.FileVersion{Resolution: "720p"}, want: false},
+		{name: "empty", want: false},
+		{
+			name:    "1080p label with 4K primary track",
+			version: catalog.FileVersion{Resolution: "1080p", VideoTracks: []models.VideoTrack{{Width: 3840, Height: 1626}}},
+			want:    true,
+		},
+		{
+			name:    "file dimensions override 1080p label",
+			version: catalog.FileVersion{Resolution: "1080p"},
+			file:    &models.MediaFile{Resolution: "1080p", VideoTracks: []models.VideoTrack{{Width: 3840, Height: 2160}}},
+			want:    true,
+		},
+		{
+			name:    "1080p file stays below the gate",
+			version: catalog.FileVersion{Resolution: "1080p"},
+			file:    &models.MediaFile{Resolution: "1080p", VideoTracks: []models.VideoTrack{{Width: 1920, Height: 1080}}},
+			want:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := is4KCompatSource(tt.version, tt.file); got != tt.want {
+				t.Errorf("is4KCompatSource() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -134,6 +162,11 @@ func TestBuildPlaybackSource4KVideoTranscodeGate(t *testing.T) {
 		CodecAudio: "eac3",
 		Container:  "mkv",
 	}
+	versionUHD := version4K
+	versionUHD.Resolution = "UHD"
+	versionDimension4K := version4K
+	versionDimension4K.Resolution = "1080p"
+	versionDimension4K.VideoTracks = []models.VideoTrack{{Width: 3840, Height: 1626}}
 	version1080 := version4K
 	version1080.Resolution = "1080p"
 
@@ -161,6 +194,20 @@ func TestBuildPlaybackSource4KVideoTranscodeGate(t *testing.T) {
 		{
 			name:            "4K video transcode blocked when disallowed",
 			version:         version4K,
+			profile:         h264Only,
+			allow4K:         false,
+			wantTranscoding: false,
+		},
+		{
+			name:            "UHD-labeled video transcode blocked when disallowed",
+			version:         versionUHD,
+			profile:         h264Only,
+			allow4K:         false,
+			wantTranscoding: false,
+		},
+		{
+			name:            "dimension-4K video transcode blocked when disallowed",
+			version:         versionDimension4K,
 			profile:         h264Only,
 			allow4K:         false,
 			wantTranscoding: false,
@@ -306,17 +353,34 @@ func TestDowngradeToSoftwareToneMap(t *testing.T) {
 func TestEnsureTranscodeSession4KGuard(t *testing.T) {
 	h := &PlaybackHandler{} // nil SettingsRepo: 4K video transcodes denied
 
-	source := PlaybackMediaSource{
-		FileID:  1,
-		Version: catalog.FileVersion{FileID: 1, Resolution: "2160p", CodecVideo: "hevc"},
+	for _, res := range []string{"2160p", "UHD", "4K", "8K"} {
+		source := PlaybackMediaSource{
+			FileID:  1,
+			Version: catalog.FileVersion{FileID: 1, Resolution: res, CodecVideo: "hevc"},
+		}
+		if _, err := h.ensureTranscodeSession(context.Background(), "ps", "session", source); !errors.Is(err, errTranscode4KDisallowed) {
+			t.Errorf("ensureTranscodeSession(%q) error = %v, want errTranscode4KDisallowed", res, err)
+		}
 	}
-	if _, err := h.ensureTranscodeSession(context.Background(), "ps", "session", source); !errors.Is(err, errTranscode4KDisallowed) {
-		t.Errorf("ensureTranscodeSession() error = %v, want errTranscode4KDisallowed", err)
+
+	dimensionSource := PlaybackMediaSource{
+		FileID: 1,
+		Version: catalog.FileVersion{
+			FileID: 1, Resolution: "1080p", CodecVideo: "hevc",
+			VideoTracks: []models.VideoTrack{{Width: 3840, Height: 1626}},
+		},
+	}
+	if _, err := h.ensureTranscodeSession(context.Background(), "ps", "session", dimensionSource); !errors.Is(err, errTranscode4KDisallowed) {
+		t.Errorf("ensureTranscodeSession(dimension-4K) error = %v, want errTranscode4KDisallowed", err)
 	}
 
 	// Video-copy sessions pass the guard (and fail later on the missing file
 	// resolver, which is fine for this test).
-	source.TranscodeAudio = true
+	source := PlaybackMediaSource{
+		FileID:         1,
+		Version:        catalog.FileVersion{FileID: 1, Resolution: "2160p", CodecVideo: "hevc"},
+		TranscodeAudio: true,
+	}
 	if _, err := h.ensureTranscodeSession(context.Background(), "ps", "session", source); errors.Is(err, errTranscode4KDisallowed) {
 		t.Error("ensureTranscodeSession() blocked a video-copy session")
 	}
@@ -325,11 +389,22 @@ func TestEnsureTranscodeSession4KGuard(t *testing.T) {
 func TestStartRemoteTranscode4KGuard(t *testing.T) {
 	h := &PlaybackHandler{} // nil SettingsRepo: 4K video transcodes denied
 
+	for _, res := range []string{"2160p", "UHD", "4K"} {
+		source := PlaybackMediaSource{
+			FileID:  1,
+			Version: catalog.FileVersion{FileID: 1, Resolution: res, CodecVideo: "hevc"},
+		}
+		if err := h.startRemoteTranscode(context.Background(), "play", "session", source, nil, 0, "http://node"); !errors.Is(err, errTranscode4KDisallowed) {
+			t.Errorf("startRemoteTranscode(%q) error = %v, want errTranscode4KDisallowed", res, err)
+		}
+	}
+
+	file := &models.MediaFile{Resolution: "1080p", VideoTracks: []models.VideoTrack{{Width: 3840, Height: 2160}}}
 	source := PlaybackMediaSource{
 		FileID:  1,
-		Version: catalog.FileVersion{FileID: 1, Resolution: "2160p", CodecVideo: "hevc"},
+		Version: catalog.FileVersion{FileID: 1, Resolution: "1080p", CodecVideo: "hevc"},
 	}
-	if err := h.startRemoteTranscode(context.Background(), "play", "session", source, nil, 0, "http://node"); !errors.Is(err, errTranscode4KDisallowed) {
-		t.Errorf("startRemoteTranscode() error = %v, want errTranscode4KDisallowed", err)
+	if err := h.startRemoteTranscode(context.Background(), "play", "session", source, file, 0, "http://node"); !errors.Is(err, errTranscode4KDisallowed) {
+		t.Errorf("startRemoteTranscode(file dimensions) error = %v, want errTranscode4KDisallowed", err)
 	}
 }

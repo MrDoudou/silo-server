@@ -2066,7 +2066,7 @@ func (h *PlaybackHandler) ensureTranscodeSessionWithToneMapMode(
 			}
 		}
 	}
-	if !source.TranscodeAudio && is4KResolution(source.Version.Resolution) && !h.allow4KVideoTranscode(ctx) {
+	if !source.TranscodeAudio && is4KCompatSource(source.Version, nil) && !h.allow4KVideoTranscode(ctx) {
 		return nil, errTranscode4KDisallowed
 	}
 	if h.fileResolver == nil {
@@ -2076,6 +2076,9 @@ func (h *PlaybackHandler) ensureTranscodeSessionWithToneMapMode(
 	file, err := h.fileResolver.GetByID(ctx, source.FileID)
 	if err != nil {
 		return nil, fmt.Errorf("resolve file: %w", err)
+	}
+	if !source.TranscodeAudio && is4KCompatSource(source.Version, file) && !h.allow4KVideoTranscode(ctx) {
+		return nil, errTranscode4KDisallowed
 	}
 	if err := os.MkdirAll(h.TranscodeDir, 0o755); err != nil {
 		return nil, fmt.Errorf("prepare transcode dir: %w", err)
