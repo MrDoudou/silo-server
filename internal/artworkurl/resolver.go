@@ -36,6 +36,15 @@ func (r *Resolver) ResolveTargetURL(ctx context.Context, target Target, variant 
 	if r == nil {
 		return artworkstore.ResolvedURL{}, errors.New("artworkurl: artwork url resolution is not configured")
 	}
+	// An empty reference means the catalog row has no artwork selected in this
+	// slot. Minting a capability anyway would hand clients a URL that can only
+	// serve the placeholder, where the API contract for absent artwork is an
+	// empty URL field — so refuse here and let batch resolution omit the entry.
+	// Lost artwork is different: its reference is still selected, so its
+	// capability mints and delivery serves fallback bytes or the placeholder.
+	if target.Reference == "" {
+		return artworkstore.ResolvedURL{}, fmt.Errorf("%w: artwork target has no selected reference", artworkstore.ErrInvalidKey)
+	}
 	if err := target.Validate(); err != nil {
 		return artworkstore.ResolvedURL{}, err
 	}

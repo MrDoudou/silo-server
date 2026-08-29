@@ -45,6 +45,25 @@ func TestResolverUsesTargetBoundRoute(t *testing.T) {
 	}
 }
 
+// TestResolveTargetURLRefusesEmptyReference pins the absent-artwork contract:
+// a target minted from a catalog row with nothing selected must not produce a
+// capability, so batch resolution omits it and the response field stays "" —
+// not a URL that can only ever serve the placeholder.
+func TestResolveTargetURLRefusesEmptyReference(t *testing.T) {
+	resolver, err := NewResolver(testSigner(t, time.Hour))
+	if err != nil {
+		t.Fatalf("NewResolver: %v", err)
+	}
+	target := Target{Surface: SurfaceItemLogos, Keys: []string{"movie-1"}, Slot: "logo"}.WithReference("")
+	if _, err := resolver.ResolveTargetURL(context.Background(), target, "w500"); !errors.Is(err, artworkstore.ErrInvalidKey) {
+		t.Fatalf("ResolveTargetURL with empty reference = %v, want ErrInvalidKey", err)
+	}
+	resolved := resolver.ResolveTargetRequests(context.Background(), []TargetRequest{{Target: target, Variant: "w500"}})
+	if len(resolved) != 0 {
+		t.Fatalf("ResolveTargetRequests minted %d capabilities for an empty reference, want 0", len(resolved))
+	}
+}
+
 func TestResolveArtworkURLRequiresLibraryReference(t *testing.T) {
 	resolver, err := NewResolver(testSigner(t, time.Hour))
 	if err != nil {

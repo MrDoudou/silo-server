@@ -62,6 +62,10 @@ request budget, Silo returns a compiled image placeholder with `200` and
 `Cache-Control: no-store`. It never returns an HTML or JSON error body to a
 valid image capability.
 
+The placeholder is for artwork that exists but is temporarily unservable. An
+item with no artwork selected in a slot gets no capability at all: the
+response's URL field is empty, exactly as before capability URLs existed.
+
 Stored responses support `ETag`, `If-None-Match`, `Range`, and private caching
 bounded by the signed expiry. An invalid or malformed capability is a
 non-enumerable `404`; an expired valid capability returns `401` so the client
