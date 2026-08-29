@@ -465,12 +465,16 @@ func TestBuildSectionsResponseMintsEpisodeStillPosterTargetForEpisode(t *testing
 }
 
 func TestBuildSectionsResponseMintsEpisodeStillBackdropTargetForEpisode(t *testing.T) {
+	// The wide default is w1280, but the still ladder tops out at w780;
+	// minting w1280 against the still slot would fail signing and drop the
+	// URL, so the handler must clamp to the widest still rung.
 	assertEpisodeSectionArtworkTarget(t, episodeSectionArtworkTargetCase{
 		backdropPath:  "episode/still/original.jpg",
 		backdropOwner: sections.SectionArtworkOwner{Kind: sections.SectionArtworkOwnerEpisode, ContentID: "episode-1"},
 		wantSurface:   artworkurl.SurfaceEpisodeStills,
 		wantKey:       "episode-1",
 		wantSlot:      artworkImageStill,
+		wantVariant:   artworkkey.VariantW780,
 	})
 }
 
@@ -494,6 +498,7 @@ type episodeSectionArtworkTargetCase struct {
 	wantSurface   string
 	wantKey       string
 	wantSlot      string
+	wantVariant   string
 }
 
 func assertEpisodeSectionArtworkTarget(t *testing.T, tc episodeSectionArtworkTargetCase) {
@@ -541,6 +546,9 @@ func assertEpisodeSectionArtworkTarget(t *testing.T, tc episodeSectionArtworkTar
 		}
 		if request.Target.Slot != tc.wantSlot {
 			t.Fatalf("slot = %q, want %q", request.Target.Slot, tc.wantSlot)
+		}
+		if tc.wantVariant != "" && request.Variant != tc.wantVariant {
+			t.Fatalf("variant = %q, want %q", request.Variant, tc.wantVariant)
 		}
 		return
 	}

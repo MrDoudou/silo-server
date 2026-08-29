@@ -1501,6 +1501,16 @@ func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withIt
 				backdropVariant = imagesize.Variant(imageTypeForBackdropPath(item.BackdropPath), size)
 				logoVariant = imagesize.Variant(artworkkey.ImageTypeLogo, size)
 			}
+			// An episode-owned backdrop is minted against the still ladder,
+			// which has no w1280/w1920 rungs; signing one of those would fail
+			// validation and drop the URL entirely, so clamp to the widest
+			// still rung instead.
+			if backdrop.Slot == artworkImageStill {
+				switch backdropVariant {
+				case artworkkey.VariantW1920, artworkkey.VariantW1280:
+					backdropVariant = artworkkey.VariantW780
+				}
+			}
 			images := pendingImages{
 				key: sectionItemImageKey{
 					sectionID: section.ID,
