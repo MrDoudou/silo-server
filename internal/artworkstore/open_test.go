@@ -277,10 +277,42 @@ func TestPinFailureFailsTheWrite(t *testing.T) {
 	}
 }
 
-// The exact scenario invariant 9 exists for: a local store that has been
+// The exact scenario the pin exists for: a local store that has been
 // materialized into, and object storage configured months later for an
-// unrelated feature. auto must not reinterpret live keys against the bucket.
-func TestPinnedLocalStoreRefusesToSwitchToS3(t *testing.T) {
+// unrelated feature. auto must not reinterpret live keys against the bucket —
+// it keeps serving the pinned local store, without the fatal mismatch that
+// used to take the whole server down over an unrelated bucket change.
+func TestPinnedLocalStoreStaysLocalUnderAutoWithS3(t *testing.T) {
+	settings := newFakeSettings()
+	root := t.TempDir()
+	handle := openLocal(t, root, settings)
+	if err := handle.Store.WriteImmutable(context.Background(), testKey, []byte("bytes"), ObjectMetadata{}); err != nil {
+		t.Fatalf("WriteImmutable: %v", err)
+	}
+	_ = handle.Close()
+
+	reopened, err := Open(context.Background(), Options{
+		Backend:   BackendAuto,
+		LocalPath: root,
+		S3:        newFakeS3(),
+		Settings:  settings,
+	})
+	if err != nil {
+		t.Fatalf("Open under auto with a pinned local store = %v, want success on the pinned backend", err)
+	}
+	t.Cleanup(func() { _ = reopened.Close() })
+	if reopened.Backend != BackendLocal {
+		t.Fatalf("Backend = %q, want the pinned %q", reopened.Backend, BackendLocal)
+	}
+	if _, err := reopened.Store.Stat(context.Background(), testKey); err != nil {
+		t.Fatalf("Stat of the materialized key on the pinned store: %v", err)
+	}
+}
+
+// An explicit conflicting backend remains fatal: it would split one catalog
+// across divergent stores, and the settings API refuses to save it for the
+// same reason.
+func TestPinnedLocalStoreRefusesExplicitS3(t *testing.T) {
 	settings := newFakeSettings()
 	root := t.TempDir()
 	handle := openLocal(t, root, settings)
@@ -290,7 +322,7 @@ func TestPinnedLocalStoreRefusesToSwitchToS3(t *testing.T) {
 	_ = handle.Close()
 
 	_, err := Open(context.Background(), Options{
-		Backend:   BackendAuto,
+		Backend:   BackendS3,
 		LocalPath: root,
 		S3:        newFakeS3(),
 		Settings:  settings,
