@@ -2246,10 +2246,17 @@ func (h *ItemsHandler) itemArtworkURL(r *http.Request, contentID, surface, slot,
 }
 
 func (h *ItemsHandler) itemArtworkTargetURL(r *http.Request, target artworkurl.Target, path, variant string) string {
-	if h.detailSvc == nil {
+	if h.detailSvc == nil || strings.TrimSpace(path) == "" || path == "-" {
 		return ""
 	}
-	return h.detailSvc.PresignArtworkTargetImageURL(r.Context(), target, path, target.Slot, variant)
+	// The callers hand over a resolved ladder variant, so presign by variant
+	// directly. Routing it through PresignArtworkTargetImageURL would put the
+	// variant in that helper's image_size parameter, where it fails to parse
+	// and silently falls back to the medium rung — discarding the client's
+	// requested size and the w300 card default alike.
+	target = target.WithReference(path)
+	resolved := h.detailSvc.PresignArtworkTargetsWithExpiry(r.Context(), []artworkurl.Target{target}, variant)
+	return resolved[target.CacheKey()].URL
 }
 
 // HandleFilterItems handles POST /items/filter with a full rule-group filter body.

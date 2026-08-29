@@ -25,6 +25,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/access"
 	"github.com/Silo-Server/silo-server/internal/adminjob"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkstore"
 	"github.com/Silo-Server/silo-server/internal/artworkupload"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
@@ -3322,15 +3323,16 @@ func (h *LibraryCollectionHandler) presignURL(r *http.Request, path string, vari
 	return ""
 }
 
-// collectionArtworkURL resolves stored collection artwork at card size.
+// collectionArtworkURL resolves stored collection artwork: posters at card
+// size, backdrops at the w1280 header rung their ladder exists for.
 func (h *LibraryCollectionHandler) collectionArtworkURL(r *http.Request, collectionID, path, slot string) string {
-	surface := artworkurl.SurfaceCollectionPosters
+	surface, variant := artworkurl.SurfaceCollectionPosters, artworkkey.VariantW300
 	if slot == "collection-backdrop" {
-		surface = artworkurl.SurfaceCollectionBackdrops
+		surface, variant = artworkurl.SurfaceCollectionBackdrops, artworkkey.VariantW1280
 	}
 	return resolveTargetStoredImageURL(r.Context(), h.ArtworkURLs, artworkurl.Target{
 		Surface: surface, Keys: []string{collectionID}, Slot: slot,
-	}, path, "w300")
+	}, path, variant)
 }
 
 func (h *LibraryCollectionHandler) userCollectionArtworkURL(r *http.Request, userID int, collectionID, path string) string {

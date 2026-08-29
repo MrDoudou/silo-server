@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/models"
@@ -343,13 +344,15 @@ func (h *ImagesHandler) presignCollectionArtwork(ctx context.Context, collection
 	if h.artworkURLs == nil {
 		return ""
 	}
-	surface, slot := artworkurl.SurfaceCollectionPosters, "collection-poster"
+	surface, slot, variant := artworkurl.SurfaceCollectionPosters, "collection-poster", artworkkey.VariantW300
 	if imageType == "Backdrop" {
-		surface, slot = artworkurl.SurfaceCollectionBackdrops, "collection-backdrop"
+		// Jellyfin clients render BoxSet backdrops full-screen; the
+		// collection-backdrop ladder carries w1280 exactly for that.
+		surface, slot, variant = artworkurl.SurfaceCollectionBackdrops, "collection-backdrop", artworkkey.VariantW1280
 	}
 	resolved, err := resolveCompatArtworkTarget(ctx, h.artworkURLs, artworkurl.Target{
 		Surface: surface, Keys: []string{collectionID}, Slot: slot,
-	}, path, "w300")
+	}, path, variant)
 	if err != nil {
 		return ""
 	}

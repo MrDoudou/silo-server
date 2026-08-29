@@ -1453,8 +1453,7 @@ func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withIt
 	type pendingImages struct {
 		key             sectionItemImageKey
 		posterTarget    artworkurl.Target
-		backdropWide    artworkurl.Target
-		backdropCard    artworkurl.Target
+		backdropTarget  artworkurl.Target
 		logoTarget      artworkurl.Target
 		posterVariant   string
 		backdropVariant string
@@ -1494,7 +1493,13 @@ func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withIt
 			backdrop := sectionArtworkTarget(item.ContentID, item.BackdropPath, artworkImageBackdrop, meta.BackdropOwner)
 			logo := sectionArtworkTarget(item.ContentID, item.LogoPath, artworkImageLogo, meta.LogoOwner)
 			posterVariant := artworkkey.VariantW500
-			backdropVariant := artworkkey.VariantW1280
+			// Continue Watching / Next Up rows render as wide cards; every
+			// other section keeps the featured-style hero backdrop, the same
+			// split the legacy path pipeline made in sectionBackdropPath.
+			backdropVariant := artworkkey.VariantW1920
+			if section.SectionType == sections.SectionContinueWatching || section.SectionType == sections.SectionNextUp {
+				backdropVariant = artworkkey.VariantW1280
+			}
 			logoVariant := artworkkey.OriginalVariant
 			if size != imagesize.Unset {
 				posterVariant = imagesize.Variant(artworkkey.ImageTypePoster, size)
@@ -1517,21 +1522,15 @@ func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withIt
 					contentID: item.ContentID,
 				},
 				posterTarget:    poster,
+				backdropTarget:  backdrop,
 				logoTarget:      logo,
 				posterVariant:   posterVariant,
 				backdropVariant: backdropVariant,
 				logoVariant:     logoVariant,
 			}
-			if size == imagesize.Unset && sectionBackdropPath(section.SectionType, item.BackdropPath) == cardThumbnailPath(item.BackdropPath) {
-				images.backdropVariant = artworkkey.VariantW300
-				images.backdropCard = backdrop
-				requests = append(requests, artworkurl.TargetRequest{Target: images.backdropCard, Variant: images.backdropVariant})
-			} else {
-				images.backdropWide = backdrop
-				requests = append(requests, artworkurl.TargetRequest{Target: images.backdropWide, Variant: images.backdropVariant})
-			}
 			pending = append(pending, images)
 			requests = append(requests,
+				artworkurl.TargetRequest{Target: backdrop, Variant: images.backdropVariant},
 				artworkurl.TargetRequest{Target: poster, Variant: images.posterVariant},
 				artworkurl.TargetRequest{Target: logo, Variant: images.logoVariant},
 			)
@@ -1540,13 +1539,9 @@ func (h *SectionHandler) resolveSectionItemImageURLs(ctx context.Context, withIt
 
 	resolved := h.DetailSvc.PresignArtworkTargetRequestsWithExpiry(ctx, requests)
 	for _, images := range pending {
-		backdrop := resolved[(artworkurl.TargetRequest{Target: images.backdropWide, Variant: images.backdropVariant}).CacheKey()].URL
-		if images.backdropCard.Surface != "" {
-			backdrop = resolved[(artworkurl.TargetRequest{Target: images.backdropCard, Variant: images.backdropVariant}).CacheKey()].URL
-		}
 		result[images.key] = sectionItemImageURLs{
 			posterURL:   resolved[(artworkurl.TargetRequest{Target: images.posterTarget, Variant: images.posterVariant}).CacheKey()].URL,
-			backdropURL: backdrop,
+			backdropURL: resolved[(artworkurl.TargetRequest{Target: images.backdropTarget, Variant: images.backdropVariant}).CacheKey()].URL,
 			logoURL:     resolved[(artworkurl.TargetRequest{Target: images.logoTarget, Variant: images.logoVariant}).CacheKey()].URL,
 		}
 	}

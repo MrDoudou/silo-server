@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/Silo-Server/silo-server/internal/artworkkey"
 	"github.com/Silo-Server/silo-server/internal/artworkurl"
 	"github.com/Silo-Server/silo-server/internal/catalog"
 	"github.com/Silo-Server/silo-server/internal/models"
@@ -255,13 +256,14 @@ func (h *ItemsHandler) presignCollectionPoster(ctx context.Context, collectionID
 	if h.artworkURLs == nil {
 		return ""
 	}
-	surface := artworkurl.SurfaceCollectionPosters
+	surface, variant := artworkurl.SurfaceCollectionPosters, artworkkey.VariantW300
 	if slot == "collection-backdrop" {
-		surface = artworkurl.SurfaceCollectionBackdrops
+		// Backdrops render full-screen; their ladder carries w1280 for that.
+		surface, variant = artworkurl.SurfaceCollectionBackdrops, artworkkey.VariantW1280
 	}
 	resolved, err := resolveCompatArtworkTarget(ctx, h.artworkURLs, artworkurl.Target{
 		Surface: surface, Keys: []string{collectionID}, Slot: slot,
-	}, path, "w300")
+	}, path, variant)
 	if err != nil {
 		return ""
 	}
