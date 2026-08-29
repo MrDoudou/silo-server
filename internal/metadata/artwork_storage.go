@@ -59,16 +59,24 @@ func (s *ArtworkStorageService) SetRebuilder(handle *artworkstore.Handle) {
 // nothing ever re-enters bulk recovery. Recording the intent first turns that
 // window into the harmless opposite: an empty_rebuilding row whose generation
 // has not caught up yet, which RunRecovery treats as a rebuild to resume.
+//
+// The write runs inside the handle's rebuild, after the request is validated:
+// a rejected rebuild (S3 backend, non-empty root) must return without durable
+// side effects, or RunRecovery would later adopt the stranded intent and force
+// a healthy populated store into bulk recovery.
 func (s *ArtworkStorageService) RebuildEmpty(ctx context.Context) (ArtworkStorageAccounting, error) {
 	if s == nil || s.pool == nil || s.rebuilder == nil {
 		return ArtworkStorageAccounting{}, artworkstore.ErrRebuildUnsupported
 	}
-	if _, err := s.pool.Exec(ctx, `UPDATE artwork_storage_accounting_state SET
-		store_health = 'empty_rebuilding', health_changed_at = NOW(), rebuild_generation = $1,
-		rebuild_surface_name = '', rebuild_enqueued_at = NULL WHERE singleton`, s.rebuilder.GenerationID()); err != nil {
-		return ArtworkStorageAccounting{}, fmt.Errorf("record artwork rebuild intent: %w", err)
+	recordIntent := func(ctx context.Context) error {
+		if _, err := s.pool.Exec(ctx, `UPDATE artwork_storage_accounting_state SET
+			store_health = 'empty_rebuilding', health_changed_at = NOW(), rebuild_generation = $1,
+			rebuild_surface_name = '', rebuild_enqueued_at = NULL WHERE singleton`, s.rebuilder.GenerationID()); err != nil {
+			return fmt.Errorf("record artwork rebuild intent: %w", err)
+		}
+		return nil
 	}
-	if err := s.rebuilder.RebuildEmpty(ctx); err != nil {
+	if err := s.rebuilder.RebuildEmpty(ctx, recordIntent); err != nil {
 		return ArtworkStorageAccounting{}, err
 	}
 	if _, err := s.pool.Exec(ctx, `UPDATE artwork_storage_accounting_state SET

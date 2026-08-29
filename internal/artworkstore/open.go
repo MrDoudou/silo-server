@@ -580,7 +580,14 @@ func (h *Handle) check(ctx context.Context) error {
 // RebuildEmpty explicitly replaces an unavailable empty local store with a
 // fresh physical generation. S3 has no local root to recreate and keeps its
 // existing authoritative-empty recovery behavior.
-func (h *Handle) RebuildEmpty(ctx context.Context) error {
+//
+// recordIntent, when non-nil, runs after the rebuild is validated (local
+// backend, empty root) and before the durable marker/pin rotation. Callers use
+// it to persist the empty_rebuilding recovery intent at exactly that point: a
+// rejected rebuild must not leave durable intent behind (RunRecovery would
+// later force a healthy store into bulk recovery), while a crash after the
+// intent lands is the harmless resume-a-rebuild state RunRecovery expects.
+func (h *Handle) RebuildEmpty(ctx context.Context, recordIntent func(context.Context) error) error {
 	if h == nil || h.local == nil {
 		return ErrRebuildUnsupported
 	}
@@ -591,6 +598,14 @@ func (h *Handle) RebuildEmpty(ctx context.Context) error {
 	if err := h.local.prepareEmptyRebuild(ctx); err != nil {
 		h.health.force(previousHealth)
 		return err
+	}
+	if recordIntent != nil {
+		// The root is already empty and its sentinels are gone, so on failure
+		// the store stays unavailable and the ordinary missing-marker recovery
+		// converges it; do not restore the pre-rebuild health.
+		if err := recordIntent(ctx); err != nil {
+			return err
+		}
 	}
 	if err := h.local.Probe(ctx); err != nil {
 		return err

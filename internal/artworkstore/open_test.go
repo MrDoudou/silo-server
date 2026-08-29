@@ -363,8 +363,20 @@ func TestRunningPinnedLocalStoreRequiresExplicitRebuildAfterDeletedRoot(t *testi
 	if err := handle.Store.WriteImmutable(t.Context(), testKey, []byte("blocked"), ObjectMetadata{}); !errors.Is(err, ErrBackendUnavailable) {
 		t.Fatalf("write while unavailable = %v, want ErrBackendUnavailable", err)
 	}
-	if err := handle.RebuildEmpty(t.Context()); err != nil {
+	intentRecorded := false
+	if err := handle.RebuildEmpty(t.Context(), func(context.Context) error {
+		intentRecorded = true
+		// Intent must land before the durable rotation: the generation the
+		// callback observes is still the pre-rebuild one.
+		if got := handle.GenerationID(); got != oldGeneration {
+			t.Fatalf("generation during recordIntent = %q, want pre-rebuild %q", got, oldGeneration)
+		}
+		return nil
+	}); err != nil {
 		t.Fatalf("RebuildEmpty: %v", err)
+	}
+	if !intentRecorded {
+		t.Fatal("RebuildEmpty completed without recording the recovery intent")
 	}
 	if state, _ := handle.Health(); state != HealthEmptyRebuilding {
 		t.Fatalf("health after rebuild = %q, want empty_rebuilding", state)
@@ -387,7 +399,10 @@ func TestRebuildEmptyRefusesRootWithArtworkObjects(t *testing.T) {
 		t.Fatal(err)
 	}
 	oldGeneration := handle.GenerationID()
-	if err := handle.RebuildEmpty(t.Context()); !errors.Is(err, ErrStoreNotEmpty) {
+	if err := handle.RebuildEmpty(t.Context(), func(context.Context) error {
+		t.Fatal("recordIntent ran for a rejected rebuild; the durable intent would strand")
+		return nil
+	}); !errors.Is(err, ErrStoreNotEmpty) {
 		t.Fatalf("RebuildEmpty = %v, want ErrStoreNotEmpty", err)
 	}
 	if state, _ := handle.Health(); state != HealthHealthy {
