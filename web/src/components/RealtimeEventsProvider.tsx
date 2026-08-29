@@ -69,7 +69,6 @@ const CATALOG_ITEM_CHANGED_EVENTS = new Set([
   "library.item_added",
   "metadata.updated",
 ]);
-const SCOPED_CATALOG_LIBRARY_EVENTS = new Set(["catalog.library.changed", "library.changed"]);
 const TERMINAL_JOB_EVENTS = new Set(["job.completed", "job.failed", "job.cancelled"]);
 // These jobs rewrite the artwork accounting snapshot (or the purge result the
 // admin surface reads back), so the storage query is stale the moment one of
