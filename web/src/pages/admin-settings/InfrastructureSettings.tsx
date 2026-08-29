@@ -465,7 +465,7 @@ function ArtworkStoreGroup({
       <SettingField
         label="Artwork backend"
         type="select"
-        description="Automatic mode uses your public S3 bucket when one is configured; otherwise it uses local disk."
+        description="Automatic mode uses your public S3 bucket when one is configured; otherwise it uses local disk. Once artwork has been stored, the backend is pinned and an explicit conflicting choice is rejected — migrate the store to switch."
         value={form.getValue("artwork.storage_backend") || "auto"}
         onChange={(v) => form.setValue("artwork.storage_backend", v)}
         options={[

@@ -2380,6 +2380,33 @@ func (h *AdminHandler) validateProspectiveImageCaching(effective, changed map[st
 	return errPublicStorageUnavailable
 }
 
+// validateProspectiveArtworkBackend refuses a backend selection the pinned
+// artwork store will fatally reject at the next boot. The pin is
+// machine-managed state, so enum normalization alone cannot catch this: an
+// explicit backend that contradicts artwork.store_pin makes artworkstore.Open
+// return its always-fatal PinMismatchError, the process exits, and the
+// settings UI needed to revert the value becomes unreachable.
+func validateProspectiveArtworkBackend(prospective, changed map[string]string) error {
+	if _, ok := changed[config.ArtworkStorageBackendKey]; !ok {
+		return nil
+	}
+	pin, err := artworkstore.DecodePin(prospective[artworkstore.StorePinSettingKey])
+	if err != nil || pin.IsZero() {
+		// An unreadable pin is Open's problem to report; the save must not
+		// wedge settings edits behind it.
+		return nil
+	}
+	backend := strings.TrimSpace(prospective[config.ArtworkStorageBackendKey])
+	switch backend {
+	case "", config.ArtworkBackendAuto, pin.Backend:
+		return nil
+	}
+	return fmt.Errorf(
+		"artwork.storage_backend=%s conflicts with this install's pinned %s artwork store; "+
+			"in-place backend switches are unsupported — keep %s (or auto), or migrate the store by byte-for-byte copy first",
+		backend, pin.Backend, pin.Backend)
+}
+
 func (h *AdminHandler) normalizeBatchSetting(
 	ctx context.Context,
 	key, value string,
@@ -2667,6 +2694,14 @@ func (h *AdminHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Reque
 			if err := h.validateProspectiveImageCaching(after, normalized); err != nil {
 				validationErr = err
 				validationCode = errCodeStorageUnavailable
+				return nil, err
+			}
+			// Checked against the raw prospective map, not the filtered
+			// snapshot: the store pin is machine-managed and hidden from the
+			// admin settings surface.
+			if err := validateProspectiveArtworkBackend(prospective, normalized); err != nil {
+				validationErr = err
+				validationCode = "invalid_settings"
 				return nil, err
 			}
 			validationSnapshot := adminSettingsValidationSnapshot(activeProspective, normalized)
@@ -3015,6 +3050,13 @@ func (h *AdminHandler) HandleUpdateSetting(w http.ResponseWriter, r *http.Reques
 			// establish or clear one write at a time. Per-key validation above
 			// remains strict; the durable prerequisites are the exception — a
 			// single-key write may not break them.
+			if key == config.ArtworkStorageBackendKey {
+				if err := validateProspectiveArtworkBackend(prospective, map[string]string{key: req.Value}); err != nil {
+					validationErr = err
+					validationCode = "invalid_settings"
+					return nil, err
+				}
+			}
 			if key == "redis.url" {
 				if err := config.ValidateRedisRateLimitTransport(
 					h.activeAdminSettings(prospective),

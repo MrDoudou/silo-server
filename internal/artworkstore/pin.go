@@ -138,6 +138,13 @@ func ReadPin(ctx context.Context, settings SettingsStore) (Pin, error) {
 	return decodePin(raw)
 }
 
+// DecodePin parses a stored artwork.store_pin value. An empty value decodes to
+// the zero Pin. It exists for callers that validate prospective settings
+// against the pin without holding a SettingsStore (see ReadPin otherwise).
+func DecodePin(raw string) (Pin, error) {
+	return decodePin(raw)
+}
+
 func decodePin(raw string) (Pin, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

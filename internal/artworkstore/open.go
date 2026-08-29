@@ -171,7 +171,7 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 		return nil, err
 	}
 
-	backend, err := resolveBackend(opts.Backend, opts.S3 != nil)
+	backend, err := resolveBackend(opts.Backend, opts.S3 != nil, recorded.Backend)
 	if err != nil {
 		return nil, err
 	}
@@ -354,13 +354,26 @@ func Open(ctx context.Context, opts Options) (*Handle, error) {
 // selects the local filesystem so a deployment without object storage works
 // with no choice to make.
 //
-// Note that auto is only *allowed* to resolve freely; Open still verifies the
-// result against the pin, so an install that materialized against the local
-// store does not switch to S3 merely because a bucket was later configured for
-// subtitles or branding.
-func resolveBackend(configured string, s3Configured bool) (string, error) {
+// Note that auto resolves freely only before the first materialization pins
+// the store. Once pinned, auto means "whatever this install's store is": an
+// install that materialized against the local store must not flip to S3 merely
+// because a bucket was later configured for subtitles or branding — before this
+// honored the pin, that flip surfaced as a fatal PinMismatchError at the next
+// boot, taking the server down over an unrelated bucket configuration.
+func resolveBackend(configured string, s3Configured bool, pinned string) (string, error) {
 	switch configured {
 	case "", BackendAuto:
+		switch pinned {
+		case BackendLocal:
+			return BackendLocal, nil
+		case BackendS3:
+			if !s3Configured {
+				return "", errors.New(
+					"the artwork store is pinned to S3 but no public S3 bucket is configured; " +
+						"restore the bucket configuration or migrate the store to local first")
+			}
+			return BackendS3, nil
+		}
 		if s3Configured {
 			return BackendS3, nil
 		}

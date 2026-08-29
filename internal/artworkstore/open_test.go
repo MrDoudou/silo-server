@@ -785,3 +785,36 @@ func TestNilHandleCheckFails(t *testing.T) {
 		t.Fatalf("closing a nil handle: %v", err)
 	}
 }
+
+// TestResolveBackendHonorsPin pins auto's post-pin behavior: once a store is
+// pinned, configuring a public bucket for other assets must not flip a
+// pinned-local install to S3 (previously a fatal PinMismatchError at boot).
+func TestResolveBackendHonorsPin(t *testing.T) {
+	cases := []struct {
+		name       string
+		configured string
+		s3         bool
+		pinned     string
+		want       string
+		wantErr    bool
+	}{
+		{name: "auto unpinned prefers s3", configured: BackendAuto, s3: true, want: BackendS3},
+		{name: "auto unpinned falls back local", configured: BackendAuto, want: BackendLocal},
+		{name: "auto honors local pin despite bucket", configured: BackendAuto, s3: true, pinned: BackendLocal, want: BackendLocal},
+		{name: "auto honors s3 pin", configured: BackendAuto, s3: true, pinned: BackendS3, want: BackendS3},
+		{name: "auto s3 pin without bucket errors", configured: BackendAuto, pinned: BackendS3, wantErr: true},
+		{name: "explicit local ignores pin resolution", configured: BackendLocal, s3: true, pinned: BackendS3, want: BackendLocal},
+	}
+	for _, tc := range cases {
+		got, err := resolveBackend(tc.configured, tc.s3, tc.pinned)
+		if tc.wantErr {
+			if err == nil {
+				t.Errorf("%s: resolveBackend = %q, want error", tc.name, got)
+			}
+			continue
+		}
+		if err != nil || got != tc.want {
+			t.Errorf("%s: resolveBackend = %q, %v; want %q", tc.name, got, err, tc.want)
+		}
+	}
+}
