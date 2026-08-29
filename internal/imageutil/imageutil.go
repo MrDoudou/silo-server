@@ -235,6 +235,14 @@ func decodeThumbhashSource(data []byte) (image.Image, error) {
 			return img, nil
 		}
 	}
+	// The pure-Go fallback materializes the full raster, so bound the
+	// header-declared dimensions first; vips never saw or already rejected
+	// these bytes, and its shrink-on-load protection does not apply here.
+	if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
+		if err := checkSourceDimensions(cfg.Width, cfg.Height); err != nil {
+			return nil, err
+		}
+	}
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("imageutil: decode for thumbhash: %w", err)
