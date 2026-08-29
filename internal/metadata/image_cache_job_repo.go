@@ -197,7 +197,7 @@ func (r *ImageCacheJobRepository) Enqueue(ctx context.Context, in EnqueueImageCa
 }
 
 func (r *ImageCacheJobRepository) EnqueueBatch(ctx context.Context, inputs []EnqueueImageCacheJobInput) (int, error) {
-	return r.enqueueBatch(ctx, inputs, false)
+	return r.enqueueBatch(ctx, inputs, false, 0)
 }
 
 // EnqueueRepair re-admits a completed target after authoritative storage loss.
@@ -205,17 +205,21 @@ func (r *ImageCacheJobRepository) EnqueueBatch(ctx context.Context, inputs []Enq
 // the existing unique target key provides cluster-wide durable deduplication
 // for request bursts.
 func (r *ImageCacheJobRepository) EnqueueRepair(ctx context.Context, in EnqueueImageCacheJobInput) (int, error) {
-	return r.enqueueBatch(ctx, []EnqueueImageCacheJobInput{in}, true)
+	return r.enqueueBatch(ctx, []EnqueueImageCacheJobInput{in}, true, imageCacheFailedCooldown)
 }
 
 // EnqueueRepairBatch is the bulk-recovery counterpart to EnqueueRepair. It
 // retains the same cluster-wide unique target key and re-admits completed jobs
-// without creating a parallel repair queue.
+// without creating a parallel repair queue. Re-admitted failed targets are due
+// immediately: a rebuild's completion is gated on outstanding repair jobs, and
+// parking them behind the request-burst cooldown would hold the store in
+// empty_rebuilding for the whole cooldown; one prompt attempt either recovers
+// the target or returns it to 'failed', which does not gate completion.
 func (r *ImageCacheJobRepository) EnqueueRepairBatch(ctx context.Context, inputs []EnqueueImageCacheJobInput) (int, error) {
-	return r.enqueueBatch(ctx, inputs, true)
+	return r.enqueueBatch(ctx, inputs, true, 0)
 }
 
-func (r *ImageCacheJobRepository) enqueueBatch(ctx context.Context, inputs []EnqueueImageCacheJobInput, repair bool) (int, error) {
+func (r *ImageCacheJobRepository) enqueueBatch(ctx context.Context, inputs []EnqueueImageCacheJobInput, repair bool, repairCooldown time.Duration) (int, error) {
 	if r == nil || r.pool == nil {
 		return 0, nil
 	}
@@ -237,7 +241,7 @@ func (r *ImageCacheJobRepository) enqueueBatch(ctx context.Context, inputs []Enq
 		if end > len(valid) {
 			end = len(valid)
 		}
-		affected, err := r.enqueueBatchChunk(ctx, valid[start:end], repair)
+		affected, err := r.enqueueBatchChunk(ctx, valid[start:end], repair, repairCooldown)
 		if err != nil {
 			return total, err
 		}
@@ -287,7 +291,7 @@ func validImageCacheJobTarget(in EnqueueImageCacheJobInput) bool {
 	}
 }
 
-func (r *ImageCacheJobRepository) enqueueBatchChunk(ctx context.Context, inputs []EnqueueImageCacheJobInput, repair bool) (int, error) {
+func (r *ImageCacheJobRepository) enqueueBatchChunk(ctx context.Context, inputs []EnqueueImageCacheJobInput, repair bool, repairCooldown time.Duration) (int, error) {
 	var sql strings.Builder
 	args := make([]any, 0, len(inputs)*12+2)
 	sql.WriteString(`
@@ -314,7 +318,7 @@ func (r *ImageCacheJobRepository) enqueueBatchChunk(ctx context.Context, inputs 
 	}
 	repairArg := len(args) + 1
 	repairCooldownArg := len(args) + 2
-	args = append(args, repair, intervalLiteral(imageCacheFailedCooldown))
+	args = append(args, repair, intervalLiteral(repairCooldown))
 	fmt.Fprintf(&sql, `
 	ON CONFLICT (target_type, target_content_id, image_type, target_language, season_number, episode_number) DO UPDATE SET
 		series_id = EXCLUDED.series_id,
@@ -1133,7 +1137,7 @@ func (r *ImageCacheJobRepository) EnqueueExistingProviderArtwork(ctx context.Con
 	if err := rows.Err(); err != nil {
 		return 0, fmt.Errorf("iterating existing provider artwork: %w", err)
 	}
-	return r.enqueueBatch(ctx, inputs, true)
+	return r.enqueueBatch(ctx, inputs, true, imageCacheFailedCooldown)
 }
 
 // ladderRecachableSchemesSQL lists the source schemes the ladder backfill
@@ -1396,7 +1400,7 @@ func (r *ImageCacheJobRepository) EnqueueLadderBackfill(ctx context.Context, lim
 	if err := rows.Err(); err != nil {
 		return 0, fmt.Errorf("iterating artwork ladder backfill candidates: %w", err)
 	}
-	return r.enqueueBatch(ctx, inputs, true)
+	return r.enqueueBatch(ctx, inputs, true, imageCacheFailedCooldown)
 }
 
 // ladderBackfillCandidateQuerySQL is the batch query behind EnqueueLadderBackfill.

@@ -55,12 +55,29 @@ func (c *ArtworkDeliveryCoordinator) ArtworkPublished(ctx context.Context, job *
 	}
 	// Only the published revision was proved durable. If upstream bytes changed,
 	// the previous revision may still be missing while another target selects it.
-	if _, err := c.pool.Exec(ctx, `
-		UPDATE artwork_revision_gc_candidates
+	// The CTE captures whether this publication actually cleared loss state:
+	// most publications are ordinary materializations of healthy paths, and
+	// running the recovered metric plus the rebuild-status aggregate for each
+	// of those turns a library scan into a per-image full accounting pass.
+	wasLost := false
+	if err := c.pool.QueryRow(ctx, `
+		WITH prev AS (
+			SELECT original_path,
+				bool_or(missing_at IS NOT NULL OR repair_state <> '' OR protected_loss_at IS NOT NULL) AS was_lost
+			FROM artwork_revision_gc_candidates WHERE original_path = $1
+			GROUP BY original_path
+		)
+		UPDATE artwork_revision_gc_candidates c
 		SET missing_at = NULL, repair_state = '', repair_queued_at = NULL,
 			protected_loss_at = NULL, last_verified_at = NOW(), updated_at = NOW()
-		WHERE original_path = $1`, publishedPath); err != nil {
-		return err
+		FROM prev WHERE c.original_path = prev.original_path
+		RETURNING prev.was_lost`, publishedPath).Scan(&wasLost); err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+	}
+	if !wasLost && !job.RepairRequested {
+		return nil
 	}
 	target, ok, err := c.artworkTargetForImageCacheJob(ctx, job)
 	if err != nil {
@@ -75,7 +92,9 @@ func (c *ArtworkDeliveryCoordinator) ArtworkPublished(ctx context.Context, job *
 			return err
 		}
 	}
-	artworkmetrics.Repair("recovered")
+	if wasLost {
+		artworkmetrics.Repair("recovered")
+	}
 	if c.health != nil {
 		if status, err := c.RebuildStatus(ctx); err == nil {
 			c.health.ReportInventoryMissing(status.MissingReferences)
@@ -539,8 +558,16 @@ func isRequestRecoverableArtworkSource(source string) bool {
 	if source == "" || strings.HasPrefix(source, "upload://") || strings.HasPrefix(source, "embedded://") || strings.HasPrefix(source, "generated://") {
 		return false
 	}
-	return strings.HasPrefix(source, "file://") || strings.HasPrefix(source, artworkurl.LibraryReferencePrefix) ||
-		strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") || strings.Contains(source, "://")
+	if strings.HasPrefix(source, "file://") || strings.HasPrefix(source, artworkurl.LibraryReferencePrefix) ||
+		strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
+		return true
+	}
+	// Any remaining scheme is treated as a provider/plugin reference — but only
+	// if the repair queue would actually accept it. Legacy s3:// and local://
+	// sources cannot be re-fetched; classifying them recoverable marks the
+	// revision repair-queued while no job is ever admitted, so the loss stays
+	// silent forever instead of raising the protected-loss alert.
+	return strings.Contains(source, "://") && !isNonProviderImageScheme(source)
 }
 
 // StoredVariant returns the current immutable key for variant. A stale signed
