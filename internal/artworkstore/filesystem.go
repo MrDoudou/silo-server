@@ -205,7 +205,7 @@ func (s *FilesystemStore) openRoot() (*os.Root, func(), error) {
 	}
 	if s.pinnedGeneration != "" {
 		if _, err := os.Stat(s.rootPath); err != nil {
-			return nil, nil, fmt.Errorf("artworkstore: opening pinned store root %s: %w", s.rootPath, err)
+			return nil, nil, fmt.Errorf("%w: store root %s: %v", ErrBackendUnavailable, s.rootPath, err)
 		}
 	} else if err := os.MkdirAll(s.rootPath, storeDirPerm); err != nil {
 		return nil, nil, fmt.Errorf("artworkstore: creating store root %s: %w", s.rootPath, err)
@@ -285,18 +285,22 @@ func (s *FilesystemStore) openRootExisting() (*os.Root, func(), error) {
 	if s.closed {
 		return nil, nil, errors.New("artworkstore: filesystem store is closed")
 	}
+	if s.root != nil {
+		root, release := s.borrowLocked()
+		return root, release, nil
+	}
 	if _, err := os.Stat(s.rootPath); err != nil {
 		return nil, nil, fmt.Errorf("artworkstore: opening existing store root %s: %w", s.rootPath, err)
 	}
-	if s.root == nil {
-		root, err := os.OpenRoot(s.rootPath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("artworkstore: opening store root %s: %w", s.rootPath, err)
-		}
-		s.root = &rootRef{root: root}
+	root, err := os.OpenRoot(s.rootPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("artworkstore: opening store root %s: %w", s.rootPath, err)
 	}
-	root, release := s.borrowLocked()
-	return root, release, nil
+	// Deliberately not cached in s.root: this path skips the pin and marker
+	// verification openRoot performs, and caching an unverified root would let
+	// concurrent writes land on a swapped mount during the very probe that is
+	// about to flag it as wrong_mount.
+	return root, func() { _ = root.Close() }, nil
 }
 
 // Probe creates the root if needed and proves it is a writable directory. An

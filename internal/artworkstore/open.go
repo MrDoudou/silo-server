@@ -430,10 +430,15 @@ func (h *Handle) Check(ctx context.Context) error {
 }
 
 // ProbeNow bypasses the readiness cache and feeds the debounced health state.
+// It still serializes on checkMu: an unlocked probe races RebuildEmpty's
+// marker/pin rotation and can write the pre-rebuild generation back over the
+// fresh one, then misreport the swap as a wrong mount.
 func (h *Handle) ProbeNow(ctx context.Context) error {
 	if h == nil {
 		return ErrBackendUnavailable
 	}
+	h.checkMu.Lock()
+	defer h.checkMu.Unlock()
 	err := h.check(ctx)
 	if err != nil {
 		h.reportProbeFailure(err)
