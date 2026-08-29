@@ -205,7 +205,7 @@ func (s *FilesystemStore) openRoot() (*os.Root, func(), error) {
 	}
 	if s.pinnedGeneration != "" {
 		if _, err := os.Stat(s.rootPath); err != nil {
-			return nil, nil, fmt.Errorf("%w: store root %s: %v", ErrBackendUnavailable, s.rootPath, err)
+			return nil, nil, fmt.Errorf("%w: store root %s: %w", ErrBackendUnavailable, s.rootPath, err)
 		}
 	} else if err := os.MkdirAll(s.rootPath, storeDirPerm); err != nil {
 		return nil, nil, fmt.Errorf("artworkstore: creating store root %s: %w", s.rootPath, err)

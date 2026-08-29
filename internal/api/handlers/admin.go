@@ -2295,6 +2295,7 @@ const (
 // errCodeStorageUnavailable is the API error code for a setting that needs
 // object storage this deployment has not configured.
 const errCodeStorageUnavailable = "storage_unavailable"
+const errCodeInvalidSettings = "invalid_settings"
 
 // errPublicStorageUnavailable is returned when a write would leave
 // metadata.cache_images enabled with no public bucket anywhere: the image cacher
@@ -2394,7 +2395,7 @@ func validateProspectiveArtworkBackend(prospective, changed map[string]string) e
 	if err != nil || pin.IsZero() {
 		// An unreadable pin is Open's problem to report; the save must not
 		// wedge settings edits behind it.
-		return nil
+		return nil //nolint:nilerr // deliberate: never block saves on pin decode failures
 	}
 	backend := strings.TrimSpace(prospective[config.ArtworkStorageBackendKey])
 	switch backend {
@@ -2701,13 +2702,13 @@ func (h *AdminHandler) HandleUpdateSettings(w http.ResponseWriter, r *http.Reque
 			// admin settings surface.
 			if err := validateProspectiveArtworkBackend(prospective, normalized); err != nil {
 				validationErr = err
-				validationCode = "invalid_settings"
+				validationCode = errCodeInvalidSettings
 				return nil, err
 			}
 			validationSnapshot := adminSettingsValidationSnapshot(activeProspective, normalized)
 			if err := validateProspectiveAdminSettings(validationSnapshot, h.RedisBootstrapAvailable); err != nil {
 				validationErr = err
-				validationCode = "invalid_settings"
+				validationCode = errCodeInvalidSettings
 				return nil, err
 			}
 			writes := make(map[string]string, len(normalized))
@@ -3053,7 +3054,7 @@ func (h *AdminHandler) HandleUpdateSetting(w http.ResponseWriter, r *http.Reques
 			if key == config.ArtworkStorageBackendKey {
 				if err := validateProspectiveArtworkBackend(prospective, map[string]string{key: req.Value}); err != nil {
 					validationErr = err
-					validationCode = "invalid_settings"
+					validationCode = errCodeInvalidSettings
 					return nil, err
 				}
 			}
@@ -3063,7 +3064,7 @@ func (h *AdminHandler) HandleUpdateSetting(w http.ResponseWriter, r *http.Reques
 					h.RedisBootstrapAvailable,
 				); err != nil {
 					validationErr = err
-					validationCode = "invalid_settings"
+					validationCode = errCodeInvalidSettings
 					return nil, err
 				}
 			}
