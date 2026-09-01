@@ -54,8 +54,10 @@ server-side (`watchstate`, `userdb`, `settingsresolve`).
 - **Node** — a remote transcode/streaming worker in `nodepool`, not the API server.
 - **Session** — ambiguous; always say which: playback session (`internal/playback`) or login
   session (`internal/auth`).
-- **jellycompat vs v1** — jellycompat is the Jellyfin-protocol surface for ecosystem clients;
-  "the API" or "v1" means Silo's native `/api/v1`.
+- **jellycompat vs the native API** — jellycompat is the Jellyfin-protocol surface for ecosystem
+  clients; "the API" means Silo's native surface, which spans `/api/v1` (the frozen alpha
+  contract, served only through the bridge release) and `/api/v2` (the stable 1.0 target and the
+  native API going forward). See "API contract rules" below.
 
 ## Priorities
 

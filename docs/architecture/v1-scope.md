@@ -35,8 +35,10 @@ amendment process in item 3 does not exist yet. Each removal is still recorded h
 tell a deliberate decision from a violation.
 
 Each entry names what goes, why waiting is worse, and the design that decided it. **Every removal
-listed here must have shipped before the scope locks.** One still outstanding at lock loses its
-justification and falls back to the Deprecation/Sunset flow like anything else.
+listed here must have shipped before the scope locks.** One still outstanding at lock needs no
+deprecation window: the route simply rides the frozen `/api/v1` bridge surface until the
+retirement tombstone removes it with everything else, and its successor shape is decided in the v2
+migration ledger.
 
 | Removed | Release | Rationale |
 |---|---|---|

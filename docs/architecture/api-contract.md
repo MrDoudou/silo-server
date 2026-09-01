@@ -353,9 +353,18 @@ existing five-minute maximum. It is never broadened to `/`.
 
 ### Discovery and capability detection
 
-`GET /api/v2/system/info` is always registered and usable before profile selection. It exposes at
-least the server build version, API major, contract digest, and links to capability documents.
-The exact response schema is part of the foundation contract.
+`GET /api/v2/system/info` is always registered, unauthenticated, and usable before login or
+profile selection. It exposes at least the server build version, API major, contract digest, and
+links to capability documents. The response is bounded — a small fixed document with no
+per-request, per-account, or deployment-topology detail — and carries an explicit reviewed cache
+policy rather than silently inheriting the structured default. The exact response schema, its
+bound, and its cache directives are part of the foundation contract.
+
+Exposing the server build version and contract digest before authentication is a deliberate,
+reviewed decision. An updated client must be able to tell a v2 server from a v1-only alpha server
+before it holds a credential, and version obscurity is not a control Silo relies on. That trade is
+accepted for these fields only; the endpoint carries nothing else an unauthenticated caller should
+not see.
 
 Clients use capability documents to decide whether a feature exists. The server version and
 contract digest are for diagnostics, support, cache identity, and last-resort compatibility
@@ -727,57 +736,59 @@ The 1.0 cutover closes after the homogeneous fleet, root probes, v2 client smoke
 external integrations, and v1 tombstone isolation all pass. The bridge artifact may remain
 downloadable without becoming another supported API line or implying a guaranteed downgrade path.
 
-## Legacy native behavioral and performance baseline
+## Tiered legacy native behavior and performance baseline
 
-Before section conversion begins, Silo records the complete legacy native surface as migration
-evidence, across the API, proxy, and transcode-node listeners. This is broader than saving example
-JSON. Every inventory row identifies observable behavior cases for status and headers, data
-meaning, field presence/nullability, authorization, sorting, filtering, pagination, error
-behavior, and relevant raw-protocol behavior. V2 is not required to reproduce pre-1.0 bytes or
-accidental alpha shapes, but every deliberate difference is recorded in the migration ledger and
-the v2 case must prove the intended product behavior.
+The route and consumer inventory is exhaustive; behavioral baselining is not. Recording every
+observable case of every legacy native route would spend the migration budget documenting alpha
+behavior that v2 is free to redesign. Baselining is therefore tiered.
 
-Inventory also searches repository-wide path literals, regular expressions, and route classifiers,
-not only handler registrations. API-key scope checks, demo mutation guards, compression/sendfile
-exclusions, request/activity logging, telemetry labels, compatibility URL builders, and other
-internal consumers move to stable operation or route metadata where practical and receive parity
-tests. A registered-route ledger that leaves stale middleware patterns behind is incomplete.
+Tier 1 is the release-critical flows — login, setup, profiles, browse/search, playback lifecycle,
+progress, settings, notifications, downloads, and core admin — plus every `ported`-disposition
+ledger row whose wire fidelity matters to a shipping client. Each tier-1 row carries a scenario
+catalog of executable assertions covering its applicable status and header behavior, data meaning,
+field presence and nullability, authorization, sorting, filtering, pagination, error behavior, and
+relevant raw-protocol behavior. Those catalogs prioritize the risky wire shapes: anonymous maps,
+`json.RawMessage`, custom marshalers, timestamps, nullable and optional fields, empty collections,
+multipart bodies, redirects, ranges, and every distinct error code, status, and header combination.
+Every other route defines its v2 behavior fresh in its own section PR with ordinary tests; there is
+no obligation to first document what its alpha predecessor did. V2 is never required to reproduce
+pre-1.0 bytes or accidental alpha shapes. A tier-1 section either proves the intended product
+behavior or records a reviewed intentional difference in the migration ledger.
 
-The baseline has two complementary modes:
+Inventory itself stays exhaustive and searches repository-wide path literals, regular expressions,
+and route classifiers, not only handler registrations. API-key scope checks, demo mutation guards,
+compression/sendfile exclusions, request/activity logging, telemetry labels, compatibility URL
+builders, and other internal consumers move to stable operation or route metadata where practical
+and receive parity tests. A registered-route ledger that leaves stale middleware patterns behind is
+incomplete.
 
-- A read-only, rate-bounded observation run exercises every safe operation and scenario available
-  on the current live pre-1.0 deployment. It uses dedicated test identities where needed and combines
-  normalized responses with server telemetry to record real response shapes, payload sizes, and
-  latency distributions. It does not load-test the live service or invoke destructive, externally
-  visible, or unsafe mutations. Unavailable capability/configuration variants are marked
-  unobserved rather than silently treated as covered.
-- A controlled bridge run exercises the legacy native surface and v2 against the same
-  release-candidate build,
-  representative non-sensitive dataset, configuration, cache state, and concurrency. Mutations,
-  negative/error cases, races, and sustained load run here. This same-environment comparison, not
-  a comparison between unrelated production and test hosts, supplies the quantitative regression
-  evidence.
+Every comparison run happens in one controlled bridge environment. The legacy native surface and v2
+are exercised against the same candidate build, representative non-sensitive dataset,
+configuration, cache state, and concurrency, covering mutations, negative and error cases, races,
+cold and warm cache states, and load. That same-environment comparison — not a comparison between
+unrelated production and test hosts — supplies the regression evidence. There is no
+live-deployment observation harness, no raw production capture, and no custody process to go with
+them. All committed evidence is synthetic: scenario definitions, deterministic synthetic fixtures
+and assertions, and measurements from the controlled environment. A live response is never
+converted into a committed fixture.
 
-Live response bodies and telemetry may contain private account, path, host, library, or media
-information. Raw captures remain access-controlled migration artifacts outside Git and are
-deleted when their diagnostic purpose ends. Only sanitized aggregate measurements, scenario
-definitions, and deterministic synthetic fixtures/assertions are committed. Production captures
-are never promoted into contract fixtures.
+Behavior checks assert domain outcomes rather than wire equality. For example, a recently released
+catalog query proves ordering by the intended release value, direction, null placement, stable
+tie-breaker, access filtering, and pagination without duplicates or gaps. Catalog scenarios cover
+each sort field in both directions, each filter independently, and a curated set of representative
+and pathological combinations — null-heavy sorts with pagination, filters with tie-breakers, empty
+results with cursors — plus empty, sparse, and large result sets. An intentional v2 correction
+records the previous behavior, the new expected behavior, and its rationale in the ledger.
 
-Behavior checks assert domain outcomes rather than wire equality. For example, a recently
-released catalog query proves ordering by the intended release value, direction, null placement,
-stable tie-breaker, access filtering, and pagination without duplicates or gaps. Equivalent cases
-cover every supported sort/filter combination and the semantics of counts and cursors. An
-intentional v2 correction records the old observation, the new expected behavior, and its
-rationale.
-
-Every operation receives a baseline disposition and a safe response/latency check where one is
-meaningful. Hot catalog and other high-volume JSON paths additionally record p50/p95/p99 latency,
-throughput, response size, allocations, and database-query behavior under controlled cold/warm
-cache and representative concurrency cases. Streaming and byte delivery use protocol throughput
-tests because they bypass Huma. A repeatable regression is investigated; the program-wide
-quantitative threshold is fixed before v2 measurements are used for acceptance, and sections may
-adopt stricter budgets.
+Performance evidence is scoped to a named hot-path list: catalog list/search, home sections,
+playback start/replan, progress writes, and jellycompat browse. Those paths record p50/p95/p99
+latency, throughput, response size, allocations, and database-query behavior at representative
+concurrency under controlled cold and warm cache states. Other operations rely on the correctness
+tests in their section PR. Streaming and byte delivery are measured separately with protocol
+throughput tests because they bypass Huma. A repeatable regression is investigated; the
+program-wide quantitative threshold and hot-path budgets are agreed before any v2 measurements
+are taken, so results cannot be rationalized after the fact, and sections may adopt stricter
+budgets.
 
 ## Evolution policy
 
@@ -821,8 +832,10 @@ The v2 contract may lock only when all of the following are true:
 - no first-party client contains a legacy native transport path in its release build;
 - the new-client/v1-only-alpha update-required, new-client/bridge, new-client/1.0,
   old-client/bridge, and old-client/1.0-tombstone cases have been tested;
-- compatibility listeners, plugin RPC, streaming/range behavior, WebSockets, auth boundaries,
-  request limits, and the complete native behavior/performance baseline have regression evidence;
+- compatibility listeners, plugin RPC, streaming/range behavior, WebSockets, auth boundaries, and
+  request limits have regression evidence; every tier-1 scenario catalog passes or records its
+  reviewed intentional difference, and every named hot path passes the agreed
+  controlled-environment performance budgets;
 - repository-wide legacy path literals and classifiers are migrated or explicitly retained, with
   API-key scope, demo guard, compression/sendfile, logging/activity, telemetry, and compatibility
   URL-builder parity proven;

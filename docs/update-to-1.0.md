@@ -11,9 +11,16 @@ listeners. Silo does not retain aliases for either class after cutover. A fresh 
 recommended where practical. Existing installations use a maintenance window; zero-downtime
 alpha-to-1.0 upgrades are not supported.
 
+1.0 is not reachable directly from an arbitrary alpha build. Existing installations update
+0.x → the final bridge release → 1.0. The bridge is the last release that carries the full
+historical migration chain, the Go data migrations, and the one-way SQLite-to-Postgres per-user
+store import. Silo 1.0 ships one squashed schema baseline behind a guard that accepts only an
+empty database or a database left at exactly the bridge's final migration version; anything else
+refuses to start and tells the administrator to update to the bridge first.
+
 Silo's general release policy requires a verified backup before every upgrade and does not
 guarantee downgrade or in-place rollback compatibility between releases. See
-[release versioning](release-versioning.md). The 1.0 procedure below follows
+[release versioning](release-versioning.md#backups-and-rollback). The 1.0 procedure below follows
 that same rule rather than creating a special downgrade promise.
 
 The architecture and rationale are recorded in
@@ -51,10 +58,13 @@ root `/health` and `/ready` paths. Update deployment and load-balancer configura
 
 - [ ] Read the release-specific notes and confirm that the server, database, Redis, object
   storage, reverse proxy, and remote-node versions are supported together.
+- [ ] Confirm the deployment is running the final pre-1.0 bridge release and that its database
+  migrations have finished before deploying 1.0. The 1.0 startup guard refuses a database that has
+  not reached the bridge's final migration version.
 - [ ] Back up PostgreSQL using the deployment's normal tested procedure, and verify that the
   backup can be restored.
 - [ ] Preserve the current server configuration, secret material, deployment manifests, and the
-  exact pre-1.0 server image or binary needed for the documented recovery procedure.
+  exact bridge server image or binary needed for the documented recovery procedure.
 - [ ] Record the public Silo URL and every reverse-proxy or load-balancer route that refers to
   `/api/v1`, `/stream`, `/downloads`, `/transcode`, or another alpha-native path named by the
   release ledger.
@@ -76,27 +86,31 @@ root `/health` and `/ready` paths. Update deployment and load-balancer configura
 
 ## Perform the update
 
-1. Stop or drain the entire alpha deployment according to the release-specific instructions,
+1. If the deployment is not already on the final bridge release, update to the bridge first,
+   following its own release notes, and let its database migrations finish. Verify the bridge is
+   healthy before continuing; 1.0 accepts only a database left at the bridge's final migration
+   version.
+2. Stop or drain the entire alpha deployment according to the release-specific instructions,
    including every API replica and remote playback/transcode node.
-2. Deploy the matching Silo 1.0 API, proxy, and worker components and run only the documented
+3. Deploy the matching Silo 1.0 API, proxy, and worker components and run only the documented
    database migration procedure. An incompatible node must remain unschedulable.
-3. Change operational checks to `GET /health` and `GET /ready`; do not leave probes pointed at
+4. Change operational checks to `GET /health` and `GET /ready`; do not leave probes pointed at
    `/api/v1/health` or `/api/v1/ready`.
-4. Update the bundled web deployment and all first-party native clients to their matching 1.0
+5. Update the bundled web deployment and all first-party native clients to their matching 1.0
    builds.
-5. Existing login sessions, refresh tokens, profile security state, and API keys remain valid
+6. Existing login sessions, refresh tokens, profile security state, and API keys remain valid
    until normal expiry or revocation. Sign in again only when the normal session flow requires it.
    Opening plugin content through 1.0 reissues its separate five-minute access cookie on the v2
    path.
-6. Open each integration in the 1.0 administration UI, regenerate or copy its new callback URL,
+7. Open each integration in the 1.0 administration UI, regenerate or copy its new callback URL,
    and save that URL in the external service. Rotate a token or secret when the UI offers that
    operation.
-7. Reconnect OAuth-backed authentication or notification integrations so the provider records the
+8. Reconnect OAuth-backed authentication or notification integrations so the provider records the
    1.0 callback URL.
-8. Open every installed plugin page through the 1.0 UI. Refresh or reinstall a plugin when its
+9. Open every installed plugin page through the 1.0 UI. Refresh or reinstall a plugin when its
    own release notes require a version compatible with Silo 1.0.
-9. Restart downloads and playback instead of attempting to resume an alpha-issued URL.
-10. Resend any pre-1.0 tokenized email action that still needs to be completed.
+10. Restart downloads and playback instead of attempting to resume an alpha-issued URL.
+11. Resend any pre-1.0 tokenized email action that still needs to be completed.
 
 ## Integration checklist
 
@@ -108,7 +122,7 @@ release candidate is promoted.
 | Autoscan | `/api/v1/autoscan/webhooks/{token}` | Generate the 1.0 webhook URL and replace it in Sonarr/Radarr | Trigger a test import and observe one accepted event |
 | Plex sync | `/api/v1/plex-sync/webhooks/{secret}` | Regenerate or copy the 1.0 receiver URL into Plex | Send a test webhook and confirm history changes once |
 | Webhook sync | `/api/v1/webhook-sync/webhooks/{secret}` | Replace the external receiver URL, rotating the secret if offered | Confirm delivery and profile mapping |
-| OAuth/auth plugin | `/api/v1/auth/oauth/{installation_id}/callback` | Reconnect the provider using the callback shown by 1.0 | Complete a new authorization and sign-in flow |
+| OAuth/auth plugin | `/api/v1/auth/oauth/{install_id}/callback` | Reconnect the provider using the callback shown by 1.0 | Complete a new authorization and sign-in flow |
 | Discord link | `/api/v1/notifications/discord/link/callback` | Start a new link operation from 1.0 | Complete the callback and send a test notification |
 | Tokenized email | `/api/v1/notifications/email/...` | Resend the action from 1.0 | Open the newly sent link successfully |
 | Downloads | `/api/v1/downloads/...` control plus `/downloads/file/{token}` and node artifact paths | Restart unfinished downloads and use only URLs issued by 1.0 | Verify `HEAD`, ranged transfer, manifest, artwork, and subtitles |
@@ -136,10 +150,12 @@ release candidate is promoted.
 
 ## Recovery preparation
 
-Keep the immutable bridge release, its exact configuration, the matching client builds, and the
-verified pre-update database backup until the 1.0 validation checklist passes. Silo does not
-guarantee that the bridge can read a database migrated or written by 1.0. Unless the release notes
-explicitly certify that exact combination, the recovery procedure is:
+The preserved pre-1.0 artifact is the bridge release itself — the version the deployment ran
+immediately before 1.0 — not an arbitrary earlier alpha build. Keep that immutable bridge image or
+binary, its exact configuration, the matching client builds, and the verified pre-update database
+backup until the 1.0 validation checklist passes. Silo does not guarantee that the bridge can read
+a database migrated or written by 1.0. Unless the release notes explicitly certify that exact
+combination, the recovery procedure is:
 
 1. Stop every 1.0 API, proxy, and worker component.
 2. Restore the complete pre-upgrade database and matching configuration.
@@ -159,5 +175,7 @@ Before Silo 1.0 ships, the release owner must:
 - add any affected plugin, worker, proxy, email, or external-integration class found during the
   migration;
 - validate the checklist against a representative upgraded deployment and a fresh deployment;
+- exercise the 0.x → bridge → 1.0 path on a real upgraded database, including the 1.0 migration
+  guard's refusal of a database that has not reached the bridge's final migration version;
 - link this guide from the release notes, server update messaging, and client update-required
   error presentation.
