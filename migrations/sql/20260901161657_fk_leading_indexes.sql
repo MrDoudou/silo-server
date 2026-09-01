@@ -24,25 +24,67 @@
 --     AND NOT EXISTS (
 --       SELECT 1 FROM pg_index i
 --       WHERE i.indrelid = con.conrelid AND i.indkey[0] = con.conkey[1]
+--         AND i.indpred IS NULL
 --     );
 --
--- conkey[1] and indkey[0] are the point: a column that only appears second in a
--- composite index (or is covered only by a partial index whose predicate does
--- not span the rows the cascade touches) does not satisfy the reference check,
--- while a column that leads any existing primary key, unique constraint, or
--- plain index already does and is deliberately absent below.
+-- conkey[1], indkey[0] and indpred are the three points. A column that only
+-- appears second in a composite index does not satisfy the reference check.
+-- Neither does a column that leads only a PARTIAL index: the planner may use
+-- such an index for the check only when the predicate provably holds for the
+-- rows being proved absent, so the audit refuses to count partial indexes at
+-- all (indpred IS NULL) and any exception is argued per case below rather than
+-- assumed. A column that leads a total primary key, unique constraint, or plain
+-- index already satisfies the check and is deliberately absent from the list.
 --
--- 45 columns come from the constraints that already existed; the remaining 10
+-- 47 columns come from the constraints that already existed; the remaining 10
 -- are columns that 20260901161700_user_fk_integrity constrains in this same
 -- release and that had no leading index either. The other seven columns it
--- constrains already lead an index: five a primary key or plain index, and two
--- -- auth_sessions.impersonator_user_id and activity_log.impersonator_user_id --
--- a partial index whose predicate is exactly "IS NOT NULL", which is precisely
--- the row set an ON DELETE action visits. None of those is duplicated here.
+-- constrains already lead an index -- five a primary key or plain index, two a
+-- partial one covered by the review below -- and are not duplicated here.
+--
+-- Two of the 47 lead a partial index and would have escaped a laxer audit that
+-- counted any leading index as coverage. They are here because their predicate
+-- turns on a column OTHER than the referencing one, so it excludes rows the
+-- cascade must still visit:
+--
+--   * watch_provider_scrobble_sessions.connection_id -- its primary key is
+--     (playback_session_id, connection_id), so connection_id is second there,
+--     and idx_watch_provider_scrobble_sessions_open leads on connection_id but
+--     is restricted to WHERE stop_sent_at IS NULL. The CASCADE from
+--     watch_provider_connections has to visit ENDED sessions too, and those are
+--     exactly the rows that index excludes. Nothing deletes them on a schedule,
+--     so they accumulate for the life of the deployment and every provider
+--     disconnect seq-scans the pile.
+--   * page_sections.library_id -- idx_page_sections_library leads on library_id
+--     but is restricted to WHERE enabled = true AND library_id IS NOT NULL, so
+--     the CASCADE from media_folders cannot use it for disabled sections. The
+--     table holds a few rows per library, so the plain index below costs almost
+--     nothing; it is here to keep the rule uniform rather than to fix a hot
+--     path.
+--
+-- Re-running the audit above after this migration still returns nine distinct
+-- table/column pairs (plus one row per activity_log partition, which inherits
+-- the parent's constraint and partial index and is covered by the same
+-- argument; the partition count grows weekly), and all nine are the documented
+-- exception rather than a miss. Every one of them
+-- leads a partial index whose predicate is exactly "<that same column> IS NOT
+-- NULL", which every cascade-relevant row satisfies by definition: a child row
+-- matching a parent key cannot have a NULL in the referencing column. The index
+-- therefore covers the whole row set the action visits.
+--
+--   activity_log.impersonator_user_id, auth_sessions.impersonator_user_id
+--     (constrained by 20260901161700 in this release)
+--   episode_libraries.first_seen_scan_run_id, history_import_runs.mapping_id,
+--   marker_edit_audit.user_id, media_files.episode_id, media_files.extra_id,
+--   media_files.first_seen_scan_run_id,
+--   push_delivery_attempts.notification_delivery_id
+--
+-- Any future addition to that list needs the same argument written down; the
+-- default answer for a partial index is that it does not count.
 --
 -- Every index is built CONCURRENTLY and this migration runs outside a
 -- transaction: a plain CREATE INDEX takes a SHARE lock that blocks all writes
--- to the table for the length of the build, and this builds 55 of them. The
+-- to the table for the length of the build, and this builds 57 of them. The
 -- cost is that a CONCURRENTLY build which fails leaves an invalid index behind,
 -- so the block below drops any invalid leftovers from an earlier attempt before
 -- rebuilding -- the same recovery the existing concurrent-index migrations do,
@@ -97,6 +139,7 @@ BEGIN
               'idx_notification_deliveries_release_event_id',
               'idx_notification_discord_link_state_user_id',
               'idx_notification_webhooks_user_id',
+              'idx_page_sections_library_id',
               'idx_playback_route_events_user_id',
               'idx_playback_sessions_sync_user_id',
               'idx_playback_v3_attempts_effective_media_file_id',
@@ -112,6 +155,7 @@ BEGIN
               'idx_user_profile_allowed_libraries_library_id',
               'idx_watch_provider_auth_sessions_user_id',
               'idx_watch_provider_connections_user_id',
+              'idx_watch_provider_scrobble_sessions_connection_id',
               'idx_watch_together_rooms_host_user_id',
               'idx_watch_together_suggestions_suggester_user_id',
               'idx_web_push_subscriptions_user_id'
@@ -234,6 +278,12 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_discord_link_state_user
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_webhooks_user_id
     ON public.notification_webhooks (user_id);
 
+-- page_sections.library_id: idx_page_sections_library leads on this column but
+-- is partial (WHERE enabled = true AND library_id IS NOT NULL), so it cannot
+-- serve the CASCADE from media_folders for disabled sections.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_page_sections_library_id
+    ON public.page_sections (library_id);
+
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_playback_route_events_user_id
     ON public.playback_route_events (user_id);
 
@@ -279,6 +329,13 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_watch_provider_auth_sessions_user_id
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_watch_provider_connections_user_id
     ON public.watch_provider_connections (user_id);
 
+-- watch_provider_scrobble_sessions.connection_id: second in the primary key,
+-- and the only index leading on it is partial (WHERE stop_sent_at IS NULL).
+-- Ended sessions are never swept, so the CASCADE from watch_provider_connections
+-- seq-scans an ever-growing table on every provider disconnect.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_watch_provider_scrobble_sessions_connection_id
+    ON public.watch_provider_scrobble_sessions (connection_id);
+
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_watch_together_rooms_host_user_id
     ON public.watch_together_rooms (host_user_id);
 
@@ -289,11 +346,12 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_web_push_subscriptions_user_id
     ON public.web_push_subscriptions (user_id);
 
 -- +goose Down
--- Drop the 55 indexes again. Nothing else in the schema depends on them: the
+-- Drop the 57 indexes again. Nothing else in the schema depends on them: the
 -- foreign keys they serve remain valid, they just go back to scanning.
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_web_push_subscriptions_user_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_watch_together_suggestions_suggester_user_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_watch_together_rooms_host_user_id;
+DROP INDEX CONCURRENTLY IF EXISTS public.idx_watch_provider_scrobble_sessions_connection_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_watch_provider_connections_user_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_watch_provider_auth_sessions_user_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_user_profile_allowed_libraries_library_id;
@@ -309,6 +367,7 @@ DROP INDEX CONCURRENTLY IF EXISTS public.idx_playback_v3_attempts_requested_medi
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_playback_v3_attempts_effective_media_file_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_playback_sessions_sync_user_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_playback_route_events_user_id;
+DROP INDEX CONCURRENTLY IF EXISTS public.idx_page_sections_library_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_notification_webhooks_user_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_notification_discord_link_state_user_id;
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_notification_deliveries_release_event_id;
