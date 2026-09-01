@@ -63,6 +63,11 @@ root `/health` and `/ready` paths. Update deployment and load-balancer configura
   not reached the bridge's final migration version.
 - [ ] Back up PostgreSQL using the deployment's normal tested procedure, and verify that the
   backup can be restored.
+- [ ] If `userdb.backend=sqlite` is configured, back up the local SQLite user store at
+  `/var/lib/silo/userdb` with the same care and verify it can be restored. The bridge's one-way
+  SQLite-to-Postgres import reads this data; losing the directory loses profiles and per-user
+  state. Confirm the path is persisted by the deployment — the default Compose file does not
+  persist it (see the deployment guide).
 - [ ] Preserve the current server configuration, secret material, deployment manifests, and the
   exact bridge server image or binary needed for the documented recovery procedure.
 - [ ] Record the public Silo URL and every reverse-proxy or load-balancer route that refers to
@@ -158,7 +163,8 @@ a database migrated or written by 1.0. Unless the release notes explicitly certi
 combination, the recovery procedure is:
 
 1. Stop every 1.0 API, proxy, and worker component.
-2. Restore the complete pre-upgrade database and matching configuration.
+2. Restore the complete pre-upgrade database and matching configuration, including the
+   `/var/lib/silo/userdb` SQLite user store when `userdb.backend=sqlite` was in use.
 3. Redeploy the preserved bridge image or binary and its matching components.
 4. Verify the restored deployment before allowing users or background work to resume.
 
