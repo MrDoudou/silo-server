@@ -78,9 +78,10 @@ func TestWidenCoreIDsMigrationContract(t *testing.T) {
 		last = at
 	}
 
-	// The guard covers the same three tables, checks both the stored ids and
-	// the identity sequence position against the int4 ceiling, and names the
-	// offender. Silent truncation is the failure mode being pinned out.
+	// The guard covers the same three tables, checks the stored ids against
+	// both ends of the int4 range and the identity sequence position against
+	// the ceiling, and names the offender. Silent truncation is the failure
+	// mode being pinned out.
 	got := targetsArray(t, down, "targets text[]")
 	if len(got) != len(widenedParents) {
 		t.Fatalf("down guard covers %d tables, contract lists %d", len(got), len(widenedParents))
@@ -91,8 +92,9 @@ func TestWidenCoreIDsMigrationContract(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"SELECT max(id) FROM public.%I",
+		"SELECT min(id), max(id) FROM public.%I",
 		"IF max_id > 2147483647 THEN RAISE EXCEPTION",
+		"IF min_id < -2147483648 THEN RAISE EXCEPTION",
 		"SELECT last_value FROM %s",
 		"IF seq_pos > 2147483647 THEN RAISE EXCEPTION",
 	} {

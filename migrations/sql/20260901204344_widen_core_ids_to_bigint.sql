@@ -26,13 +26,15 @@
 -- the altered column, which takes ACCESS EXCLUSIVE on each referencing table
 -- as well and revalidates each constraint with one sequential scan of the
 -- child. Verified on the same scratch database: the users ALTER holds ACCESS
--- EXCLUSIVE on all 97 relations (tables and partitions) that reference users,
--- and pg_stat_user_tables shows seq_scan = 1 / seq_tup_read = <row count> on
--- each child (5000 seeded user_profiles rows read once), while every child's
--- relfilenode is unchanged -- read, never rewritten. So the window is the
--- three rewrites plus one pass over every referencing table, and nothing can
--- read or write any of those tables until the transaction commits. Treat it
--- as a full-schema outage, not a three-table one.
+-- EXCLUSIVE on every relation (table or partition) that references users --
+-- the count varies by install because activity_log and operational_logs are
+-- date-partitioned -- and pg_stat_user_tables shows seq_scan = 1 /
+-- seq_tup_read = <row count> on each child (5000 seeded user_profiles rows
+-- read once), while every child's relfilenode is unchanged -- read, never
+-- rewritten. So the window is the three rewrites plus one pass over every
+-- referencing table, and nothing can read or write any of those tables until
+-- the transaction commits. Treat it as a full-schema outage, not a
+-- three-table one.
 --
 -- ALTER COLUMN ... TYPE on an identity column retypes the owned sequence in
 -- the same statement: pg_sequences.data_type goes integer -> bigint and
@@ -79,11 +81,24 @@
 --     media_intro_fingerprints, movie_match_queue. All small next to
 --     media_files itself.
 --
--- Beyond the FKs, 21 plain integer columns hold one of these ids without a
--- constraint (users.library_ids integer[], access_groups.library_ids,
--- invitations.library_ids, *_availability.library_id, user_watch_progress.
--- last_file_id, playback_sessions_sync.media_file_id, ...); they carry the
--- same int4 ceiling and belong in the same child sweep.
+-- Beyond the FKs, a number of plain integer columns hold one of these ids
+-- without a constraint -- users.library_ids integer[], access_groups.
+-- library_ids, invitations.library_ids, the *_availability.library_id
+-- columns, user_watch_progress.last_file_id, playback_sessions_sync.
+-- media_file_id, and others found by grepping for *_id / *_ids integer
+-- columns; they carry the same int4 ceiling and belong in the same child
+-- sweep.
+--
+-- Four advisory-lock sites in Go also narrow users.id to int4 and belong in
+-- that sweep, not here: internal/userstore/pgstore/preference_settings_tx.go
+-- (Go int32(s.userID), which wraps silently so two accounts 2^32 apart would
+-- share a lock key) and the $2::int4 casts in internal/requests/repository.go,
+-- internal/diagnostics/repo.go and internal/subtitles/ai/pgrepo.go (which
+-- error with "integer out of range"). All are unreachable today because every
+-- integer child of users blocks such an account from existing. When the
+-- children widen, switch each to the single-bigint form
+-- pg_advisory_xact_lock($1::bigint) with the namespace folded into the key
+-- (e.g. hashtext(namespace) or namespace << 32 | user_id).
 --
 -- The three tables are altered in one transaction (goose's default), so a
 -- failure part-way leaves all three integer. Order is smallest first so a
@@ -97,26 +112,33 @@ ALTER TABLE public.media_files ALTER COLUMN id TYPE bigint;
 -- +goose StatementBegin
 -- Narrow the three columns back to integer -- the same rewrite in the other
 -- direction, with the same locks -- but only if every stored id and every
--- sequence position still fits. A value above 2147483647 is refused with a
--- message naming the table and the value, before any ALTER runs, so a
--- rollback can never truncate an id or leave a sequence that cannot be
--- retyped. (Postgres would also reject the ALTER itself with "integer out of
--- range" / "RESTART value cannot be greater than MAXVALUE", but only after
--- starting the copy and without saying which row.) Children are not touched:
--- an integer child referencing an integer parent is where the Up started, and
--- the bigint children were bigint before this migration.
+-- sequence position still fits. A value outside the integer range (above
+-- 2147483647 or below -2147483648; the identity column is BY DEFAULT, so a
+-- negative id can be inserted explicitly) is refused with a message naming
+-- the table and the value, before any ALTER runs, so a rollback can never
+-- truncate an id or leave a sequence that cannot be retyped. (Postgres would
+-- also reject the ALTER itself with "integer out of range" / "RESTART value
+-- cannot be greater than MAXVALUE", but only after starting the copy and
+-- without saying which row.) Children are not touched: an integer child
+-- referencing an integer parent is where the Up started, and the bigint
+-- children were bigint before this migration.
 DO $$
 DECLARE
     target text;
+    min_id bigint;
     max_id bigint;
     seq_pos bigint;
     targets text[] := ARRAY['media_folders', 'users', 'media_files'];
 BEGIN
     FOREACH target IN ARRAY targets LOOP
-        EXECUTE format('SELECT max(id) FROM public.%I', target) INTO max_id;
+        EXECUTE format('SELECT min(id), max(id) FROM public.%I', target) INTO min_id, max_id;
         IF max_id > 2147483647 THEN
             RAISE EXCEPTION 'widen_core_ids_to_bigint down: public.%.id holds % which does not fit integer; remove or renumber the row before rolling back',
                 target, max_id;
+        END IF;
+        IF min_id < -2147483648 THEN
+            RAISE EXCEPTION 'widen_core_ids_to_bigint down: public.%.id holds % which does not fit integer; remove or renumber the row before rolling back',
+                target, min_id;
         END IF;
         EXECUTE format('SELECT last_value FROM %s', pg_get_serial_sequence('public.' || quote_ident(target), 'id')) INTO seq_pos;
         IF seq_pos > 2147483647 THEN
