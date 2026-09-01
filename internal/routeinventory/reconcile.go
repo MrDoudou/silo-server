@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -39,10 +40,11 @@ func Observed(router chi.Routes) ([]string, error) {
 // not claim, sorted. An empty result means the running router is fully
 // accounted for.
 //
-// The check is deliberately one-directional. The inventory is expected to hold
-// more routes than any single wiring registers — that is the point of building
-// it from source — so an inventory row with no runtime counterpart is not an
-// error.
+// The check is one-directional because a listener with conditionally
+// registered routes holds more rows than any single wiring can register — that
+// is the point of building it from source. Use ReconcileExact for a listener
+// whose rows are all unconditional, where a row with no runtime counterpart is
+// a phantom.
 func (inv *Inventory) Reconcile(listener string, observed []string) []string {
 	claimed := inv.RuntimeKeys(listener)
 	var missing []string
@@ -53,6 +55,42 @@ func (inv *Inventory) Reconcile(listener string, observed []string) []string {
 	}
 	sort.Strings(missing)
 	return missing
+}
+
+// ReconcileExact compares a live router against the inventory in both
+// directions: every observed route must have a row, and every row must be
+// observed.
+//
+// It applies to a listener whose rows are all unconditional. For those, one
+// wiring is the whole surface, so a row with no runtime counterpart is a
+// phantom the one-directional check would let stand. Callers should assert
+// ConditionalCount is zero before relying on it.
+func (inv *Inventory) ReconcileExact(listener string, observed []string) (unledgered, unobserved []string) {
+	unledgered = inv.Reconcile(listener, observed)
+
+	seen := make(map[string]struct{}, len(observed))
+	for _, entry := range observed {
+		seen[listener+" "+entry] = struct{}{}
+	}
+	for key := range inv.RuntimeKeys(listener) {
+		if _, ok := seen[key]; !ok {
+			unobserved = append(unobserved, strings.TrimPrefix(key, listener+" "))
+		}
+	}
+	sort.Strings(unobserved)
+	return unledgered, unobserved
+}
+
+// ConditionalCount is how many of a listener's rows are registered under a
+// condition. Zero means one wiring registers the listener's whole surface.
+func (inv *Inventory) ConditionalCount(listener string) int {
+	count := 0
+	for _, route := range inv.Routes {
+		if route.Listener == listener && route.Conditional {
+			count++
+		}
+	}
+	return count
 }
 
 // LoadArtifact reads the committed inventory. dir is any directory inside the

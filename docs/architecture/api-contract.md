@@ -109,42 +109,79 @@ change without changing these canonical project URLs.
 ### Legacy native route inventory
 
 `contracts/api/v2/route-inventory.json` is the enumerated legacy native surface every later
-migration decision is measured against: the main API listener (`internal/api.NewRouter`), the
-proxy node listener (`internal/proxy.(*Server).Handler`), and the transcode node listener
-(`internal/transcodenode.(*Server).Handler`). It carries one row per method+path variant, so `GET`
-and `HEAD` on the same path, a WebSocket handshake, and a wildcard `Handle` registration are
-separate rows rather than one operation.
+migration decision is measured against. It covers four listeners:
+
+- the process root listener (`cmd/silo.newRootHandler`) — the `http.ServeMux` the primary port
+  actually serves, which answers `/metrics`, hands `/api/` to the API router, and serves the
+  frontend at `/`;
+- the main API listener (`internal/api.NewRouter`);
+- the proxy node listener (`internal/proxy.(*Server).Handler`);
+- the transcode node listener (`internal/transcodenode.(*Server).Handler`).
+
+It carries one row per method+path variant, so `GET` and `HEAD` on the same path, a WebSocket
+handshake, and a wildcard `Handle` registration are separate rows rather than one operation. The
+root listener's `/api/` rows are delegations: their `delegates_to` names the API listener, whose own
+rows are the operations behind that prefix.
 
 The inventory is generated from registration source by `cmd/route-inventory`, not by walking a
 router built with a chosen set of dependencies. Silo's native routes are registered under `if`
 guards on optional wiring, so a runtime walk only shows the routes that particular wiring
-constructed — the fully-wired test fixture registers 368 of the API listener's 691 rows. An
-inventory built from that walk would be short by a third and would not say so.
+constructed: today the fully-wired test fixture registers roughly half of the API listener's rows.
+An inventory built from that walk would be short by half and would not say so. The artifact's
+`totals` and per-listener `route_count` are the authoritative numbers; any count quoted in prose is
+a point-in-time illustration.
 
-Completeness is structural rather than diligent. A route can only be registered on a chi router
-value; within the analyzed packages such a value can only originate from `chi.NewRouter()` or a
-`chi.Router`-typed parameter; and the generator fails, rather than emitting a smaller artifact,
-when it meets any of:
+Completeness is structural rather than diligent. A route can only be registered on a router value;
+such a value can only originate from `chi.NewRouter()`, `chi.NewMux()`, `http.NewServeMux()`, a
+`chi.Router`-typed parameter, or a type assertion that recovers one of those from an interface; and
+the generator fails, rather than emitting a smaller artifact, when it meets any of:
 
-- a chi router constructed outside a declared listener or a recorded exclusion;
+- a router constructed anywhere in the repository outside a declared listener entry function or a
+  recorded exclusion. The sweep covers every Go tree in the module, and both allowances name one
+  function, so a router added beside an excluded one is still a failure. A construction at package
+  scope belongs to no function and is refused outright;
+- a second router or mux constructed inside one entry function, whose attachment the walk cannot
+  prove. Constructions are recognized by the call, not by the binding: `r := chi.NewRouter()`,
+  `var r = chi.NewRouter()`, `a, b := chi.NewRouter(), chi.NewRouter()` and
+  `r := (chi.NewRouter())` are all the same construction, and a construction the walk cannot tie to
+  exactly one name is refused rather than approximated;
+- a registration made on a listener's handler after its entry function returned it, whether the
+  handler is the receiver of the registration method or is passed as an argument. A handler value
+  may be passed only to a declared listener entry function, to `http.ListenAndServe` and its three
+  siblings, or into a parameter declared `http.Handler`; every other call is opaque to the audit and
+  refused. This tracking follows local variables within one file, including through a
+  `h.(chi.Router)` assertion; a handler carried between files through package state is outside it;
+- a call to `http.Handle` or `http.HandleFunc`, which registers on `http.DefaultServeMux`;
 - a function or closure taking a `chi.Router` that no declared listener reaches;
 - a router value flowing into a construct the generator does not model — a loop, a `switch`, a
-  struct field, or a call it cannot follow;
-- a path template or HTTP method that is not a literal or a resolvable constant.
+  struct field, a handler argument, or a call it cannot follow — and any router or mux value
+  constructed or type-asserted inside such a construct;
+- a value from a chi constructor the generator does not model, once a method is called on it;
+- a path template or HTTP method that is not a literal or a resolvable constant;
+- an `http.ServeMux` pattern that names a method. Go answers `HEAD` on a `GET /path` pattern and
+  turns other methods into `405`, so one `GET` row would understate it. Nothing registers such a
+  pattern today; modeling it is a prerequisite for the first one.
 
-`make verify-route-inventory` regenerates and byte-compares the artifact in CI. Each listener
-package additionally reconciles its real router against the artifact at test time, so an analyzer
-bug cannot drop a live route: every method+path a running router registers must have a row. The
-check is one-directional, because the artifact is expected to hold routes no single wiring
-registers.
+`make verify-route-inventory` regenerates and byte-compares the artifact in CI, and the generator
+fails on any of the above, so that gate is the guarantee. Listener packages additionally reconcile a
+real router against the artifact at test time as a backstop against an analyzer bug, limited to what
+a test fixture can construct. For the proxy and transcode node listeners, whose rows are all
+unconditional, that comparison is an equality: every observed route has a row, and every row is
+observed. For the API listener, whose rows are mostly conditional, it runs one way — every route the
+fixtures register must have a row — because routes behind dependencies the fixtures do not construct
+are covered by the generator rather than by the runtime walk.
 
 Jellyfin and Audiobookshelf are external wire contracts rather than Silo's native API, so their
-listeners are recorded as named exclusions in the artifact rather than left unlisted. A listener
-that is neither declared nor excluded fails the gate.
+router constructions are recorded as named exclusions in the artifact rather than left unlisted. A
+router that is neither declared nor excluded fails the gate.
 
 Success statuses and error codes are not derivable from registration source. They are explicitly
 null in every row and named in the artifact's `deferred_fields`; a later inventory stage fills them
-in. Nothing in the artifact is guessed.
+in. Listener, method, path, conditions, middleware chain, handler expression and method origin are
+read directly off the registration and are never inferred. Three fields sit between those two
+groups, and the artifact names them in `heuristic_fields`: `request_kind`, `response_media_kind` and
+`upgrades_websocket` are inferred from handler bodies by matching callee names and substrings, so
+they are evidence to confirm rather than facts to build on.
 
 ### Contract foundation
 

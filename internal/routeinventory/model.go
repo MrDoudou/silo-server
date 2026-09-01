@@ -36,9 +36,13 @@ const (
 
 // Route is one method+path variant registered on one listener.
 //
-// Every field is derived from the registration source. Fields that cannot be
-// derived statically are explicitly null (see Inventory.DeferredFields) rather
-// than guessed.
+// Every field is derived from the registration source. Listener, method, path,
+// conditions, middleware, handler expression and method origin are read
+// directly off the registration and are never inferred; success statuses and
+// error codes cannot be derived statically at all and are explicitly null (see
+// Inventory.DeferredFields). Between those two groups sit the fields named in
+// Inventory.HeuristicFields, which are inferred from handler bodies by name
+// matching and can be wrong.
 type Route struct {
 	Listener  string `json:"listener"`
 	Namespace string `json:"namespace"`
@@ -73,13 +77,22 @@ type Route struct {
 	Conditions  []string `json:"conditions"`
 	Conditional bool     `json:"conditional"`
 
+	// RequestKind and ResponseMediaKind are heuristic; see
+	// Inventory.HeuristicFields.
 	RequestKind       string `json:"request_kind"`
 	ResponseMediaKind string `json:"response_media_kind"`
+
+	// DelegatesTo names the listener whose surface this registration hands off
+	// to, empty for a leaf route. The root listener's `/api/` registration is a
+	// delegation: the operations behind it are the API listener's own rows, not
+	// one wildcard handler.
+	DelegatesTo string `json:"delegates_to"`
 
 	// Streams is true when the registration wraps the handler in the
 	// stream-telemetry media observer, which is the repository's own
 	// declaration that the route carries media bytes.
-	Streams           bool `json:"streams"`
+	Streams bool `json:"streams"`
+	// UpgradesWebSocket is heuristic; see Inventory.HeuristicFields.
 	UpgradesWebSocket bool `json:"upgrades_websocket"`
 
 	// MethodOrigin records how the method variant was produced: "explicit" for
@@ -126,10 +139,14 @@ type MiddlewareChain struct {
 
 // Inventory is the committed artifact.
 type Inventory struct {
-	SchemaVersion    int               `json:"schema_version"`
-	Generator        string            `json:"generator"`
-	Description      string            `json:"description"`
-	DeferredFields   []string          `json:"deferred_fields"`
+	SchemaVersion  int      `json:"schema_version"`
+	Generator      string   `json:"generator"`
+	Description    string   `json:"description"`
+	DeferredFields []string `json:"deferred_fields"`
+	// HeuristicFields are the row fields inferred from handler bodies rather
+	// than read off the registration. They are named here so no reader mistakes
+	// them for the same grade of evidence as the rest of the row.
+	HeuristicFields  []string          `json:"heuristic_fields"`
 	Exclusions       []string          `json:"excluded_listeners"`
 	Listeners        []Listener        `json:"listeners"`
 	Totals           Totals            `json:"totals"`

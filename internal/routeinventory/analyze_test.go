@@ -14,11 +14,48 @@ func fixtureConfig(name string) Config {
 			ID:          "fixture",
 			Description: "analyzer fixture",
 			Dir:         "listener",
-			Func:        chiNewRouter,
+			Func:        "NewRouter",
 		}},
 		AuditDirs: []string{"listener"},
 		ScanRoots: []string{"."},
 	}
+}
+
+// servemuxFixtureConfig declares both halves of the root-listener shape: a chi
+// listener and the http.ServeMux in front of it.
+func servemuxFixtureConfig(name string) Config {
+	return Config{
+		Root:       filepath.Join("testdata", "fixtures", name),
+		ModulePath: "example.test/fixture",
+		Listeners: []ListenerSpec{
+			{
+				ID:          "api",
+				Description: "analyzer fixture api listener",
+				Dir:         "api",
+				Func:        "NewRouter",
+			},
+			{
+				ID:          "root",
+				Kind:        ListenerKindServeMux,
+				Description: "analyzer fixture root listener",
+				Dir:         "root",
+				Func:        "newRootHandler",
+				Delegates:   map[string]string{"apiRouter": "api"},
+			},
+		},
+		AuditDirs: []string{"api", "root"},
+		ScanRoots: []string{"."},
+	}
+}
+
+// rootOnlyFixtureConfig is the ServeMux half on its own, for fixtures that have
+// no API listener beside it.
+func rootOnlyFixtureConfig(name string) Config {
+	cfg := servemuxFixtureConfig(name)
+	cfg.Listeners = cfg.Listeners[1:]
+	cfg.Listeners[0].Delegates = nil
+	cfg.AuditDirs = []string{"root"}
+	return cfg
 }
 
 func analyzeFixture(t *testing.T, name string) *Inventory {
@@ -126,23 +163,135 @@ func TestAnalyzeResolvesHandlerIdentityAndKinds(t *testing.T) {
 	t.Fatal("POST /api/v1/admin/things not found")
 }
 
+// TestAnalyzeEnumeratesNewMuxListener proves chi.NewMux is the same
+// constructor as chi.NewRouter as far as the inventory is concerned. Matching
+// only the NewRouter spelling would drop every route on a NewMux listener.
+func TestAnalyzeEnumeratesNewMuxListener(t *testing.T) {
+	inv := analyzeFixture(t, "newmux_listener")
+	for _, route := range inv.Routes {
+		if route.Method == "GET" && route.Path == "/api/v1/from-mux" {
+			return
+		}
+	}
+	t.Fatalf("GET /api/v1/from-mux missing; inventory has %d routes", len(inv.Routes))
+}
+
+// TestAnalyzeEnumeratesServeMuxListener covers the process root listener: an
+// http.ServeMux is a listener like any other, and the registrations it makes
+// directly — /metrics above all — need rows of their own.
+func TestAnalyzeEnumeratesServeMuxListener(t *testing.T) {
+	inv, err := Analyze(servemuxFixtureConfig("servemux"))
+	if err != nil {
+		t.Fatalf("analyze servemux fixture: %v", err)
+	}
+	metrics := 0
+	health := 0
+	sawDelegation := false
+	for _, route := range inv.Routes {
+		if route.Listener != "root" {
+			continue
+		}
+		switch route.Path {
+		case "/metrics":
+			metrics++
+			if route.Namespace != NamespaceOperational {
+				t.Errorf("/metrics namespace = %q, want %q", route.Namespace, NamespaceOperational)
+			}
+		case "/api/":
+			sawDelegation = true
+			if route.DelegatesTo != "api" {
+				t.Errorf("/api/ delegates_to = %q, want api", route.DelegatesTo)
+			}
+			if route.AuthClass != authDelegated {
+				t.Errorf("/api/ auth_class = %q, want %q", route.AuthClass, authDelegated)
+			}
+		case "/health":
+			health++
+		}
+		// A method-less ServeMux pattern answers every method, so every row it
+		// produces has to say it came from that and not from a chosen verb.
+		if route.MethodOrigin != "handle_all" {
+			t.Errorf("%s %s: method_origin = %q, want handle_all", route.Method, route.Path, route.MethodOrigin)
+		}
+	}
+	if metrics != len(handleAllMethods) {
+		t.Errorf("/metrics produced %d rows, want %d", metrics, len(handleAllMethods))
+	}
+	if health != len(handleAllMethods) {
+		t.Errorf("/health produced %d rows, want %d", health, len(handleAllMethods))
+	}
+	if !sawDelegation {
+		t.Error("no /api/ delegation row")
+	}
+}
+
 // TestAnalyzeRefusesHiddenRegistration is the structural guarantee: every way
 // a route could be registered outside the enumerated walk has to fail the
 // generator rather than quietly shrink the inventory.
 func TestAnalyzeRefusesHiddenRegistration(t *testing.T) {
 	cases := []struct {
 		fixture string
+		cfg     func(string) Config
 		want    string
 	}{
-		{"unreachable_helper", "never reached from a declared listener entry point"},
-		{"escaping_router", "cannot follow"},
-		{"loop_registration", "does not model"},
-		{"dynamic_pattern", "must be a string literal"},
-		{"stray_router", "outside the inventoried listeners"},
+		{fixture: "unreachable_helper", want: "never reached from a declared listener entry point"},
+		{fixture: "escaping_router", want: "cannot follow"},
+		{fixture: "loop_registration", want: "does not model"},
+		{fixture: "dynamic_pattern", want: "must be a string literal"},
+		{fixture: "stray_router", want: "outside the inventoried listeners"},
+		// chi.NewMux is a router constructor too: a stray listener built with
+		// it has to fail the same way one built with chi.NewRouter does.
+		{fixture: "stray_mux", want: "chi.NewMux() constructed in Handler outside the inventoried listeners"},
+		// A chi constructor the walk does not model may still return a router.
+		{fixture: "unmodeled_chi", want: "a chi constructor the route inventory does not model"},
+		// A second router in the entry point is attached somewhere the walk
+		// cannot prove, so its rows would claim the wrong paths. The three
+		// variants below are the same defect written in the binding forms a
+		// walk that matched only `name := chi.NewRouter()` did not recognize:
+		// each one used to be accepted, dropping /inner behind a wildcard.
+		{fixture: "second_router", want: "a second chi router is constructed"},
+		{fixture: "second_router_var", want: "a second chi router is constructed"},
+		{fixture: "second_router_multi", want: "a second chi router is constructed"},
+		{fixture: "second_router_paren", want: "a second chi router is constructed"},
+		{fixture: "package_scope_router", want: "constructed at package scope"},
+		// A listener handler passed to a call the audit cannot see into could
+		// have anything registered on it, receiver or not.
+		{fixture: "carrier_helper", want: "which the route inventory cannot see into"},
+		// A method-aware ServeMux pattern means more than the row it spells.
+		{
+			fixture: "servemux_method",
+			cfg:     rootOnlyFixtureConfig,
+			want:    "method-aware ServeMux pattern",
+		},
+		// A tracked router handed in as a handler is a mount in disguise.
+		{fixture: "router_as_handler", want: "does not model"},
+		// A registration made on the listener's handler after the entry point
+		// returned it is invisible to the walk of that entry point.
+		{fixture: "entrypoint_escape", want: "on a listener handler after its entry point returned it"},
+		// The mux of a root listener escapes into a helper.
+		{fixture: "servemux_escape", cfg: rootOnlyFixtureConfig, want: "does not model"},
+		// An exclusion covers one function, not the file it lives in.
+		{
+			fixture: "excluded_construct",
+			cfg: func(name string) Config {
+				cfg := fixtureConfig(name)
+				cfg.Exclusions = []RouterExclusion{{
+					File:   "compat/server.go",
+					Func:   "NewCompat",
+					Reason: "fixture compatibility listener",
+				}}
+				return cfg
+			},
+			want: "constructed in NewSneaky outside the inventoried listeners",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.fixture, func(t *testing.T) {
-			inv, err := Analyze(fixtureConfig(tc.fixture))
+			build := tc.cfg
+			if build == nil {
+				build = fixtureConfig
+			}
+			inv, err := Analyze(build(tc.fixture))
 			if err == nil {
 				t.Fatalf("expected a failure, got an inventory with %d routes", len(inv.Routes))
 			}
@@ -150,6 +299,24 @@ func TestAnalyzeRefusesHiddenRegistration(t *testing.T) {
 				t.Fatalf("error = %q, want it to mention %q", err.Error(), tc.want)
 			}
 		})
+	}
+}
+
+// TestAnalyzeAcceptsRecordedExclusion is the other half of the exclusion rule:
+// the construction that was actually recorded must pass.
+func TestAnalyzeAcceptsRecordedExclusion(t *testing.T) {
+	cfg := fixtureConfig("excluded_construct")
+	cfg.Root = filepath.Join("testdata", "fixtures", "excluded_construct")
+	cfg.Exclusions = []RouterExclusion{
+		{File: "compat/server.go", Func: "NewCompat", Reason: "fixture compatibility listener"},
+		{File: "compat/server.go", Func: "NewSneaky", Reason: "fixture second listener, also recorded"},
+	}
+	inv, err := Analyze(cfg)
+	if err != nil {
+		t.Fatalf("recorded exclusions should pass: %v", err)
+	}
+	if len(inv.Exclusions) != 2 {
+		t.Fatalf("exclusions = %v, want both recorded in the artifact", inv.Exclusions)
 	}
 }
 
@@ -212,6 +379,31 @@ func TestReconcileDetectsSeededDiscrepancy(t *testing.T) {
 	missing = inv.Reconcile(ListenerAPI, []string{"POST /api/v1/auth/login"})
 	if len(missing) != 1 {
 		t.Fatalf("missing = %v, want the dropped row to be reported", missing)
+	}
+}
+
+// TestReconcileExactCatchesPhantomRows covers the direction the one-way check
+// cannot: for a listener with no conditional rows, a row nothing registers is
+// an invention, not a surplus.
+func TestReconcileExactCatchesPhantomRows(t *testing.T) {
+	inv := &Inventory{Routes: []Route{
+		{Listener: ListenerProxy, Method: "GET", Path: "/healthz"},
+		{Listener: ListenerProxy, Method: "GET", Path: "/phantom"},
+	}}
+	if count := inv.ConditionalCount(ListenerProxy); count != 0 {
+		t.Fatalf("conditional count = %d, want 0", count)
+	}
+	unledgered, unobserved := inv.ReconcileExact(ListenerProxy, []string{"GET /healthz", "GET /extra"})
+	if len(unledgered) != 1 || unledgered[0] != "GET /extra" {
+		t.Errorf("unledgered = %v, want the route with no row", unledgered)
+	}
+	if len(unobserved) != 1 || unobserved[0] != "GET /phantom" {
+		t.Errorf("unobserved = %v, want the row nothing registers", unobserved)
+	}
+
+	inv.Routes = inv.Routes[:1]
+	if unledgered, unobserved := inv.ReconcileExact(ListenerProxy, []string{"GET /healthz"}); len(unledgered)+len(unobserved) != 0 {
+		t.Errorf("clean equality reported %v / %v", unledgered, unobserved)
 	}
 }
 

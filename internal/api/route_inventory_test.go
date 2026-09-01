@@ -14,15 +14,18 @@ import (
 	"github.com/Silo-Server/silo-server/internal/scanner"
 )
 
-// TestRouteInventoryCoversRuntimeRouter is the runtime half of the inventory
-// gate. `make verify-route-inventory` proves the committed artifact matches the
-// source analysis; this proves the source analysis matches a router that
-// actually runs, so an analyzer bug cannot quietly drop a live route.
+// TestRouteInventoryCoversRuntimeRouter is the runtime backstop for the
+// inventory gate. `make verify-route-inventory` proves the committed artifact
+// matches the source analysis and is the guarantee; this proves the source
+// analysis matches a router that actually runs, so an analyzer bug cannot
+// quietly drop a live route.
 //
-// The comparison is one-directional on purpose: the inventory is expected to
-// hold more routes than any single wiring registers. That surplus is the whole
-// reason the inventory is built from source — the maximal fixture below cannot
-// see routes behind dependencies it does not construct.
+// Its reach is exactly the routes these fixtures construct, and no further. The
+// comparison is one-directional for the same reason: the inventory is expected
+// to hold more routes than any single wiring registers, and the fixtures below
+// cannot see routes behind dependencies they do not construct. The proxy and
+// transcode node listeners, whose rows are all unconditional, compare for
+// equality instead.
 func TestRouteInventoryCoversRuntimeRouter(t *testing.T) {
 	inventory, err := routeinventory.LoadArtifact(".")
 	if err != nil {
@@ -39,15 +42,17 @@ func TestRouteInventoryCoversRuntimeRouter(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
+	// NewRouter returns http.Handler so no production caller can register on the
+	// finished router; walking the tree in a test is what the assertion is for.
 	fixtures := map[string]chi.Routes{
-		"minimal": NewRouter(Dependencies{Config: cfg}),
+		"minimal": NewRouter(Dependencies{Config: cfg}).(chi.Routes),
 		"maximal": NewRouter(Dependencies{
 			DB:         pool,
 			Config:     cfg,
 			FileRepo:   scanner.NewFileRepository(pool),
 			FolderRepo: catalog.NewFolderRepository(pool),
 			SessionMgr: playback.NewSessionManager(0, 0),
-		}),
+		}).(chi.Routes),
 	}
 
 	total := 0

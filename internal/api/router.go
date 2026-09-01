@@ -239,9 +239,6 @@ func (d *Dependencies) CurrentConfig() *config.Config {
 	return d.Config
 }
 
-// NewRouter creates a chi.Router with all middleware and routes mounted
-// under /api/v1/. ABS-compat routes (/abs/*, /login, /socket.io/*) are
-// mounted at the root level when deps.ABSHandler is non-nil.
 // invalidateNodeCapabilities drops every cached view of one node's hardware.
 //
 // There is more than one: protocol-v3 planning holds an inventory, and prepared
@@ -260,7 +257,16 @@ func (deps Dependencies) invalidateNodeCapabilities(playbackHandler *handlers.Pl
 	}
 }
 
-func NewRouter(deps Dependencies) chi.Router {
+// NewRouter builds the API listener's handler: the base middleware stack, every
+// route under /api/v1/, and the version-neutral paths registered beside it.
+//
+// It returns http.Handler rather than chi.Router deliberately. A caller holding
+// the chi surface can register routes on the finished router — outside the
+// route inventory's walk of this function and outside any gate — leaving the
+// inventory short by exactly those routes with nothing to notice. The proxy and
+// transcode node listeners already return http.Handler; this matches them. A
+// test that needs to walk the tree asserts to chi.Routes explicitly.
+func NewRouter(deps Dependencies) http.Handler {
 	declareNativeMediaRoutes()
 	r := chi.NewRouter()
 

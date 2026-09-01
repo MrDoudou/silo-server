@@ -31,8 +31,10 @@ func TestMediaRouteManifest(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 	declareNativeMediaRoutes()
-	minimal := NewRouter(Dependencies{Config: cfg})
-	maximal := NewRouter(Dependencies{DB: pool, Config: cfg, FileRepo: scanner.NewFileRepository(pool), FolderRepo: catalog.NewFolderRepository(pool), SessionMgr: playback.NewSessionManager(0, 0)})
+	// NewRouter returns http.Handler so no production caller can register on the
+	// finished router; walking the tree in a test is what the assertion is for.
+	minimal := NewRouter(Dependencies{Config: cfg}).(chi.Routes)
+	maximal := NewRouter(Dependencies{DB: pool, Config: cfg, FileRepo: scanner.NewFileRepository(pool), FolderRepo: catalog.NewFolderRepository(pool), SessionMgr: playback.NewSessionManager(0, 0)}).(chi.Routes)
 	actual, err := streamtelemetry.BuildRouteManifest([]chi.Routes{minimal, maximal}, nativeMediaRoutes)
 	if err != nil {
 		t.Fatal(err)

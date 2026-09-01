@@ -31,6 +31,9 @@ const (
 	handlerKindFunc       = "func"
 	handlerKindLiteral    = "literal"
 	handlerKindExpression = "expression"
+	// handlerKindDelegation is a registration that hands a whole path subtree
+	// to another inventoried listener.
+	handlerKindDelegation = "delegation"
 )
 
 // Auth classes, from least to most privileged.
@@ -42,6 +45,11 @@ const (
 	authProfileScoped   = "profile_scoped"
 	authPermissionGated = "permission_gated"
 	authActingAdmin     = "acting_admin"
+	// authDelegated marks a registration that forwards a subtree to another
+	// listener. The auth that applies is the delegated listener's own, so
+	// calling the delegation public would be a claim about routes it does not
+	// own.
+	authDelegated = "delegated"
 )
 
 // Auth traits.
@@ -296,7 +304,7 @@ func (c *classifier) evidenceForBody(body *ast.BlockStmt, pkg *pkgSource, file *
 			evidence.responseRedirect = true
 		case qualified == "net/http.ServeContent", qualified == "net/http.ServeFile":
 			evidence.responseBinary = true
-		case name == "ServeHTTP" && strings.Contains(args, "w,"):
+		case name == methodServeHTTP && strings.Contains(args, "w,"):
 			// Reverse proxies and embedded handlers write their own bodies.
 			evidence.responseBinary = true
 		case name == "Upgrade" || name == "Accept":
@@ -417,11 +425,11 @@ func calleeName(fun ast.Expr) string {
 // package-level call, so `json.NewDecoder` cannot be confused with a method
 // named NewDecoder on some other type.
 func qualifiedCallee(fun ast.Expr, file *ast.File) string {
-	sel, ok := fun.(*ast.SelectorExpr)
+	sel, ok := unwrapParen(fun).(*ast.SelectorExpr)
 	if !ok {
 		return ""
 	}
-	ident, ok := sel.X.(*ast.Ident)
+	ident, ok := unwrapParen(sel.X).(*ast.Ident)
 	if !ok {
 		return ""
 	}
