@@ -107,6 +107,14 @@ jobs:
       - name: Verify playback protocol fixtures are current
         run: make verify-playback-fixtures
 
+      # The API v2 migration needs every legacy native route accounted for
+      # before anything is ported. The generator reads registration source, so
+      # a route hidden behind optional dependency wiring still has to appear,
+      # and a registration it cannot follow fails here rather than shrinking
+      # the inventory in silence.
+      - name: Verify the legacy native route inventory is current
+        run: make verify-route-inventory
+
       # Runs the settings-contract gate among everything else: the embedded
       # manifest must parse, satisfy its own schema, hold every structural
       # invariant, and agree with the live settings registry on keys and

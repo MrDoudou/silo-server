@@ -1,4 +1,4 @@
-.PHONY: frontend build dev-frontend dev-backend dev-proxy dev-transcode lint test test-go test-web embed-stub clean jellyfin-web migrate-continuum-check verify-local-paths install-hooks migrate-create migrate-validate migrate-status migrate-up migrate-down-to settings-bindings verify-settings-bindings verify-settings-bindings-web verify-settings-bindings-all playback-fixtures verify-playback-fixtures
+.PHONY: frontend build dev-frontend dev-backend dev-proxy dev-transcode lint test test-go test-web embed-stub clean jellyfin-web migrate-continuum-check verify-local-paths install-hooks migrate-create migrate-validate migrate-status migrate-up migrate-down-to settings-bindings verify-settings-bindings verify-settings-bindings-web verify-settings-bindings-all playback-fixtures verify-playback-fixtures route-inventory verify-route-inventory
 
 GIT_COMMON_DIR := $(strip $(shell git rev-parse --git-common-dir 2>/dev/null))
 MAIN_CHECKOUT_ROOT := $(if $(GIT_COMMON_DIR),$(abspath $(GIT_COMMON_DIR)/..))
@@ -175,6 +175,20 @@ verify-playback-fixtures:
 			|| { echo "::error::$(PLAYBACK_SCHEMA_FIXTURE_DIR)/$$fixture is stale; run make playback-fixtures"; exit 1; }; \
 	done
 	@echo "playback fixtures are current"
+
+ROUTE_INVENTORY := contracts/api/v2/route-inventory.json
+
+# Rebuild the legacy native route inventory from registration source.
+route-inventory:
+	go run ./cmd/route-inventory -out $(ROUTE_INVENTORY)
+
+# Fail when the committed inventory disagrees with the registration source, or
+# when the source contains a registration the generator cannot account for. The
+# generator refuses to emit a partial inventory, so both failures land here
+# rather than as a quietly shorter artifact.
+verify-route-inventory:
+	@go run ./cmd/route-inventory -check $(ROUTE_INVENTORY) \
+		|| { echo "::error::$(ROUTE_INVENTORY) is stale or a route is unaccounted for; run make route-inventory"; exit 1; }
 
 # Check committed content for local machine path leaks.
 verify-local-paths:

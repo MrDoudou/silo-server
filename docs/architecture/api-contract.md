@@ -106,6 +106,46 @@ the website to regenerate them. `https://siloserver.org/docs/api/v2/` may provid
 but it is presentation over the raw JSON, not another source of truth. The hosting provider may
 change without changing these canonical project URLs.
 
+### Legacy native route inventory
+
+`contracts/api/v2/route-inventory.json` is the enumerated legacy native surface every later
+migration decision is measured against: the main API listener (`internal/api.NewRouter`), the
+proxy node listener (`internal/proxy.(*Server).Handler`), and the transcode node listener
+(`internal/transcodenode.(*Server).Handler`). It carries one row per method+path variant, so `GET`
+and `HEAD` on the same path, a WebSocket handshake, and a wildcard `Handle` registration are
+separate rows rather than one operation.
+
+The inventory is generated from registration source by `cmd/route-inventory`, not by walking a
+router built with a chosen set of dependencies. Silo's native routes are registered under `if`
+guards on optional wiring, so a runtime walk only shows the routes that particular wiring
+constructed — the fully-wired test fixture registers 368 of the API listener's 691 rows. An
+inventory built from that walk would be short by a third and would not say so.
+
+Completeness is structural rather than diligent. A route can only be registered on a chi router
+value; within the analyzed packages such a value can only originate from `chi.NewRouter()` or a
+`chi.Router`-typed parameter; and the generator fails, rather than emitting a smaller artifact,
+when it meets any of:
+
+- a chi router constructed outside a declared listener or a recorded exclusion;
+- a function or closure taking a `chi.Router` that no declared listener reaches;
+- a router value flowing into a construct the generator does not model — a loop, a `switch`, a
+  struct field, or a call it cannot follow;
+- a path template or HTTP method that is not a literal or a resolvable constant.
+
+`make verify-route-inventory` regenerates and byte-compares the artifact in CI. Each listener
+package additionally reconciles its real router against the artifact at test time, so an analyzer
+bug cannot drop a live route: every method+path a running router registers must have a row. The
+check is one-directional, because the artifact is expected to hold routes no single wiring
+registers.
+
+Jellyfin and Audiobookshelf are external wire contracts rather than Silo's native API, so their
+listeners are recorded as named exclusions in the artifact rather than left unlisted. A listener
+that is neither declared nor excluded fails the gate.
+
+Success statuses and error codes are not derivable from registration source. They are explicitly
+null in every row and named in the artifact's `deferred_fields`; a later inventory stage fills them
+in. Nothing in the artifact is guessed.
+
 ### Contract foundation
 
 The first implementation slice establishes and tests rules shared by every later operation:
