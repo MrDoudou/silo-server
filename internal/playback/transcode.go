@@ -1630,22 +1630,41 @@ func appendSubtitleBurnInArgs(args []string, opts TranscodeOpts) []string {
 
 // resolutionToScale returns an ffmpeg scale filter string for the target resolution.
 func resolutionToScale(res string) string {
-	switch res {
-	case "2160p":
-		return "scale=-2:2160"
-	case "1080p":
-		return "scale=-2:1080"
-	case "720p":
-		return "scale=-2:720"
-	case "480p":
-		return "scale=-2:480"
-	case transcodeResolution420p:
-		return "scale=-2:420"
-	case transcodeResolution328p:
-		return "scale=-2:328"
-	default:
+	width, height, ok := resolutionScaleBounds(res)
+	if !ok {
 		return ""
 	}
+	return fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:force_divisible_by=2", width, height)
+}
+
+func resolutionScaleBounds(res string) (int, int, bool) {
+	switch res {
+	case "2160p":
+		return 3840, 2160, true
+	case "1080p":
+		return 1920, 1080, true
+	case "720p":
+		return 1280, 720, true
+	case "480p":
+		return 854, 480, true
+	case transcodeResolution420p:
+		return 746, 420, true
+	case transcodeResolution328p:
+		return 582, 328, true
+	default:
+		return 0, 0, false
+	}
+}
+
+func hardwareScaleFilter(name, res string) string {
+	width, height, ok := resolutionScaleBounds(res)
+	if !ok {
+		return name + "=format=nv12"
+	}
+	return fmt.Sprintf(
+		"%s=w=%d:h=%d:format=nv12:force_original_aspect_ratio=decrease:force_divisible_by=2",
+		name, width, height,
+	)
 }
 
 // qsvScaleFilter returns the VAAPI→QSV filter chain with optional resolution scaling.
@@ -1658,22 +1677,7 @@ func qsvScaleFilterWithMapMode(res, mapMode string) string {
 	if mapMode != "" {
 		hwmap += ":mode=" + mapMode
 	}
-	switch res {
-	case "2160p":
-		return "scale_vaapi=w=-2:h=2160:format=nv12," + hwmap + ",format=qsv"
-	case "1080p":
-		return "scale_vaapi=w=-2:h=1080:format=nv12," + hwmap + ",format=qsv"
-	case "720p":
-		return "scale_vaapi=w=-2:h=720:format=nv12," + hwmap + ",format=qsv"
-	case "480p":
-		return "scale_vaapi=w=-2:h=480:format=nv12," + hwmap + ",format=qsv"
-	case transcodeResolution420p:
-		return "scale_vaapi=w=-2:h=420:format=nv12," + hwmap + ",format=qsv"
-	case transcodeResolution328p:
-		return "scale_vaapi=w=-2:h=328:format=nv12," + hwmap + ",format=qsv"
-	default:
-		return "scale_vaapi=format=nv12," + hwmap + ",format=qsv"
-	}
+	return hardwareScaleFilter("scale_vaapi", res) + "," + hwmap + ",format=qsv"
 }
 
 // qsvToneMapScaleFilter maps VAAPI tone-map output with read/write access. The default
@@ -1699,22 +1703,7 @@ func qsvSoftwareDecodeFilter(res string) string {
 // browser-compatible encoder format. Using the CPU scale filter on VAAPI frames
 // causes FFmpeg auto_scale format-negotiation failures.
 func vaapiScaleFilter(res string) string {
-	switch res {
-	case "2160p":
-		return "scale_vaapi=w=-2:h=2160:format=nv12"
-	case "1080p":
-		return "scale_vaapi=w=-2:h=1080:format=nv12"
-	case "720p":
-		return "scale_vaapi=w=-2:h=720:format=nv12"
-	case "480p":
-		return "scale_vaapi=w=-2:h=480:format=nv12"
-	case transcodeResolution420p:
-		return "scale_vaapi=w=-2:h=420:format=nv12"
-	case transcodeResolution328p:
-		return "scale_vaapi=w=-2:h=328:format=nv12"
-	default:
-		return "scale_vaapi=format=nv12"
-	}
+	return hardwareScaleFilter("scale_vaapi", res)
 }
 
 func vaapiSoftwareDecodeFilter(res string) string {
@@ -1726,22 +1715,7 @@ func vaapiSoftwareDecodeFilter(res string) string {
 }
 
 func nvencScaleFilter(res string) string {
-	switch res {
-	case "2160p":
-		return "scale_cuda=w=-2:h=2160:format=nv12"
-	case "1080p":
-		return "scale_cuda=w=-2:h=1080:format=nv12"
-	case "720p":
-		return "scale_cuda=w=-2:h=720:format=nv12"
-	case "480p":
-		return "scale_cuda=w=-2:h=480:format=nv12"
-	case transcodeResolution420p:
-		return "scale_cuda=w=-2:h=420:format=nv12"
-	case transcodeResolution328p:
-		return "scale_cuda=w=-2:h=328:format=nv12"
-	default:
-		return "scale_cuda=format=nv12"
-	}
+	return hardwareScaleFilter("scale_cuda", res)
 }
 
 // filterPathReplacer escapes special characters in file paths for ffmpeg filter syntax.
