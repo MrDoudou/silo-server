@@ -51,3 +51,35 @@ func TestMiddlewareTrustBoundaryAndHotReload(t *testing.T) {
 		t.Fatalf("hot reload did not narrow trust: %q", got)
 	}
 }
+
+func TestResolverUsesCloudflareConnectingIPFromTrustedPeer(t *testing.T) {
+	trusted, err := ParseCIDRs("10.0.0.0/8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver := NewResolver(trusted)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.42.0.169:8080"
+	req.Header.Set("CF-Connecting-IP", "198.51.100.42")
+
+	if got := resolver.ClientIP(req); got != "198.51.100.42" {
+		t.Fatalf("Cloudflare connecting IP = %q, want 198.51.100.42", got)
+	}
+}
+
+func TestResolverIgnoresCloudflareConnectingIPFromUntrustedPeer(t *testing.T) {
+	trusted, err := ParseCIDRs("10.0.0.0/8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver := NewResolver(trusted)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "203.0.113.7:8080"
+	req.Header.Set("CF-Connecting-IP", "198.51.100.42")
+
+	if got := resolver.ClientIP(req); got != "203.0.113.7" {
+		t.Fatalf("untrusted Cloudflare connecting IP = %q, want 203.0.113.7", got)
+	}
+}
