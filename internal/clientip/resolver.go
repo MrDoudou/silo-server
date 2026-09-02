@@ -33,6 +33,14 @@ func (r *Resolver) ClientIP(req *http.Request) string {
 		return normalize(remoteIP)
 	}
 
+	// Cloudflare Tunnel preserves the viewer address in CF-Connecting-IP.
+	// This header is trusted only after the peer passed the proxy boundary above.
+	if cloudflareIP := strings.TrimSpace(req.Header.Get("CF-Connecting-IP")); cloudflareIP != "" {
+		if parsed := net.ParseIP(cloudflareIP); parsed != nil {
+			return normalize(parsed)
+		}
+	}
+
 	// Check X-Forwarded-For: walk right-to-left, return first untrusted IP.
 	if xff := req.Header.Get("X-Forwarded-For"); xff != "" {
 		ips := strings.Split(xff, ",")
