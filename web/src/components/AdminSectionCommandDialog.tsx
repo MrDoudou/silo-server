@@ -12,6 +12,8 @@ import {
 import { navigateToPluginRoute } from "@/lib/buildPluginHref";
 import type { AdminNavGroup, AdminNavItem } from "@/lib/adminNavigation";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface AdminSectionCommandDialogProps {
   sections: readonly AdminNavGroup[];
@@ -25,6 +27,7 @@ export function AdminSectionCommandDialog({
   open: openProp,
   onOpenChange,
 }: AdminSectionCommandDialogProps) {
+  useUILanguage();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = openProp ?? uncontrolledOpen;
   const isControlled = openProp !== undefined;
@@ -141,8 +144,12 @@ export function AdminSectionCommandDialog({
         showCloseButton={false}
       >
         <VisuallyHidden.Root>
-          <DialogTitle>Search admin sections</DialogTitle>
-          <DialogDescription>Search and open admin sections.</DialogDescription>
+          <DialogTitle>
+            {tr("components.admin_section_command_dialog.search_admin_sections")}
+          </DialogTitle>
+          <DialogDescription>
+            {tr("components.admin_section_command_dialog.search_and_open_admin_sections")}
+          </DialogDescription>
         </VisuallyHidden.Root>
         <div className="border-border flex h-12 items-center border-b px-4">
           <Search className="text-muted-foreground mr-3 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -155,21 +162,27 @@ export function AdminSectionCommandDialog({
               setSelectedIndex(0);
             }}
             onKeyDown={handleInputKeyDown}
-            placeholder="Search admin sections..."
-            aria-label="Search admin sections"
+            placeholder={tr(
+              "components.admin_section_command_dialog.search_admin_sections_17c7ff4c",
+            )}
+            aria-label={tr("components.admin_section_command_dialog.search_admin_sections")}
             aria-activedescendant={selectedResult ? resultId(selectedResult.href) : undefined}
             className="placeholder:text-muted-foreground h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
             autoComplete="off"
             autoFocus
           />
           <kbd className="bg-muted text-muted-foreground pointer-events-none ml-3 hidden rounded border px-1.5 py-0.5 text-[10px] font-medium select-none sm:inline-flex">
-            ESC
+            {tr("components.admin_section_command_dialog.esc")}
           </kbd>
         </div>
 
         <div className="max-h-[min(25rem,58vh)] overflow-y-auto overscroll-contain p-2">
           {filteredSections.length > 0 ? (
-            <div role="listbox" aria-label="Admin sections" className="space-y-3">
+            <div
+              role="listbox"
+              aria-label={tr("components.admin_section_command_dialog.admin_sections")}
+              className="space-y-3"
+            >
               {filteredSections.map((section) => (
                 <div key={section.label}>
                   <div className="text-muted-foreground px-2 pb-1 text-xs font-medium">
@@ -195,15 +208,20 @@ export function AdminSectionCommandDialog({
             </div>
           ) : (
             <p className="text-muted-foreground px-3 py-6 text-center text-sm">
-              No matching admin sections
+              {tr("components.admin_section_command_dialog.no_matching_admin_sections")}
             </p>
           )}
         </div>
 
         <div className="text-muted-foreground border-border border-t px-4 py-2 text-xs">
           {query.trim()
-            ? `${resultCount} ${resultCount === 1 ? "match" : "matches"}`
-            : `${totalCount} admin sections`}
+            ? tr("components.admin_section_command_dialog.result_count_value", {
+                resultCount: resultCount,
+                value: resultCount === 1 ? "match" : "matches",
+              })
+            : tr("components.admin_section_command_dialog.total_count_admin_sections", {
+                totalCount: totalCount,
+              })}
         </div>
       </DialogContent>
     </Dialog>
@@ -223,6 +241,7 @@ function AdminCommandResultRow({
   onMouseEnter: () => void;
   onPick: () => void;
 }) {
+  useUILanguage();
   const Icon = item.icon;
   const matchingSettings = filterSettingsSearchEntries(item.settings, query).slice(0, 3);
 

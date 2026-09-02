@@ -16,7 +16,7 @@ import { downloadAdminSubtitle } from "@/hooks/queries/admin/subtitles";
 import { getLanguageName } from "@/player/utils/languageNames";
 import { cn } from "@/lib/utils";
 import { Download, Ear, Loader2, Pencil, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import AdminSubtitleEditSheet from "./AdminSubtitleEditSheet";
 import {
   basenameFromPath,
@@ -27,6 +27,8 @@ import {
   staggerRowClass,
 } from "./subtitleAdminStyles";
 import { formatRelativeTime } from "@/lib/date";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface AdminSubtitlesTableProps {
   subtitles: AdminDownloadedSubtitle[];
@@ -47,6 +49,7 @@ export default function AdminSubtitlesTable({
   onDelete,
   isDeleting,
 }: AdminSubtitlesTableProps) {
+  useUILanguage();
   const [editTarget, setEditTarget] = useState<AdminDownloadedSubtitle | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminDownloadedSubtitle | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -55,9 +58,11 @@ export default function AdminSubtitlesTable({
     setDownloadingId(subtitle.id);
     try {
       await downloadAdminSubtitle(subtitle);
-      toast.success("Subtitle downloaded");
+      toast.success("feedback.admin.subtitles.admin_subtitles_table.subtitle_downloaded");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to download subtitle");
+      toast.error("errors.admin.subtitles.admin_subtitles_table.failed_to_download_subtitle", {
+        error: err,
+      });
     } finally {
       setDownloadingId(null);
     }
@@ -72,16 +77,24 @@ export default function AdminSubtitlesTable({
           <span />
         </div>
         <h2 className="text-lg font-semibold tracking-tight">
-          {hasActiveFilters ? "No subtitles match these filters" : "No stored subtitles yet"}
+          {hasActiveFilters
+            ? tr(
+                "components.admin.subtitles.admin_subtitles_table.no_subtitles_match_these_filters",
+              )
+            : tr("components.admin.subtitles.admin_subtitles_table.no_stored_subtitles_yet")}
         </h2>
         <p className="text-muted-foreground mx-auto mt-2 max-w-lg text-sm leading-relaxed">
           {hasActiveFilters
-            ? "Try widening the provider, language, or uploader filters to see more results."
-            : "User uploads and provider downloads will appear here once subtitles are stored in S3."}
+            ? tr(
+                "components.admin.subtitles.admin_subtitles_table.try_widening_the_provider_language_or_uploader_filters_to_see",
+              )
+            : tr(
+                "components.admin.subtitles.admin_subtitles_table.user_uploads_and_provider_downloads_will_appear_here_once_subtitles",
+              )}
         </p>
         {hasActiveFilters && (
           <Button type="button" variant="outline" className="mt-5" onClick={onResetFilters}>
-            Reset filters
+            {tr("components.admin.subtitles.admin_subtitles_table.reset_filters")}
           </Button>
         )}
       </div>
@@ -94,16 +107,28 @@ export default function AdminSubtitlesTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Media</TableHead>
-              <TableHead>File</TableHead>
-              <TableHead>Language</TableHead>
-              <TableHead>Provider</TableHead>
-              <TableHead>Release</TableHead>
-              <TableHead>Format</TableHead>
-              <TableHead className="w-10">HI</TableHead>
-              <TableHead>Uploader</TableHead>
-              <TableHead>Added</TableHead>
-              <TableHead className="w-[120px] text-right">Actions</TableHead>
+              <TableHead>{tr("components.admin.subtitles.admin_subtitles_table.media")}</TableHead>
+              <TableHead>{tr("components.admin.subtitles.admin_subtitles_table.file")}</TableHead>
+              <TableHead>
+                {tr("components.admin.subtitles.admin_subtitles_table.language")}
+              </TableHead>
+              <TableHead>
+                {tr("components.admin.subtitles.admin_subtitles_table.provider")}
+              </TableHead>
+              <TableHead>
+                {tr("components.admin.subtitles.admin_subtitles_table.release")}
+              </TableHead>
+              <TableHead>{tr("components.admin.subtitles.admin_subtitles_table.format")}</TableHead>
+              <TableHead className="w-10">
+                {tr("components.admin.subtitles.admin_subtitles_table.hi")}
+              </TableHead>
+              <TableHead>
+                {tr("components.admin.subtitles.admin_subtitles_table.uploader")}
+              </TableHead>
+              <TableHead>{tr("components.admin.subtitles.admin_subtitles_table.added")}</TableHead>
+              <TableHead className="w-[120px] text-right">
+                {tr("components.admin.subtitles.admin_subtitles_table.actions")}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -113,19 +138,20 @@ export default function AdminSubtitlesTable({
                   <div className="space-y-1">
                     {subtitle.media_content_id ? (
                       <Link
-                        to={`/item/${encodeURIComponent(subtitle.media_content_id)}`}
+                        to={"/item/" + encodeURIComponent(subtitle.media_content_id)}
                         className="hover:text-primary line-clamp-2 font-semibold transition-colors hover:underline"
                       >
                         {subtitle.media_title || subtitle.media_content_id}
                       </Link>
                     ) : (
                       <div className="line-clamp-2 font-semibold">
-                        {subtitle.media_title || "Unknown media"}
+                        {subtitle.media_title ||
+                          tr("components.admin.subtitles.admin_subtitles_table.unknown_media")}
                       </div>
                     )}
                     {subtitle.media_type === "episode" && (
                       <Badge variant="outline" className="text-[10px] tracking-[0.12em] uppercase">
-                        Episode
+                        {tr("components.admin.subtitles.admin_subtitles_table.episode")}
                       </Badge>
                     )}
                   </div>
@@ -176,7 +202,7 @@ export default function AdminSubtitlesTable({
                   {subtitle.hearing_impaired ? (
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-200">
                       <Ear className="h-3.5 w-3.5" aria-hidden="true" />
-                      HI
+                      {tr("components.admin.subtitles.admin_subtitles_table.hi")}
                     </span>
                   ) : null}
                 </TableCell>
@@ -191,7 +217,10 @@ export default function AdminSubtitlesTable({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      aria-label={`Edit subtitle ${subtitle.id}`}
+                      aria-label={tr(
+                        "components.admin.subtitles.admin_subtitles_table.edit_subtitle_id",
+                        { id: subtitle.id },
+                      )}
                       onClick={() => setEditTarget(subtitle)}
                     >
                       <Pencil className="h-4 w-4" />
@@ -201,7 +230,10 @@ export default function AdminSubtitlesTable({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      aria-label={`Download subtitle ${subtitle.id}`}
+                      aria-label={tr(
+                        "components.admin.subtitles.admin_subtitles_table.download_subtitle_id",
+                        { id: subtitle.id },
+                      )}
                       disabled={downloadingId === subtitle.id}
                       onClick={() => void handleDownload(subtitle)}
                     >
@@ -216,7 +248,10 @@ export default function AdminSubtitlesTable({
                       variant="ghost"
                       size="icon"
                       className="text-destructive hover:text-destructive h-8 w-8"
-                      aria-label={`Delete subtitle ${subtitle.id}`}
+                      aria-label={tr(
+                        "components.admin.subtitles.admin_subtitles_table.delete_subtitle_id",
+                        { id: subtitle.id },
+                      )}
                       onClick={() => setDeleteTarget(subtitle)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -242,13 +277,20 @@ export default function AdminSubtitlesTable({
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-        title="Delete subtitle?"
+        title={tr("components.admin.subtitles.admin_subtitles_table.delete_subtitle")}
         description={
           deleteTarget
-            ? `Remove ${providerLabel(deleteTarget.provider)} ${deleteTarget.language.toUpperCase()} subtitles for "${deleteTarget.media_title || "this media"}"? This deletes the stored file from S3.`
+            ? tr(
+                "components.admin.subtitles.admin_subtitles_table.remove_value_value2_subtitles_for_value3_this_deletes_the_stored",
+                {
+                  value: providerLabel(deleteTarget.provider),
+                  value2: deleteTarget.language.toUpperCase(),
+                  value3: deleteTarget.media_title || "this media",
+                },
+              )
             : ""
         }
-        confirmLabel="Delete"
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         isPending={isDeleting}
         onConfirm={() => {

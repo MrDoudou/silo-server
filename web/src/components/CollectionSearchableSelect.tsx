@@ -4,6 +4,8 @@ import { Check, ChevronsUpDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { CollectionOption } from "@/hooks/queries/useAllUserCollections";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CollectionSearchableSelectProps {
   /** The full list of available collection options. */
@@ -26,6 +28,7 @@ export function CollectionSearchableSelect({
   disabled = false,
   isLoading = false,
 }: CollectionSearchableSelectProps) {
+  useUILanguage();
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
 
@@ -69,7 +72,9 @@ export function CollectionSearchableSelect({
             !value && "text-muted-foreground",
           )}
         >
-          <span className="truncate">{isLoading ? "Loading..." : displayText}</span>
+          <span className="truncate">
+            {isLoading ? tr("components.collection_searchable_select.loading") : displayText}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </button>
       </PopoverPrimitive.Trigger>
@@ -85,7 +90,7 @@ export function CollectionSearchableSelect({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search collections..."
+              placeholder={tr("components.collection_searchable_select.search_collections")}
               className="border-input bg-background placeholder:text-muted-foreground flex h-8 w-full rounded-md border px-2 text-sm outline-none"
               autoFocus
             />
@@ -93,9 +98,13 @@ export function CollectionSearchableSelect({
 
           <div className="max-h-60 overflow-y-auto p-1">
             {isLoading ? (
-              <p className="text-muted-foreground py-4 text-center text-sm">Loading...</p>
+              <p className="text-muted-foreground py-4 text-center text-sm">
+                {tr("components.collection_searchable_select.loading")}
+              </p>
             ) : filtered.length === 0 ? (
-              <p className="text-muted-foreground py-4 text-center text-sm">No collections found</p>
+              <p className="text-muted-foreground py-4 text-center text-sm">
+                {tr("components.collection_searchable_select.no_collections_found")}
+              </p>
             ) : (
               <>
                 {/* Clear / placeholder option */}
@@ -114,7 +123,9 @@ export function CollectionSearchableSelect({
                   <Check
                     className={cn("mr-2 h-4 w-4 shrink-0", value ? "opacity-0" : "opacity-100")}
                   />
-                  <span className="text-muted-foreground italic">Choose collection</span>
+                  <span className="text-muted-foreground italic">
+                    {tr("components.collection_searchable_select.choose_collection")}
+                  </span>
                 </button>
 
                 {Array.from(grouped.entries()).map(([groupName, items]) => (

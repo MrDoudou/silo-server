@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { SETTINGS_CONTROL_WIDTH, SettingFieldRow } from "@/pages/admin-settings/SettingField";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface SecretFieldProps {
   label: string;
@@ -64,6 +66,7 @@ export function SecretField({
   disabled = false,
   restartRequired = false,
 }: SecretFieldProps) {
+  useUILanguage();
   const controlId = useId();
   const hintId = useId();
 
@@ -113,14 +116,20 @@ export function SecretField({
             variant="outline"
             onClick={clearStaged ? keepSaved : onClear}
           >
-            {clearStaged ? "Keep saved value" : "Clear saved value"}
+            {clearStaged
+              ? tr("components.settings.secret_field.keep_saved_value")
+              : tr("components.settings.secret_field.clear_saved_value")}
           </Button>
         ) : null}
         <Input
           id={controlId}
           type="password"
           placeholder={
-            clearStaged ? "Will be cleared on save" : configured ? "••••••••••••" : "Not configured"
+            clearStaged
+              ? tr("components.settings.secret_field.will_be_cleared_on_save")
+              : configured
+                ? "••••••••••••"
+                : tr("components.settings.secret_field.not_configured")
           }
           value={value}
           onChange={(e) => handleChange(e.target.value)}

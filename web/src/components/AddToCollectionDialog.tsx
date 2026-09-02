@@ -17,6 +17,8 @@ import {
   libraryCollectionsQueryOptions,
 } from "@/hooks/queries/libraryCollections";
 import { useIsActingAdmin } from "@/hooks/useIsActingAdmin";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface AddToCollectionDialogProps {
   open: boolean;
@@ -46,6 +48,7 @@ export default function AddToCollectionDialog({
   mediaItemId,
   itemTitle,
 }: AddToCollectionDialogProps) {
+  useUILanguage();
   const isAdmin = useIsActingAdmin();
   const { data: userCollections, isLoading: userLoading } = useCollections();
   const { data: libraries } = useUserLibraries();
@@ -114,11 +117,16 @@ export default function AddToCollectionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add to Collection</DialogTitle>
+          <DialogTitle>{tr("components.add_to_collection_dialog.add_to_collection")}</DialogTitle>
           <DialogDescription>
             {itemTitle
-              ? `Pick a manual collection to add "${itemTitle}" to.`
-              : "Pick a manual collection."}
+              ? tr(
+                  "components.add_to_collection_dialog.pick_a_manual_collection_to_add_item_title_to",
+                  {
+                    itemTitle: itemTitle,
+                  },
+                )
+              : tr("components.add_to_collection_dialog.pick_a_manual_collection")}
           </DialogDescription>
         </DialogHeader>
 
@@ -126,12 +134,17 @@ export default function AddToCollectionDialog({
           {isLoading ? (
             <div className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading collections…
+              {tr("components.add_to_collection_dialog.loading_collections")}
             </div>
           ) : groups.length === 0 ? (
             <div className="text-muted-foreground px-4 py-10 text-center text-sm">
-              You don&apos;t have any manual collections yet. Create one in{" "}
-              <span className="text-foreground">Collections</span> first.
+              {tr(
+                "components.add_to_collection_dialog.you_don_t_have_any_manual_collections_yet_create_one",
+              )}{" "}
+              <span className="text-foreground">
+                {tr("components.add_to_collection_dialog.collections")}
+              </span>{" "}
+              {tr("components.add_to_collection_dialog.first")}
             </div>
           ) : (
             <ul className="divide-border divide-y">
@@ -148,15 +161,16 @@ export default function AddToCollectionDialog({
                         type="button"
                         onClick={() => setSelectedId(p.id)}
                         data-selected={isSelected ? "true" : undefined}
-                        className={`hover:bg-muted/50 flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
-                          isSelected ? "bg-muted/60" : ""
-                        }`}
+                        className={
+                          "hover:bg-muted/50 flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors " +
+                          (isSelected ? "bg-muted/60" : "")
+                        }
                       >
                         <FolderPlus className="text-muted-foreground h-4 w-4 shrink-0" />
                         <span className="flex-1 truncate">{p.title}</span>
                         {p.source === "library" && (
                           <span className="text-muted-foreground text-[10px] tracking-[0.1em] uppercase">
-                            Library
+                            {tr("components.add_to_collection_dialog.library")}
                           </span>
                         )}
                       </button>
@@ -170,7 +184,7 @@ export default function AddToCollectionDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={addItem.isPending}>
-            Cancel
+            {tr("common.actions.cancel")}
           </Button>
           <Button
             onClick={handleConfirm}
@@ -178,7 +192,7 @@ export default function AddToCollectionDialog({
             className="gap-2"
           >
             {addItem.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Add
+            {tr("common.actions.add")}
           </Button>
         </DialogFooter>
       </DialogContent>

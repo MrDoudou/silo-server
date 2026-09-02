@@ -5,8 +5,11 @@ import type { Library } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useDeleteLibraryPoster, useUploadLibraryPoster } from "@/hooks/queries/admin/libraries";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export function LibraryPosterSection({ library }: { library: Library }) {
+  useUILanguage();
   const uploadMutation = useUploadLibraryPoster();
   const deleteMutation = useDeleteLibraryPoster();
   const fileInputId = `poster-upload-${library.id}`;
@@ -20,12 +23,14 @@ export function LibraryPosterSection({ library }: { library: Library }) {
 
   return (
     <div className="space-y-1.5">
-      <Label>Poster</Label>
+      <Label>{tr("components.admin.libraries.library_poster_section.poster")}</Label>
       <div className="flex items-center gap-2">
         {library.poster_url ? (
           <img
             src={library.poster_url}
-            alt={`${library.name} poster`}
+            alt={tr("components.admin.libraries.library_poster_section.name_poster", {
+              name: library.name,
+            })}
             className="border-border h-14 flex-shrink-0 rounded border object-cover"
             style={{ aspectRatio: "16/9" }}
           />
@@ -52,7 +57,11 @@ export function LibraryPosterSection({ library }: { library: Library }) {
           onClick={() => document.getElementById(fileInputId)?.click()}
           disabled={uploadMutation.isPending}
         >
-          {uploadMutation.isPending ? "..." : library.poster_url ? "Replace" : "Upload"}
+          {uploadMutation.isPending
+            ? "..."
+            : library.poster_url
+              ? tr("components.admin.libraries.library_poster_section.replace")
+              : tr("common.actions.upload")}
         </Button>
         {library.poster_url && (
           <Button
@@ -62,7 +71,7 @@ export function LibraryPosterSection({ library }: { library: Library }) {
             className="text-muted-foreground hover:text-destructive h-8 w-8"
             onClick={() => deleteMutation.mutate(library.id)}
             disabled={deleteMutation.isPending}
-            title="Remove poster"
+            title={tr("components.admin.libraries.library_poster_section.remove_poster")}
           >
             <Trash2 className="h-3 w-3" />
           </Button>

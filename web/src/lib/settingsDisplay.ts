@@ -5,6 +5,8 @@ import {
 } from "@/lib/settingsContract";
 import { languageOptionsFor, type SettingOption } from "@/lib/languageOptions";
 
+import { tr } from "@/i18n/translate";
+
 /**
  * Display helpers over the generated settings contract.
  *
@@ -72,7 +74,7 @@ export function optionsFor(definition: SettingDisplay): SettingOption[] {
     label: member.label || String(member.value),
   }));
   if (definition.nullable) {
-    return [{ value: "", label: "Unset" }, ...members];
+    return [{ value: "", label: tr("lib.settings_display.unset") }, ...members];
   }
   return members;
 }

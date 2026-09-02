@@ -164,8 +164,11 @@ type sessionsListResponse struct {
 
 // errorResponse represents an error in JSON responses.
 type errorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message"`
+	Error          string         `json:"error"`
+	Message        string         `json:"message"`
+	Params         map[string]any `json:"params,omitempty"`
+	PluginID       string         `json:"plugin_id,omitempty"`
+	TranslationKey string         `json:"translation_key,omitempty"`
 }
 
 type authProviderResponse struct {
@@ -635,7 +638,38 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // error code, and message.
 func writeError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, errorResponse{
-		Error:   code,
-		Message: message,
+		Error:          code,
+		Message:        message,
+		TranslationKey: apiTranslationKey(code, message),
+	})
+}
+
+func writeErrorWithParams(
+	w http.ResponseWriter,
+	status int,
+	code string,
+	message string,
+	params map[string]any,
+) {
+	writeJSON(w, status, errorResponse{
+		Error:          code,
+		Message:        message,
+		Params:         params,
+		TranslationKey: apiTranslationKey(code, message),
+	})
+}
+
+func writePluginError(
+	w http.ResponseWriter,
+	status int,
+	code string,
+	message string,
+	pluginID string,
+) {
+	writeJSON(w, status, errorResponse{
+		Error:          code,
+		Message:        message,
+		PluginID:       pluginID,
+		TranslationKey: apiTranslationKey(code, message),
 	})
 }

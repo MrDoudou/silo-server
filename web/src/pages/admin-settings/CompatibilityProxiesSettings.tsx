@@ -28,6 +28,8 @@ import { FieldGroup } from "./FieldGroup";
 import { SaveBar } from "./SaveBar";
 import { SettingField, SettingFieldStatus } from "./SettingField";
 import { formatDateTime } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const JELLYFIN_ADVANCED_KEYS = [
   "jellyfin_compat.server_name",
@@ -63,21 +65,24 @@ function statusLabel(value: string): string {
 
 // `web_state` is an internal enum; admins get plain wording instead.
 const WEB_STATE_LABELS: Record<string, string> = {
-  missing: "Not installed",
-  installed: "Installed",
-  update_available: "Update available",
-  installing: "Installing",
-  removing: "Removing",
-  failed: "Install failed",
+  missing: "pages.admin_settings.compatibility_proxies_settings.not_installed",
+  installed: "pages.admin_settings.compatibility_proxies_settings.installed",
+  update_available: "pages.admin_settings.compatibility_proxies_settings.update_available",
+  installing: "pages.admin_settings.compatibility_proxies_settings.installing",
+  removing: "pages.admin_settings.compatibility_proxies_settings.removing",
+  failed: "pages.admin_settings.compatibility_proxies_settings.install_failed",
 };
 
 function webStateLabel(value?: string): string {
-  if (!value) return "Unknown";
-  return WEB_STATE_LABELS[value] ?? statusLabel(value);
+  if (!value) return tr("pages.admin_settings.compatibility_proxies_settings.unknown");
+  const knownLabel = WEB_STATE_LABELS[value];
+  return knownLabel ? tr(knownLabel) : statusLabel(value);
 }
 
 function operationTitle(kind?: string): string {
-  return kind === "remove" ? "Removing Jellyfin Web UI" : "Installing Jellyfin Web UI";
+  return kind === "remove"
+    ? tr("pages.admin_settings.compatibility_proxies_settings.removing_jellyfin_web_ui")
+    : tr("pages.admin_settings.compatibility_proxies_settings.installing_jellyfin_web_ui");
 }
 
 function formatTimestamp(value?: string): string {
@@ -106,17 +111,23 @@ function StatusLine({
   value?: string | boolean;
   mono?: boolean;
 }) {
+  useUILanguage();
   return (
     <div className="flex min-h-9 items-center justify-between gap-4 py-2 text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span className={mono ? "max-w-[60%] truncate font-mono text-xs" : "text-right"}>
-        {typeof value === "boolean" ? (value ? "Yes" : "No") : value || "Not set"}
+        {typeof value === "boolean"
+          ? value
+            ? tr("common.actions.yes")
+            : tr("common.actions.no")
+          : value || tr("pages.admin_settings.compatibility_proxies_settings.not_set")}
       </span>
     </div>
   );
 }
 
 export default function CompatibilityProxiesSettings() {
+  useUILanguage();
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
   const restartKeys = useRestartKeys();
   const allRestart = (keys: string[]) => keys.every((key) => restartKeys.has(key));
@@ -129,7 +140,11 @@ export default function CompatibilityProxiesSettings() {
 
   if (form.isLoading || statusQuery.isLoading)
     return (
-      <div className="space-y-6" role="status" aria-label="Loading settings">
+      <div
+        className="space-y-6"
+        role="status"
+        aria-label={tr("pages.admin_settings.compatibility_proxies_settings.loading_settings")}
+      >
         <Skeleton className="h-8 w-56" />
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
@@ -141,7 +156,9 @@ export default function CompatibilityProxiesSettings() {
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-        <span className="sr-only">Loading settings</span>
+        <span className="sr-only">
+          {tr("pages.admin_settings.compatibility_proxies_settings.loading_settings")}
+        </span>
       </div>
     );
 
@@ -175,12 +192,20 @@ export default function CompatibilityProxiesSettings() {
 
   return (
     <div className="flex h-full flex-col">
-      <SettingsPageHeader title="Compatibility" className="mb-8" />
+      <SettingsPageHeader
+        title={tr("pages.admin_settings.compatibility_proxies_settings.compatibility")}
+        className="mb-8"
+      />
 
       <div className="flex-1 space-y-5">
-        <FieldGroup label="Jellyfin" restartAll={allRestart(JELLYFIN_KEYS)}>
+        <FieldGroup
+          label={tr("pages.admin_settings.compatibility_proxies_settings.jellyfin")}
+          restartAll={allRestart(JELLYFIN_KEYS)}
+        >
           <SettingField
-            label="Allow Jellyfin apps to connect"
+            label={tr(
+              "pages.admin_settings.compatibility_proxies_settings.allow_jellyfin_apps_to_connect",
+            )}
             type="toggle"
             value={jellyfinEnabledChecked ? "true" : "false"}
             onChange={setJellyfinAPIEnabled}
@@ -189,8 +214,10 @@ export default function CompatibilityProxiesSettings() {
           />
 
           <SettingField
-            label="Address Jellyfin apps should use"
-            hint="https://media.example.com"
+            label={tr(
+              "pages.admin_settings.compatibility_proxies_settings.address_jellyfin_apps_should_use",
+            )}
+            hint={tr("pages.admin_settings.compatibility_proxies_settings.https_media_example_com")}
             value={form.getValue("jellyfin_compat.public_url")}
             onChange={(v) => form.setValue("jellyfin_compat.public_url", v)}
             restartRequired={restartKeys.has("jellyfin_compat.public_url")}
@@ -205,24 +232,39 @@ export default function CompatibilityProxiesSettings() {
 
           <div className="space-y-4 py-3.5">
             <div>
-              <h4 className="text-sm font-medium">Jellyfin web player</h4>
+              <h4 className="text-sm font-medium">
+                {tr("pages.admin_settings.compatibility_proxies_settings.jellyfin_web_player")}
+              </h4>
               <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                Jellyfin mobile and TV apps expect to find it on the server.
+                {tr(
+                  "pages.admin_settings.compatibility_proxies_settings.jellyfin_mobile_and_tv_apps_expect_to_find_it_on",
+                )}
               </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
                 <SettingFieldStatus tone={installedWebAssetsPresent ? "ok" : "muted"}>
                   {installedWebAssetsPresent
-                    ? `Version ${status?.installed_version} installed`
+                    ? tr(
+                        "pages.admin_settings.compatibility_proxies_settings.version_installed_version_installed",
+                        {
+                          installed_version: status?.installed_version,
+                        },
+                      )
                     : webStateLabel(status?.web_state)}
                 </SettingFieldStatus>
                 {jellyfinProxyRunning && installedWebAssetsPresent ? (
                   <SettingFieldStatus tone={jellyfinWebServing ? "ok" : "muted"}>
-                    {jellyfinWebServing ? "Served to clients" : "Not served to clients"}
+                    {jellyfinWebServing
+                      ? tr("pages.admin_settings.compatibility_proxies_settings.served_to_clients")
+                      : tr(
+                          "pages.admin_settings.compatibility_proxies_settings.not_served_to_clients",
+                        )}
                   </SettingFieldStatus>
                 ) : null}
                 {status?.installer_ready === false ? (
                   <SettingFieldStatus tone="warn">
-                    Downloader is missing required tools
+                    {tr(
+                      "pages.admin_settings.compatibility_proxies_settings.downloader_is_missing_required_tools",
+                    )}
                   </SettingFieldStatus>
                 ) : null}
               </div>
@@ -255,10 +297,16 @@ export default function CompatibilityProxiesSettings() {
                         <p className="text-muted-foreground text-xs">{phase}</p>
                       </div>
                       {progress !== null && (
-                        <Progress value={progress} aria-label="Jellyfin Web install progress" />
+                        <Progress
+                          value={progress}
+                          aria-label={tr(
+                            "pages.admin_settings.compatibility_proxies_settings.jellyfin_web_install_progress",
+                          )}
+                        />
                       )}
                       <p className="text-muted-foreground text-xs">
-                        Started {formatTimestamp(status.operation.started_at)}
+                        {tr("pages.admin_settings.compatibility_proxies_settings.started")}{" "}
+                        {formatTimestamp(status.operation.started_at)}
                       </p>
                     </div>
                   </div>
@@ -280,10 +328,10 @@ export default function CompatibilityProxiesSettings() {
                 >
                   <Download className="mr-2 h-4 w-4" />
                   {status?.web_state === "update_available"
-                    ? "Update Web UI"
+                    ? tr("pages.admin_settings.compatibility_proxies_settings.update_web_ui")
                     : operationRunning
-                      ? "Web UI Busy"
-                      : "Install Web UI"}
+                      ? tr("pages.admin_settings.compatibility_proxies_settings.web_ui_busy")
+                      : tr("pages.admin_settings.compatibility_proxies_settings.install_web_ui")}
                 </Button>
               )}
               {installedWebAssetsPresent && (
@@ -301,7 +349,9 @@ export default function CompatibilityProxiesSettings() {
                   ) : (
                     <Power className="mr-2 h-4 w-4" />
                   )}
-                  {jellyfinWebServing ? "Disable Web UI" : "Enable Web UI"}
+                  {jellyfinWebServing
+                    ? tr("pages.admin_settings.compatibility_proxies_settings.disable_web_ui")
+                    : tr("pages.admin_settings.compatibility_proxies_settings.enable_web_ui")}
                 </Button>
               )}
               <Button
@@ -317,29 +367,37 @@ export default function CompatibilityProxiesSettings() {
                 }
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Remove Web UI
+                {tr("pages.admin_settings.compatibility_proxies_settings.remove_web_ui")}
               </Button>
               {hasDirtyWebConfig && (
                 <span className="text-muted-foreground text-sm">
-                  Save your changes before installing or removing the web player.
+                  {tr(
+                    "pages.admin_settings.compatibility_proxies_settings.save_your_changes_before_installing_or_removing_the_web_player",
+                  )}
                 </span>
               )}
               {missingPrerequisites.length > 0 && (
                 <span className="text-muted-foreground text-sm">
-                  Silo cannot download it until these commands are installed on the server:{" "}
+                  {tr(
+                    "pages.admin_settings.compatibility_proxies_settings.silo_cannot_download_it_until_these_commands_are_installed_on",
+                  )}{" "}
                   {missingPrerequisites.map((item) => item.command).join(", ")}
                 </span>
               )}
               {pinnedJellyfinWebInstalled && (
                 <span className="text-muted-foreground inline-flex items-center gap-1 text-sm">
                   <CheckCircle2 className="h-4 w-4" />
-                  The chosen version is installed
+                  {tr(
+                    "pages.admin_settings.compatibility_proxies_settings.the_chosen_version_is_installed",
+                  )}
                 </span>
               )}
               {status?.license_present && status?.provenance_present ? (
                 <span className="text-muted-foreground inline-flex items-center gap-1 text-sm">
                   <CheckCircle2 className="h-4 w-4" />
-                  License and download record present
+                  {tr(
+                    "pages.admin_settings.compatibility_proxies_settings.license_and_download_record_present",
+                  )}
                 </span>
               ) : null}
             </div>
@@ -352,35 +410,80 @@ export default function CompatibilityProxiesSettings() {
                 aria-expanded={showDiagnostics}
                 onClick={() => setShowDiagnostics((current) => !current)}
               >
-                {showDiagnostics ? "Hide download details" : "Show download details"}
+                {showDiagnostics
+                  ? tr("pages.admin_settings.compatibility_proxies_settings.hide_download_details")
+                  : tr("pages.admin_settings.compatibility_proxies_settings.show_download_details")}
               </Button>
               {showDiagnostics && (
                 <div className="grid gap-x-8 pt-2 md:grid-cols-2">
                   <StatusLine
-                    label="API state"
+                    label={tr("pages.admin_settings.compatibility_proxies_settings.api_state")}
                     value={status ? statusLabel(status.api_state) : ""}
                   />
-                  <StatusLine label="Listen address" value={status?.listen} mono />
-                  <StatusLine label="Public URL in use" value={status?.public_url} mono />
                   <StatusLine
-                    label="Jellyfin version reported"
+                    label={tr("pages.admin_settings.compatibility_proxies_settings.listen_address")}
+                    value={status?.listen}
+                    mono
+                  />
+                  <StatusLine
+                    label={tr(
+                      "pages.admin_settings.compatibility_proxies_settings.public_url_in_use",
+                    )}
+                    value={status?.public_url}
+                    mono
+                  />
+                  <StatusLine
+                    label={tr(
+                      "pages.admin_settings.compatibility_proxies_settings.jellyfin_version_reported",
+                    )}
                     value={status?.emulated_server_version}
                   />
-                  <StatusLine label="Version chosen" value={status?.pinned_version} />
                   <StatusLine
-                    label="Current job"
+                    label={tr("pages.admin_settings.compatibility_proxies_settings.version_chosen")}
+                    value={status?.pinned_version}
+                  />
+                  <StatusLine
+                    label={tr("pages.admin_settings.compatibility_proxies_settings.current_job")}
                     value={
                       status?.operation
                         ? `${statusLabel(status.operation.kind)} ${statusLabel(status.operation.state)}`
                         : "None"
                     }
                   />
-                  <StatusLine label="Downloaded from" value={status?.source_url} mono />
-                  <StatusLine label="Source commit" value={status?.commit_sha} mono />
-                  <StatusLine label="Checksum" value={status?.checksum} mono />
-                  <StatusLine label="Installed at" value={status?.install_path} mono />
-                  <StatusLine label="License file present" value={status?.license_present} />
-                  <StatusLine label="Download record present" value={status?.provenance_present} />
+                  <StatusLine
+                    label={tr(
+                      "pages.admin_settings.compatibility_proxies_settings.downloaded_from",
+                    )}
+                    value={status?.source_url}
+                    mono
+                  />
+                  <StatusLine
+                    label={tr("pages.admin_settings.compatibility_proxies_settings.source_commit")}
+                    value={status?.commit_sha}
+                    mono
+                  />
+                  <StatusLine
+                    label={tr("pages.admin_settings.compatibility_proxies_settings.checksum")}
+                    value={status?.checksum}
+                    mono
+                  />
+                  <StatusLine
+                    label={tr("pages.admin_settings.compatibility_proxies_settings.installed_at")}
+                    value={status?.install_path}
+                    mono
+                  />
+                  <StatusLine
+                    label={tr(
+                      "pages.admin_settings.compatibility_proxies_settings.license_file_present",
+                    )}
+                    value={status?.license_present}
+                  />
+                  <StatusLine
+                    label={tr(
+                      "pages.admin_settings.compatibility_proxies_settings.download_record_present",
+                    )}
+                    value={status?.provenance_present}
+                  />
                 </div>
               )}
             </div>
@@ -392,52 +495,74 @@ export default function CompatibilityProxiesSettings() {
             forceOpen={jellyfinAdvancedDirty.length > 0}
           >
             <SettingField
-              label="Name shown to Jellyfin apps"
-              description="Defaults to your Silo server name."
+              label={tr(
+                "pages.admin_settings.compatibility_proxies_settings.name_shown_to_jellyfin_apps",
+              )}
+              description={tr(
+                "pages.admin_settings.compatibility_proxies_settings.defaults_to_your_silo_server_name",
+              )}
               value={form.getValue("jellyfin_compat.server_name")}
               onChange={(v) => form.setValue("jellyfin_compat.server_name", v)}
               restartRequired={restartKeys.has("jellyfin_compat.server_name")}
             />
             <SettingField
-              label="Server ID"
-              description="Changing it makes saved clients treat Silo as a new server."
+              label={tr("pages.admin_settings.compatibility_proxies_settings.server_id")}
+              description={tr(
+                "pages.admin_settings.compatibility_proxies_settings.changing_it_makes_saved_clients_treat_silo_as_a_new",
+              )}
               value={form.getValue("jellyfin_compat.server_id")}
               onChange={(v) => form.setValue("jellyfin_compat.server_id", v)}
               restartRequired={restartKeys.has("jellyfin_compat.server_id")}
             />
             <SettingField
-              label="Jellyfin version to report"
-              description="Leave as is unless an app refuses to connect."
+              label={tr(
+                "pages.admin_settings.compatibility_proxies_settings.jellyfin_version_to_report",
+              )}
+              description={tr(
+                "pages.admin_settings.compatibility_proxies_settings.leave_as_is_unless_an_app_refuses_to_connect",
+              )}
               value={form.getValue("jellyfin_compat.emulated_server_version")}
               onChange={(v) => form.setValue("jellyfin_compat.emulated_server_version", v)}
               restartRequired={restartKeys.has("jellyfin_compat.emulated_server_version")}
             />
             <SettingField
-              label="Stay signed in for"
+              label={tr("pages.admin_settings.compatibility_proxies_settings.stay_signed_in_for")}
               type="duration"
-              description="For example 24h."
+              description={tr(
+                "pages.admin_settings.compatibility_proxies_settings.for_example_24h",
+              )}
               value={form.getValue("jellyfin_compat.session_ttl")}
               onChange={(v) => form.setValue("jellyfin_compat.session_ttl", v)}
               restartRequired={restartKeys.has("jellyfin_compat.session_ttl")}
             />
             <SettingField
-              label="Forget idle playback after"
+              label={tr(
+                "pages.admin_settings.compatibility_proxies_settings.forget_idle_playback_after",
+              )}
               type="duration"
-              description="For example 6h."
+              description={tr("pages.admin_settings.compatibility_proxies_settings.for_example_6h")}
               value={form.getValue("jellyfin_compat.playback_session_ttl")}
               onChange={(v) => form.setValue("jellyfin_compat.playback_session_ttl", v)}
               restartRequired={restartKeys.has("jellyfin_compat.playback_session_ttl")}
             />
             <SettingField
-              label="Web player version to install"
-              description="Leave blank to match the reported Jellyfin version."
+              label={tr(
+                "pages.admin_settings.compatibility_proxies_settings.web_player_version_to_install",
+              )}
+              description={tr(
+                "pages.admin_settings.compatibility_proxies_settings.leave_blank_to_match_the_reported_jellyfin_version",
+              )}
               value={form.getValue("jellyfin_compat.web_version")}
               onChange={(v) => form.setValue("jellyfin_compat.web_version", v)}
               restartRequired={restartKeys.has("jellyfin_compat.web_version")}
             />
             <SettingField
-              label="Web player install folder"
-              description="Leave blank to use the folder Silo manages."
+              label={tr(
+                "pages.admin_settings.compatibility_proxies_settings.web_player_install_folder",
+              )}
+              description={tr(
+                "pages.admin_settings.compatibility_proxies_settings.leave_blank_to_use_the_folder_silo_manages",
+              )}
               value={form.getValue("jellyfin_compat.web_install_dir")}
               onChange={(v) => form.setValue("jellyfin_compat.web_install_dir", v)}
               restartRequired={restartKeys.has("jellyfin_compat.web_install_dir")}
@@ -445,9 +570,14 @@ export default function CompatibilityProxiesSettings() {
           </AdvancedSection>
         </FieldGroup>
 
-        <FieldGroup label="Audiobookshelf" restartAll={allRestart(AUDIOBOOKSHELF_KEYS)}>
+        <FieldGroup
+          label={tr("pages.admin_settings.compatibility_proxies_settings.audiobookshelf")}
+          restartAll={allRestart(AUDIOBOOKSHELF_KEYS)}
+        >
           <SettingField
-            label="Allow Audiobookshelf apps to connect"
+            label={tr(
+              "pages.admin_settings.compatibility_proxies_settings.allow_audiobookshelf_apps_to_connect",
+            )}
             type="toggle"
             value={form.getValue("audiobookshelf_compat.enabled")}
             onChange={(v) => form.setValue("audiobookshelf_compat.enabled", v)}

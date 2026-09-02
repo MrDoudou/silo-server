@@ -1,3 +1,5 @@
+import { tr } from "@/i18n/translate";
+
 /** Default app name, overridable by admin branding settings. */
 export let APP_DOCUMENT_TITLE = "Silo";
 
@@ -26,47 +28,47 @@ export function setAppDocumentTitle(name: string) {
 }
 
 const SETTINGS_TITLES: Record<string, string> = {
-  account: "Account Settings",
-  appearance: "Appearance Settings",
-  interface: "Navigation & Card Settings",
-  accessibility: "Accessibility Settings",
-  playback: "Playback Settings",
-  profiles: "Profile Settings",
-  libraries: "Library Settings",
-  "history-import": "History Import Settings",
-  "plex-webhooks": "Webhook Sync Settings",
-  "webhook-sync": "Webhook Sync Settings",
-  "subtitle-appearance": "Subtitle Settings",
-  "home-screen": "Home Screen Settings",
-  "card-overlays": "Card Overlay Settings",
-  "connect-apps": "Connect Apps Settings",
+  account: "lib.document_title.account_settings",
+  appearance: "lib.document_title.appearance_settings",
+  interface: "lib.document_title.navigation_card_settings",
+  accessibility: "lib.document_title.accessibility_settings",
+  playback: "lib.document_title.playback_settings",
+  profiles: "lib.document_title.profile_settings",
+  libraries: "lib.document_title.library_settings",
+  "history-import": "lib.document_title.history_import_settings",
+  "plex-webhooks": "lib.document_title.webhook_sync_settings",
+  "webhook-sync": "lib.document_title.webhook_sync_settings",
+  "subtitle-appearance": "lib.document_title.subtitle_settings",
+  "home-screen": "lib.document_title.home_screen_settings",
+  "card-overlays": "lib.document_title.card_overlay_settings",
+  "connect-apps": "lib.document_title.connect_apps_settings",
 };
 
 const ADMIN_TITLES: Record<string, string> = {
-  "access-groups": "Admin Access Groups",
-  activity: "Admin Activity",
-  "api-keys": "Admin API Keys",
-  autoscan: "Admin Autoscan",
-  collections: "Admin Collections",
-  devices: "Admin Devices",
-  "settings/devices": "Your Devices",
-  diagnostics: "Admin Client Diagnostics",
-  history: "Admin Playback History",
-  "history-import": "Admin History Import",
-  "marker-history": "Admin Marker History",
-  libraries: "Admin Libraries",
-  logs: "Admin Logs",
-  maintenance: "Admin Maintenance",
-  nodes: "Admin Nodes",
-  plugins: "Admin Plugins",
-  policy: "Admin Policy",
-  recommendations: "Admin Recommendations",
-  requests: "Admin Requests",
-  sections: "Admin Sections",
-  subtitles: "Admin Subtitles",
-  settings: "Admin Settings",
-  tasks: "Admin Tasks",
-  users: "Admin Users",
+  "access-groups": "lib.document_title.admin_access_groups",
+  activity: "lib.document_title.admin_activity",
+  "api-keys": "lib.document_title.admin_api_keys",
+  autoscan: "lib.document_title.admin_autoscan",
+  collections: "lib.document_title.admin_collections",
+  devices: "lib.document_title.admin_devices",
+  "settings/devices": "lib.document_title.your_devices",
+  diagnostics: "lib.document_title.admin_client_diagnostics",
+  history: "lib.document_title.admin_playback_history",
+  "history-import": "lib.document_title.admin_history_import",
+  "marker-history": "lib.document_title.admin_marker_history",
+  libraries: "lib.document_title.admin_libraries",
+  logs: "lib.document_title.admin_logs",
+  maintenance: "lib.document_title.admin_maintenance",
+  nodes: "lib.document_title.admin_nodes",
+  plugins: "lib.document_title.admin_plugins",
+  policy: "lib.document_title.admin_policy",
+  recommendations: "lib.document_title.admin_recommendations",
+  requests: "lib.document_title.admin_requests",
+  sections: "lib.document_title.admin_sections",
+  subtitles: "lib.document_title.admin_subtitles",
+  settings: "lib.document_title.admin_settings",
+  tasks: "lib.document_title.admin_tasks",
+  users: "lib.document_title.admin_users",
 };
 
 export function formatDocumentTitle(label?: string | null): string {
@@ -80,7 +82,7 @@ export function formatDocumentTitle(label?: string | null): string {
 export function resolveSettingsDocumentTitle(pathname: string): string {
   const segments = pathname.split("/").filter(Boolean);
   const settingsSegment = segments[1];
-  return SETTINGS_TITLES[settingsSegment ?? ""] ?? "Settings";
+  return tr(SETTINGS_TITLES[settingsSegment ?? ""] ?? "lib.document_title.settings");
 }
 
 export function resolveAdminDocumentTitle(pathname: string): string {
@@ -89,25 +91,25 @@ export function resolveAdminDocumentTitle(pathname: string): string {
   const nestedSegment = segments[2];
 
   if (!adminSegment) {
-    return "Admin";
+    return tr("lib.document_title.admin");
   }
 
   if (adminSegment === "collections") {
     if (nestedSegment === "new") {
-      return "New Admin Collection";
+      return tr("lib.document_title.new_admin_collection");
     }
     if (segments[3] === "edit") {
-      return "Edit Admin Collection";
+      return tr("lib.document_title.edit_admin_collection");
     }
   }
 
   if (adminSegment === "tasks" && nestedSegment) {
-    return "Admin Task";
+    return tr("lib.document_title.admin_task");
   }
 
   if (adminSegment === "users" && nestedSegment) {
-    return "Admin User";
+    return tr("lib.document_title.admin_user");
   }
 
-  return ADMIN_TITLES[adminSegment] ?? "Admin";
+  return tr(ADMIN_TITLES[adminSegment] ?? "lib.document_title.admin");
 }

@@ -1,6 +1,8 @@
 import type { CollectionSortConfig, QuerySort } from "@/api/types";
 import { getDefaultQuerySortOrder, getQuerySortOptions } from "@/lib/querySortOptions";
 
+import { tr } from "@/i18n/translate";
+
 // COLLECTION_SOURCE_ORDER is the in-form sentinel for "no default sort" — the
 // collection keeps the order its source supplied (MDBList list order, manual
 // item order). Radix Select disallows empty-string item values, so the empty
@@ -22,7 +24,10 @@ export function collectionDefaultSortOptions(
   allowPersonalized: boolean,
 ): CollectionDefaultSortOption[] {
   return [
-    { value: COLLECTION_SOURCE_ORDER, label: "Collection order (default)" },
+    {
+      value: COLLECTION_SOURCE_ORDER,
+      label: tr("lib.collection_sort_config.collection_order_default"),
+    },
     ...getQuerySortOptions({ includePersonalized: allowPersonalized }).map((option) => ({
       value: `${option.value}:${option.defaultOrder}`,
       label: option.label,

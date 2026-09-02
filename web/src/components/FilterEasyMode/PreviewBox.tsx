@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { previewSection, type PreviewResponse } from "@/lib/recipes";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface Props {
   sectionType: string;
@@ -9,6 +11,7 @@ interface Props {
 }
 
 export default function PreviewBox({ sectionType, config, itemLimit, libraryID }: Props) {
+  useUILanguage();
   const [data, setData] = useState<PreviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,7 +41,13 @@ export default function PreviewBox({ sectionType, config, itemLimit, libraryID }
   return (
     <div className="rounded border-l-2 border-indigo-500 bg-indigo-500/10 px-3 py-2 text-xs">
       <div className="mb-1 text-[10px] tracking-wider uppercase opacity-65">
-        {loading ? "Loading…" : error ? "Error" : `Preview · ${data?.total_count ?? 0} items match`}
+        {loading
+          ? tr("components.filter_easy_mode.preview_box.loading")
+          : error
+            ? tr("components.filter_easy_mode.preview_box.error")
+            : tr("components.filter_easy_mode.preview_box.preview_value_items_match", {
+                value: data?.total_count ?? 0,
+              })}
       </div>
       {error && <div className="text-red-400">{error}</div>}
       {!error && data && (
@@ -46,7 +55,7 @@ export default function PreviewBox({ sectionType, config, itemLimit, libraryID }
           {data.items
             .slice(0, 10)
             .map((i) => i.title ?? i.content_id)
-            .join(" · ") || "no matches"}
+            .join(" · ") || tr("components.filter_easy_mode.preview_box.no_matches")}
         </div>
       )}
     </div>

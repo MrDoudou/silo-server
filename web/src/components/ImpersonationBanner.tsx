@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
+import { Trans, useTranslation } from "react-i18next";
 
 interface ImpersonationBannerProps {
   userName: string;
@@ -12,6 +13,7 @@ export default function ImpersonationBanner({
   impersonatorName,
   onEnd,
 }: ImpersonationBannerProps) {
+  const { t } = useTranslation(undefined);
   const [isEnding, setIsEnding] = useState(false);
 
   async function handleEnd() {
@@ -34,7 +36,7 @@ export default function ImpersonationBanner({
             <span className="impersonation-dot relative inline-flex h-2 w-2 rounded-full" />
           </span>
           <span className="impersonation-label text-[10px] font-semibold uppercase">
-            Viewing as
+            {t("shell.impersonation.viewing_as")}
           </span>
         </div>
 
@@ -49,21 +51,25 @@ export default function ImpersonationBanner({
 
         <span className="text-muted-foreground hidden truncate text-xs sm:inline">
           <span className="text-muted-foreground/60 mr-2">·</span>
-          authorized by <span className="text-foreground/80 font-medium">{impersonatorName}</span>
+          <Trans
+            i18nKey="shell.impersonation.authorized_by"
+            values={{ name: impersonatorName }}
+            components={{ name: <span className="text-foreground/80 font-medium" /> }}
+          />
         </span>
 
         <button
           type="button"
           onClick={() => void handleEnd()}
           disabled={isEnding}
-          aria-label="End impersonation session"
+          aria-label={t("shell.impersonation.end_aria_label")}
           className="impersonation-end-btn group ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-semibold whitespace-nowrap transition-all duration-150 outline-none disabled:pointer-events-none disabled:opacity-50"
         >
           <X
             className="h-3.5 w-3.5 transition-transform duration-200 motion-safe:group-hover:rotate-90"
             aria-hidden="true"
           />
-          <span>End session</span>
+          <span>{t("shell.impersonation.end_action")}</span>
         </button>
       </div>
     </div>

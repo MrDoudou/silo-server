@@ -2,6 +2,8 @@ import { CircleCheck } from "lucide-react";
 
 import { useSettingsOverview } from "@/hooks/admin/useSettingsOverview";
 import { HealthTile, HealthTileSkeleton, SectionCard, SectionCardSkeleton } from "./overviewCards";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const SKELETON_TILES = [0, 1];
 const SKELETON_CARDS = [0, 1, 2, 3, 4, 5];
@@ -11,6 +13,7 @@ const SKELETON_CARDS = [0, 1, 2, 3, 4, 5];
  * directory of settings categories. Mounted at the settings index route.
  */
 export default function SettingsOverview() {
+  useUILanguage();
   const { isLoading, tiles, cards } = useSettingsOverview();
 
   // Keep this focused on actionable setup and health items rather than
@@ -20,20 +23,25 @@ export default function SettingsOverview() {
   return (
     <div className="w-full space-y-10">
       <header className="max-w-3xl space-y-3">
-        <h1 className="page-title text-[clamp(2.25rem,4vw,3.5rem)]">Settings</h1>
+        <h1 className="page-title text-[clamp(2.25rem,4vw,3.5rem)]">
+          {tr("pages.admin_settings.settings_overview.settings")}
+        </h1>
         <p className="text-muted-foreground text-sm leading-relaxed sm:text-base">
-          Configure the server, media processing, integrations, and the defaults your household
-          starts with.
+          {tr(
+            "pages.admin_settings.settings_overview.configure_the_server_media_processing_integrations_and_the_defaults_your",
+          )}
         </p>
       </header>
 
       <section aria-labelledby="setup-health-heading" className="space-y-4">
         <div className="space-y-1.5">
           <h2 id="setup-health-heading" className="text-xl font-semibold tracking-tight">
-            Setup &amp; health
+            {tr("pages.admin_settings.settings_overview.setup_health")}
           </h2>
           <p className="text-muted-foreground text-sm">
-            Recommendations and configuration problems that may limit server features.
+            {tr(
+              "pages.admin_settings.settings_overview.recommendations_and_configuration_problems_that_may_limit_server_features",
+            )}
           </p>
         </div>
         {isLoading ? (
@@ -46,9 +54,13 @@ export default function SettingsOverview() {
           <div className="border-border/60 bg-card/35 inline-flex max-w-xl items-start gap-3 rounded-xl border px-4 py-3">
             <CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-500" aria-hidden="true" />
             <div className="space-y-0.5">
-              <p className="text-sm font-medium">No action needed</p>
+              <p className="text-sm font-medium">
+                {tr("pages.admin_settings.settings_overview.no_action_needed")}
+              </p>
               <p className="text-muted-foreground text-xs leading-relaxed">
-                Missing setup, unavailable services, and restart-required changes will appear here.
+                {tr(
+                  "pages.admin_settings.settings_overview.missing_setup_unavailable_services_and_restart_required_changes_will_appear",
+                )}
               </p>
             </div>
           </div>
@@ -64,10 +76,12 @@ export default function SettingsOverview() {
       <section aria-labelledby="settings-groups-heading" className="space-y-5">
         <div className="space-y-1.5">
           <h2 id="settings-groups-heading" className="text-xl font-semibold tracking-tight">
-            Settings groups
+            {tr("pages.admin_settings.settings_overview.settings_groups")}
           </h2>
           <p className="text-muted-foreground text-sm">
-            Each group shows the sections you’ll find inside.
+            {tr(
+              "pages.admin_settings.settings_overview.each_group_shows_the_sections_you_ll_find_inside",
+            )}
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

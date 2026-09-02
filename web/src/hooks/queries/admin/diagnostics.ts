@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { api, apiResponse } from "@/api/client";
 import type {
@@ -52,14 +52,18 @@ export function useUpdateDiagnosticsUploadsEnabled() {
         queryClient.invalidateQueries({ queryKey: adminKeys.diagnosticStatus() }),
         queryClient.invalidateQueries({ queryKey: adminKeys.serverSettings() }),
       ]);
-      toast.success(
-        enabled ? "Client diagnostic uploads enabled" : "Client diagnostic uploads disabled",
-      );
+      toast.success("feedback.queries.admin.diagnostics.reported_message", {
+        values: {
+          message: enabled
+            ? "Client diagnostic uploads enabled"
+            : "Client diagnostic uploads disabled",
+        },
+      });
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update client diagnostic uploads",
-      );
+      toast.error("errors.queries.admin.diagnostics.failed_to_update_client_diagnostic_uploads", {
+        error: error,
+      });
     },
   });
 }
@@ -94,10 +98,12 @@ export function useDeleteDiagnosticReport() {
       void queryClient.invalidateQueries({
         queryKey: ["admin", "diagnostics", "reports"],
       });
-      toast.success("Diagnostic report deleted");
+      toast.success("feedback.queries.admin.diagnostics.diagnostic_report_deleted");
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to delete diagnostic report");
+      toast.error("errors.queries.admin.diagnostics.failed_to_delete_diagnostic_report", {
+        error: error,
+      });
     },
   });
 }

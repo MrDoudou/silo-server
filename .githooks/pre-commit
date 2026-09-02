@@ -3,4 +3,28 @@ set -euo pipefail
 
 # Resolve via git toplevel so the hook works from any cwd (e.g., when
 # git invokes hooks from within a non-root subdirectory).
-"$(git rev-parse --show-toplevel)/scripts/check-local-path-leaks.sh" --cached
+repo_root="$(git rev-parse --show-toplevel)"
+"$repo_root/scripts/check-local-path-leaks.sh" --cached
+
+needs_i18n_check=false
+while IFS= read -r -d '' staged_path; do
+  case "$staged_path" in
+    web/src/*.ts | web/src/*.tsx | web/scripts/*.mjs | web/i18n-key-exceptions.json | internal/api/*.go | internal/plugins/*.go)
+      needs_i18n_check=true
+      break
+      ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACMRD -z)
+
+if [[ "$needs_i18n_check" == true ]]; then
+  if ! command -v node >/dev/null 2>&1; then
+    echo "i18n key check requires Node.js; install the web development prerequisites" >&2
+    exit 1
+  fi
+  if [[ ! -d "$repo_root/web/node_modules/typescript" ]]; then
+    echo "i18n key check requires web dependencies; run 'cd web && pnpm install'" >&2
+    exit 1
+  fi
+
+  (cd "$repo_root/web" && node scripts/check-i18n-keys.mjs --staged)
+fi

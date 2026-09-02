@@ -7,6 +7,8 @@ import { SectionError } from "../feedback";
 import { rangeHours, rangeTitle } from "../range";
 import { useWidgetRange } from "../widgetChrome";
 import { WidgetRangePicker } from "../WidgetRangePicker";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Coarse playback health for the chosen window.
@@ -19,6 +21,7 @@ import { WidgetRangePicker } from "../WidgetRangePicker";
  * reverse-engineered from logs. See docs/admin-api.md.
  */
 export function PlaybackReliabilityWidget() {
+  useUILanguage();
   const { range } = useWidgetRange();
   const query = useAdminPlaybackActivity(rangeHours(range));
   const reliability = query.data?.reliability;
@@ -27,7 +30,7 @@ export function PlaybackReliabilityWidget() {
     <Card className="h-full">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between gap-2 space-y-0 pb-3">
         <CardTitle className="text-sm font-bold">
-          {rangeTitle("Playback reliability", range)}
+          {rangeTitle("components.admin.dashboard.registry.playback_reliability", range)}
         </CardTitle>
         <WidgetRangePicker />
       </CardHeader>
@@ -39,27 +42,47 @@ export function PlaybackReliabilityWidget() {
             ))}
           </div>
         ) : query.error || !reliability ? (
-          <SectionError message="Failed to load playback reliability." />
+          <SectionError
+            message={tr(
+              "components.admin.dashboard.widgets.playback_reliability_widget.failed_to_load_playback_reliability",
+            )}
+          />
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MiniStat label="Started" value={reliability.sessions_started.toLocaleString()} />
             <MiniStat
-              label="Transcode starts"
+              label={tr("components.admin.dashboard.widgets.playback_reliability_widget.started")}
+              value={reliability.sessions_started.toLocaleString()}
+            />
+            <MiniStat
+              label={tr(
+                "components.admin.dashboard.widgets.playback_reliability_widget.transcode_starts",
+              )}
               value={reliability.transcode_starts.toLocaleString()}
             />
             <MiniStat
-              label="Completed"
+              label={tr("components.admin.dashboard.widgets.playback_reliability_widget.completed")}
               value={formatCompletionRate(
                 reliability.completion_rate,
                 reliability.finalized_sessions,
               )}
               detail={
                 reliability.finalized_sessions > 0
-                  ? `${reliability.completed_sessions.toLocaleString()} of ${reliability.finalized_sessions.toLocaleString()} finished`
-                  : "No finished sessions yet"
+                  ? tr(
+                      "components.admin.dashboard.widgets.playback_reliability_widget.completed_of_total_finished",
+                      {
+                        completed: reliability.completed_sessions.toLocaleString(),
+                        total: reliability.finalized_sessions.toLocaleString(),
+                      },
+                    )
+                  : tr(
+                      "components.admin.dashboard.widgets.playback_reliability_widget.no_finished_sessions_yet",
+                    )
               }
             />
-            <MiniStat label="Profiles" value={reliability.unique_profiles.toLocaleString()} />
+            <MiniStat
+              label={tr("components.admin.dashboard.widgets.playback_reliability_widget.profiles")}
+              value={reliability.unique_profiles.toLocaleString()}
+            />
           </div>
         )}
       </CardContent>
@@ -68,6 +91,7 @@ export function PlaybackReliabilityWidget() {
 }
 
 function MiniStat({ label, value, detail }: { label: string; value: string; detail?: ReactNode }) {
+  useUILanguage();
   return (
     <div className="bg-surface border-border rounded-lg border p-3">
       <div className="text-[20px] leading-none font-extrabold tracking-tight tabular-nums">

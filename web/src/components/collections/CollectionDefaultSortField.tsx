@@ -7,6 +7,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { collectionDefaultSortOptions } from "@/lib/collectionSortConfig";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface Props {
   value: string;
@@ -31,11 +33,14 @@ export function CollectionDefaultSortField({
   inputId = "collection-default-sort",
   disabled = false,
 }: Props) {
+  useUILanguage();
   const options = collectionDefaultSortOptions(allowPersonalized);
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={inputId}>Default Sort</Label>
+      <Label htmlFor={inputId}>
+        {tr("components.collections.collection_default_sort_field.default_sort")}
+      </Label>
       <Select value={value} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger id={inputId}>
           <SelectValue />
@@ -49,8 +54,9 @@ export function CollectionDefaultSortField({
         </SelectContent>
       </Select>
       <p className="text-muted-foreground text-xs">
-        The order viewers get when they open this collection. They can still sort it their own way,
-        and that choice is remembered for them.
+        {tr(
+          "components.collections.collection_default_sort_field.the_order_viewers_get_when_they_open_this_collection_they",
+        )}
       </p>
     </div>
   );

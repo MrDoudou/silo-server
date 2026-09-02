@@ -8,6 +8,8 @@ import { decodeThumbhash } from "@/lib/thumbhash";
 import { useCarouselEmbla } from "@/hooks/useCarouselEmbla";
 import { preferredDateLocale } from "@/lib/datetime";
 import { useDateTimeFormat } from "@/hooks/useDateTimeFormat";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface PlayingNextScreenProps {
   seriesId?: string;
@@ -32,6 +34,7 @@ export function PlayingNextScreen({
   onPlayItem,
   onClose,
 }: PlayingNextScreenProps) {
+  useUILanguage();
   useDateTimeFormat();
   // -- Auto-play setting --
   // Shared with Settings → Playback: both surfaces edit the same profile row,
@@ -140,7 +143,7 @@ export function PlayingNextScreen({
         onClick={onClose}
         type="button"
         className="absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm transition-colors hover:bg-white/20 sm:top-5 sm:right-5 sm:h-10 sm:w-10"
-        title="Close (Esc)"
+        title={tr("player.components.playing_next_screen.close_esc")}
       >
         <X className="h-4 w-4 sm:h-5 sm:w-5" />
       </motion.button>
@@ -158,7 +161,9 @@ export function PlayingNextScreen({
         >
           {/* Label */}
           <div className="mb-2.5 text-[10px] font-semibold tracking-[0.25em] text-white/40 uppercase sm:mb-3 sm:text-[11px]">
-            {nextEpisode ? "Playing Next" : "Finished"}
+            {nextEpisode
+              ? tr("player.components.playing_next_screen.playing_next")
+              : tr("player.components.playing_next_screen.finished")}
           </div>
 
           {nextEpisode ? (
@@ -184,7 +189,7 @@ export function PlayingNextScreen({
                   <img src={blurPlaceholder} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-white/5 text-sm text-white/30">
-                    No Preview
+                    {tr("player.components.playing_next_screen.no_preview")}
                   </div>
                 )}
               </div>
@@ -196,9 +201,14 @@ export function PlayingNextScreen({
                 )}
                 <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
                   <span className="text-xs font-medium text-white/60 sm:text-sm">
-                    S{nextEpisode.seasonNumber}:E{nextEpisode.episodeNumber}
+                    {tr("player.components.playing_next_screen.s")}
+                    {nextEpisode.seasonNumber}
+                    {tr("player.components.playing_next_screen.e")}
+                    {nextEpisode.episodeNumber}
                   </span>
-                  <span className="hidden text-sm text-white/25 sm:inline">&mdash;</span>
+                  <span className="hidden text-sm text-white/25 sm:inline">
+                    {tr("player.components.playing_next_screen.mdash")}
+                  </span>
                   <span className="text-sm font-semibold sm:text-base">{nextEpisode.title}</span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-white/40 sm:text-xs">
@@ -212,10 +222,15 @@ export function PlayingNextScreen({
                     </span>
                   )}
                   {nextEpisode.airDate && nextEpisode.runtime > 0 && (
-                    <span className="text-white/20">&bull;</span>
+                    <span className="text-white/20">
+                      {tr("player.components.playing_next_screen.bull")}
+                    </span>
                   )}
                   {nextEpisode.runtime > 0 && (
-                    <span>{Math.round(nextEpisode.runtime / 60)} min</span>
+                    <span>
+                      {Math.round(nextEpisode.runtime / 60)}{" "}
+                      {tr("player.components.playing_next_screen.min")}
+                    </span>
                   )}
                 </div>
                 {nextEpisode.overview && (
@@ -238,7 +253,7 @@ export function PlayingNextScreen({
                   className="bg-primary text-primary-foreground flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold shadow-lg transition-all hover:scale-105 hover:shadow-xl sm:px-7 sm:py-3"
                 >
                   <Play className="h-4 w-4 fill-current" />
-                  Play Now
+                  {tr("player.components.playing_next_screen.play_now")}
                 </button>
 
                 {videoEnded && autoplay && (
@@ -269,7 +284,10 @@ export function PlayingNextScreen({
                         className="text-primary transition-all duration-1000 ease-linear"
                       />
                     </svg>
-                    <span className="text-sm text-white/50 tabular-nums">{secondsRemaining}s</span>
+                    <span className="text-sm text-white/50 tabular-nums">
+                      {secondsRemaining}
+                      {tr("player.components.playing_next_screen.s_a0f1490a")}
+                    </span>
                   </motion.div>
                 )}
               </motion.div>
@@ -280,7 +298,10 @@ export function PlayingNextScreen({
                 type="button"
                 className="mt-2 text-xs text-white/30 transition-colors hover:text-white/60 sm:mt-2.5"
               >
-                Auto-play is {autoplay ? "on" : "off"}
+                {tr("player.components.playing_next_screen.auto_play_is")}{" "}
+                {autoplay
+                  ? tr("player.components.playing_next_screen.on")
+                  : tr("player.components.playing_next_screen.off")}
               </button>
             </>
           ) : (
@@ -289,14 +310,16 @@ export function PlayingNextScreen({
                 {endOfSeriesHeading}
               </div>
               <div className="mt-2 max-w-md text-center text-sm text-white/50">
-                There are no more episodes available. Pick something else from On Deck below.
+                {tr(
+                  "player.components.playing_next_screen.there_are_no_more_episodes_available_pick_something_else_from",
+                )}
               </div>
               <button
                 onClick={onClose}
                 type="button"
                 className="mt-5 flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-white/20 sm:mt-6 sm:px-7 sm:py-3"
               >
-                Back
+                {tr("common.actions.back")}
               </button>
             </>
           )}
@@ -321,6 +344,7 @@ function OnDeckCarousel({
   items: ContinueWatchingItem[];
   onPlayItem: (contentId: string) => void;
 }) {
+  useUILanguage();
   const { emblaRef, canScrollPrev, canScrollNext, scrollPrev, scrollNext } = useCarouselEmbla({
     options: { slidesToScroll: 3, align: "start" },
   });
@@ -334,7 +358,7 @@ function OnDeckCarousel({
     >
       <div className="mb-2 flex items-center justify-between sm:mb-3">
         <h3 className="text-[10px] font-semibold tracking-wider text-white/40 uppercase sm:text-xs">
-          On Deck
+          {tr("player.components.playing_next_screen.on_deck")}
         </h3>
         <div className="flex gap-1">
           <button
@@ -399,7 +423,7 @@ function OnDeckCarousel({
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center bg-white/5 text-xs text-white/30">
-                        No Image
+                        {tr("player.components.playing_next_screen.no_image")}
                       </div>
                     )}
                     {/* Play overlay */}
@@ -423,11 +447,17 @@ function OnDeckCarousel({
                     {episodeMeta && (
                       <div className="truncate text-[11px] text-white/40">
                         {episodeMeta}
-                        {episodeTitle ? ` \u00b7 ${episodeTitle}` : ""}
+                        {episodeTitle
+                          ? tr("player.components.playing_next_screen.episode_title", {
+                              episodeTitle: episodeTitle,
+                            })
+                          : ""}
                       </div>
                     )}
                     {timeLeft > 0 && (
-                      <div className="text-[11px] text-white/30">{timeLeft} min left</div>
+                      <div className="text-[11px] text-white/30">
+                        {timeLeft} {tr("player.components.playing_next_screen.min_left")}
+                      </div>
                     )}
                   </div>
                 </button>

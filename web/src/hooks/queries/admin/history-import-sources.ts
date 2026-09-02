@@ -8,7 +8,7 @@ import type {
   UpdateHistoryImportSourceRequest,
 } from "@/api/types";
 import { adminKeys, historyImportKeys } from "../keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 export function useAdminHistoryImportSources() {
   return useQuery({
@@ -26,12 +26,14 @@ export function useCreateAdminHistoryImportSource() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Saved server created");
+      toast.success("feedback.queries.admin.history_import_sources.saved_server_created");
       queryClient.invalidateQueries({ queryKey: adminKeys.historyImportSources() });
       queryClient.invalidateQueries({ queryKey: historyImportKeys.sources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to create saved server");
+      toast.error("errors.queries.admin.history_import_sources.failed_to_create_saved_server", {
+        error: err,
+      });
     },
   });
 }
@@ -45,12 +47,14 @@ export function useUpdateAdminHistoryImportSource() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Saved server updated");
+      toast.success("feedback.queries.admin.history_import_sources.saved_server_updated");
       queryClient.invalidateQueries({ queryKey: adminKeys.historyImportSources() });
       queryClient.invalidateQueries({ queryKey: historyImportKeys.sources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update saved server");
+      toast.error("errors.queries.admin.history_import_sources.failed_to_update_saved_server", {
+        error: err,
+      });
     },
   });
 }
@@ -60,12 +64,14 @@ export function useDeleteAdminHistoryImportSource() {
   return useMutation({
     mutationFn: (id: number) => api(`/admin/history-import-sources/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Saved server deleted");
+      toast.success("feedback.queries.admin.history_import_sources.saved_server_deleted");
       queryClient.invalidateQueries({ queryKey: adminKeys.historyImportSources() });
       queryClient.invalidateQueries({ queryKey: historyImportKeys.sources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete saved server");
+      toast.error("errors.queries.admin.history_import_sources.failed_to_delete_saved_server", {
+        error: err,
+      });
     },
   });
 }
@@ -79,11 +85,13 @@ export function useSetAdminSourceToken() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Admin token saved");
+      toast.success("feedback.queries.admin.history_import_sources.admin_token_saved");
       queryClient.invalidateQueries({ queryKey: adminKeys.historyImportSources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save admin token");
+      toast.error("errors.queries.admin.history_import_sources.failed_to_save_admin_token", {
+        error: err,
+      });
     },
   });
 }
@@ -94,11 +102,13 @@ export function useClearAdminSourceToken() {
     mutationFn: (id: number) =>
       api(`/admin/history-imports/sources/${id}/token`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Admin token removed");
+      toast.success("feedback.queries.admin.history_import_sources.admin_token_removed");
       queryClient.invalidateQueries({ queryKey: adminKeys.historyImportSources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to remove admin token");
+      toast.error("errors.queries.admin.history_import_sources.failed_to_remove_admin_token", {
+        error: err,
+      });
     },
   });
 }
@@ -123,7 +133,7 @@ export function usePlexLogin() {
         body: JSON.stringify(body),
       }),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Plex login failed");
+      toast.error("errors.queries.admin.history_import_sources.plex_login_failed", { error: err });
     },
   });
 }

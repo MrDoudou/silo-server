@@ -14,6 +14,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { LANGUAGES, getLanguageName } from "@/player/utils/languageNames";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const ACCEPTED_SUBTITLE_EXTENSIONS = ".srt,.vtt,.ass,.ssa,.sub";
 const ACCEPTED_SUBTITLE_EXTENSION_LIST = ["srt", "vtt", "ass", "ssa", "sub"] as const;
@@ -67,6 +69,7 @@ export function SubtitleUploadForm({
   variant = "default",
   defaultLanguage = "en",
 }: SubtitleUploadFormProps) {
+  useUILanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
   const detectRequestRef = useRef(0);
@@ -228,11 +231,12 @@ export function SubtitleUploadForm({
     >
       <div className="space-y-1">
         <p className={cn("text-sm font-medium", isPlayer ? "text-white" : "text-foreground")}>
-          Upload subtitle
+          {tr("components.subtitles.subtitle_upload_form.upload_subtitle")}
         </p>
         <p className={cn("text-xs", isPlayer ? "text-white/50" : "text-muted-foreground")}>
-          Drag and drop or browse for SRT, VTT, ASS, SSA, or SUB files up to 5 MB. Language is
-          detected automatically when possible.
+          {tr(
+            "components.subtitles.subtitle_upload_form.drag_and_drop_or_browse_for_srt_vtt_ass_ssa",
+          )}
         </p>
       </div>
 
@@ -247,7 +251,9 @@ export function SubtitleUploadForm({
       <div
         role="button"
         tabIndex={0}
-        aria-label="Drop subtitle file here or browse"
+        aria-label={tr(
+          "components.subtitles.subtitle_upload_form.drop_subtitle_file_here_or_browse",
+        )}
         onClick={handleBrowseClick}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -276,10 +282,12 @@ export function SubtitleUploadForm({
         />
         <div className="space-y-1">
           <p className={cn("text-sm font-medium", isPlayer ? "text-white" : "text-foreground")}>
-            {isDragging ? "Drop subtitle file" : "Drag and drop a subtitle file"}
+            {isDragging
+              ? tr("components.subtitles.subtitle_upload_form.drop_subtitle_file")
+              : tr("components.subtitles.subtitle_upload_form.drag_and_drop_a_subtitle_file")}
           </p>
           <p className={cn("text-xs", isPlayer ? "text-white/50" : "text-muted-foreground")}>
-            or click to browse
+            {tr("components.subtitles.subtitle_upload_form.or_click_to_browse")}
           </p>
         </div>
       </div>
@@ -288,7 +296,7 @@ export function SubtitleUploadForm({
         <div className={cn("space-y-1", !isPlayer && "w-full sm:w-[220px]")}>
           {isPlayer ? (
             <select
-              aria-label="Upload language"
+              aria-label={tr("components.subtitles.subtitle_upload_form.upload_language")}
               className="w-full rounded bg-neutral-800 px-2 py-1.5 text-sm text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
               value={language}
               onChange={(event) => handleLanguageChange(event.target.value)}
@@ -307,7 +315,9 @@ export function SubtitleUploadForm({
               disabled={detectingLanguage}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Language" />
+                <SelectValue
+                  placeholder={tr("components.subtitles.subtitle_upload_form.language")}
+                />
               </SelectTrigger>
               <SelectContent>
                 {LANGUAGES.map((lang) => (
@@ -320,11 +330,13 @@ export function SubtitleUploadForm({
           )}
           {detectingLanguage ? (
             <p className={cn("text-xs", isPlayer ? "text-white/50" : "text-muted-foreground")}>
-              Detecting language…
+              {tr("components.subtitles.subtitle_upload_form.detecting_language")}
             </p>
           ) : detectionSource && detectionSource !== "manual" ? (
             <p className={cn("text-xs", isPlayer ? "text-white/50" : "text-muted-foreground")}>
-              Detected {getLanguageName(language)} from {detectionSourceLabel(detectionSource)}
+              {tr("components.subtitles.subtitle_upload_form.detected")} {getLanguageName(language)}{" "}
+              {tr("components.subtitles.subtitle_upload_form.from")}{" "}
+              {detectionSourceLabel(detectionSource)}
             </p>
           ) : null}
         </div>
@@ -337,17 +349,17 @@ export function SubtitleUploadForm({
               onChange={(event) => setHearingImpaired(event.target.checked)}
               className="rounded border-white/20 bg-neutral-800"
             />
-            Hearing impaired (HI)
+            {tr("components.subtitles.subtitle_upload_form.hearing_impaired_hi")}
           </label>
         ) : (
           <div className="flex items-center gap-2">
             <Switch
-              id={`subtitle-upload-hi-${mediaFileId}`}
+              id={"subtitle-upload-hi-" + mediaFileId}
               checked={hearingImpaired}
               onCheckedChange={setHearingImpaired}
             />
-            <Label htmlFor={`subtitle-upload-hi-${mediaFileId}`} className="text-sm font-normal">
-              Hearing impaired (HI)
+            <Label htmlFor={"subtitle-upload-hi-" + mediaFileId} className="text-sm font-normal">
+              {tr("components.subtitles.subtitle_upload_form.hearing_impaired_hi")}
             </Label>
           </div>
         )}
@@ -364,7 +376,9 @@ export function SubtitleUploadForm({
             ) : (
               <Upload className="size-4" />
             )}
-            {uploading ? "Uploading…" : "Upload"}
+            {uploading
+              ? tr("components.subtitles.subtitle_upload_form.uploading")
+              : tr("common.actions.upload")}
           </button>
         ) : (
           <Button
@@ -377,14 +391,16 @@ export function SubtitleUploadForm({
             ) : (
               <Upload className="size-4" />
             )}
-            {uploading ? "Uploading…" : "Upload"}
+            {uploading
+              ? tr("components.subtitles.subtitle_upload_form.uploading")
+              : tr("common.actions.upload")}
           </Button>
         )}
       </div>
 
       {selectedFile && (
         <p className={cn("truncate text-xs", isPlayer ? "text-white/60" : "text-muted-foreground")}>
-          Selected: {selectedFile.name}
+          {tr("components.subtitles.subtitle_upload_form.selected")} {selectedFile.name}
         </p>
       )}
 

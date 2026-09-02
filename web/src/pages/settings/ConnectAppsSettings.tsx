@@ -11,7 +11,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import type { Profile } from "@/api/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -31,11 +31,14 @@ import {
   JELLYFIN_APP_EXAMPLES,
   SILO_APP_EXAMPLES,
 } from "./connectApps";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type AppKind = "silo" | "jellyfin";
 
 /** Renders `name#Profile` with the separator tinted so `#` reads as structure. */
 function HashString({ before, after }: { before: string; after: string }) {
+  useUILanguage();
   return (
     <span className="font-mono">
       {before}
@@ -56,6 +59,7 @@ interface FieldRowProps {
 }
 
 function FieldRow({ label, icon: Icon, kind, hint, children, copyValue }: FieldRowProps) {
+  useUILanguage();
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -70,7 +74,9 @@ function FieldRow({ label, icon: Icon, kind, hint, children, copyValue }: FieldR
       await copyTextToClipboard(copyValue);
       setCopied(true);
     } catch {
-      toast.error("Couldn't copy — select the text and copy it manually");
+      toast.error(
+        "errors.settings.connect_apps_settings.couldn_t_copy_select_the_text_and_copy_it_manually",
+      );
     }
   }
 
@@ -88,7 +94,12 @@ function FieldRow({ label, icon: Icon, kind, hint, children, copyValue }: FieldR
       <div className="mt-1.5 flex items-center gap-2">
         <div className="min-w-0 flex-1 text-[15px] break-all">{children}</div>
         {copyValue ? (
-          <Button size="icon-sm" variant="ghost" aria-label={`Copy ${label}`} onClick={handleCopy}>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={tr("pages.settings.connect_apps_settings.copy_label", { label: label })}
+            onClick={handleCopy}
+          >
             {copied ? <Check className="text-success h-4 w-4" /> : <Copy className="h-4 w-4" />}
           </Button>
         ) : null}
@@ -99,6 +110,7 @@ function FieldRow({ label, icon: Icon, kind, hint, children, copyValue }: FieldR
 }
 
 function ScopeBanner({ kind }: { kind: AppKind }) {
+  useUILanguage();
   const isJellyfin = kind === "jellyfin";
   return (
     <div
@@ -114,13 +126,17 @@ function ScopeBanner({ kind }: { kind: AppKind }) {
       )}
       <div className="min-w-0 space-y-0.5">
         <p className="text-sm font-medium">
-          {isJellyfin ? "For Jellyfin-compatible apps only" : "For Silo's own apps"}
+          {isJellyfin
+            ? tr("pages.settings.connect_apps_settings.for_jellyfin_compatible_apps_only")
+            : tr("pages.settings.connect_apps_settings.for_silo_s_own_apps")}
         </p>
         <p className="text-muted-foreground text-xs leading-relaxed">
           {isJellyfin ? JELLYFIN_APP_EXAMPLES : SILO_APP_EXAMPLES}.{" "}
           {isJellyfin
-            ? "These credentials will not work on a Silo sign-in screen."
-            : "Don't add a # to either field here."}
+            ? tr(
+                "pages.settings.connect_apps_settings.these_credentials_will_not_work_on_a_silo_sign_in",
+              )
+            : tr("pages.settings.connect_apps_settings.don_t_add_a_to_either_field_here")}
         </p>
       </div>
     </div>
@@ -136,10 +152,11 @@ function ProfilePicker({
   selectedId: string | null;
   onSelect: (profile: Profile) => void;
 }) {
+  useUILanguage();
   return (
     <div className="space-y-2">
       <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.16em] uppercase">
-        Which profile are you signing in as?
+        {tr("pages.settings.connect_apps_settings.which_profile_are_you_signing_in_as")}
       </p>
       <div className="flex flex-wrap gap-2">
         {profiles.map((profile) => {
@@ -180,6 +197,7 @@ function TroubleshootingPanel({
   accountUsername: string;
   compatURL: string | null;
 }) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
 
   const rows = [
@@ -219,7 +237,9 @@ function TroubleshootingPanel({
       >
         <TriangleAlert className="text-warning h-4 w-4" />
         <span className="text-sm font-semibold">
-          A Jellyfin app says my username or password is wrong
+          {tr(
+            "pages.settings.connect_apps_settings.a_jellyfin_app_says_my_username_or_password_is_wrong",
+          )}
         </span>
         <ChevronDown
           className={cn(
@@ -245,6 +265,7 @@ function TroubleshootingPanel({
 }
 
 export default function ConnectAppsSettings() {
+  useUILanguage();
   const { user, profile: activeProfile } = useAuth();
   const {
     data: profiles = [],
@@ -297,22 +318,31 @@ export default function ConnectAppsSettings() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Connect Apps</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.settings.connect_apps_settings.connect_apps")}
+        </h2>
         <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-          Exactly what to type on a sign-in screen. Pick the kind of app you're using — the
-          credentials are different for each.
+          {tr("pages.settings.connect_apps_settings.exactly_what_to_type_on_a_sign_in_screen_pick")}
         </p>
       </div>
 
       <div
         className="surface-panel-subtle grid grid-cols-1 gap-1 rounded-[1.1rem] p-1 sm:grid-cols-2"
         role="group"
-        aria-label="App type"
+        aria-label={tr("pages.settings.connect_apps_settings.app_type")}
       >
         {(
           [
-            { id: "silo", label: "Silo app or website", icon: MonitorSmartphone },
-            { id: "jellyfin", label: "Jellyfin-compatible app", icon: Cast },
+            {
+              id: "silo",
+              label: tr("pages.settings.connect_apps_settings.silo_app_or_website"),
+              icon: MonitorSmartphone,
+            },
+            {
+              id: "jellyfin",
+              label: tr("pages.settings.connect_apps_settings.jellyfin_compatible_app"),
+              icon: Cast,
+            },
           ] as const
         ).map((option) => {
           const active = option.id === kind;
@@ -355,32 +385,47 @@ export default function ConnectAppsSettings() {
           </div>
         ) : loadFailed ? (
           <div className="border-destructive/40 rounded-md border border-dashed px-3.5 py-4">
-            <p className="text-sm font-medium">Couldn't load your sign-in details</p>
+            <p className="text-sm font-medium">
+              {tr("pages.settings.connect_apps_settings.couldn_t_load_your_sign_in_details")}
+            </p>
             <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-              Reload the page to try again. Credentials are withheld rather than guessed, so nothing
-              here is stale or wrong.
+              {tr(
+                "pages.settings.connect_apps_settings.reload_the_page_to_try_again_credentials_are_withheld_rather",
+              )}
             </p>
           </div>
         ) : isJellyfin && !passwordLoginAvailable ? (
           <div className="border-border rounded-md border border-dashed px-3.5 py-4">
-            <p className="text-sm font-medium">This account can't sign in to a Jellyfin app</p>
+            <p className="text-sm font-medium">
+              {tr(
+                "pages.settings.connect_apps_settings.this_account_can_t_sign_in_to_a_jellyfin_app",
+              )}
+            </p>
             <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-              It signs in through an external provider rather than a Silo password, and the
-              compatibility API only accepts Silo passwords. Use a Silo app, or ask an administrator
-              about an account with password sign-in.
+              {tr(
+                "pages.settings.connect_apps_settings.it_signs_in_through_an_external_provider_rather_than_a",
+              )}
             </p>
           </div>
         ) : isJellyfin && !compatEnabled ? (
           <div className="border-border rounded-md border border-dashed px-3.5 py-4">
             <p className="text-sm font-medium">
               {compatPendingRestart
-                ? "The Jellyfin compatibility API isn't running yet"
-                : "The Jellyfin compatibility API is turned off"}
+                ? tr(
+                    "pages.settings.connect_apps_settings.the_jellyfin_compatibility_api_isn_t_running_yet",
+                  )
+                : tr(
+                    "pages.settings.connect_apps_settings.the_jellyfin_compatibility_api_is_turned_off",
+                  )}
             </p>
             <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
               {compatPendingRestart
-                ? "An administrator has turned it on, but the server has to restart before it starts accepting connections."
-                : "Third-party Jellyfin apps can't reach this server until an administrator enables it in Admin → Settings → Compatibility."}
+                ? tr(
+                    "pages.settings.connect_apps_settings.an_administrator_has_turned_it_on_but_the_server_has",
+                  )
+                : tr(
+                    "pages.settings.connect_apps_settings.third_party_jellyfin_apps_can_t_reach_this_server_until",
+                  )}
             </p>
           </div>
         ) : (
@@ -395,7 +440,7 @@ export default function ConnectAppsSettings() {
 
             <div className="space-y-2.5">
               <FieldRow
-                label="Server"
+                label={tr("pages.settings.connect_apps_settings.server")}
                 icon={Server}
                 kind={kind}
                 copyValue={
@@ -408,8 +453,12 @@ export default function ConnectAppsSettings() {
                 hint={
                   isJellyfin
                     ? compatURLIsLoopback
-                      ? "This address only works on the server itself, so phones and TVs can't reach it. An administrator needs to set the compatibility API's public address."
-                      : "The compatibility API listens on its own address — not the one this page is on."
+                      ? tr(
+                          "pages.settings.connect_apps_settings.this_address_only_works_on_the_server_itself_so_phones",
+                        )
+                      : tr(
+                          "pages.settings.connect_apps_settings.the_compatibility_api_listens_on_its_own_address_not_the",
+                        )
                     : undefined
                 }
               >
@@ -422,7 +471,9 @@ export default function ConnectAppsSettings() {
                     </code>
                   ) : (
                     <span className="text-muted-foreground text-sm">
-                      No public address configured — ask an administrator.
+                      {tr(
+                        "pages.settings.connect_apps_settings.no_public_address_configured_ask_an_administrator",
+                      )}
                     </span>
                   )
                 ) : (
@@ -431,7 +482,7 @@ export default function ConnectAppsSettings() {
               </FieldRow>
 
               <FieldRow
-                label="Username"
+                label={tr("pages.settings.connect_apps_settings.username")}
                 icon={Users}
                 kind={kind}
                 copyValue={
@@ -444,8 +495,11 @@ export default function ConnectAppsSettings() {
                 hint={
                   isJellyfin
                     ? (usernameIssue ??
-                      `Your account name, then #, then the profile name — not just "${accountUsername}".`)
-                    : "Just your account name."
+                      tr(
+                        "pages.settings.connect_apps_settings.your_account_name_then_then_the_profile_name_not_just",
+                        { accountUsername },
+                      ))
+                    : tr("pages.settings.connect_apps_settings.just_your_account_name")
                 }
               >
                 {isJellyfin && selectedProfile ? (
@@ -456,19 +510,23 @@ export default function ConnectAppsSettings() {
               </FieldRow>
 
               <FieldRow
-                label="Password"
+                label={tr("pages.settings.connect_apps_settings.password")}
                 icon={KeyRound}
                 kind={kind}
                 hint={
                   isJellyfin
                     ? buildJellyfinPasswordHint(selectedProfile)
-                    : "Your account password. The profile PIN is asked for separately, in the app."
+                    : tr(
+                        "pages.settings.connect_apps_settings.your_account_password_the_profile_pin_is_asked_for_separately",
+                      )
                 }
               >
                 {isJellyfin && selectedProfile?.has_pin ? (
                   <HashString before="your password" after="PIN" />
                 ) : (
-                  <code className="font-mono">your password</code>
+                  <code className="font-mono">
+                    {tr("pages.settings.connect_apps_settings.your_password")}
+                  </code>
                 )}
               </FieldRow>
             </div>
@@ -477,15 +535,17 @@ export default function ConnectAppsSettings() {
               <p className="text-muted-foreground flex items-start gap-1.5 text-xs leading-relaxed">
                 <X className="text-info mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>
-                  Jellyfin apps offer only two boxes and never prompt for a profile, so the profile
-                  name and PIN are appended here. This format is rejected on a Silo sign-in screen.
+                  {tr(
+                    "pages.settings.connect_apps_settings.jellyfin_apps_offer_only_two_boxes_and_never_prompt_for",
+                  )}
                 </span>
               </p>
             ) : (
               <div className="border-border/70 rounded-md border border-dashed px-3.5 py-2.5">
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  After signing in you'll choose a profile from the profile picker, and
-                  PIN-protected profiles prompt for their PIN there.
+                  {tr(
+                    "pages.settings.connect_apps_settings.after_signing_in_you_ll_choose_a_profile_from_the",
+                  )}
                 </p>
               </div>
             )}
@@ -499,7 +559,9 @@ export default function ConnectAppsSettings() {
 
       {showCompatCredentials && profiles.length > 1 ? (
         <section className="surface-panel rounded-md border px-4 py-4 shadow-none sm:px-5">
-          <h3 className="text-sm font-semibold">Every profile at a glance</h3>
+          <h3 className="text-sm font-semibold">
+            {tr("pages.settings.connect_apps_settings.every_profile_at_a_glance")}
+          </h3>
           <ul className="mt-2.5 space-y-1.5">
             {profiles.map((profile) => {
               // Same guard as the Username field: a name containing # yields a
@@ -513,7 +575,9 @@ export default function ConnectAppsSettings() {
                         {profile.name}
                       </span>
                       <Badge variant="outline" className="text-muted-foreground">
-                        rename to use from a Jellyfin app
+                        {tr(
+                          "pages.settings.connect_apps_settings.rename_to_use_from_a_jellyfin_app",
+                        )}
                       </Badge>
                     </>
                   ) : (
@@ -521,7 +585,7 @@ export default function ConnectAppsSettings() {
                       <HashString before={accountUsername} after={profile.name} />
                       {profile.has_pin ? (
                         <Badge variant="outline" className="text-muted-foreground">
-                          needs #PIN
+                          {tr("pages.settings.connect_apps_settings.needs_pin")}
                         </Badge>
                       ) : null}
                     </>

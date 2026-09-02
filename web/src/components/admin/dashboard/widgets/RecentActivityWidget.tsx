@@ -7,29 +7,40 @@ import { getSessionClientLabel } from "@/pages/adminActivityPresentation";
 import { formatRelativeTime } from "@/lib/date";
 import { ActivitySkeletonRows, SectionError } from "../feedback";
 import { SessionProfilePill } from "./SessionProfilePill";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export function RecentActivityWidget() {
+  useUILanguage();
   const sessionsQuery = useAdminSessions();
   const sessions = sessionsQuery.data ?? [];
 
   return (
     <Card className="h-full">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-sm font-bold">Recent Activity</CardTitle>
+        <CardTitle className="text-sm font-bold">
+          {tr("components.admin.dashboard.widgets.recent_activity_widget.recent_activity")}
+        </CardTitle>
         <Link
           to="/admin/activity"
           className="text-muted-foreground hover:text-primary text-[11px] transition-colors"
         >
-          View all ›
+          {tr("components.admin.dashboard.widgets.recent_activity_widget.view_all")}
         </Link>
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-y-auto">
         {sessionsQuery.isLoading ? (
           <ActivitySkeletonRows />
         ) : sessionsQuery.error ? (
-          <SectionError message="Failed to load activity." />
+          <SectionError
+            message={tr(
+              "components.admin.dashboard.widgets.recent_activity_widget.failed_to_load_activity",
+            )}
+          />
         ) : sessions.length === 0 ? (
-          <div className="text-muted-foreground py-4 text-center text-sm">No recent activity.</div>
+          <div className="text-muted-foreground py-4 text-center text-sm">
+            {tr("components.admin.dashboard.widgets.recent_activity_widget.no_recent_activity")}
+          </div>
         ) : (
           <div className="space-y-0">
             {sessions.slice(0, 10).map((s) => {
@@ -63,9 +74,15 @@ export function RecentActivityWidget() {
                           <SessionProfilePill label={profileDisplay} />
                         </>
                       ) : null}
-                      {" started watching "}
+                      {tr(
+                        "components.admin.dashboard.widgets.recent_activity_widget.started_watching",
+                      )}
                       <Link
-                        to={`/admin/history?user_id=${s.user_id}${s.profile_id ? `&profile_id=${encodeURIComponent(s.profile_id)}` : ""}`}
+                        to={
+                          "/admin/history?user_id=" +
+                          s.user_id +
+                          (s.profile_id ? `&profile_id=${encodeURIComponent(s.profile_id)}` : "")
+                        }
                         className="text-foreground hover:text-primary font-semibold transition-colors"
                       >
                         {title}

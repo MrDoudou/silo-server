@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import type { SubtitleProviderConfig } from "@/api/types";
 import {
@@ -42,6 +42,8 @@ import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { FieldGroup } from "./FieldGroup";
 import { MarkerProviderTiles } from "./MarkerProviderTiles";
 import { SettingField } from "./SettingField";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * MDBList is the only provider on this page whose credential is a server
@@ -74,6 +76,8 @@ function DisconnectButton({
   actionLabel?: string;
   onConfirm: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const [open, setOpen] = useState(false);
 
   return (
@@ -88,7 +92,7 @@ function DisconnectButton({
             <AlertDialogDescription>{description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
@@ -165,6 +169,8 @@ function SubtitleProviderTile({
   test: ProviderTestState | undefined;
   onTested: (test: ProviderTestState | undefined) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   // `null` means "follow the server"; the switch only pins a value while the
   // admin has an unsaved change, so a refetch can't silently flip it back.
   const [enabledDraft, setEnabledDraft] = useState<boolean | null>(null);
@@ -234,15 +240,15 @@ function SubtitleProviderTile({
           onTested({
             ok: result.success,
             message: result.success
-              ? "Connection successful."
-              : (result.error ?? "Connection failed."),
+              ? tr("api.messages.connection_successful")
+              : tr.remote({ message: result.error ?? "Connection failed." }),
             at: Date.now(),
             durationMs: Date.now() - started,
           }),
         onError: (err) =>
           onTested({
             ok: false,
-            message: err instanceof Error ? err.message : "Connection failed.",
+            message: tr.error("errors.admin_settings.providers_settings.connection_failed", err),
             at: Date.now(),
             durationMs: Date.now() - started,
           }),
@@ -280,7 +286,15 @@ function SubtitleProviderTile({
       busy={updateProvider.isPending || testProvider.isPending}
       expanded={expanded}
       primaryAction={{
-        label: test && !test.ok ? "Fix" : configured ? "Manage" : "Connect",
+        get label() {
+          return tr(
+            test && !test.ok
+              ? "pages.admin_settings.providers_settings.fix"
+              : configured
+                ? "pages.admin_settings.providers_settings.manage"
+                : "pages.admin_settings.providers_settings.connect",
+          );
+        },
         onClick: onExpand,
       }}
       headerActions={
@@ -288,7 +302,7 @@ function SubtitleProviderTile({
           <Switch
             checked={enabled}
             onCheckedChange={setEnabledDraft}
-            aria-label={`Enable ${name}`}
+            aria-label={tr("pages.admin_settings.providers_settings.enable_name", { name: name })}
           />
         ) : undefined
       }
@@ -296,15 +310,19 @@ function SubtitleProviderTile({
       {usesAccount ? (
         <>
           <SettingField
-            label="Username"
+            label={tr("pages.admin_settings.providers_settings.username")}
             value={username}
             onChange={handleUsernameChange}
             description={
-              config.has_credentials ? "Leave blank to keep the saved username." : undefined
+              config.has_credentials
+                ? tr(
+                    "pages.admin_settings.providers_settings.leave_blank_to_keep_the_saved_username",
+                  )
+                : undefined
             }
           />
           <SecretField
-            label="Password"
+            label={tr("pages.admin_settings.providers_settings.password")}
             value={password}
             configured={config.has_credentials}
             onChange={handlePasswordChange}
@@ -312,7 +330,7 @@ function SubtitleProviderTile({
         </>
       ) : (
         <SecretField
-          label="API key"
+          label={tr("pages.admin_settings.providers_settings.api_key")}
           value={apiKey}
           configured={config.has_api_key}
           onChange={handleApiKeyChange}
@@ -320,7 +338,9 @@ function SubtitleProviderTile({
       )}
       <ProviderPanelActions test={test}>
         <Button type="button" size="sm" onClick={handleSave} disabled={updateProvider.isPending}>
-          {updateProvider.isPending ? "Saving..." : "Save"}
+          {updateProvider.isPending
+            ? tr("pages.admin_settings.providers_settings.saving")
+            : tr("common.actions.save")}
         </Button>
         <Button
           type="button"
@@ -329,21 +349,30 @@ function SubtitleProviderTile({
           onClick={handleTest}
           disabled={testProvider.isPending}
         >
-          {testProvider.isPending ? "Testing..." : "Test connection"}
+          {testProvider.isPending
+            ? tr("pages.admin_settings.providers_settings.testing")
+            : tr("pages.admin_settings.providers_settings.test_connection")}
         </Button>
         {configured ? (
           <DisconnectButton
-            title={`Clear ${name} credentials?`}
-            description={`${name} is turned off and removed from subtitle searches right away.`}
+            title={tr("pages.admin_settings.providers_settings.clear_name_credentials", {
+              name: name,
+            })}
+            description={tr(
+              "pages.admin_settings.providers_settings.name_is_turned_off_and_removed_from_subtitle_searches_right",
+              { name: name },
+            )}
             actionLabel="Clear and turn off"
             onConfirm={handleClear}
           />
         ) : null}
         <Button type="button" size="sm" variant="outline" onClick={onCollapse}>
-          Close
+          {tr("common.actions.close")}
         </Button>
       </ProviderPanelActions>
-      <p className="text-muted-foreground mt-2 text-xs">Test uses the values typed here.</p>
+      <p className="text-muted-foreground mt-2 text-xs">
+        {tr("pages.admin_settings.providers_settings.test_uses_the_values_typed_here")}
+      </p>
     </ProviderTile>
   );
 }
@@ -369,6 +398,8 @@ function MDBListTile({
   test: ProviderTestState | undefined;
   onTested: (test: ProviderTestState | undefined) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const updateSettings = useUpdateServerSettings();
   const checkConnection = useCheckAdminSettingsConnection();
   const [apiKey, setApiKey] = useState("");
@@ -380,14 +411,14 @@ function MDBListTile({
 
   async function save() {
     if (!hasDraft) {
-      toast.info("Nothing to save for MDBList.");
+      toast.info("feedback.admin_settings.providers_settings.nothing_to_save_for_mdblist");
       return;
     }
     try {
       await updateSettings.mutateAsync({ "mdblist.api_key": apiKey });
       setApiKey("");
       onTested(undefined);
-      toast.success("MDBList credentials saved");
+      toast.success("feedback.admin_settings.providers_settings.mdblist_credentials_saved");
     } catch {
       // The mutation surfaces the API error.
     }
@@ -398,7 +429,7 @@ function MDBListTile({
       await updateSettings.mutateAsync({ "mdblist.api_key": "" });
       setApiKey("");
       onTested(undefined);
-      toast.success("MDBList credentials cleared");
+      toast.success("feedback.admin_settings.providers_settings.mdblist_credentials_cleared");
     } catch {
       // The mutation surfaces the API error.
     }
@@ -416,11 +447,19 @@ function MDBListTile({
           },
         }),
       );
-      onTested({ ok: result.success, message: result.message, at: Date.now(), durationMs });
+      onTested({
+        ok: result.success,
+        message: tr.remote({ message: result.message }),
+        at: Date.now(),
+        durationMs,
+      });
     } catch (error) {
       onTested({
         ok: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error(
+          "errors.admin_settings.providers_settings.connection_check_failed",
+          error,
+        ),
         at: Date.now(),
         durationMs: 0,
       });
@@ -435,7 +474,7 @@ function MDBListTile({
   return (
     <ProviderTile
       name="MDBList"
-      tagline="Ratings and lists"
+      tagline={tr("pages.admin_settings.providers_settings.ratings_and_lists")}
       monogram="MD"
       monogramClass="bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
       state={state}
@@ -445,24 +484,34 @@ function MDBListTile({
       // A pending restart has to be visible without opening the tile.
       badge={restartKeys.has("mdblist.api_key") ? <RestartBadge /> : undefined}
       primaryAction={{
-        label: test && !test.ok ? "Fix" : configured ? "Manage" : "Connect",
+        get label() {
+          return tr(
+            test && !test.ok
+              ? "pages.admin_settings.providers_settings.fix"
+              : configured
+                ? "pages.admin_settings.providers_settings.manage"
+                : "pages.admin_settings.providers_settings.connect",
+          );
+        },
         onClick: onExpand,
       }}
     >
       <p className="text-muted-foreground mb-1 text-xs">
-        A key adds search and browse; list URLs import without one. Get a key at{" "}
+        {tr(
+          "pages.admin_settings.providers_settings.a_key_adds_search_and_browse_list_urls_import_without",
+        )}{" "}
         <a
           href="https://mdblist.com/preferences/#api"
           target="_blank"
           rel="noreferrer"
           className="underline"
         >
-          mdblist.com/preferences
+          {tr("pages.admin_settings.providers_settings.mdblist_com_preferences")}
         </a>
         .
       </p>
       <SecretField
-        label="API key"
+        label={tr("pages.admin_settings.providers_settings.api_key")}
         value={apiKey}
         configured={configured}
         onChange={(next) => {
@@ -479,7 +528,9 @@ function MDBListTile({
           onClick={() => void save()}
           disabled={updateSettings.isPending}
         >
-          {updateSettings.isPending ? "Saving..." : "Save"}
+          {updateSettings.isPending
+            ? tr("pages.admin_settings.providers_settings.saving")
+            : tr("common.actions.save")}
         </Button>
         <Button
           type="button"
@@ -488,21 +539,27 @@ function MDBListTile({
           onClick={() => void runTest()}
           disabled={testing || (!configured && !hasDraft)}
         >
-          {testing ? "Testing..." : "Test connection"}
+          {testing
+            ? tr("pages.admin_settings.providers_settings.testing")
+            : tr("pages.admin_settings.providers_settings.test_connection")}
         </Button>
         {configured ? (
           <DisconnectButton
-            title="Clear MDBList credentials?"
-            description="MDBList search and browse stop working. Lists already imported by URL are unaffected."
+            title={tr("pages.admin_settings.providers_settings.clear_mdblist_credentials")}
+            description={tr(
+              "pages.admin_settings.providers_settings.mdblist_search_and_browse_stop_working_lists_already_imported_by",
+            )}
             onConfirm={() => void clearAll()}
           />
         ) : null}
         <Button type="button" size="sm" variant="outline" onClick={onCollapse}>
-          Close
+          {tr("common.actions.close")}
         </Button>
       </ProviderPanelActions>
       <p className="text-muted-foreground mt-2 text-xs">
-        Test uses the key typed here, or the saved one.
+        {tr(
+          "pages.admin_settings.providers_settings.test_uses_the_key_typed_here_or_the_saved_one",
+        )}
       </p>
     </ProviderTile>
   );
@@ -513,6 +570,8 @@ function MDBListTile({
 // ---------------------------------------------------------------------------
 
 export default function ProvidersSettings() {
+  useUILanguage();
+  useUILanguage();
   const form = useSettingsForm({ keys: KEYS });
   const restartKeys = useRestartKeys();
   const { data, isLoading } = useSubtitleProviders();
@@ -543,24 +602,34 @@ export default function ProvidersSettings() {
 
   if (form.isLoading || isLoading) {
     return (
-      <div className="max-w-5xl space-y-6" role="status" aria-label="Loading providers">
+      <div
+        className="max-w-5xl space-y-6"
+        role="status"
+        aria-label={tr("pages.admin_settings.providers_settings.loading_providers")}
+      >
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-40 w-full" />
-        <span className="sr-only">Loading providers</span>
+        <span className="sr-only">
+          {tr("pages.admin_settings.providers_settings.loading_providers")}
+        </span>
       </div>
     );
   }
 
   return (
     <div className="flex h-full max-w-5xl flex-col gap-7">
-      <SettingsPageHeader title="Subtitles & Metadata" />
+      <SettingsPageHeader
+        title={tr("pages.admin_settings.providers_settings.subtitles_metadata")}
+      />
 
-      <FieldGroup label="Subtitle providers">
+      <FieldGroup label={tr("pages.admin_settings.providers_settings.subtitle_providers")}>
         <div className="py-3.5">
           {providers.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No subtitle providers are available.</p>
+            <p className="text-muted-foreground text-sm">
+              {tr("pages.admin_settings.providers_settings.no_subtitle_providers_are_available")}
+            </p>
           ) : (
             <ProviderTileGrid>
               {providers.map((provider) => (
@@ -579,7 +648,7 @@ export default function ProvidersSettings() {
         </div>
       </FieldGroup>
 
-      <FieldGroup label="Metadata providers">
+      <FieldGroup label={tr("pages.admin_settings.providers_settings.metadata_providers")}>
         <div className="space-y-3 py-3.5">
           <ProviderTileGrid>
             <MDBListTile
@@ -593,9 +662,9 @@ export default function ProvidersSettings() {
             />
           </ProviderTileGrid>
           <p className="text-muted-foreground text-xs">
-            TMDB and TheTVDB connect from{" "}
+            {tr("pages.admin_settings.providers_settings.tmdb_and_the_tvdb_connect_from")}{" "}
             <Link to="/admin/plugins" className="underline underline-offset-2">
-              Plugins
+              {tr("pages.admin_settings.providers_settings.plugins")}
             </Link>
             .
           </p>
@@ -608,7 +677,7 @@ export default function ProvidersSettings() {
         does — lookup order, whether this server contributes back — is provider
         configuration and belongs beside the other providers.
       */}
-      <FieldGroup label="Marker providers">
+      <FieldGroup label={tr("pages.admin_settings.providers_settings.marker_providers")}>
         <div className="space-y-3 py-3.5">
           <MarkerProviderTiles
             expandedTile={expandedTile}
@@ -618,25 +687,25 @@ export default function ProvidersSettings() {
           <p className="text-muted-foreground text-xs">
             {offlineMarkerMode ? (
               <>
-                Nothing here is searched right now:{" "}
+                {tr("pages.admin_settings.providers_settings.nothing_here_is_searched_right_now")}{" "}
                 <Link
                   to="/admin/settings/library"
                   className="hover:text-foreground font-medium underline underline-offset-2 transition-colors"
                 >
-                  Find intros and credits
+                  {tr("pages.admin_settings.providers_settings.find_intros_and_credits")}
                 </Link>{" "}
-                is set to {offlineMarkerMode}.
+                {tr("pages.admin_settings.providers_settings.is_set_to")} {offlineMarkerMode}.
               </>
             ) : (
               <>
-                Providers are searched when{" "}
+                {tr("pages.admin_settings.providers_settings.providers_are_searched_when")}{" "}
                 <Link
                   to="/admin/settings/library"
                   className="hover:text-foreground font-medium underline underline-offset-2 transition-colors"
                 >
-                  Find intros and credits
+                  {tr("pages.admin_settings.providers_settings.find_intros_and_credits")}
                 </Link>{" "}
-                looks online.
+                {tr("pages.admin_settings.providers_settings.looks_online")}
               </>
             )}
           </p>

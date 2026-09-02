@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { adminRefreshPerson, adminUpdatePerson, refreshPerson, searchPeople } from "@/api/client";
 import type { Person, PersonRefreshQueuedResponse, UpdatePersonRequest } from "@/api/types";
@@ -52,14 +52,14 @@ export function useRefreshPerson(id: string | undefined, isAdmin: boolean) {
       if (result.mode === "admin" && id) {
         queryClient.setQueryData(personKeys.detail(id), result.person);
         await queryClient.invalidateQueries({ queryKey: personKeys.detail(id) });
-        toast.success("Person metadata refreshed");
+        toast.success("feedback.queries.people.person_metadata_refreshed");
         return;
       }
 
-      toast.success("Person refresh queued");
+      toast.success("feedback.queries.people.person_refresh_queued");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Refresh failed");
+      toast.error("errors.queries.people.refresh_failed", { error: err });
     },
   });
 }
@@ -82,10 +82,10 @@ export function useUpdatePersonMetadata(id: string | undefined) {
 
       queryClient.setQueryData(personKeys.detail(id), updatedPerson);
       await queryClient.invalidateQueries({ queryKey: personKeys.detail(id) });
-      toast.success("Person metadata saved");
+      toast.success("feedback.queries.people.person_metadata_saved");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save metadata");
+      toast.error("errors.queries.people.failed_to_save_metadata", { error: err });
     },
   });
 }

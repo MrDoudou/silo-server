@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { tr } from "@/i18n/translate";
+
 import { ApiClientError, api } from "@/api/client";
 import type {
   SectionsResponse,
@@ -16,7 +18,6 @@ import type {
 import { sectionKeys } from "./keys";
 import { invalidateAdminCollectionQueries } from "./collectionSurfaceRefresh";
 import { runBulkDelete, type BulkDeleteProgress } from "./bulkDelete";
-
 /**
  * Home section data outlives the default client-wide gcTime on purpose.
  *
@@ -231,14 +232,21 @@ export function useDeleteSections() {
       ),
     onSuccess: async ({ requested, deleted, failed, firstError }) => {
       if (failed === 0) {
-        toast.success(`Deleted ${deleted} section${deleted === 1 ? "" : "s"}`);
+        toast.success("feedback.queries.sections.deleted_count_sections", {
+          values: { count: deleted },
+        });
       } else if (deleted > 0) {
-        toast.warning(`Deleted ${deleted} of ${requested} sections`, {
-          description: firstError,
+        toast.warning("feedback.queries.sections.deleted_deleted_of_requested_sections", {
+          values: {
+            deleted,
+            requested,
+          },
+          resolvedDescription: firstError ? tr.remote({ message: firstError }) : undefined,
         });
       } else {
-        toast.error(`Failed to delete ${failed} section${failed === 1 ? "" : "s"}`, {
-          description: firstError,
+        toast.error("errors.queries.sections.sections_not_deleted_count", {
+          values: { count: failed },
+          resolvedDescription: firstError ? tr.remote({ message: firstError }) : undefined,
         });
       }
       await Promise.all([

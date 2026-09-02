@@ -21,6 +21,8 @@ import {
   updateLibraryPageSearchParams,
   type LibraryBrowseType,
 } from "./libraryPageSearchParams";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const LIBRARY_SAVE_RETRY_DELAYS_MS = [2_000, 5_000] as const;
 
@@ -38,6 +40,7 @@ interface HydratedLibrarySearch {
 }
 
 export default function LibraryPage() {
+  useUILanguage();
   const { libraryId } = useParams<{ libraryId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: libraries, isLoading } = useUserLibraries();
@@ -114,7 +117,7 @@ export default function LibraryPage() {
     setHasRenderedHero(rendered);
   }, []);
 
-  useDocumentTitle(library?.name ?? "Library");
+  useDocumentTitle(library?.name ?? tr("pages.library_page.library"));
 
   /* eslint-disable react-hooks/set-state-in-effect -- hydration provenance is synchronized with router state */
   useEffect(() => {
@@ -419,9 +422,9 @@ export default function LibraryPage() {
   if (!library) {
     return (
       <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-        <p>This library is hidden or unavailable for your account.</p>
+        <p>{tr("pages.library_page.this_library_is_hidden_or_unavailable_for_your_account")}</p>
         <Link to="/settings/libraries" className="text-primary text-sm font-medium hover:underline">
-          Manage library visibility in Settings
+          {tr("pages.library_page.manage_library_visibility_in_settings")}
         </Link>
       </div>
     );

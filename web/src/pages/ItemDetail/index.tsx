@@ -4,7 +4,7 @@ import { useCatalogItemDetail } from "@/hooks/queries/catalogRead";
 import type { ItemDetail } from "@/api/types";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import MovieContent from "@/pages/ItemDetail/MovieContent";
 import SeriesContent from "@/pages/ItemDetail/SeriesContent";
 import SeasonContent from "@/pages/ItemDetail/SeasonContent";
@@ -22,6 +22,8 @@ import {
   useSidebarItemEnteredFromHome,
 } from "@/components/sidebarItemNavigationContext";
 import { parseOptionalLibraryId } from "@/components/sidebarItemNavigation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function ItemDetailSkeleton() {
   return (
@@ -100,6 +102,7 @@ function getHomeItemTransitionShape(item?: ItemDetail): HomeItemTransitionShape 
 }
 
 function HomeItemTransitionShell({ item }: { item?: ItemDetail }) {
+  useUILanguage();
   const [shape] = useState(() => getHomeItemTransitionShape(item));
   const { compact, hidePoster, squarePoster, hasLogo } = shape;
 
@@ -109,28 +112,30 @@ function HomeItemTransitionShell({ item }: { item?: ItemDetail }) {
       className="bg-background min-h-screen"
       aria-busy="true"
     >
-      <span className="sr-only">Loading item details</span>
+      <span className="sr-only">{tr("pages.item_detail.loading_item_details")}</span>
       <section aria-hidden="true" className="border-border/10 border-b">
         <div
-          className={`page-shell-wide flex flex-col justify-end pb-8 ${
-            compact
+          className={
+            "page-shell-wide flex flex-col justify-end pb-8 " +
+            (compact
               ? "min-h-[max(35vh,300px)] pt-20 lg:min-h-[42vh]"
-              : "min-h-[60dvh] pt-28 lg:min-h-[72dvh]"
-          }`}
+              : "min-h-[60dvh] pt-28 lg:min-h-[72dvh]")
+          }
         >
-          <div className={`flex flex-col gap-6 ${!hidePoster ? "lg:flex-row lg:items-end" : ""}`}>
+          <div className={"flex flex-col gap-6 " + (!hidePoster ? "lg:flex-row lg:items-end" : "")}>
             {!hidePoster && (
               <div
                 data-testid="home-item-transition-poster"
-                className={`home-item-transition-block flex-shrink-0 rounded-lg border border-solid shadow-[var(--shadow-md)] ${
-                  squarePoster
+                className={
+                  "home-item-transition-block flex-shrink-0 rounded-lg border border-solid shadow-[var(--shadow-md)] " +
+                  (squarePoster
                     ? compact
                       ? "aspect-square w-[180px] sm:w-[200px]"
                       : "aspect-square w-[200px] sm:w-[260px]"
                     : compact
                       ? "aspect-[2/3] w-[140px] sm:w-[160px]"
-                      : "aspect-[2/3] w-[170px] sm:w-[220px]"
-                }`}
+                      : "aspect-[2/3] w-[170px] sm:w-[220px]")
+                }
               />
             )}
 
@@ -138,13 +143,14 @@ function HomeItemTransitionShell({ item }: { item?: ItemDetail }) {
               <div className="home-item-transition-block mb-4 h-3 w-16 rounded-full" />
               <div
                 data-testid="home-item-transition-title"
-                className={`home-item-transition-block mb-4 rounded-lg ${
-                  hasLogo
+                className={
+                  "home-item-transition-block mb-4 rounded-lg " +
+                  (hasLogo
                     ? "h-20 w-full max-w-[420px] lg:h-28 lg:max-w-[480px]"
                     : compact
                       ? "h-10 w-full max-w-sm sm:h-11"
-                      : "h-12 w-full max-w-lg sm:h-14 lg:h-16"
-                }`}
+                      : "h-12 w-full max-w-lg sm:h-14 lg:h-16")
+                }
               />
               <div className="home-item-transition-block mb-4 h-5 w-52 max-w-full rounded-md" />
               <div className="home-item-transition-block mb-4 h-4 w-36 rounded-md" />
@@ -162,6 +168,7 @@ function HomeItemTransitionShell({ item }: { item?: ItemDetail }) {
 }
 
 export default function ItemDetail() {
+  useUILanguage();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const libraryId = parseOptionalLibraryId(searchParams.get("libraryId"));
@@ -169,11 +176,11 @@ export default function ItemDetail() {
   const itemDetailsReady = useSidebarItemDetailsReady();
   const enteredItemFromHome = useSidebarItemEnteredFromHome();
 
-  useDocumentTitle(item?.title ?? "Item");
+  useDocumentTitle(item?.title ?? tr("pages.item_detail.item"));
 
   useEffect(() => {
     if (itemError) {
-      toast.error(itemError instanceof Error ? itemError.message : "Failed to load item");
+      toast.error("errors.item_detail.failed_to_load_item", { error: itemError });
     }
   }, [itemError]);
 
@@ -185,7 +192,11 @@ export default function ItemDetail() {
   }
 
   if (!item) {
-    return <div className="page-shell text-muted-foreground py-8">Item not found.</div>;
+    return (
+      <div className="page-shell text-muted-foreground py-8">
+        {tr("pages.item_detail.item_not_found")}
+      </div>
+    );
   }
 
   switch (item.type) {
@@ -206,11 +217,11 @@ export default function ItemDetail() {
     case "manga":
       return <MangaContent item={item as ItemDetail & { type: "manga" }} libraryId={libraryId} />;
     case "podcast":
-      return <Navigate to={`/podcasts/show/${item.content_id}`} replace />;
+      return <Navigate to={"/podcasts/show/" + item.content_id} replace />;
     default:
       return (
         <div className="page-shell text-muted-foreground py-8">
-          Unsupported item type: {item.type}
+          {tr("pages.item_detail.unsupported_item_type")} {item.type}
         </div>
       );
   }

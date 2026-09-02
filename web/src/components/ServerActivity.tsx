@@ -18,6 +18,9 @@ import {
 } from "@/pages/adminActivityPresentation";
 import { cn } from "@/lib/utils";
 import { clampTaskProgress, formatTaskProgress } from "@/lib/taskProgress";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 const CONNECTION_PROBLEM_INDICATOR_DELAY_MS = 4_000;
 const MAX_ACTIVITY_SCAN_ROWS = 25;
@@ -103,6 +106,7 @@ function useDelayedConnectionProblem(connectionState: RealtimeConnectionState) {
 }
 
 export default function ServerActivity({ hideWhenEmpty = false, className }: ServerActivityProps) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
@@ -132,8 +136,11 @@ export default function ServerActivity({ hideWhenEmpty = false, className }: Ser
           type="button"
           aria-label={
             totalActive > 0
-              ? `Server activity: ${activeScansMayBeTruncated ? "at least " : ""}${totalActive} active`
-              : "Server activity"
+              ? tr("components.server_activity.server_activity_value_total_active_active", {
+                  value: activeScansMayBeTruncated ? "at least " : "",
+                  totalActive: totalActive,
+                })
+              : tr("components.server_activity.server_activity")
           }
           className={cn(
             "hover:bg-accent/60 relative flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
@@ -141,9 +148,9 @@ export default function ServerActivity({ hideWhenEmpty = false, className }: Ser
           )}
         >
           <Activity
-            className={`h-[18px] w-[18px] ${
-              totalActive > 0 ? "text-primary" : "text-muted-foreground"
-            }`}
+            className={
+              "h-[18px] w-[18px] " + (totalActive > 0 ? "text-primary" : "text-muted-foreground")
+            }
           />
           {totalActive > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] animate-[pulse-opacity_2s_ease-in-out_infinite] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm">
@@ -168,10 +175,14 @@ export default function ServerActivity({ hideWhenEmpty = false, className }: Ser
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[color-mix(in_srgb,var(--border)_50%,transparent)] px-4 py-3">
-            <span className="text-[13px] font-bold">Server Activity</span>
+            <span className="text-[13px] font-bold">
+              {tr("components.server_activity.server_activity_facd3d18")}
+            </span>
             {connectionState !== "live" && (
               <span className="text-warning text-[10px] font-medium">
-                {connectionState === "connecting" ? "Connecting…" : "Disconnected"}
+                {connectionState === "connecting"
+                  ? tr("components.server_activity.connecting")
+                  : tr("components.server_activity.disconnected")}
               </span>
             )}
           </div>
@@ -179,13 +190,13 @@ export default function ServerActivity({ hideWhenEmpty = false, className }: Ser
           <div className="max-h-[400px] overflow-y-auto">
             {totalActive === 0 && scansLoaded ? (
               <div className="text-muted-foreground px-4 py-8 text-center text-sm">
-                No active server activity
+                {tr("components.server_activity.no_active_server_activity")}
               </div>
             ) : (
               <>
                 {/* Streams */}
                 <ActivitySection
-                  title="Streams"
+                  title={tr("components.server_activity.streams")}
                   count={sessions.length}
                   href="/admin/activity"
                   onNavigate={() => setOpen(false)}
@@ -199,13 +210,13 @@ export default function ServerActivity({ hideWhenEmpty = false, className }: Ser
                         ))}
                     </div>
                   ) : (
-                    <EmptyRow>No active streams</EmptyRow>
+                    <EmptyRow>{tr("components.server_activity.no_active_streams")}</EmptyRow>
                   )}
                 </ActivitySection>
 
                 {/* Tasks */}
                 <ActivitySection
-                  title="Tasks"
+                  title={tr("components.server_activity.tasks")}
                   count={runningTasks.length}
                   href="/admin/tasks"
                   onNavigate={() => setOpen(false)}
@@ -217,13 +228,13 @@ export default function ServerActivity({ hideWhenEmpty = false, className }: Ser
                       ))}
                     </div>
                   ) : (
-                    <EmptyRow>No running tasks</EmptyRow>
+                    <EmptyRow>{tr("components.server_activity.no_running_tasks")}</EmptyRow>
                   )}
                 </ActivitySection>
 
                 {/* Scans */}
                 <ActivitySection
-                  title="Scans"
+                  title={tr("components.server_activity.scans")}
                   count={activeScans.length}
                   countIsLowerBound={activeScansMayBeTruncated}
                   href="/admin/libraries"
@@ -242,13 +253,13 @@ export default function ServerActivity({ hideWhenEmpty = false, className }: Ser
                       {hiddenActiveScanCount > 0 && (
                         <MoreRows
                           count={hiddenActiveScanCount}
-                          label="more scans queued"
+                          label={tr("components.server_activity.more_scans_queued")}
                           countIsLowerBound={activeScansMayBeTruncated}
                         />
                       )}
                     </div>
                   ) : (
-                    <EmptyRow>No active scans</EmptyRow>
+                    <EmptyRow>{tr("components.server_activity.no_active_scans")}</EmptyRow>
                   )}
                 </ActivitySection>
               </>
@@ -279,6 +290,7 @@ function ActivitySection({
   last?: boolean;
   children: React.ReactNode;
 }) {
+  useUILanguage();
   return (
     <div
       className={
@@ -303,7 +315,7 @@ function ActivitySection({
           onClick={onNavigate}
           className="text-muted-foreground hover:text-primary flex items-center gap-0.5 text-[10px] font-medium transition-colors"
         >
-          View all
+          {tr("components.server_activity.view_all")}
           <ChevronRight className="h-3 w-3" />
         </Link>
       </div>
@@ -320,10 +332,11 @@ function formatBadgeCount(count: number, countIsLowerBound = false) {
 }
 
 function StreamCountRow({ method, count }: { method: string; count: number }) {
+  useUILanguage();
   const meta = activityMethodMeta(method);
   return (
     <div className="flex items-center gap-2.5">
-      <span className={`h-2 w-2 rounded-full ${meta.swatchClass}`} />
+      <span className={"h-2 w-2 rounded-full " + meta.swatchClass} />
       <span className="text-[12px] font-medium">
         {count} {meta.label}
       </span>
@@ -332,6 +345,7 @@ function StreamCountRow({ method, count }: { method: string; count: number }) {
 }
 
 function TaskRow({ task }: { task: TaskInfo }) {
+  useUILanguage();
   const hasDeterminateProgress = task.progress > 0;
 
   return (
@@ -345,7 +359,7 @@ function TaskRow({ task }: { task: TaskInfo }) {
         ) : (
           <span className="text-primary ml-2 flex shrink-0 items-center gap-1 text-[10px] font-semibold">
             <Loader className="h-3 w-3 animate-spin" aria-hidden="true" />
-            Running
+            {tr("components.server_activity.running")}
           </span>
         )}
       </div>
@@ -365,6 +379,7 @@ function TaskRow({ task }: { task: TaskInfo }) {
 }
 
 function ScanRow({ scan, libraryName }: { scan: ScanRun; libraryName: string }) {
+  useUILanguage();
   const progressLabel = formatScanProgress(scan);
   return (
     <div className="flex items-start gap-2.5">
@@ -377,12 +392,14 @@ function ScanRow({ scan, libraryName }: { scan: ScanRun; libraryName: string }) 
         <div className="flex items-center gap-2">
           <span className="truncate text-[12px] font-medium">{libraryName}</span>
           <span className="text-muted-foreground ml-auto shrink-0 text-[10px]">
-            {scan.status === "running" ? "Scanning…" : "Queued"}
+            {scan.status === "running"
+              ? tr("components.server_activity.scanning")
+              : tr("components.server_activity.queued")}
           </span>
         </div>
         <div className="text-muted-foreground truncate text-[10px]">
           {formatScanLabel(scan)}
-          {scan.path ? ` · ${scan.path}` : ""}
+          {scan.path ? tr("components.server_activity.path", { path: scan.path }) : ""}
         </div>
         {progressLabel && (
           <div className="text-muted-foreground/80 truncate text-[10px]">{progressLabel}</div>
@@ -415,15 +432,23 @@ function formatScanProgress(scan: ScanRun) {
       0,
       Math.min(100, Math.round((result.files_processed / result.total_files) * 100)),
     );
-    return `${result.message ?? "Processing files"} · ${result.files_processed.toLocaleString()} / ${result.total_files.toLocaleString()} (${percent}%)`;
+    return tr("components.server_activity.message_processed_total_percent", {
+      message: result.message
+        ? tr.remote({ message: result.message })
+        : tr("components.server_activity.processing_files"),
+      processed: result.files_processed.toLocaleString(),
+      total: result.total_files.toLocaleString(),
+      percent,
+    });
   }
   if (result.message) {
-    return result.message;
+    return tr.remote({ message: result.message });
   }
   return null;
 }
 
 function EmptyRow({ children }: { children: React.ReactNode }) {
+  useUILanguage();
   return <div className="text-muted-foreground py-1 text-[11px]">{children}</div>;
 }
 
@@ -436,9 +461,10 @@ function MoreRows({
   label: string;
   countIsLowerBound?: boolean;
 }) {
+  useUILanguage();
   return (
     <div className="text-muted-foreground border-t border-[color-mix(in_srgb,var(--border)_35%,transparent)] pt-1.5 text-[11px]">
-      {countIsLowerBound ? "At least " : ""}
+      {countIsLowerBound ? tr("components.server_activity.at_least") : ""}
       {count.toLocaleString()} {label}
     </div>
   );

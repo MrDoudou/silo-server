@@ -6,6 +6,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getDefaultQuerySortOrder, getQuerySortOptions } from "@/lib/querySortOptions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface Filters {
   type: string;
@@ -19,18 +21,19 @@ interface FilterBarProps {
 }
 
 export default function FilterBar({ filters, onChange }: FilterBarProps) {
+  useUILanguage();
   const sortOptions = getQuerySortOptions(false);
 
   return (
     <div className="flex flex-wrap gap-3">
       <Select value={filters.type} onValueChange={(v) => onChange({ ...filters, type: v })}>
         <SelectTrigger className="w-32">
-          <SelectValue placeholder="Type" />
+          <SelectValue placeholder={tr("components.filter_bar.type")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All</SelectItem>
-          <SelectItem value="movie">Movies</SelectItem>
-          <SelectItem value="series">Series</SelectItem>
+          <SelectItem value="all">{tr("components.filter_bar.all")}</SelectItem>
+          <SelectItem value="movie">{tr("components.filter_bar.movies")}</SelectItem>
+          <SelectItem value="series">{tr("components.filter_bar.series")}</SelectItem>
         </SelectContent>
       </Select>
 
@@ -39,7 +42,7 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
         onValueChange={(v) => onChange({ ...filters, sort: v, order: getDefaultQuerySortOrder(v) })}
       >
         <SelectTrigger className="w-40">
-          <SelectValue placeholder="Sort by" />
+          <SelectValue placeholder={tr("components.filter_bar.sort_by")} />
         </SelectTrigger>
         <SelectContent>
           {sortOptions.map((option) => (
@@ -52,11 +55,11 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
 
       <Select value={filters.order} onValueChange={(v) => onChange({ ...filters, order: v })}>
         <SelectTrigger className="w-28">
-          <SelectValue placeholder="Order" />
+          <SelectValue placeholder={tr("components.filter_bar.order")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="desc">Desc</SelectItem>
-          <SelectItem value="asc">Asc</SelectItem>
+          <SelectItem value="desc">{tr("components.filter_bar.desc")}</SelectItem>
+          <SelectItem value="asc">{tr("components.filter_bar.asc")}</SelectItem>
         </SelectContent>
       </Select>
     </div>

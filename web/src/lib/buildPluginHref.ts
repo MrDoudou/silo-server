@@ -1,4 +1,5 @@
 import { api } from "@/api/client";
+import { currentLanguage } from "@/i18n";
 
 // Plugin SPAs run behind the plugin proxy, which authenticates each request
 // via Authorization header or a short-lived HttpOnly launch cookie. A full-page
@@ -7,6 +8,7 @@ export function buildPluginHref(basePath: string): string {
   const theme = document.documentElement.dataset.theme;
   const params = new URLSearchParams();
   if (theme) params.set("theme", theme);
+  params.set("lang", currentLanguage());
   const qs = params.toString();
   if (!qs) return basePath;
   const sep = basePath.includes("?") ? "&" : "?";

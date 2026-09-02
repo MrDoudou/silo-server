@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { adminKeys } from "../keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 interface JobStatus {
   running: boolean;
@@ -32,7 +32,9 @@ export function useTriggerEmbeddings() {
       queryClient.invalidateQueries({ queryKey: adminKeys.recommendationsStatus() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to trigger embeddings");
+      toast.error("errors.queries.admin.recommendations.failed_to_trigger_embeddings", {
+        error: err,
+      });
     },
   });
 }
@@ -45,7 +47,9 @@ export function useTriggerTasteProfiles() {
       queryClient.invalidateQueries({ queryKey: adminKeys.recommendationsStatus() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to trigger taste profiles");
+      toast.error("errors.queries.admin.recommendations.failed_to_trigger_taste_profiles", {
+        error: err,
+      });
     },
   });
 }
@@ -58,7 +62,9 @@ export function useTriggerCowatch() {
       queryClient.invalidateQueries({ queryKey: adminKeys.recommendationsStatus() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to trigger co-watch computation");
+      toast.error("errors.queries.admin.recommendations.failed_to_trigger_co_watch_computation", {
+        error: err,
+      });
     },
   });
 }
@@ -71,7 +77,9 @@ export function useTriggerRecommendations() {
       queryClient.invalidateQueries({ queryKey: adminKeys.recommendationsStatus() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to trigger recommendations");
+      toast.error("errors.queries.admin.recommendations.failed_to_trigger_recommendations", {
+        error: err,
+      });
     },
   });
 }

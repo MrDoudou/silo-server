@@ -14,7 +14,7 @@ import type {
   NotificationUnreadCountResponse,
 } from "@/api/types";
 import { notificationKeys } from "./keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 const NOTIFICATIONS_PAGE_SIZE = 25;
 
@@ -54,7 +54,7 @@ export function useMarkNotificationRead() {
       applyNotificationRead(queryClient, { profile_id: "", id });
     },
     onError: () => {
-      toast.error("Failed to mark notification read");
+      toast.error("errors.queries.notifications.failed_to_mark_notification_read");
       void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     },
   });
@@ -68,7 +68,7 @@ export function useMarkAllNotificationsRead() {
       applyNotificationRead(queryClient, { profile_id: "", all: true });
     },
     onError: () => {
-      toast.error("Failed to mark notifications read");
+      toast.error("errors.queries.notifications.failed_to_mark_notifications_read");
       void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     },
   });
@@ -93,7 +93,7 @@ export function useUpdateNotificationPreferences() {
       queryClient.setQueryData(notificationKeys.preferences(), prefs);
     },
     onError: () => {
-      toast.error("Failed to save notification preferences");
+      toast.error("errors.queries.notifications.failed_to_save_notification_preferences");
     },
   });
 }
@@ -118,7 +118,9 @@ export function useUpdateEmailNotificationPreferences() {
       queryClient.setQueryData(notificationKeys.emailPreferences(), prefs);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to save email preferences");
+      toast.error("errors.queries.notifications.failed_to_save_email_preferences", {
+        error: error,
+      });
     },
   });
 }
@@ -133,10 +135,16 @@ export function useRequestEmailNotificationAddress() {
       }),
     onSuccess: (prefs) => {
       queryClient.setQueryData(notificationKeys.emailPreferences(), prefs);
-      toast.success(`Verification email sent to ${prefs.pending_email}`);
+      toast.success("feedback.queries.notifications.verification_email_sent_to_email", {
+        values: {
+          email: prefs.pending_email,
+        },
+      });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to send the verification email");
+      toast.error("errors.queries.notifications.failed_to_send_the_verification_email", {
+        error: error,
+      });
     },
   });
 }
@@ -152,7 +160,9 @@ export function useClearEmailNotificationAddress() {
       queryClient.setQueryData(notificationKeys.emailPreferences(), prefs);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to remove the custom address");
+      toast.error("errors.queries.notifications.failed_to_remove_the_custom_address", {
+        error: error,
+      });
     },
   });
 }
@@ -177,7 +187,9 @@ export function useUpdateDiscordNotificationPreferences() {
       queryClient.setQueryData(notificationKeys.discordPreferences(), prefs);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to save Discord preferences");
+      toast.error("errors.queries.notifications.failed_to_save_discord_preferences", {
+        error: error,
+      });
     },
   });
 }
@@ -188,7 +200,7 @@ export function useDiscordLinkInit() {
     mutationFn: () =>
       api<NotificationDiscordLinkInit>("/notifications/discord/link/init", { method: "POST" }),
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to start Discord link");
+      toast.error("errors.queries.notifications.failed_to_start_discord_link", { error: error });
     },
   });
 }
@@ -199,10 +211,10 @@ export function useUnlinkDiscord() {
     mutationFn: () => api("/notifications/discord-link", { method: "DELETE" }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.discordPreferences() });
-      toast.success("Discord account unlinked");
+      toast.success("feedback.queries.notifications.discord_account_unlinked");
     },
     onError: () => {
-      toast.error("Failed to unlink Discord account");
+      toast.error("errors.queries.notifications.failed_to_unlink_discord_account");
     },
   });
 }

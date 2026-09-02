@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { mediaKindLabel, type CollectionTemplate } from "@/lib/collectionTemplates";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const SOURCE_LABEL: Record<CollectionTemplate["source"], string> = {
   tmdb: "TMDB",
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export function CollectionTemplateCard({ template, onPick }: Props) {
+  useUILanguage();
   return (
     <button
       type="button"
@@ -43,7 +46,8 @@ export function CollectionTemplateCard({ template, onPick }: Props) {
             <>
               <span aria-hidden>•</span>
               <span className="truncate">
-                syncs {scheduleDescription(template.default_sync_schedule)}
+                {tr("components.collection_template_gallery.collection_template_card.syncs")}{" "}
+                {scheduleDescription(template.default_sync_schedule)}
               </span>
             </>
           ) : null}
@@ -54,6 +58,7 @@ export function CollectionTemplateCard({ template, onPick }: Props) {
 }
 
 function TemplateBadges({ template }: { template: CollectionTemplate }) {
+  useUILanguage();
   return (
     <>
       <Badge variant="outline" className="bg-background/80 text-[10px] tracking-wide uppercase">
@@ -61,7 +66,7 @@ function TemplateBadges({ template }: { template: CollectionTemplate }) {
       </Badge>
       {template.requires_profile ? (
         <Badge variant="secondary" className="text-[10px]">
-          Profile
+          {tr("components.collection_template_gallery.collection_template_card.profile")}
         </Badge>
       ) : null}
     </>

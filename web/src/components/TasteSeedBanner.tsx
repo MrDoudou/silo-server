@@ -9,6 +9,8 @@ import {
   isTasteSeedDismissed,
   setTasteSeedBannerDismissed,
 } from "@/lib/tasteSeed";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Soft re-prompt for users who skipped the post-signup taste-seeding flow.
@@ -24,6 +26,7 @@ import {
  * profile.
  */
 export default function TasteSeedBanner() {
+  useUILanguage();
   const { profile } = useAuth();
   const { data: favorites, isPending } = useFavorites();
   const [hidden, setHidden] = useState(false);
@@ -45,19 +48,23 @@ export default function TasteSeedBanner() {
           <Sparkles className="h-5 w-5" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold sm:text-base">Personalize your home</p>
+          <p className="text-sm font-semibold sm:text-base">
+            {tr("components.taste_seed_banner.personalize_your_home")}
+          </p>
           <p className="text-muted-foreground text-xs sm:text-sm">
-            Pick a few titles you love and we'll tailor your recommendations.
+            {tr("components.taste_seed_banner.pick_a_few_titles_you_love_and_we_ll_tailor")}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button asChild size="sm">
-            <Link to="/taste-seed?from=settings">Personalize</Link>
+            <Link to="/taste-seed?from=settings">
+              {tr("components.taste_seed_banner.personalize")}
+            </Link>
           </Button>
           <button
             type="button"
             onClick={handleDismiss}
-            aria-label="Dismiss personalization prompt"
+            aria-label={tr("components.taste_seed_banner.dismiss_personalization_prompt")}
             className="text-muted-foreground hover:text-foreground inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors"
           >
             <X className="h-4 w-4" />

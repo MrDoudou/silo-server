@@ -4,6 +4,8 @@ import CalendarEventCard from "./CalendarEventCard";
 import type { CalendarDay } from "@/hooks/queries/calendar";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { carouselCardWidthClasses } from "@/lib/uiCustomization";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface DayGroupProps {
   day: CalendarDay;
@@ -11,6 +13,7 @@ interface DayGroupProps {
 }
 
 export default function DayGroup({ day, isSelected }: DayGroupProps) {
+  useUILanguage();
   const today = isToday(day.date);
   const title = formatDayHeading(day.date);
   const { cardPresentation } = useUICustomization();
@@ -20,7 +23,7 @@ export default function DayGroup({ day, isSelected }: DayGroupProps) {
     // scroll-mt offsets the sticky header so the title isn't hidden when scrolled into view
     // (mobile carries the app header + week strip; desktop only the week strip).
     <div
-      id={`day-${day.date}`}
+      id={"day-" + day.date}
       data-selected={isSelected ? "true" : undefined}
       className="scroll-mt-44 transition-colors lg:scroll-mt-32"
     >
@@ -30,12 +33,12 @@ export default function DayGroup({ day, isSelected }: DayGroupProps) {
           <span className="flex items-center gap-1.5">
             {today && (
               <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase">
-                Today
+                {tr("components.calendar.day_group.today")}
               </span>
             )}
             {isSelected && (
               <span className="border-primary/40 text-primary rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase">
-                Focused
+                {tr("components.calendar.day_group.focused")}
               </span>
             )}
           </span>

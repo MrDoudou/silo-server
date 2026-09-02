@@ -2,6 +2,11 @@
 
 Commands and paths in this document assume the repository root or the server's `/api/v1` base URL.
 
+Errors follow the additive envelope documented in
+[`docs/architecture/api-error-localization.md`](architecture/api-error-localization.md).
+Clients branch on `error`, resolve `translation_key` for presentation, and
+retain `message` as an English fallback.
+
 ## Account passwords
 
 A password belongs to a login account, not to an individual household profile. Every profile on an
@@ -52,14 +57,14 @@ rate-limited separately from login attempts.
 
 Success returns `204 No Content`.
 
-| Status | Error | Meaning |
-| --- | --- | --- |
-| `400` | `bad_request` | The body is invalid or a required field is empty. |
-| `400` | `invalid_current_password` | The current password did not match. |
-| `400` | `weak_password` | The new password contains fewer than 8 characters. |
-| `400` | `password_too_long` | The new password exceeds 72 UTF-8 bytes. |
-| `403` | `password_change_forbidden` | The active profile is not the primary profile, or the caller is an API key or impersonation session. |
-| `409` | `password_login_disabled` | The account does not use local password login. |
+| Status | Error                       | Meaning                                                                                              |
+| ------ | --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `400`  | `bad_request`               | The body is invalid or a required field is empty.                                                    |
+| `400`  | `invalid_current_password`  | The current password did not match.                                                                  |
+| `400`  | `weak_password`             | The new password contains fewer than 8 characters. `params.min_length` is `8`.                       |
+| `400`  | `password_too_long`         | The new password exceeds 72 UTF-8 bytes. `params.max_bytes` is `72`.                                 |
+| `403`  | `password_change_forbidden` | The active profile is not the primary profile, or the caller is an API key or impersonation session. |
+| `409`  | `password_login_disabled`   | The account does not use local password login.                                                       |
 
 The Jellyfin-compatibility listener does not expose password mutation. Jellyfin-compatible clients
 continue to authenticate with the account's current local password, while password management stays

@@ -7,6 +7,8 @@ import {
   type PlaybackQualityPreset,
 } from "@/lib/playback-quality";
 
+import { tr } from "@/i18n/translate";
+
 export interface ProfileDraft {
   name: string;
   avatarPreset: string;
@@ -33,11 +35,51 @@ export interface ProfileAccessSummary {
 }
 
 export const CONTENT_RATING_OPTIONS: ContentRatingOption[] = [
-  { value: "", label: "Any content", summary: "Any content" },
-  { value: "G", label: "G / TV-G", summary: "G max" },
-  { value: "PG", label: "PG / TV-PG / TV-Y7", summary: "PG max" },
-  { value: "PG-13", label: "PG-13 / TV-14", summary: "PG-13 max" },
-  { value: "R", label: "R / TV-MA / NC-17", summary: "R max" },
+  {
+    value: "",
+    get label() {
+      return tr("lib.profile_management.any_content");
+    },
+    get summary() {
+      return tr("lib.profile_management.any_content");
+    },
+  },
+  {
+    value: "G",
+    get label() {
+      return tr("lib.profile_management.g_tv_g");
+    },
+    get summary() {
+      return tr("lib.profile_management.g_max");
+    },
+  },
+  {
+    value: "PG",
+    get label() {
+      return tr("lib.profile_management.pg_tv_pg_tv_y7");
+    },
+    get summary() {
+      return tr("lib.profile_management.pg_max");
+    },
+  },
+  {
+    value: "PG-13",
+    get label() {
+      return tr("lib.profile_management.pg_13_tv_14");
+    },
+    get summary() {
+      return tr("lib.profile_management.pg_13_max");
+    },
+  },
+  {
+    value: "R",
+    get label() {
+      return tr("lib.profile_management.r_tv_ma_nc_17");
+    },
+    get summary() {
+      return tr("lib.profile_management.r_max");
+    },
+  },
 ];
 
 function sortUniqueLibraryIDs(ids: number[] | null | undefined): number[] {

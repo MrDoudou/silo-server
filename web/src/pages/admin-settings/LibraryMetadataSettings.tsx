@@ -20,6 +20,9 @@ import { MarkerTasksCard } from "./MarkerTasksCard";
 import { SaveBar } from "./SaveBar";
 import { SearchStatusPanel } from "./SearchStatusPanel";
 import { SettingField, SettingFieldStatus } from "./SettingField";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 const ARTWORK_KEYS = ["metadata.cache_images"];
 
@@ -50,6 +53,8 @@ const SEARCH_KEYS = ["catalog.search.provider", ...MEILI_KEYS];
 const KEYS = [...ARTWORK_KEYS, ...SCANNER_KEYS, ...MARKER_KEYS, ...SEARCH_KEYS];
 
 export default function LibraryMetadataSettings() {
+  useUILanguage();
+  useUILanguage();
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
   const branding = useBranding();
   const restartKeys = useRestartKeys();
@@ -94,7 +99,10 @@ export default function LibraryMetadataSettings() {
     } catch (error) {
       setConnectionResult({
         success: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error(
+          "errors.admin_settings.library_metadata_settings.connection_check_failed",
+          error,
+        ),
       });
     }
   }
@@ -103,24 +111,35 @@ export default function LibraryMetadataSettings() {
 
   if (form.isLoading) {
     return (
-      <div className="space-y-6" role="status" aria-label="Loading settings">
+      <div
+        className="space-y-6"
+        role="status"
+        aria-label={tr("pages.admin_settings.library_metadata_settings.loading_settings")}
+      >
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-40 w-full" />
-        <span className="sr-only">Loading settings</span>
+        <span className="sr-only">
+          {tr("pages.admin_settings.library_metadata_settings.loading_settings")}
+        </span>
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col">
-      <SettingsPageHeader title="Library & Metadata" className="mb-8" />
+      <SettingsPageHeader
+        title={tr("pages.admin_settings.library_metadata_settings.library_metadata")}
+        className="mb-8"
+      />
 
       <div className="flex-1 space-y-5">
         <FieldGroup
-          label="Artwork"
-          description="Posters and backdrops from metadata providers, copied into the public bucket and served from there."
+          label={tr("pages.admin_settings.library_metadata_settings.artwork")}
+          description={tr(
+            "pages.admin_settings.library_metadata_settings.posters_and_backdrops_from_metadata_providers_copied_into_the_public",
+          )}
           restartAll={allRestart(ARTWORK_KEYS)}
         >
           {!branding.storageAvailable && (
@@ -128,26 +147,36 @@ export default function LibraryMetadataSettings() {
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               <p className="text-muted-foreground text-[13px] leading-relaxed">
                 {publicBucketSaved ? (
-                  <>Restart the server for artwork storage to start.</>
+                  <>
+                    {tr(
+                      "pages.admin_settings.library_metadata_settings.restart_the_server_for_artwork_storage_to_start",
+                    )}
+                  </>
                 ) : (
                   <>
-                    Artwork storage needs a public S3 bucket, set in{" "}
+                    {tr(
+                      "pages.admin_settings.library_metadata_settings.artwork_storage_needs_a_public_s3_bucket_set_in",
+                    )}{" "}
                     <Link
                       to="/admin/settings/infrastructure"
                       className="text-foreground font-medium underline-offset-2 hover:underline"
                     >
-                      Storage &amp; Database
+                      {tr("pages.admin_settings.library_metadata_settings.storage_database")}
                     </Link>{" "}
-                    settings.
+                    {tr("pages.admin_settings.library_metadata_settings.settings")}
                   </>
                 )}
               </p>
             </div>
           )}
           <SettingField
-            label="Store artwork in your bucket"
+            label={tr(
+              "pages.admin_settings.library_metadata_settings.store_artwork_in_your_bucket",
+            )}
             type="toggle"
-            description="When off, clients load artwork straight from the providers."
+            description={tr(
+              "pages.admin_settings.library_metadata_settings.when_off_clients_load_artwork_straight_from_the_providers",
+            )}
             value={form.getValue("metadata.cache_images")}
             onChange={(value) => form.setValue("metadata.cache_images", value)}
             disabled={artworkStorageLocked}
@@ -155,32 +184,41 @@ export default function LibraryMetadataSettings() {
           />
         </FieldGroup>
 
-        <FieldGroup label="Scanning" restartAll={allRestart(SCANNER_KEYS)}>
+        <FieldGroup
+          label={tr("pages.admin_settings.library_metadata_settings.scanning")}
+          restartAll={allRestart(SCANNER_KEYS)}
+        >
           <AdvancedSection
             id="library.scanning"
             count={SCANNER_KEYS.length}
             forceOpen={anyDirty(SCANNER_KEYS)}
           >
             <SettingField
-              label="Scanner workers"
+              label={tr("pages.admin_settings.library_metadata_settings.scanner_workers")}
               type="number"
-              description="How many files Silo reads at once."
+              description={tr(
+                "pages.admin_settings.library_metadata_settings.how_many_files_silo_reads_at_once",
+              )}
               value={form.getValue("scanner.workers")}
               onChange={(value) => form.setValue("scanner.workers", value)}
               restartRequired={restartKeys.has("scanner.workers")}
             />
             <SettingField
-              label="Matcher workers"
+              label={tr("pages.admin_settings.library_metadata_settings.matcher_workers")}
               type="number"
-              description="How many items Silo looks up at once."
+              description={tr(
+                "pages.admin_settings.library_metadata_settings.how_many_items_silo_looks_up_at_once",
+              )}
               value={form.getValue("matcher.workers")}
               onChange={(value) => form.setValue("matcher.workers", value)}
               restartRequired={restartKeys.has("matcher.workers")}
             />
             <SettingField
-              label="Matcher batch size"
+              label={tr("pages.admin_settings.library_metadata_settings.matcher_batch_size")}
               type="number"
-              description="How many items each matcher worker claims per round."
+              description={tr(
+                "pages.admin_settings.library_metadata_settings.how_many_items_each_matcher_worker_claims_per_round",
+              )}
               value={form.getValue("matcher.batch_size")}
               onChange={(value) => form.setValue("matcher.batch_size", value)}
               restartRequired={restartKeys.has("matcher.batch_size")}
@@ -194,27 +232,40 @@ export default function LibraryMetadataSettings() {
           providers.
         */}
         <FieldGroup
-          label="Intro and credits markers"
+          label={tr("pages.admin_settings.library_metadata_settings.intro_and_credits_markers")}
           restartAll={allRestart(MARKER_KEYS)}
           actions={
             <Link
               to="/admin/settings/providers"
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
             >
-              Marker providers
+              {tr("pages.admin_settings.library_metadata_settings.marker_providers")}
               <ArrowRight className="h-3 w-3" aria-hidden="true" />
             </Link>
           }
         >
           <SettingField
-            label="Find intros and credits"
+            label={tr("pages.admin_settings.library_metadata_settings.find_intros_and_credits")}
             type="select"
-            description="Detecting on this server utilizes CPU. Looking online uses the marker providers set up on the Subtitles & Metadata page."
+            description={tr(
+              "pages.admin_settings.library_metadata_settings.detecting_on_this_server_utilizes_cpu_looking_online_uses_the",
+            )}
             options={[
-              { value: "off", label: "Off" },
-              { value: "local", label: "Detect on this server" },
-              { value: "both", label: "Detect on this server, then look online" },
-              { value: "online", label: "Look online only" },
+              { value: "off", label: tr("pages.admin_settings.library_metadata_settings.off") },
+              {
+                value: "local",
+                label: tr("pages.admin_settings.library_metadata_settings.detect_on_this_server"),
+              },
+              {
+                value: "both",
+                label: tr(
+                  "pages.admin_settings.library_metadata_settings.detect_on_this_server_then_look_online",
+                ),
+              },
+              {
+                value: "online",
+                label: tr("pages.admin_settings.library_metadata_settings.look_online_only"),
+              },
             ]}
             value={markerMode}
             onChange={(value) => form.setValue("markers.mode", value)}
@@ -222,9 +273,11 @@ export default function LibraryMetadataSettings() {
           />
 
           <SettingField
-            label="Fetch markers on playback"
+            label={tr("pages.admin_settings.library_metadata_settings.fetch_markers_on_playback")}
             type="toggle"
-            description="Uses the enabled marker providers to look up missing markers when playback starts. Can delay the first few seconds."
+            description={tr(
+              "pages.admin_settings.library_metadata_settings.uses_the_enabled_marker_providers_to_look_up_missing_markers",
+            )}
             value={form.getValue("markers.lazy_playback") || "false"}
             onChange={(value) => form.setValue("markers.lazy_playback", value)}
             restartRequired={restartKeys.has("markers.lazy_playback")}
@@ -235,16 +288,24 @@ export default function LibraryMetadataSettings() {
           </div>
         </FieldGroup>
 
-        <FieldGroup label="Search" restartAll={allRestart(SEARCH_KEYS)}>
+        <FieldGroup label={tr("common.actions.search")} restartAll={allRestart(SEARCH_KEYS)}>
           <SettingField
-            label="Search engine"
+            label={tr("pages.admin_settings.library_metadata_settings.search_engine")}
             type="select"
-            description="Meilisearch tolerates typos but runs as its own service. If it goes down, search falls back to the built-in engine automatically."
+            description={tr(
+              "pages.admin_settings.library_metadata_settings.meilisearch_tolerates_typos_but_runs_as_its_own_service_if",
+            )}
             value={provider}
             onChange={(value) => form.setValue("catalog.search.provider", value)}
             options={[
-              { value: "postgres", label: "Built-in (Postgres)" },
-              { value: "meilisearch", label: "Meilisearch" },
+              {
+                value: "postgres",
+                label: tr("pages.admin_settings.library_metadata_settings.built_in_postgres"),
+              },
+              {
+                value: "meilisearch",
+                label: tr("pages.admin_settings.library_metadata_settings.meilisearch"),
+              },
             ]}
             restartRequired={restartKeys.has("catalog.search.provider")}
           />
@@ -252,15 +313,15 @@ export default function LibraryMetadataSettings() {
           {showMeili && (
             <>
               <SettingField
-                label="Meilisearch URL"
+                label={tr("pages.admin_settings.library_metadata_settings.meilisearch_url")}
                 value={form.getValue(MEILI_URL_KEY)}
                 onChange={(value) => form.setValue(MEILI_URL_KEY, value)}
-                hint="http://localhost:7700"
+                hint={tr("pages.admin_settings.library_metadata_settings.http_localhost_7700")}
                 disabled={!meiliEnabled}
                 restartRequired={restartKeys.has(MEILI_URL_KEY)}
               />
               <SecretField
-                label="Meilisearch API key"
+                label={tr("pages.admin_settings.library_metadata_settings.meilisearch_api_key")}
                 value={form.getValue(MEILI_API_KEY)}
                 configured={form.sensitiveConfigured.includes(MEILI_API_KEY)}
                 onChange={(value) => form.setValue(MEILI_API_KEY, value)}
@@ -269,7 +330,9 @@ export default function LibraryMetadataSettings() {
                 // Meilisearch instance without a master key needs it empty.
                 onClear={() => form.setValue(MEILI_API_KEY, "")}
                 cleared={form.isClearStaged(MEILI_API_KEY)}
-                hint="Master key, or one that can read and write the index."
+                hint={tr(
+                  "pages.admin_settings.library_metadata_settings.master_key_or_one_that_can_read_and_write_the",
+                )}
                 disabled={!meiliEnabled}
                 restartRequired={restartKeys.has(MEILI_API_KEY)}
               />
@@ -286,64 +349,88 @@ export default function LibraryMetadataSettings() {
                 forceOpen={anyDirty(MEILI_ADVANCED_KEYS)}
               >
                 <SettingField
-                  label="Index name prefix"
+                  label={tr("pages.admin_settings.library_metadata_settings.index_name_prefix")}
                   value={form.getValue("catalog.search.meilisearch.index") || "silo_media_items"}
                   onChange={(value) => form.setValue("catalog.search.meilisearch.index", value)}
-                  description="Only needed when Silo servers share one Meilisearch."
+                  description={tr(
+                    "pages.admin_settings.library_metadata_settings.only_needed_when_silo_servers_share_one_meilisearch",
+                  )}
                   disabled={!meiliEnabled}
                   restartRequired={restartKeys.has("catalog.search.meilisearch.index")}
                 />
                 <SettingField
-                  label="Query timeout"
+                  label={tr("pages.admin_settings.library_metadata_settings.query_timeout")}
                   type="number"
                   unit="ms"
                   value={form.getValue("catalog.search.meilisearch.timeout_ms") || "800"}
                   onChange={(value) =>
                     form.setValue("catalog.search.meilisearch.timeout_ms", value)
                   }
-                  description="Searches that take longer fall back to the built-in engine."
+                  description={tr(
+                    "pages.admin_settings.library_metadata_settings.searches_that_take_longer_fall_back_to_the_built_in",
+                  )}
                   disabled={!meiliEnabled}
                   restartRequired={restartKeys.has("catalog.search.meilisearch.timeout_ms")}
                 />
                 <SettingField
-                  label="When a search has several words"
+                  label={tr(
+                    "pages.admin_settings.library_metadata_settings.when_a_search_has_several_words",
+                  )}
                   type="select"
                   value={form.getValue("catalog.search.meilisearch.matching_strategy") || "last"}
                   onChange={(value) =>
                     form.setValue("catalog.search.meilisearch.matching_strategy", value)
                   }
                   options={[
-                    { value: "last", label: "Drop trailing words until something matches" },
-                    { value: "all", label: "Require every word" },
+                    {
+                      value: "last",
+                      label: tr(
+                        "pages.admin_settings.library_metadata_settings.drop_trailing_words_until_something_matches",
+                      ),
+                    },
+                    {
+                      value: "all",
+                      label: tr(
+                        "pages.admin_settings.library_metadata_settings.require_every_word",
+                      ),
+                    },
                   ]}
                   disabled={!meiliEnabled}
                   restartRequired={restartKeys.has("catalog.search.meilisearch.matching_strategy")}
                 />
                 <SettingField
-                  label="Items sent to the index per batch"
+                  label={tr(
+                    "pages.admin_settings.library_metadata_settings.items_sent_to_the_index_per_batch",
+                  )}
                   type="number"
                   value={form.getValue("catalog.search.meilisearch.sync_batch_size") || "500"}
                   onChange={(value) =>
                     form.setValue("catalog.search.meilisearch.sync_batch_size", value)
                   }
-                  description="Larger batches index faster and use more memory."
+                  description={tr(
+                    "pages.admin_settings.library_metadata_settings.larger_batches_index_faster_and_use_more_memory",
+                  )}
                   disabled={!meiliEnabled}
                   restartRequired={restartKeys.has("catalog.search.meilisearch.sync_batch_size")}
                 />
                 <SettingField
-                  label="Match by meaning as well as words"
+                  label={tr(
+                    "pages.admin_settings.library_metadata_settings.match_by_meaning_as_well_as_words",
+                  )}
                   type="toggle"
                   value={form.getValue("catalog.search.meilisearch.semantic_enabled") || "false"}
                   onChange={(value) =>
                     form.setValue("catalog.search.meilisearch.semantic_enabled", value)
                   }
-                  description="Also matches items whose description means something similar."
+                  description={tr(
+                    "pages.admin_settings.library_metadata_settings.also_matches_items_whose_description_means_something_similar",
+                  )}
                   status={
                     enablingSemanticSearch ? (
                       <SettingFieldStatus tone="warn">
-                        Enabling this changes the index format. After you save and restart, Silo
-                        rebuilds the index automatically. Keyword search stays available while it
-                        rebuilds.
+                        {tr(
+                          "pages.admin_settings.library_metadata_settings.enabling_this_changes_the_index_format_after_you_save_and",
+                        )}
                       </SettingFieldStatus>
                     ) : undefined
                   }
@@ -351,13 +438,17 @@ export default function LibraryMetadataSettings() {
                   restartRequired={restartKeys.has("catalog.search.meilisearch.semantic_enabled")}
                 />
                 <SettingField
-                  label="Meaning-based share of results"
+                  label={tr(
+                    "pages.admin_settings.library_metadata_settings.meaning_based_share_of_results",
+                  )}
                   type="number"
                   value={form.getValue("catalog.search.meilisearch.semantic_ratio") || "0.50"}
                   onChange={(value) =>
                     form.setValue("catalog.search.meilisearch.semantic_ratio", value)
                   }
-                  description="0 ranks by words, 1 by meaning."
+                  description={tr(
+                    "pages.admin_settings.library_metadata_settings.value_0_ranks_by_words_1_by_meaning",
+                  )}
                   disabled={!meiliEnabled}
                   restartRequired={restartKeys.has("catalog.search.meilisearch.semantic_ratio")}
                 />
@@ -369,17 +460,21 @@ export default function LibraryMetadataSettings() {
             <div className="py-3.5">
               <SettingFieldStatus tone="warn">
                 <span>
-                  {searchStatus.degraded_reason ?? "Search is running in a degraded mode."}
+                  {searchStatus.degraded_reason ??
+                    tr(
+                      "pages.admin_settings.library_metadata_settings.search_is_running_in_a_degraded_mode",
+                    )}
                   {searchStatus.index.rebuild_required && (
                     <>
                       {" "}
-                      Automatic search maintenance rebuilds the index in the background and retries
-                      if needed.{" "}
+                      {tr(
+                        "pages.admin_settings.library_metadata_settings.automatic_search_maintenance_rebuilds_the_index_in_the_background_and",
+                      )}{" "}
                       <Link
                         className="font-medium underline underline-offset-2"
                         to="/admin/tasks/sync_catalog_search_index"
                       >
-                        Open maintenance task
+                        {tr("pages.admin_settings.library_metadata_settings.open_maintenance_task")}
                       </Link>
                       .
                     </>
@@ -389,7 +484,10 @@ export default function LibraryMetadataSettings() {
             </div>
           )}
 
-          <AdvancedSection id="library.search.status" title="Search status">
+          <AdvancedSection
+            id="library.search.status"
+            title={tr("pages.admin_settings.library_metadata_settings.search_status")}
+          >
             <SearchStatusPanel />
           </AdvancedSection>
         </FieldGroup>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import type { FileVersion } from "@/api/types";
 import {
   Dialog,
@@ -12,6 +12,8 @@ import {
 import { formatFileSize } from "@/lib/mediaFormat";
 import { buildDirectDownloadUrl } from "@/hooks/queries/downloads";
 import { buildQualitySummary, sortByResolution } from "@/pages/ItemDetail/components/VersionFlyout";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface DownloadVersionPickerProps {
   open: boolean;
@@ -28,6 +30,7 @@ export default function DownloadVersionPicker({
   title,
   summaryBuilder,
 }: DownloadVersionPickerProps) {
+  useUILanguage();
   const sorted = sortByResolution(versions);
   const [downloading, setDownloading] = useState<number | null>(null);
 
@@ -37,9 +40,11 @@ export default function DownloadVersionPicker({
     try {
       const res = await fetch(url, { method: "HEAD" });
       if (!res.ok) {
-        if (res.status === 403) toast.error("You are not allowed to download this file");
-        else if (res.status === 429) toast.error("Download limit reached. Try again later");
-        else toast.error("Download failed. Try again later");
+        if (res.status === 403)
+          toast.error("errors.download_version_picker.you_are_not_allowed_to_download_this_file");
+        else if (res.status === 429)
+          toast.error("errors.download_version_picker.download_limit_reached_try_again_later");
+        else toast.error("errors.download_version_picker.download_failed_try_again_later");
         return;
       }
       const a = document.createElement("a");
@@ -50,7 +55,9 @@ export default function DownloadVersionPicker({
       document.body.removeChild(a);
       onOpenChange(false);
     } catch {
-      toast.error("Network error. Check your connection and try again");
+      toast.error(
+        "errors.download_version_picker.network_error_check_your_connection_and_try_again",
+      );
     } finally {
       setDownloading(null);
     }
@@ -60,9 +67,14 @@ export default function DownloadVersionPicker({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Download{title ? `: ${title}` : ""}</DialogTitle>
+          <DialogTitle>
+            {tr("common.actions.download")}
+            {title ? tr("components.download_version_picker.title", { title: title }) : ""}
+          </DialogTitle>
           <DialogDescription>
-            Choose a file to download. Make sure you have enough disk space.
+            {tr(
+              "components.download_version_picker.choose_a_file_to_download_make_sure_you_have_enough",
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -96,7 +108,9 @@ export default function DownloadVersionPicker({
         </div>
 
         {sorted.length > 1 && (
-          <p className="text-muted-foreground text-xs">Larger files require more storage space.</p>
+          <p className="text-muted-foreground text-xs">
+            {tr("components.download_version_picker.larger_files_require_more_storage_space")}
+          </p>
         )}
       </DialogContent>
     </Dialog>

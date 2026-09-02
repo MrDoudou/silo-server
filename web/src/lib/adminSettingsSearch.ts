@@ -16,6 +16,8 @@ import type { LucideIcon } from "lucide-react";
 
 import type { SettingsSearchGroup, SettingsSearchItem } from "@/components/settings/settingsSearch";
 
+import { tr } from "@/i18n/translate";
+
 export interface AdminSettingsSearchItem extends SettingsSearchItem {
   id: string;
   label: string;
@@ -45,12 +47,18 @@ const settingIndex = (...labels: string[]) => labels.map((label) => ({ label }))
 // One group keeps the Overview cards and command palette in the same order.
 export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
   {
-    label: "Settings",
+    get label() {
+      return tr("lib.admin_settings_search.settings");
+    },
     items: [
       {
         id: "general",
-        label: "General",
-        description: "Server identity, public signups, and logging.",
+        get label() {
+          return tr("lib.admin_settings_search.general");
+        },
+        get description() {
+          return tr("lib.admin_settings_search.server_identity_public_signups_and_logging");
+        },
         groups: ["Identity", "Access", "Logging"],
         keywords: [
           "server name",
@@ -76,8 +84,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "infrastructure",
-        label: "Storage & Database",
-        description: "Redis, S3 storage buckets, the database, and log retention.",
+        get label() {
+          return tr("lib.admin_settings_search.storage_database");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.redis_s3_storage_buckets_the_database_and_log_retention",
+          );
+        },
         groups: ["Redis", "Public storage", "Private storage", "Database", "Logs"],
         keywords: [
           "redis",
@@ -131,8 +145,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "appearance",
-        label: "Appearance",
-        description: "Logos, accent color, default theme, custom CSS, and poster badges.",
+        get label() {
+          return tr("lib.admin_settings_search.appearance");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.logos_accent_color_default_theme_custom_css_and_poster_badges",
+          );
+        },
         groups: ["Logos and icons", "Colors and theme", "Card overlays"],
         keywords: [
           "logo",
@@ -177,8 +197,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "security",
-        label: "Security & Access",
-        description: "Sign-in sessions, trusted proxies, and request rate limits.",
+        get label() {
+          return tr("lib.admin_settings_search.security_access");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.sign_in_sessions_trusted_proxies_and_request_rate_limits",
+          );
+        },
         groups: ["Sign-in sessions", "Network", "Rate limiting"],
         keywords: [
           "access token",
@@ -213,8 +239,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "library",
-        label: "Library & Metadata",
-        description: "Artwork storage, scanning, intro and credits markers, and catalog search.",
+        get label() {
+          return tr("lib.admin_settings_search.library_metadata");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.artwork_storage_scanning_intro_and_credits_markers_and_catalog_search",
+          );
+        },
         groups: ["Artwork", "Scanning", "Intro and credits markers", "Search"],
         keywords: [
           "scanner workers",
@@ -263,8 +295,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "playback",
-        label: "Playback",
-        description: "Transcoding, hardware acceleration, and watch thresholds.",
+        get label() {
+          return tr("lib.admin_settings_search.playback");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.transcoding_hardware_acceleration_and_watch_thresholds",
+          );
+        },
         groups: ["Transcoding", "Watch behavior"],
         keywords: [
           "ffmpeg",
@@ -298,8 +336,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "downloads",
-        label: "Downloads",
-        description: "Offline downloads, per-user and server-wide limits, and prepared copies.",
+        get label() {
+          return tr("lib.admin_settings_search.downloads");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.offline_downloads_per_user_and_server_wide_limits_and_prepared",
+          );
+        },
         groups: ["Downloads"],
         keywords: [
           "downloads",
@@ -332,8 +376,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "providers",
-        label: "Subtitles & Metadata",
-        description: "Subtitle provider accounts, the MDBList metadata key, and marker providers.",
+        get label() {
+          return tr("lib.admin_settings_search.subtitles_metadata");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.subtitle_provider_accounts_the_mdblist_metadata_key_and_marker_providers",
+          );
+        },
         groups: ["Subtitle providers", "Metadata providers", "Marker providers"],
         keywords: [
           "opensubtitles",
@@ -374,9 +424,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "watch-sync",
-        label: "Watch Providers",
-        description:
-          "Trakt, Simkl, and watch-provider plugins that profiles connect their own accounts to.",
+        get label() {
+          return tr("lib.admin_settings_search.watch_providers");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.trakt_simkl_and_watch_provider_plugins_that_profiles_connect_their",
+          );
+        },
         groups: ["Watch providers"],
         keywords: [
           "trakt",
@@ -394,8 +449,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "ai",
-        label: "AI Services",
-        description: "Text and speech-to-text models, and the features that spend them.",
+        get label() {
+          return tr("lib.admin_settings_search.ai_services");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.text_and_speech_to_text_models_and_the_features_that",
+          );
+        },
         groups: ["Models", "Features", "Usage and tuning"],
         keywords: [
           "openai",
@@ -432,8 +493,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "notifications",
-        label: "Notifications",
-        description: "Release events, delivery channels, the mail server, and webhooks.",
+        get label() {
+          return tr("lib.admin_settings_search.notifications");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.release_events_delivery_channels_the_mail_server_and_webhooks",
+          );
+        },
         groups: ["Release events", "Delivery channels", "Tuning", "Retention"],
         keywords: [
           "release events",
@@ -500,9 +567,14 @@ export const ADMIN_SETTINGS_GROUPS: AdminSettingsSearchGroup[] = [
       },
       {
         id: "compatibility",
-        label: "Compatibility",
-        description:
-          "Jellyfin and Audiobookshelf client compatibility and the Jellyfin web player.",
+        get label() {
+          return tr("lib.admin_settings_search.compatibility");
+        },
+        get description() {
+          return tr(
+            "lib.admin_settings_search.jellyfin_and_audiobookshelf_client_compatibility_and_the_jellyfin_web_player",
+          );
+        },
         groups: ["Jellyfin", "Audiobookshelf"],
         keywords: [
           "jellyfin",

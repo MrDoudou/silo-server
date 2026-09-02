@@ -21,6 +21,8 @@ import { MARKER_KINDS, MARKER_LABELS, formatClock, parseClock } from "@/lib/mark
 import { useItemMarkerHistory, useItemMarkers, useSetItemMarkers } from "@/hooks/queries/markers";
 import { useIsActingAdmin } from "@/hooks/useIsActingAdmin";
 import { formatTime, preferredDateLocale } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface MarkerEditorProps {
   itemId: string;
@@ -45,6 +47,7 @@ function fieldsFromResponse(data: FileMarkersResponse): FieldState {
  * authenticated markers API.
  */
 export function MarkerEditor({ itemId, open, onOpenChange }: MarkerEditorProps) {
+  useUILanguage();
   const isAdmin = useIsActingAdmin();
   const { data, isLoading, isError } = useItemMarkers(itemId, { enabled: open });
   const history = useItemMarkerHistory(itemId, { enabled: open && isAdmin, limit: 25 });
@@ -53,10 +56,11 @@ export function MarkerEditor({ itemId, open, onOpenChange }: MarkerEditorProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Edit markers</DialogTitle>
+          <DialogTitle>{tr("components.markers.marker_editor.edit_markers")}</DialogTitle>
           <DialogDescription>
-            Set intro, recap, credits, and preview times. Use m:ss or h:mm:ss; leave both fields
-            empty to remove a marker.
+            {tr(
+              "components.markers.marker_editor.set_intro_recap_credits_and_preview_times_use_m_ss",
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -65,7 +69,9 @@ export function MarkerEditor({ itemId, open, onOpenChange }: MarkerEditorProps) 
             <Loader2 className="size-5 animate-spin" />
           </div>
         ) : isError || !data ? (
-          <p className="text-destructive py-6 text-center text-sm">Failed to load markers.</p>
+          <p className="text-destructive py-6 text-center text-sm">
+            {tr("components.markers.marker_editor.failed_to_load_markers")}
+          </p>
         ) : (
           // Keyed by file id so the form re-initializes from fresh data without
           // a state-syncing effect.
@@ -99,6 +105,7 @@ function MarkerEditorForm({
   showHistory: boolean;
   onClose: () => void;
 }) {
+  useUILanguage();
   const setMarkers = useSetItemMarkers(itemId);
   const [fields, setFields] = useState<FieldState>(() => fieldsFromResponse(data));
   const [error, setError] = useState<string | null>(null);
@@ -128,11 +135,19 @@ function MarkerEditorForm({
       const start = parseClock(startStr);
       const end = parseClock(endStr);
       if (start == null || end == null || Number.isNaN(start) || Number.isNaN(end)) {
-        setError(`${MARKER_LABELS[kind]}: enter both start and end (e.g. 1:30).`);
+        setError(
+          tr("components.markers.marker_editor.value1_enter_both_start_and_end_e_g_1_30", {
+            value1: MARKER_LABELS[kind],
+          }),
+        );
         return;
       }
       if (end <= start) {
-        setError(`${MARKER_LABELS[kind]}: end must be after start.`);
+        setError(
+          tr("components.markers.marker_editor.value1_end_must_be_after_start", {
+            value1: MARKER_LABELS[kind],
+          }),
+        );
         return;
       }
       // Inputs carry whole-second precision; round the (possibly fractional)
@@ -158,14 +173,18 @@ function MarkerEditorForm({
           <div key={kind} className="grid grid-cols-[5.5rem_1fr_1fr_auto] items-center gap-2">
             <span className="text-sm font-medium">{MARKER_LABELS[kind]}</span>
             <Input
-              aria-label={`${MARKER_LABELS[kind]} start`}
-              placeholder="start"
+              aria-label={tr("components.markers.marker_editor.value_start", {
+                value: MARKER_LABELS[kind],
+              })}
+              placeholder={tr("components.markers.marker_editor.start")}
               value={fields[kind].start}
               onChange={(e) => setField(kind, "start", e.target.value)}
             />
             <Input
-              aria-label={`${MARKER_LABELS[kind]} end`}
-              placeholder="end"
+              aria-label={tr("components.markers.marker_editor.value_end", {
+                value: MARKER_LABELS[kind],
+              })}
+              placeholder={tr("components.markers.marker_editor.end")}
               value={fields[kind].end}
               onChange={(e) => setField(kind, "end", e.target.value)}
             />
@@ -173,7 +192,9 @@ function MarkerEditorForm({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={`Clear ${MARKER_LABELS[kind]}`}
+              aria-label={tr("components.markers.marker_editor.clear_value", {
+                value: MARKER_LABELS[kind],
+              })}
               onClick={() => clearKind(kind)}
             >
               <Trash2 className="size-4" />
@@ -188,11 +209,11 @@ function MarkerEditorForm({
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
-          Cancel
+          {tr("common.actions.cancel")}
         </Button>
         <Button onClick={handleSave} disabled={setMarkers.isPending}>
           {setMarkers.isPending && <Loader2 className="size-4 animate-spin" />}
-          Save
+          {tr("common.actions.save")}
         </Button>
       </DialogFooter>
     </>
@@ -200,14 +221,19 @@ function MarkerEditorForm({
 }
 
 function MarkerHistory({ rows, isLoading }: { rows: MarkerEditAuditEntry[]; isLoading: boolean }) {
+  useUILanguage();
   return (
     <div className="border-border mt-2 border-t pt-3">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-medium">Recent changes</h3>
+        <h3 className="text-sm font-medium">
+          {tr("components.markers.marker_editor.recent_changes")}
+        </h3>
         {isLoading && <Loader2 className="text-muted-foreground size-4 animate-spin" />}
       </div>
       {rows.length === 0 && !isLoading ? (
-        <p className="text-muted-foreground text-sm">No marker edits recorded.</p>
+        <p className="text-muted-foreground text-sm">
+          {tr("components.markers.marker_editor.no_marker_edits_recorded")}
+        </p>
       ) : (
         <div className="max-h-48 overflow-y-auto">
           {rows.map((row) => (
@@ -217,11 +243,14 @@ function MarkerHistory({ rows, isLoading }: { rows: MarkerEditAuditEntry[]; isLo
             >
               <div className="text-muted-foreground text-xs">
                 <div>{formatHistoryDate(row.created_at)}</div>
-                <div>{row.username ?? "Unknown user"}</div>
+                <div>{row.username ?? tr("components.markers.marker_editor.unknown_user")}</div>
               </div>
               <div className="text-sm">
                 <div className="font-medium">
-                  {row.action === "clear" ? "Cleared" : "Set"} {MARKER_LABELS[row.segment]}
+                  {row.action === "clear"
+                    ? tr("components.markers.marker_editor.cleared")
+                    : tr("components.markers.marker_editor.set")}{" "}
+                  {MARKER_LABELS[row.segment]}
                 </div>
                 <div className="text-muted-foreground font-mono text-xs">
                   {formatHistoryRange(row.before)}

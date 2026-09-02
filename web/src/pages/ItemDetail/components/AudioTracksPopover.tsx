@@ -9,6 +9,8 @@ import { formatChannels, mapAudioLabel } from "@/lib/mediaFormat";
 import { audioTitle, compactAudioMeta } from "./versionFormatUtils";
 import { formatAudioTrackSummary, resolveAudioTrackSelection } from "./prePlaySelection";
 import DetailPopover from "./DetailPopover";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface AudioTracksPopoverProps {
   version: FileVersion | null;
@@ -31,6 +33,8 @@ function AudioOptionRow({
   badges?: ReactNode;
   onSelect?: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const content = (
     <>
       <div className="min-w-0 flex-1">
@@ -49,7 +53,9 @@ function AudioOptionRow({
   if (!onSelect) {
     return (
       <div
-        className={`flex items-start gap-3 rounded-lg px-3 py-2.5 ${active ? "bg-accent/50" : ""}`}
+        className={
+          "flex items-start gap-3 rounded-lg px-3 py-2.5 " + (active ? "bg-accent/50" : "")
+        }
       >
         {content}
       </div>
@@ -60,9 +66,10 @@ function AudioOptionRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
-        active ? "bg-accent/50" : "hover:bg-accent/30"
-      }`}
+      className={
+        "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors " +
+        (active ? "bg-accent/50" : "hover:bg-accent/30")
+      }
     >
       {content}
     </button>
@@ -76,6 +83,8 @@ function AudioTracksPopover({
   onSelectTrack,
   onResetSelection,
 }: AudioTracksPopoverProps) {
+  useUILanguage();
+  useUILanguage();
   const tracks = version?.audio_tracks;
   if (!tracks || tracks.length === 0) return null;
 
@@ -97,11 +106,13 @@ function AudioTracksPopover({
           className="h-8 max-w-full min-w-0 shrink gap-1.5 rounded-full px-3 text-xs font-medium"
         >
           <Volume2 className="size-3.5" />
-          Audio
+          {tr("pages.item_detail.components.audio_tracks_popover.audio")}
           <span className="text-muted-foreground max-w-44 truncate text-[11px] font-normal sm:max-w-64">
             {isInteractive
               ? selectionMode === "auto"
-                ? `Auto: ${autoSummary}`
+                ? tr("pages.item_detail.components.audio_tracks_popover.auto_auto_summary", {
+                    autoSummary: autoSummary,
+                  })
                 : activeSummary
               : tracks.length}
           </span>
@@ -113,7 +124,7 @@ function AudioTracksPopover({
         {isInteractive && (
           <AudioOptionRow
             active={selectionMode === "auto"}
-            title="Auto"
+            title={tr("pages.item_detail.components.audio_tracks_popover.auto")}
             description={autoSummary}
             onSelect={onResetSelection}
           />
@@ -157,7 +168,7 @@ function AudioTracksPopover({
                   )}
                   {track.default && (
                     <Badge variant="outline" className="px-1.5 py-0 text-[10px] uppercase">
-                      Default
+                      {tr("pages.item_detail.components.audio_tracks_popover.default")}
                     </Badge>
                   )}
                 </>

@@ -5,12 +5,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CollectionPosterCard } from "@/components/collections/CollectionPosterCard";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { cardGridClasses } from "@/lib/uiCustomization";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface LibraryCollectionsProps {
   libraryId: number;
 }
 
 export default function LibraryCollections({ libraryId }: LibraryCollectionsProps) {
+  useUILanguage();
   const { data, isLoading } = useLibraryCollections(libraryId);
   const { cardPresentation } = useUICustomization();
   const gridClasses = cardGridClasses(cardPresentation.poster_size);
@@ -39,9 +42,13 @@ export default function LibraryCollections({ libraryId }: LibraryCollectionsProp
       <div className="page-shell py-6 sm:py-8">
         <Card className="surface-panel overflow-hidden rounded-[2rem] border-0 shadow-none">
           <CardContent className="py-10 text-center">
-            <p className="text-lg font-semibold">No collections yet</p>
+            <p className="text-lg font-semibold">
+              {tr("pages.library_collections.no_collections_yet")}
+            </p>
             <p className="text-muted-foreground mt-2 text-sm">
-              Create library collections from the admin area to feature curated shelves here.
+              {tr(
+                "pages.library_collections.create_library_collections_from_the_admin_area_to_feature_curated",
+              )}
             </p>
           </CardContent>
         </Card>
@@ -53,9 +60,13 @@ export default function LibraryCollections({ libraryId }: LibraryCollectionsProp
     <div className="page-shell space-y-6 py-6 sm:py-8">
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Collections</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.library_collections.collections")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Browse hand-picked shelves and smart lists created for this library.
+            {tr(
+              "pages.library_collections.browse_hand_picked_shelves_and_smart_lists_created_for_this",
+            )}
           </p>
         </div>
       </div>
@@ -116,6 +127,7 @@ function UngroupedGroupSection({
   libraryId: number;
   gridClasses: string;
 }) {
+  useUILanguage();
   return (
     <section>
       <div className={gridClasses}>
@@ -136,6 +148,7 @@ function GroupSection({
   libraryId: number;
   gridClasses: string;
 }) {
+  useUILanguage();
   return (
     <section>
       <h2 className="mb-3 text-lg font-semibold">{group.name}</h2>

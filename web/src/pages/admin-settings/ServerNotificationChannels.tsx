@@ -9,7 +9,8 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import type {
   NotificationWebhookTestResult,
   ServerNotificationChannel,
@@ -40,6 +41,8 @@ import {
   useUpdateServerNotificationChannel,
 } from "@/hooks/queries/admin/serverNotificationChannels";
 import { formatRelativeTime } from "@/lib/date";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type ChannelNotifyKey =
   | "notify_new_movies"
@@ -59,21 +62,73 @@ interface ChannelNotifyField {
 
 const EVENT_SECTIONS: { label: string; fields: ChannelNotifyField[] }[] = [
   {
-    label: "New content",
+    get label() {
+      return tr("pages.admin_settings.server_notification_channels.new_content");
+    },
     fields: [
-      { key: "notify_new_movies", label: "New movies", defaultValue: true },
-      { key: "notify_new_episodes", label: "New episodes", defaultValue: true },
-      { key: "notify_new_audiobooks", label: "New audiobooks", defaultValue: true },
-      { key: "notify_new_ebooks", label: "New ebooks", defaultValue: true },
+      {
+        key: "notify_new_movies",
+        get label() {
+          return tr("pages.admin_settings.server_notification_channels.new_movies");
+        },
+        defaultValue: true,
+      },
+      {
+        key: "notify_new_episodes",
+        get label() {
+          return tr("pages.admin_settings.server_notification_channels.new_episodes");
+        },
+        defaultValue: true,
+      },
+      {
+        key: "notify_new_audiobooks",
+        get label() {
+          return tr("pages.admin_settings.server_notification_channels.new_audiobooks");
+        },
+        defaultValue: true,
+      },
+      {
+        key: "notify_new_ebooks",
+        get label() {
+          return tr("pages.admin_settings.server_notification_channels.new_ebooks");
+        },
+        defaultValue: true,
+      },
     ],
   },
   {
-    label: "Media requests",
+    get label() {
+      return tr("pages.admin_settings.server_notification_channels.media_requests");
+    },
     fields: [
-      { key: "notify_request_submitted", label: "Request submitted", defaultValue: false },
-      { key: "notify_request_approved", label: "Request approved", defaultValue: false },
-      { key: "notify_request_declined", label: "Request declined", defaultValue: false },
-      { key: "notify_request_fulfilled", label: "Request fulfilled", defaultValue: false },
+      {
+        key: "notify_request_submitted",
+        get label() {
+          return tr("pages.admin_settings.server_notification_channels.request_submitted");
+        },
+        defaultValue: false,
+      },
+      {
+        key: "notify_request_approved",
+        get label() {
+          return tr("pages.admin_settings.server_notification_channels.request_approved");
+        },
+        defaultValue: false,
+      },
+      {
+        key: "notify_request_declined",
+        get label() {
+          return tr("pages.admin_settings.server_notification_channels.request_declined");
+        },
+        defaultValue: false,
+      },
+      {
+        key: "notify_request_fulfilled",
+        get label() {
+          return tr("pages.admin_settings.server_notification_channels.request_fulfilled");
+        },
+        defaultValue: false,
+      },
     ],
   },
 ];
@@ -91,6 +146,7 @@ function ChannelFormDialog({
   channel: ServerNotificationChannel | null;
   onSecret: (secret: string) => void;
 }) {
+  useUILanguage();
   const create = useCreateServerNotificationChannel();
   const update = useUpdateServerNotificationChannel();
   const [name, setName] = useState(channel?.name ?? "");
@@ -122,19 +178,23 @@ function ChannelFormDialog({
       return;
     }
     if (!input.url) {
-      toast.error("A webhook URL is required");
+      toast.error("errors.admin_settings.server_notification_channels.a_webhook_url_is_required");
       return;
     }
     create.mutate(input, {
       onSuccess: (created) => {
         onOpenChange(false);
-        toast.success(`Channel "${created.name}" created`);
+        toast.success("feedback.admin_settings.server_notification_channels.channel_name_created", {
+          values: { name: created.name },
+        });
         if (created.signing_secret) {
           onSecret(created.signing_secret);
         }
       },
       onError: (error) => {
-        toast.error(error instanceof Error ? error.message : "Failed to create channel");
+        toast.error("errors.admin_settings.server_notification_channels.failed_to_create_channel", {
+          error: error,
+        });
       },
     });
   };
@@ -143,33 +203,52 @@ function ChannelFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editing ? `Edit "${channel.name}"` : "Add server channel"}</DialogTitle>
+          <DialogTitle>
+            {editing
+              ? tr("pages.admin_settings.server_notification_channels.edit_name", {
+                  name: channel.name,
+                })
+              : tr("pages.admin_settings.server_notification_channels.add_server_channel")}
+          </DialogTitle>
           <DialogDescription>
-            Server channels broadcast server-wide events — every profile sees the same posts.
-            Discord webhook URLs render as native embeds; any other HTTPS endpoint receives signed
-            JSON.
+            {tr(
+              "pages.admin_settings.server_notification_channels.server_channels_broadcast_server_wide_events_every_profile_sees_the",
+            )}
           </DialogDescription>
         </DialogHeader>
         <fieldset disabled={pending} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="server-channel-name">Name</Label>
+            <Label htmlFor="server-channel-name">
+              {tr("pages.admin_settings.server_notification_channels.name")}
+            </Label>
             <Input
               id="server-channel-name"
               value={name}
               maxLength={64}
-              placeholder="Community #new-content"
+              placeholder={tr(
+                "pages.admin_settings.server_notification_channels.community_new_content",
+              )}
               onChange={(event) => setName(event.target.value)}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="server-channel-url">{editing ? "Replace URL (optional)" : "URL"}</Label>
+            <Label htmlFor="server-channel-url">
+              {editing
+                ? tr("pages.admin_settings.server_notification_channels.replace_url_optional")
+                : tr("pages.admin_settings.server_notification_channels.url")}
+            </Label>
             <Input
               id="server-channel-url"
               value={url}
               placeholder={
                 editing
-                  ? `Currently pointing at ${channel.url_host}`
-                  : "https://discord.com/api/webhooks/…"
+                  ? tr(
+                      "pages.admin_settings.server_notification_channels.currently_pointing_at_url_host",
+                      { url_host: channel.url_host },
+                    )
+                  : tr(
+                      "pages.admin_settings.server_notification_channels.https_discord_com_api_webhooks",
+                    )
               }
               onChange={(event) => setUrl(event.target.value)}
             />
@@ -193,11 +272,11 @@ function ChannelFormDialog({
         </fieldset>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {tr("common.actions.cancel")}
           </Button>
           <Button onClick={submit} disabled={pending || !name.trim()}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {editing ? "Save" : "Create"}
+            {editing ? tr("common.actions.save") : tr("common.actions.create")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -214,6 +293,7 @@ function ChannelCard({
   onEdit: () => void;
   onSecret: (secret: string) => void;
 }) {
+  useUILanguage();
   const update = useUpdateServerNotificationChannel();
   const remove = useDeleteServerNotificationChannel();
   const test = useTestServerNotificationChannel();
@@ -238,7 +318,9 @@ function ChannelCard({
         <span className="text-muted-foreground text-xs">{channel.url_host}</span>
         <div className="ml-auto flex items-center gap-1.5">
           <span className="text-muted-foreground text-xs">
-            {channel.enabled ? "Enabled" : "Disabled"}
+            {channel.enabled
+              ? tr("pages.admin_settings.server_notification_channels.enabled")
+              : tr("pages.admin_settings.server_notification_channels.disabled")}
           </span>
           <Switch
             checked={channel.enabled}
@@ -248,30 +330,58 @@ function ChannelCard({
       </div>
 
       <div className="text-muted-foreground text-xs">
-        {enabledEvents.length > 0 ? enabledEvents.join(" · ") : "No events selected"}
+        {enabledEvents.length > 0
+          ? enabledEvents.join(" · ")
+          : tr("pages.admin_settings.server_notification_channels.no_events_selected")}
       </div>
 
       {lastSuccess && !failing && (
-        <div className="text-muted-foreground text-xs">Last post: {lastSuccess}</div>
+        <div className="text-muted-foreground text-xs">
+          {tr("pages.admin_settings.server_notification_channels.last_post")} {lastSuccess}
+        </div>
       )}
       {failing && (
         <div className="flex items-start gap-1.5 text-xs text-amber-500">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             {channel.disabled_reason
-              ? `Disabled: ${channel.disabled_reason} Re-enable the channel to resume from now.`
-              : `Last failure${lastFailure ? ` ${lastFailure}` : ""}: ${
-                  channel.last_failure_message || `HTTP ${channel.last_failure_status ?? "error"}`
-                }. Check the destination URL.`}
+              ? tr(
+                  "pages.admin_settings.server_notification_channels.disabled_disabled_reason_re_enable_the_channel_to_resume_from",
+                  {
+                    disabled_reason: channel.disabled_reason,
+                  },
+                )
+              : tr(
+                  "pages.admin_settings.server_notification_channels.last_failure_value_value2_check_the_destination_url",
+                  {
+                    value: lastFailure ? ` ${lastFailure}` : "",
+                    value2:
+                      channel.last_failure_message ||
+                      `HTTP ${channel.last_failure_status ?? "error"}`,
+                  },
+                )}
           </span>
         </div>
       )}
       {testResult && (
-        <div className={`text-xs ${testResult.ok ? "text-emerald-500" : "text-amber-500"}`}>
-          Test {testResult.ok ? "succeeded" : "failed"}
-          {testResult.http_status ? ` (HTTP ${testResult.http_status}` : " ("}
-          {`${testResult.duration_ms}ms)`}
-          {testResult.message ? ` — ${testResult.message}` : ""}
+        <div className={"text-xs " + (testResult.ok ? "text-emerald-500" : "text-amber-500")}>
+          {tr("pages.admin_settings.server_notification_channels.test")}{" "}
+          {testResult.ok
+            ? tr("pages.admin_settings.server_notification_channels.succeeded")
+            : tr("pages.admin_settings.server_notification_channels.failed")}
+          {testResult.http_status
+            ? tr("pages.admin_settings.server_notification_channels.http_http_status", {
+                http_status: testResult.http_status,
+              })
+            : " ("}
+          {tr("pages.admin_settings.server_notification_channels.duration_ms_ms", {
+            duration_ms: testResult.duration_ms,
+          })}
+          {testResult.message
+            ? tr("pages.admin_settings.server_notification_channels.message", {
+                message: tr.remote({ message: testResult.message }),
+              })
+            : ""}
         </div>
       )}
 
@@ -283,7 +393,10 @@ function ChannelCard({
           onClick={() =>
             test.mutate(channel.id, {
               onSuccess: setTestResult,
-              onError: () => toast.error("Test request failed"),
+              onError: () =>
+                toast.error(
+                  "errors.admin_settings.server_notification_channels.test_request_failed",
+                ),
             })
           }
         >
@@ -292,11 +405,11 @@ function ChannelCard({
           ) : (
             <Send className="mr-1.5 h-3.5 w-3.5" />
           )}
-          Test
+          {tr("pages.admin_settings.server_notification_channels.test")}
         </Button>
         <Button variant="outline" size="sm" onClick={onEdit}>
           <Pencil className="mr-1.5 h-3.5 w-3.5" />
-          Edit
+          {tr("common.actions.edit")}
         </Button>
         {channel.type === "generic" && (
           <Button
@@ -310,7 +423,7 @@ function ChannelCard({
             }
           >
             <KeyRound className="mr-1.5 h-3.5 w-3.5" />
-            Rotate secret
+            {tr("pages.admin_settings.server_notification_channels.rotate_secret")}
           </Button>
         )}
         <Button
@@ -320,21 +433,29 @@ function ChannelCard({
           onClick={() => setConfirmDelete(true)}
         >
           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-          Delete
+          {tr("common.actions.delete")}
         </Button>
       </div>
 
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title={`Delete "${channel.name}"?`}
-        description="Server events will stop posting to this destination. This cannot be undone."
-        confirmLabel="Delete"
+        title={tr("pages.admin_settings.server_notification_channels.delete_name", {
+          name: channel.name,
+        })}
+        description={tr(
+          "pages.admin_settings.server_notification_channels.server_events_will_stop_posting_to_this_destination_this_cannot",
+        )}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         isPending={remove.isPending}
         onConfirm={() => remove.mutate(channel.id, { onSettled: () => setConfirmDelete(false) })}
       />
-      {update.isPending && <span className="sr-only">Saving…</span>}
+      {update.isPending && (
+        <span className="sr-only">
+          {tr("pages.admin_settings.server_notification_channels.saving")}
+        </span>
+      )}
     </div>
   );
 }
@@ -345,6 +466,7 @@ function ChannelCard({
  * shared audience (e.g. a community Discord channel).
  */
 export default function ServerNotificationChannels() {
+  useUILanguage();
   const { data: channels, isLoading } = useServerNotificationChannels();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ServerNotificationChannel | null>(null);
@@ -370,7 +492,9 @@ export default function ServerNotificationChannels() {
           {(channels ?? []).length === 0 && (
             <div className="text-muted-foreground flex items-center gap-2 py-1 text-sm">
               <Megaphone className="h-4 w-4" />
-              No server channels yet. Create one to broadcast new content and request activity.
+              {tr(
+                "pages.admin_settings.server_notification_channels.no_server_channels_yet_create_one_to_broadcast_new_content",
+              )}
             </div>
           )}
           <div>
@@ -383,7 +507,7 @@ export default function ServerNotificationChannels() {
               }}
             >
               <Plus className="mr-1.5 h-4 w-4" />
-              Add server channel
+              {tr("pages.admin_settings.server_notification_channels.add_server_channel")}
             </Button>
           </div>
         </>

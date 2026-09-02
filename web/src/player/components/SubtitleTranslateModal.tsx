@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import type { PlayerConfig } from "../context/PlayerConfigContext";
 import type { PlayerAudioTrack, PlayerSubtitleInfo } from "../types";
 import { playerFetch, PlayerFetchError } from "../player-fetch";
@@ -11,6 +11,9 @@ import {
   type SubtitleTranslateMode,
 } from "./subtitleTranslateRequest";
 import { QUOTA_PERIOD_WINDOW_LABELS } from "@/lib/quotaPeriods";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 interface SubtitleTranslateModalProps {
   mediaFileId: number;
@@ -59,6 +62,7 @@ export function SubtitleTranslateModal({
   getStartPosition,
   onClose,
 }: SubtitleTranslateModalProps) {
+  useUILanguage();
   // Only offer sources the server can actually translate (excludes live tracks,
   // bitmap embedded tracks, and ASS/non-text external/downloaded tracks).
   const sourceTracks = useMemo(() => tracks.filter(isTranslatableSource), [tracks]);
@@ -128,7 +132,9 @@ export function SubtitleTranslateModal({
       // reload, or a second viewer) won't get its own live stream — tell the
       // user it's underway; it'll appear via the subtitle-ready refresh.
       if (res?.job?.status === "running") {
-        toast.info("A job for this track is already in progress — it'll appear when it's ready.");
+        toast.info(
+          "feedback.player.components.subtitle_translate_modal.a_job_for_this_track_is_already_in_progress_it",
+        );
       }
       // Otherwise the player takes over: it pauses, streams cues in as they're
       // generated, then resumes once your position is covered.
@@ -141,11 +147,12 @@ export function SubtitleTranslateModal({
         refreshQuota();
       }
       setError(
-        err instanceof Error
-          ? err.message
-          : mode === "audio"
-            ? "Couldn't start subtitle generation."
-            : "Couldn't start translation.",
+        tr.error(
+          mode === "audio"
+            ? "errors.player.components.subtitle_translate_modal.couldn_t_start_subtitle_generation"
+            : "errors.player.components.subtitle_translate_modal.couldn_t_start_translation",
+          err,
+        ),
       );
     } finally {
       setSubmitting(false);
@@ -173,7 +180,7 @@ export function SubtitleTranslateModal({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Translate subtitles with AI"
+      aria-label={tr("player.components.subtitle_translate_modal.translate_subtitles_with_ai")}
     >
       <div
         className="w-full max-w-[440px] rounded-lg bg-neutral-900 text-white shadow-xl"
@@ -181,13 +188,15 @@ export function SubtitleTranslateModal({
       >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <h2 className="text-sm font-semibold">
-            {mode === "audio" ? "Generate subtitles with AI" : "Translate subtitles with AI"}
+            {mode === "audio"
+              ? tr("player.components.subtitle_translate_modal.generate_subtitles_with_ai")
+              : tr("player.components.subtitle_translate_modal.translate_subtitles_with_ai")}
           </h2>
           <button
             type="button"
             className="rounded text-white/60 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={tr("common.actions.close")}
           >
             ✕
           </button>
@@ -207,9 +216,12 @@ export function SubtitleTranslateModal({
                   type="button"
                   role="tab"
                   aria-selected={mode === value}
-                  className={`flex-1 rounded px-2 py-1 text-xs font-medium focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-                    mode === value ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"
-                  }`}
+                  className={
+                    "flex-1 rounded px-2 py-1 text-xs font-medium focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+                    (mode === value
+                      ? "bg-white/15 text-white"
+                      : "text-white/50 hover:text-white/80")
+                  }
                   onClick={() => setMode(value)}
                   disabled={submitting}
                 >
@@ -221,14 +233,16 @@ export function SubtitleTranslateModal({
 
           {!canTranslate && !canTranscribe ? (
             <p className="py-4 text-center text-xs text-white/50">
-              No text subtitle track is available to translate. Add or download one first.
+              {tr(
+                "player.components.subtitle_translate_modal.no_text_subtitle_track_is_available_to_translate_add_or",
+              )}
             </p>
           ) : (
             <>
               {mode === "subtitles" ? (
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-white/60">
-                    Translate from
+                    {tr("player.components.subtitle_translate_modal.translate_from")}
                   </span>
                   <select
                     className="w-full rounded bg-neutral-800 px-2 py-1.5 text-sm text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none disabled:opacity-50"
@@ -245,7 +259,9 @@ export function SubtitleTranslateModal({
                 </label>
               ) : (
                 <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-white/60">Audio track</span>
+                  <span className="mb-1 block text-xs font-medium text-white/60">
+                    {tr("player.components.subtitle_translate_modal.audio_track")}
+                  </span>
                   <select
                     className="w-full rounded bg-neutral-800 px-2 py-1.5 text-sm text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none disabled:opacity-50"
                     value={audioIndex}
@@ -263,7 +279,9 @@ export function SubtitleTranslateModal({
 
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-white/60">
-                  {mode === "audio" ? "Subtitle language" : "Translate to"}
+                  {mode === "audio"
+                    ? tr("player.components.subtitle_translate_modal.subtitle_language")
+                    : tr("player.components.subtitle_translate_modal.translate_to")}
                 </span>
                 <select
                   className="w-full rounded bg-neutral-800 px-2 py-1.5 text-sm text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none disabled:opacity-50"
@@ -281,13 +299,24 @@ export function SubtitleTranslateModal({
 
               {mode === "audio" && quota && (
                 <p
-                  className={`text-[11px] leading-relaxed ${
-                    quotaExhausted ? "text-amber-300/90" : "text-white/35"
-                  }`}
+                  className={
+                    "text-[11px] leading-relaxed " +
+                    (quotaExhausted ? "text-amber-300/90" : "text-white/35")
+                  }
                 >
                   {quotaExhausted
-                    ? `You've used all ${quota.limit} transcriptions for the last ${quotaPeriodLabel}. Try again later.`
-                    : `${quota.remaining} of ${quota.limit} transcriptions left for the last ${quotaPeriodLabel}.`}
+                    ? tr(
+                        "player.components.subtitle_translate_modal.you_ve_used_all_limit_transcriptions_for_the_last_quota",
+                        { limit: quota.limit, quotaPeriodLabel: quotaPeriodLabel },
+                      )
+                    : tr(
+                        "player.components.subtitle_translate_modal.remaining_of_limit_transcriptions_left_for_the_last_quota_period",
+                        {
+                          remaining: quota.remaining,
+                          limit: quota.limit,
+                          quotaPeriodLabel: quotaPeriodLabel,
+                        },
+                      )}
                 </p>
               )}
 
@@ -303,7 +332,7 @@ export function SubtitleTranslateModal({
                   className="rounded px-3 py-1.5 text-sm text-white/60 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
                   onClick={onClose}
                 >
-                  Cancel
+                  {tr("common.actions.cancel")}
                 </button>
                 <button
                   type="button"
@@ -315,14 +344,22 @@ export function SubtitleTranslateModal({
                     (mode === "audio" && quotaExhausted)
                   }
                 >
-                  {submitting ? "Starting…" : mode === "audio" ? "Generate" : "Translate"}
+                  {submitting
+                    ? tr("player.components.subtitle_translate_modal.starting")
+                    : mode === "audio"
+                      ? tr("player.components.subtitle_translate_modal.generate")
+                      : tr("player.components.subtitle_translate_modal.translate")}
                 </button>
               </div>
 
               <p className="text-[11px] leading-relaxed text-white/35">
                 {mode === "audio"
-                  ? "The audio is transcribed on the server (and translated if the language differs) — longer files take a while. The finished track is saved for everyone."
-                  : "Playback pauses while the first lines are translated, then resumes with subtitles streaming in. The finished track is saved for everyone."}
+                  ? tr(
+                      "player.components.subtitle_translate_modal.the_audio_is_transcribed_on_the_server_and_translated_if",
+                    )
+                  : tr(
+                      "player.components.subtitle_translate_modal.playback_pauses_while_the_first_lines_are_translated_then_resumes",
+                    )}
               </p>
             </>
           )}

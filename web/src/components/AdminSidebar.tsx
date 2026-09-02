@@ -16,6 +16,8 @@ import { usePolicyCapability } from "@/hooks/queries/admin/policy";
 import { useAdminSessions } from "@/hooks/queries/admin/stats";
 import { useBuildInfo } from "@/hooks/queries/admin/system";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SidebarItem extends AdminNavItem {
   badge?: ReactNode;
@@ -37,6 +39,7 @@ function useSessionCount() {
 }
 
 export default function AdminSidebar({ onNavigate, embedded = false }: AdminSidebarProps) {
+  useUILanguage();
   const location = useLocation();
   const sessionCount = useSessionCount();
   const buildInfo = useBuildInfo();
@@ -56,7 +59,11 @@ export default function AdminSidebar({ onNavigate, embedded = false }: AdminSide
   }
 
   const activityBadge =
-    sessionCount > 0 ? <span className="live-badge">{sessionCount} live</span> : undefined;
+    sessionCount > 0 ? (
+      <span className="live-badge">
+        {sessionCount} {tr("components.admin_sidebar.live")}
+      </span>
+    ) : undefined;
   const sections: SidebarSection[] = buildAdminNavSections({
     policyEditorAvailable: policyCapability.data?.editor_available === true,
   }).map((section) => ({
@@ -74,7 +81,7 @@ export default function AdminSidebar({ onNavigate, embedded = false }: AdminSide
   const { data: adminInstallations } = useAdminPluginInstallations();
   const adminPluginItems = buildAdminPluginNavItems(adminInstallations);
   if (adminPluginItems.length > 0) {
-    sections.push({ label: "Plugin Apps", items: adminPluginItems });
+    sections.push({ label: tr("components.admin_sidebar.plugin_apps"), items: adminPluginItems });
   }
 
   function isActive(item: SidebarItem) {
@@ -97,7 +104,7 @@ export default function AdminSidebar({ onNavigate, embedded = false }: AdminSide
         <Link
           to="/"
           onClick={onNavigate}
-          aria-label="Go to app home"
+          aria-label={tr("components.admin_sidebar.go_to_app_home")}
           className="focus-visible:ring-ring/50 inline-flex rounded-md transition-opacity hover:opacity-85 focus-visible:ring-[3px] focus-visible:outline-none"
         >
           <SiloBrand className="h-12 w-[112px]" />
@@ -105,7 +112,7 @@ export default function AdminSidebar({ onNavigate, embedded = false }: AdminSide
       </div>
       {/* Nav sections */}
       <nav
-        aria-label="Admin navigation"
+        aria-label={tr("components.admin_sidebar.admin_navigation")}
         className="sidebar-scroll flex-1 space-y-5 overflow-y-auto px-3"
       >
         {sections.map((section) => (
@@ -146,11 +153,17 @@ export default function AdminSidebar({ onNavigate, embedded = false }: AdminSide
       <div className="space-y-3 px-3 pb-4">
         <div className="border-sidebar-border/70 bg-sidebar-accent/40 rounded-xl border px-3 py-2">
           <div className="text-muted-foreground text-[10px] font-semibold tracking-[0.18em] uppercase">
-            Build
+            {tr("components.admin_sidebar.build")}
           </div>
           <div
             className="text-sidebar-foreground mt-1 font-mono text-[12px] leading-5"
-            title={buildInfo.data?.built_at ? `Built ${buildInfo.data.built_at}` : undefined}
+            title={
+              buildInfo.data?.built_at
+                ? tr("components.admin_sidebar.built_built_at", {
+                    built_at: buildInfo.data.built_at,
+                  })
+                : undefined
+            }
           >
             {buildDisplay}
           </div>
@@ -164,7 +177,7 @@ export default function AdminSidebar({ onNavigate, embedded = false }: AdminSide
           className="text-muted-foreground hover:text-foreground hover:bg-accent/70 flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors duration-150"
         >
           <ArrowLeft className="h-[18px] w-[18px]" />
-          <span>Back to App</span>
+          <span>{tr("components.admin_sidebar.back_to_app")}</span>
         </ViewTransitionLink>
       </div>
     </aside>

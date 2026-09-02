@@ -6,6 +6,8 @@ import {
   type GalleryPreset,
   type RecipeDefinition,
 } from "@/lib/recipes";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function score(query: string, preset: GalleryPreset): number {
   const q = query.toLowerCase();
@@ -19,15 +21,15 @@ function score(query: string, preset: GalleryPreset): number {
 }
 
 const CATEGORY_LABELS: Record<Category, string> = {
-  library_staples: "Library staples",
-  personalized: "Personalized",
-  discovery: "Discovery",
-  editorial: "Editorial",
-  seasonal: "Seasonal",
-  mood: "Mood",
-  hand_picked: "Hand-picked",
-  social: "Social",
-  custom: "Custom",
+  library_staples: "components.recipe_gallery.recipe_gallery_modal.library_staples",
+  personalized: "components.recipe_gallery.recipe_gallery_modal.personalized",
+  discovery: "components.recipe_gallery.recipe_gallery_modal.discovery",
+  editorial: "components.recipe_gallery.recipe_gallery_modal.editorial",
+  seasonal: "components.recipe_gallery.recipe_gallery_modal.seasonal",
+  mood: "components.recipe_gallery.recipe_gallery_modal.mood",
+  hand_picked: "components.recipe_gallery.recipe_gallery_modal.hand_picked",
+  social: "components.recipe_gallery.recipe_gallery_modal.social",
+  custom: "components.recipe_gallery.recipe_gallery_modal.custom",
 };
 
 interface Props {
@@ -43,6 +45,7 @@ interface Props {
 }
 
 export default function RecipeGalleryModal({ open, onClose, onPick, hideAdminOnly }: Props) {
+  useUILanguage();
   const [catalog, setCatalog] = useState<Partial<Record<Category, RecipeDefinition[]>>>({});
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<Category | "all">("all");
@@ -86,17 +89,23 @@ export default function RecipeGalleryModal({ open, onClose, onPick, hideAdminOnl
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <h2 className="text-base font-semibold">Add a section</h2>
+          <h2 className="text-base font-semibold">
+            {tr("components.recipe_gallery.recipe_gallery_modal.add_a_section")}
+          </h2>
           <button type="button" onClick={onClose} className="text-white/60 hover:text-white">
             ✕
           </button>
         </div>
 
-        {error && <div className="mt-3 text-sm text-red-400">Error loading recipes: {error}</div>}
+        {error && (
+          <div className="mt-3 text-sm text-red-400">
+            {tr("components.recipe_gallery.recipe_gallery_modal.error_loading_recipes")} {error}
+          </div>
+        )}
 
         <input
           className="mt-4 w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm"
-          placeholder="🔍 Search recipes..."
+          placeholder={tr("components.recipe_gallery.recipe_gallery_modal.search_recipes")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -105,18 +114,24 @@ export default function RecipeGalleryModal({ open, onClose, onPick, hideAdminOnl
           <button
             type="button"
             onClick={() => setActiveCategory("all")}
-            className={`rounded-full px-3 py-1 text-xs ${activeCategory === "all" ? "bg-indigo-500 text-white" : "bg-white/5 text-white/80"}`}
+            className={
+              "rounded-full px-3 py-1 text-xs " +
+              (activeCategory === "all" ? "bg-indigo-500 text-white" : "bg-white/5 text-white/80")
+            }
           >
-            All
+            {tr("components.recipe_gallery.recipe_gallery_modal.all")}
           </button>
           {(Object.keys(catalog) as Category[]).map((c) => (
             <button
               key={c}
               type="button"
               onClick={() => setActiveCategory(c)}
-              className={`rounded-full px-3 py-1 text-xs ${activeCategory === c ? "bg-indigo-500 text-white" : "bg-white/5 text-white/80"}`}
+              className={
+                "rounded-full px-3 py-1 text-xs " +
+                (activeCategory === c ? "bg-indigo-500 text-white" : "bg-white/5 text-white/80")
+              }
             >
-              {CATEGORY_LABELS[c]}
+              {tr(CATEGORY_LABELS[c])}
             </button>
           ))}
         </div>
@@ -133,7 +148,13 @@ export default function RecipeGalleryModal({ open, onClose, onPick, hideAdminOnl
           {flat.length === 0 && (
             <div className="col-span-3 flex flex-col items-center justify-center py-12 text-center text-sm text-white/50">
               <div className="mb-2 text-3xl">🔍</div>
-              <div>No recipes match {search ? `"${search}"` : "this filter"}.</div>
+              <div>
+                {tr("components.recipe_gallery.recipe_gallery_modal.no_recipes_match")}{" "}
+                {search
+                  ? tr("components.recipe_gallery.recipe_gallery_modal.search", { search: search })
+                  : tr("components.recipe_gallery.recipe_gallery_modal.this_filter")}
+                .
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -142,7 +163,7 @@ export default function RecipeGalleryModal({ open, onClose, onPick, hideAdminOnl
                 }}
                 className="mt-3 text-xs underline opacity-80"
               >
-                Clear filters
+                {tr("components.recipe_gallery.recipe_gallery_modal.clear_filters")}
               </button>
             </div>
           )}

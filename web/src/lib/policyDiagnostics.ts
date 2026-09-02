@@ -3,6 +3,8 @@ import { Text } from "@codemirror/state";
 
 import type { PolicyCompileIssue } from "@/api/types";
 
+import { tr } from "@/i18n/translate";
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -25,7 +27,11 @@ export function mapPolicyIssuesToDiagnostics(
       from,
       to,
       severity: "error",
-      message: issue.message || "Policy compile error",
+      get message() {
+        return issue.message
+          ? tr.remote({ message: issue.message })
+          : tr("lib.policy_diagnostics.policy_compile_error");
+      },
     };
   });
 }

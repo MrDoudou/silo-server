@@ -81,41 +81,59 @@ import type {
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/date";
 import { formatDateTime as formatPreferredDateTime } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
 const STATUS_CONFIG = {
-  queued: { icon: Clock, color: "text-info", bg: "bg-info/10 border-info/20", label: "Queued" },
+  queued: {
+    icon: Clock,
+    color: "text-info",
+    bg: "bg-info/10 border-info/20",
+    get label() {
+      return tr("pages.admin_history_import.queued");
+    },
+  },
   running: {
     icon: Loader2,
     color: "text-warning",
     bg: "bg-warning/10 border-warning/20",
-    label: "Running",
+    get label() {
+      return tr("pages.admin_history_import.running");
+    },
     spin: true,
   },
   completed: {
     icon: CheckCircle2,
     color: "text-success",
     bg: "bg-success/10 border-success/20",
-    label: "Completed",
+    get label() {
+      return tr("pages.admin_history_import.completed");
+    },
   },
   failed: {
     icon: XCircle,
     color: "text-destructive",
     bg: "bg-destructive/10 border-destructive/20",
-    label: "Failed",
+    get label() {
+      return tr("pages.admin_history_import.failed");
+    },
   },
   cancelled: {
     icon: CircleSlash2,
     color: "text-muted-foreground",
     bg: "bg-muted border-border",
-    label: "Cancelled",
+    get label() {
+      return tr("pages.admin_history_import.cancelled");
+    },
   },
 } as const;
 
 function StatusBadge({ status }: { status: HistoryImportRun["status"] }) {
+  useUILanguage();
   const c = STATUS_CONFIG[status];
   const Icon = c.icon;
   return (
@@ -162,6 +180,7 @@ function SourceDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  useUILanguage();
   const isEdit = mode.kind === "edit";
   const existing = isEdit ? mode.source : null;
   const [name, setName] = useState(existing?.name ?? "");
@@ -245,12 +264,16 @@ function SourceDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit server" : "Add source server"}</DialogTitle>
+          <DialogTitle>
+            {isEdit
+              ? tr("pages.admin_history_import.edit_server")
+              : tr("pages.admin_history_import.add_source_server")}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="src-name">Name</Label>
+              <Label htmlFor="src-name">{tr("pages.admin_history_import.name")}</Label>
               <Input
                 id="src-name"
                 placeholder={hints.name}
@@ -260,7 +283,7 @@ function SourceDialog({
             </div>
             {!isEdit ? (
               <div className="space-y-1.5">
-                <Label>Type</Label>
+                <Label>{tr("pages.admin_history_import.type")}</Label>
                 <Select
                   value={sourceType}
                   onValueChange={(v) => {
@@ -273,21 +296,23 @@ function SourceDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="jellyfin">Jellyfin</SelectItem>
-                    <SelectItem value="emby">Emby</SelectItem>
-                    <SelectItem value="plex">Plex</SelectItem>
+                    <SelectItem value="jellyfin">
+                      {tr("pages.admin_history_import.jellyfin")}
+                    </SelectItem>
+                    <SelectItem value="emby">{tr("pages.admin_history_import.emby")}</SelectItem>
+                    <SelectItem value="plex">{tr("pages.admin_history_import.plex")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             ) : (
               <div className="space-y-1.5">
-                <Label>Type</Label>
+                <Label>{tr("pages.admin_history_import.type")}</Label>
                 <Input value={existing?.source_type ?? ""} disabled className="capitalize" />
               </div>
             )}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="src-url">Server URL</Label>
+            <Label htmlFor="src-url">{tr("pages.admin_history_import.server_url")}</Label>
             <Input
               id="src-url"
               placeholder={hints.url}
@@ -311,7 +336,7 @@ function SourceDialog({
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    Sign in with Plex
+                    {tr("pages.admin_history_import.sign_in_with_plex")}
                   </button>
                   <button
                     type="button"
@@ -323,7 +348,7 @@ function SourceDialog({
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    Paste token
+                    {tr("pages.admin_history_import.paste_token")}
                   </button>
                 </div>
               )}
@@ -331,16 +356,20 @@ function SourceDialog({
               {isPlex && tokenMode === "login" ? (
                 <div className="space-y-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="plex-user-create">Plex email or username</Label>
+                    <Label htmlFor="plex-user-create">
+                      {tr("pages.admin_history_import.plex_email_or_username")}
+                    </Label>
                     <Input
                       id="plex-user-create"
-                      placeholder="you@example.com"
+                      placeholder={tr("pages.admin_history_import.you_example_com")}
                       value={plexUser}
                       onChange={(e) => setPlexUser(e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="plex-pass-create">Plex password</Label>
+                    <Label htmlFor="plex-pass-create">
+                      {tr("pages.admin_history_import.plex_password")}
+                    </Label>
                     <Input
                       id="plex-pass-create"
                       type="password"
@@ -352,14 +381,22 @@ function SourceDialog({
               ) : (
                 <div className="space-y-1.5">
                   <Label htmlFor="src-token">
-                    {isPlex ? "Plex auth token" : "Admin API key"}{" "}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
+                    {isPlex
+                      ? tr("pages.admin_history_import.plex_auth_token")
+                      : tr("pages.admin_history_import.admin_api_key")}{" "}
+                    <span className="text-muted-foreground font-normal">
+                      {tr("pages.admin_history_import.optional")}
+                    </span>
                   </Label>
                   <div className="relative">
                     <Input
                       id="src-token"
                       type={showToken ? "text" : "password"}
-                      placeholder={isPlex ? "Paste Plex token here…" : "Paste API key here…"}
+                      placeholder={
+                        isPlex
+                          ? tr("pages.admin_history_import.paste_plex_token_here")
+                          : tr("pages.admin_history_import.paste_api_key_here")
+                      }
                       value={adminToken}
                       onChange={(e) => setAdminToken(e.target.value)}
                       className="pr-10"
@@ -379,15 +416,19 @@ function SourceDialog({
 
           <div className="flex items-center gap-3">
             <Switch id="src-enabled" checked={enabled} onCheckedChange={setEnabled} />
-            <Label htmlFor="src-enabled">Enabled</Label>
+            <Label htmlFor="src-enabled">{tr("pages.admin_history_import.enabled")}</Label>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {tr("common.actions.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={!name.trim() || !baseURL.trim() || isPending}>
-            {isPending ? "Saving…" : isEdit ? "Save" : "Add server"}
+            {isPending
+              ? tr("pages.admin_history_import.saving")
+              : isEdit
+                ? tr("common.actions.save")
+                : tr("pages.admin_history_import.add_server")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -404,6 +445,7 @@ function TokenDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  useUILanguage();
   const isPlex = source.source_type === "plex";
   const [mode, setMode] = useState<"token" | "login">(isPlex ? "login" : "token");
   const [token, setToken] = useState("");
@@ -442,7 +484,9 @@ function TokenDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Admin API key — {source.name}</DialogTitle>
+          <DialogTitle>
+            {tr("pages.admin_history_import.admin_api_key_89d70b41")} {source.name}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           {/* Mode toggle for Plex sources */}
@@ -458,7 +502,7 @@ function TokenDialog({
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Sign in with Plex
+                {tr("pages.admin_history_import.sign_in_with_plex")}
               </button>
               <button
                 type="button"
@@ -470,7 +514,7 @@ function TokenDialog({
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Paste token
+                {tr("pages.admin_history_import.paste_token")}
               </button>
             </div>
           )}
@@ -478,19 +522,23 @@ function TokenDialog({
           {mode === "login" && isPlex ? (
             <div className="space-y-3">
               <p className="text-muted-foreground text-sm">
-                Sign in with your Plex account to generate an admin token automatically.
+                {tr(
+                  "pages.admin_history_import.sign_in_with_your_plex_account_to_generate_an_admin",
+                )}
               </p>
               <div className="space-y-1.5">
-                <Label htmlFor="plex-user">Email or username</Label>
+                <Label htmlFor="plex-user">
+                  {tr("pages.admin_history_import.email_or_username")}
+                </Label>
                 <Input
                   id="plex-user"
-                  placeholder="you@example.com"
+                  placeholder={tr("pages.admin_history_import.you_example_com")}
                   value={plexUser}
                   onChange={(e) => setPlexUser(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="plex-pass">Password</Label>
+                <Label htmlFor="plex-pass">{tr("pages.admin_history_import.password")}</Label>
                 <Input
                   id="plex-pass"
                   type="password"
@@ -503,16 +551,20 @@ function TokenDialog({
             <div className="space-y-3">
               <p className="text-muted-foreground text-sm">
                 {isPlex
-                  ? "Paste your Plex auth token directly."
-                  : "This key is used to discover users on the server and import their watch history into Silo."}
+                  ? tr("pages.admin_history_import.paste_your_plex_auth_token_directly")
+                  : tr(
+                      "pages.admin_history_import.this_key_is_used_to_discover_users_on_the_server",
+                    )}
               </p>
               <div className="space-y-1.5">
-                <Label htmlFor="admin-token">API key / Token</Label>
+                <Label htmlFor="admin-token">
+                  {tr("pages.admin_history_import.api_key_token")}
+                </Label>
                 <div className="relative">
                   <Input
                     id="admin-token"
                     type={showToken ? "text" : "password"}
-                    placeholder="Paste token here…"
+                    placeholder={tr("pages.admin_history_import.paste_token_here")}
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     className="pr-10"
@@ -531,7 +583,9 @@ function TokenDialog({
 
           {source.has_admin_token && (
             <p className="text-muted-foreground text-xs">
-              A token is already configured. Saving will replace it.
+              {tr(
+                "pages.admin_history_import.a_token_is_already_configured_saving_will_replace_it",
+              )}
             </p>
           )}
         </div>
@@ -542,19 +596,21 @@ function TokenDialog({
               onClick={() => clearToken.mutate(source.id, { onSuccess: onClose })}
               disabled={clearToken.isPending}
             >
-              Remove
+              {tr("common.actions.remove")}
             </Button>
           )}
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {tr("common.actions.cancel")}
           </Button>
           {mode === "login" && isPlex ? (
             <Button onClick={handlePlexLogin} disabled={!plexUser.trim() || !plexPass || isSaving}>
-              {isSaving ? "Signing in…" : "Sign in & save"}
+              {isSaving
+                ? tr("pages.admin_history_import.signing_in")
+                : tr("pages.admin_history_import.sign_in_save")}
             </Button>
           ) : (
             <Button onClick={handleSaveToken} disabled={!token.trim() || isSaving}>
-              {isSaving ? "Saving…" : "Save"}
+              {isSaving ? tr("pages.admin_history_import.saving") : tr("common.actions.save")}
             </Button>
           )}
         </DialogFooter>
@@ -578,6 +634,7 @@ function DiscoverDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  useUILanguage();
   const { data: externalUsers, isFetching, refetch, error } = useDiscoverExternalUsers(source.id);
   const { data: users = [] } = useAdminUsers();
   const createMapping = useCreateAdminMapping();
@@ -633,7 +690,9 @@ function DiscoverDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Discover users on {source.name}</DialogTitle>
+          <DialogTitle>
+            {tr("pages.admin_history_import.discover_users_on")} {source.name}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -642,10 +701,12 @@ function DiscoverDialog({
             <div className="surface-panel-subtle flex flex-col items-center gap-3 rounded-xl p-8 text-center">
               <Search className="text-muted-foreground h-8 w-8" />
               <p className="text-muted-foreground text-sm">
-                Query the server to find user accounts available for import.
+                {tr(
+                  "pages.admin_history_import.query_the_server_to_find_user_accounts_available_for_import",
+                )}
               </p>
               <Button onClick={() => refetch()} size="sm">
-                Discover users
+                {tr("pages.admin_history_import.discover_users")}
               </Button>
             </div>
           )}
@@ -653,7 +714,9 @@ function DiscoverDialog({
           {isFetching && (
             <div className="flex items-center justify-center gap-2 py-8 text-sm">
               <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
-              <span className="text-muted-foreground">Connecting to server…</span>
+              <span className="text-muted-foreground">
+                {tr("pages.admin_history_import.connecting_to_server")}
+              </span>
             </div>
           )}
 
@@ -664,7 +727,7 @@ function DiscoverDialog({
                 <span>{discoverErrorMessage}</span>
               </div>
               <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Retry
+                {tr("common.actions.retry")}
               </Button>
             </div>
           )}
@@ -675,11 +738,14 @@ function DiscoverDialog({
               <div className="flex items-center justify-between">
                 <p className="text-muted-foreground text-sm">
                   {unmappedUsers.length === 0
-                    ? "All users are already mapped."
-                    : `${unmappedUsers.length} unmapped user${unmappedUsers.length !== 1 ? "s" : ""} found`}
+                    ? tr("pages.admin_history_import.all_users_are_already_mapped")
+                    : tr("pages.admin_history_import.length_unmapped_user_value_found", {
+                        length: unmappedUsers.length,
+                        value: unmappedUsers.length !== 1 ? "s" : "",
+                      })}
                 </p>
                 <Button variant="ghost" size="sm" onClick={() => refetch()}>
-                  Refresh
+                  {tr("common.actions.refresh")}
                 </Button>
               </div>
 
@@ -688,7 +754,7 @@ function DiscoverDialog({
                   <div className="relative">
                     <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
                     <Input
-                      placeholder="Search users…"
+                      placeholder={tr("pages.admin_history_import.search_users")}
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       className="pl-9"
@@ -697,7 +763,9 @@ function DiscoverDialog({
                   <div className="surface-panel-subtle max-h-96 divide-y overflow-y-auto rounded-xl border-0">
                     {filteredUsers.length === 0 ? (
                       <p className="text-muted-foreground px-4 py-6 text-center text-sm">
-                        No users matching &ldquo;{search}&rdquo;
+                        {tr("pages.admin_history_import.no_users_matching_ldquo")}
+                        {search}
+                        {tr("pages.admin_history_import.rdquo")}
                       </p>
                     ) : (
                       filteredUsers.map((u) => (
@@ -720,7 +788,7 @@ function DiscoverDialog({
                           </div>
                           {mappingTarget?.id === u.id ? (
                             <Badge variant="outline" className="shrink-0 text-xs">
-                              Selected
+                              {tr("pages.admin_history_import.selected")}
                             </Badge>
                           ) : (
                             <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
@@ -736,12 +804,15 @@ function DiscoverDialog({
               {mappingTarget && (
                 <div className="surface-panel-subtle space-y-4 rounded-xl border-0 p-4">
                   <p className="text-sm font-medium">
-                    Map <span className="text-primary">{mappingTarget.name}</span> to a Silo user
-                    and profile:
+                    {tr("pages.admin_history_import.map")}{" "}
+                    <span className="text-primary">{mappingTarget.name}</span>{" "}
+                    {tr("pages.admin_history_import.to_a_silo_user_and_profile")}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Silo user</Label>
+                      <Label className="text-xs">
+                        {tr("pages.admin_history_import.silo_user")}
+                      </Label>
                       <Select
                         value={userId}
                         onValueChange={(v) => {
@@ -750,7 +821,7 @@ function DiscoverDialog({
                         }}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select user…" />
+                          <SelectValue placeholder={tr("pages.admin_history_import.select_user")} />
                         </SelectTrigger>
                         <SelectContent>
                           {users.map((u) => (
@@ -762,10 +833,12 @@ function DiscoverDialog({
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Profile</Label>
+                      <Label className="text-xs">{tr("pages.admin_history_import.profile")}</Label>
                       <Select value={profileId} onValueChange={setProfileId} disabled={!userId}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select profile…" />
+                          <SelectValue
+                            placeholder={tr("pages.admin_history_import.select_profile")}
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           {profiles.map((p) => (
@@ -786,14 +859,14 @@ function DiscoverDialog({
                       {createMapping.isPending ? (
                         <>
                           <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                          Saving…
+                          {tr("pages.admin_history_import.saving")}
                         </>
                       ) : (
-                        "Save mapping"
+                        tr("pages.admin_history_import.save_mapping")
                       )}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setMappingTarget(null)}>
-                      Cancel
+                      {tr("common.actions.cancel")}
                     </Button>
                   </div>
                 </div>
@@ -804,7 +877,7 @@ function DiscoverDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Done
+            {tr("common.actions.done")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -833,6 +906,7 @@ function SourceBar({
   onDelete: (s: HistoryImportSource) => void;
   onSetToken: (s: HistoryImportSource) => void;
 }) {
+  useUILanguage();
   if (sources.length === 0) {
     return (
       <div className="surface-panel-subtle flex flex-col items-center gap-4 rounded-xl border-0 px-6 py-12 text-center">
@@ -840,14 +914,16 @@ function SourceBar({
           <Server className="text-muted-foreground h-6 w-6" />
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-medium">No source servers</p>
+          <p className="text-sm font-medium">
+            {tr("pages.admin_history_import.no_source_servers")}
+          </p>
           <p className="text-muted-foreground max-w-sm text-sm">
-            Add the Jellyfin, Emby, or Plex server you want to import watch history from.
+            {tr("pages.admin_history_import.add_the_jellyfin_emby_or_plex_server_you_want_to")}
           </p>
         </div>
         <Button size="sm" onClick={onAdd}>
           <Plus className="mr-2 h-4 w-4" />
-          Add server
+          {tr("pages.admin_history_import.add_server")}
         </Button>
       </div>
     );
@@ -862,7 +938,7 @@ function SourceBar({
             onValueChange={(v) => onSelect(Number(v))}
           >
             <SelectTrigger className="w-56">
-              <SelectValue placeholder="Select a server…" />
+              <SelectValue placeholder={tr("pages.admin_history_import.select_a_server")} />
             </SelectTrigger>
             <SelectContent>
               {sources.map((s) => (
@@ -890,7 +966,7 @@ function SourceBar({
                 size="sm"
                 variant="ghost"
                 onClick={() => onSetToken(selected)}
-                title="Set API key"
+                title={tr("pages.admin_history_import.set_api_key")}
               >
                 <KeyRound className="h-3.5 w-3.5" />
               </Button>
@@ -898,7 +974,7 @@ function SourceBar({
                 size="sm"
                 variant="ghost"
                 onClick={() => onEdit(selected)}
-                title="Edit server"
+                title={tr("pages.admin_history_import.edit_server")}
               >
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
@@ -906,7 +982,7 @@ function SourceBar({
                 size="sm"
                 variant="ghost"
                 onClick={() => onDelete(selected)}
-                title="Delete server"
+                title={tr("pages.admin_history_import.delete_server")}
               >
                 <Trash2 className="text-destructive h-3.5 w-3.5" />
               </Button>
@@ -914,7 +990,7 @@ function SourceBar({
           )}
           <Button size="sm" variant="outline" onClick={onAdd}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
-            Add
+            {tr("common.actions.add")}
           </Button>
         </div>
       </div>
@@ -924,11 +1000,11 @@ function SourceBar({
         <div className="bg-warning/5 flex items-center gap-3 border-b px-4 py-3">
           <AlertTriangle className="text-warning h-4 w-4 shrink-0" />
           <p className="text-muted-foreground flex-1 text-sm">
-            No admin API key configured. Add one to discover users and run imports.
+            {tr("pages.admin_history_import.no_admin_api_key_configured_add_one_to_discover_users")}
           </p>
           <Button size="sm" variant="outline" onClick={() => onSetToken(selected)}>
             <KeyRound className="mr-1.5 h-3.5 w-3.5" />
-            Set API key
+            {tr("pages.admin_history_import.set_api_key")}
           </Button>
         </div>
       )}
@@ -936,7 +1012,9 @@ function SourceBar({
       {selected && selected.has_admin_token && (
         <div className="flex items-center gap-2 px-4 py-2">
           <span className="bg-success/20 inline-flex h-2 w-2 rounded-full" />
-          <span className="text-muted-foreground text-xs">API key configured</span>
+          <span className="text-muted-foreground text-xs">
+            {tr("pages.admin_history_import.api_key_configured")}
+          </span>
         </div>
       )}
     </div>
@@ -954,6 +1032,7 @@ function MappingsSection({
   source: HistoryImportSource;
   mappings: HistoryImportUserMapping[];
 }) {
+  useUILanguage();
   const [discoverOpen, setDiscoverOpen] = useState(false);
   const deleteMapping = useDeleteAdminMapping();
   const createRun = useCreateAdminRunForMapping();
@@ -965,7 +1044,9 @@ function MappingsSection({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide">User mappings</h2>
+        <h2 className="text-sm font-semibold tracking-wide">
+          {tr("pages.admin_history_import.user_mappings")}
+        </h2>
         <div className="flex items-center gap-2">
           {mappings.length > 0 && (
             <Button
@@ -979,12 +1060,12 @@ function MappingsSection({
               ) : (
                 <Play className="mr-1.5 h-3.5 w-3.5" />
               )}
-              Import all
+              {tr("pages.admin_history_import.import_all")}
             </Button>
           )}
           <Button size="sm" onClick={() => setDiscoverOpen(true)}>
             <Search className="mr-1.5 h-3.5 w-3.5" />
-            Discover users
+            {tr("pages.admin_history_import.discover_users")}
           </Button>
         </div>
       </div>
@@ -992,11 +1073,11 @@ function MappingsSection({
       {mappings.length === 0 ? (
         <div className="surface-panel-subtle flex flex-col items-center gap-3 rounded-xl border-0 py-10 text-center">
           <p className="text-muted-foreground text-sm">
-            No user mappings yet. Discover users on the server to create mappings.
+            {tr("pages.admin_history_import.no_user_mappings_yet_discover_users_on_the_server_to")}
           </p>
           <Button size="sm" variant="outline" onClick={() => setDiscoverOpen(true)}>
             <Search className="mr-1.5 h-3.5 w-3.5" />
-            Discover users
+            {tr("pages.admin_history_import.discover_users")}
           </Button>
         </div>
       ) : (
@@ -1004,13 +1085,15 @@ function MappingsSection({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Source user</TableHead>
+                <TableHead>{tr("pages.admin_history_import.source_user")}</TableHead>
                 <TableHead className="hidden sm:table-cell">
                   <ArrowRight className="h-3.5 w-3.5" />
                 </TableHead>
-                <TableHead>Silo user</TableHead>
-                <TableHead>Last imported</TableHead>
-                <TableHead className="w-24 text-right">Actions</TableHead>
+                <TableHead>{tr("pages.admin_history_import.silo_user")}</TableHead>
+                <TableHead>{tr("pages.admin_history_import.last_imported")}</TableHead>
+                <TableHead className="w-24 text-right">
+                  {tr("pages.admin_history_import.actions")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1025,7 +1108,12 @@ function MappingsSection({
                     <ArrowRight className="h-3.5 w-3.5" />
                   </TableCell>
                   <TableCell>
-                    <p className="text-sm">{m.silo_username || `User ${m.silo_user_id}`}</p>
+                    <p className="text-sm">
+                      {m.silo_username ||
+                        tr("pages.admin_history_import.user_silo_user_id", {
+                          silo_user_id: m.silo_user_id,
+                        })}
+                    </p>
                     {m.silo_profile_name && (
                       <p className="text-muted-foreground text-xs">{m.silo_profile_name}</p>
                     )}
@@ -1040,7 +1128,7 @@ function MappingsSection({
                         variant="ghost"
                         onClick={() => createRun.mutate(m.id)}
                         disabled={createRun.isPending}
-                        title="Run import"
+                        title={tr("pages.admin_history_import.run_import")}
                       >
                         <Play className="h-3.5 w-3.5" />
                       </Button>
@@ -1048,7 +1136,7 @@ function MappingsSection({
                         size="sm"
                         variant="ghost"
                         onClick={() => setDeleteTarget(m)}
-                        title="Remove mapping"
+                        title={tr("pages.admin_history_import.remove_mapping")}
                       >
                         <Trash2 className="text-destructive h-3.5 w-3.5" />
                       </Button>
@@ -1075,9 +1163,12 @@ function MappingsSection({
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-        title="Remove mapping"
-        description={`Remove the mapping for "${deleteTarget?.external_user_name || deleteTarget?.external_user_id}"? This won't delete any imported history.`}
-        confirmLabel="Remove"
+        title={tr("pages.admin_history_import.remove_mapping")}
+        description={tr(
+          "pages.admin_history_import.remove_the_mapping_for_value_this_won_t_delete_any",
+          { value: deleteTarget?.external_user_name || deleteTarget?.external_user_id },
+        )}
+        confirmLabel={tr("common.actions.remove")}
         variant="destructive"
         onConfirm={() => {
           if (deleteTarget) deleteMapping.mutate(deleteTarget.id);
@@ -1095,6 +1186,7 @@ function MappingsSection({
 type RunFilter = "all" | "admin" | "user";
 
 function RunsSection({ sourceId }: { sourceId: number }) {
+  useUILanguage();
   const { data: allRuns = [] } = useAdminHistoryImportRuns(sourceId);
   const { data: users = [] } = useAdminUsers();
   const cancelRun = useCancelAdminRun();
@@ -1118,7 +1210,9 @@ function RunsSection({ sourceId }: { sourceId: number }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide">Recent imports</h2>
+        <h2 className="text-sm font-semibold tracking-wide">
+          {tr("pages.admin_history_import.recent_imports")}
+        </h2>
         <div className="flex items-center gap-1 rounded-lg border p-0.5">
           {(["all", "admin", "user"] as const).map((v) => (
             <button
@@ -1140,7 +1234,8 @@ function RunsSection({ sourceId }: { sourceId: number }) {
       <div className="surface-panel overflow-hidden rounded-2xl border-0">
         {runs.length === 0 ? (
           <p className="text-muted-foreground px-4 py-6 text-center text-sm">
-            No {filter === "all" ? "" : filter + " "}imports to show.
+            {tr("common.actions.no")} {filter === "all" ? "" : filter + " "}
+            {tr("pages.admin_history_import.imports_to_show")}
           </p>
         ) : (
           <div className="divide-y">
@@ -1163,30 +1258,41 @@ function RunsSection({ sourceId }: { sourceId: number }) {
                     <StatusBadge status={run.status} />
                     <div className="flex-1 space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium capitalize">{run.source_type} import</p>
+                        <p className="text-sm font-medium capitalize">
+                          {run.source_type} {tr("pages.admin_history_import.import")}
+                        </p>
                         {run.connection_mode === "admin_token" ? (
                           <Badge variant="outline" className="text-[10px]">
-                            Admin
+                            {tr("pages.admin_history_import.admin")}
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="text-[10px]">
-                            Self
+                            {tr("pages.admin_history_import.self")}
                           </Badge>
                         )}
                       </div>
                       <p className="text-muted-foreground text-xs">
-                        {userMap.get(run.user_id) ?? `User ${run.user_id}`}
+                        {userMap.get(run.user_id) ??
+                          tr("pages.admin_history_import.user_user_id", { user_id: run.user_id })}
                         {" · "}
                         {formatDate(run.created_at)}
                       </p>
                     </div>
                     <div className="text-muted-foreground hidden items-center gap-4 text-xs sm:flex">
-                      {run.fetched > 0 && <span>{run.fetched} fetched</span>}
+                      {run.fetched > 0 && (
+                        <span>
+                          {run.fetched} {tr("pages.admin_history_import.fetched")}
+                        </span>
+                      )}
                       {run.matched > 0 && (
-                        <span className="text-success">{run.matched} matched</span>
+                        <span className="text-success">
+                          {run.matched} {tr("pages.admin_history_import.matched")}
+                        </span>
                       )}
                       {run.unmatched > 0 && (
-                        <span className="text-warning">{run.unmatched} unmatched</span>
+                        <span className="text-warning">
+                          {run.unmatched} {tr("pages.admin_history_import.unmatched")}
+                        </span>
                       )}
                     </div>
                     {isActive && (
@@ -1197,7 +1303,7 @@ function RunsSection({ sourceId }: { sourceId: number }) {
                         disabled={cancelRun.isPending}
                         className="text-destructive hover:text-destructive"
                       >
-                        Cancel
+                        {tr("common.actions.cancel")}
                       </Button>
                     )}
                   </div>
@@ -1211,49 +1317,63 @@ function RunsSection({ sourceId }: { sourceId: number }) {
                       )}
                       <div className="text-muted-foreground grid grid-cols-3 gap-2 text-xs sm:grid-cols-6">
                         <div>
-                          <p className="font-medium">Fetched</p>
+                          <p className="font-medium">
+                            {tr("pages.admin_history_import.fetched_44169079")}
+                          </p>
                           <p>{run.fetched}</p>
                         </div>
                         <div>
-                          <p className="font-medium">Matched</p>
+                          <p className="font-medium">
+                            {tr("pages.admin_history_import.matched_1bf3ec5b")}
+                          </p>
                           <p>{run.matched}</p>
                         </div>
                         <div>
-                          <p className="font-medium">Unmatched</p>
+                          <p className="font-medium">
+                            {tr("pages.admin_history_import.unmatched_c625b458")}
+                          </p>
                           <p>{run.unmatched}</p>
                         </div>
                         <div>
-                          <p className="font-medium">Updated</p>
+                          <p className="font-medium">{tr("pages.admin_history_import.updated")}</p>
                           <p>{run.progress_updated}</p>
                         </div>
                         <div>
-                          <p className="font-medium">History</p>
+                          <p className="font-medium">{tr("pages.admin_history_import.history")}</p>
                           <p>{run.history_created}</p>
                         </div>
                         <div>
-                          <p className="font-medium">Favorites</p>
+                          <p className="font-medium">
+                            {tr("pages.admin_history_import.favorites")}
+                          </p>
                           <p>{run.favorites_imported}</p>
                         </div>
                         <div>
-                          <p className="font-medium">Watchlist</p>
+                          <p className="font-medium">
+                            {tr("pages.admin_history_import.watchlist")}
+                          </p>
                           <p>{run.watchlist_added}</p>
                         </div>
                         <div>
-                          <p className="font-medium">Skipped</p>
+                          <p className="font-medium">{tr("pages.admin_history_import.skipped")}</p>
                           <p>{run.skipped}</p>
                         </div>
                       </div>
                       {run.warnings.length > 0 && (
                         <div className="space-y-1">
                           <p className="text-muted-foreground text-xs font-medium">
-                            Warnings ({run.warnings.length})
+                            {tr("pages.admin_history_import.warnings")}
+                            {run.warnings.length})
                           </p>
                           <ul className="text-muted-foreground list-inside list-disc space-y-0.5 text-xs">
                             {run.warnings.slice(0, 5).map((w, i) => (
                               <li key={i}>{w}</li>
                             ))}
                             {run.warnings.length > 5 && (
-                              <li className="italic">and {run.warnings.length - 5} more…</li>
+                              <li className="italic">
+                                {tr("pages.admin_history_import.and")} {run.warnings.length - 5}{" "}
+                                {tr("pages.admin_history_import.more")}
+                              </li>
                             )}
                           </ul>
                         </div>
@@ -1261,13 +1381,16 @@ function RunsSection({ sourceId }: { sourceId: number }) {
                       {run.unmatched_samples.length > 0 && (
                         <div className="space-y-1">
                           <p className="text-muted-foreground text-xs font-medium">
-                            Unmatched samples
+                            {tr("pages.admin_history_import.unmatched_samples")}
                           </p>
                           <ul className="text-muted-foreground list-inside list-disc space-y-0.5 text-xs">
                             {run.unmatched_samples.map((s, i) => (
                               <li key={i}>
                                 {s.title}
-                                {s.year ? ` (${s.year})` : ""} — {s.reason}
+                                {s.year
+                                  ? tr("pages.admin_history_import.year", { year: s.year })
+                                  : ""}{" "}
+                                — {s.reason}
                               </li>
                             ))}
                           </ul>
@@ -1276,7 +1399,9 @@ function RunsSection({ sourceId }: { sourceId: number }) {
                       {!run.error_message &&
                         run.warnings.length === 0 &&
                         run.unmatched_samples.length === 0 && (
-                          <p className="text-muted-foreground text-xs">No issues.</p>
+                          <p className="text-muted-foreground text-xs">
+                            {tr("pages.admin_history_import.no_issues")}
+                          </p>
                         )}
                     </div>
                   )}
@@ -1295,6 +1420,7 @@ function RunsSection({ sourceId }: { sourceId: number }) {
 // ---------------------------------------------------------------------------
 
 export default function AdminHistoryImport() {
+  useUILanguage();
   useEventChannel("history_import");
   const { data: sources = [] } = useAdminHistoryImportSources();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1328,9 +1454,13 @@ export default function AdminHistoryImport() {
     <div className="page-shell space-y-8 py-4 sm:py-6">
       <div className="page-header">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">History Import</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_history_import.history_import")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Import watch history from external servers into Silo user profiles.
+            {tr(
+              "pages.admin_history_import.import_watch_history_from_external_servers_into_silo_user_profiles",
+            )}
           </p>
         </div>
       </div>
@@ -1362,9 +1492,12 @@ export default function AdminHistoryImport() {
         onOpenChange={(open) => {
           if (!open) setDeleteSource(null);
         }}
-        title="Delete server"
-        description={`Delete "${deleteSource?.name}"? All user mappings for this server will also be removed.`}
-        confirmLabel="Delete"
+        title={tr("pages.admin_history_import.delete_server")}
+        description={tr(
+          "pages.admin_history_import.delete_name_all_user_mappings_for_this_server_will_also",
+          { name: deleteSource?.name },
+        )}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         onConfirm={() => {
           if (deleteSource) deleteMutation.mutate(deleteSource.id);

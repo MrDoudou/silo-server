@@ -5,12 +5,15 @@ import { useCarouselEmbla } from "@/hooks/useCarouselEmbla";
 import { formatSeasonMeta, getSeasonDisplayTitle } from "./itemDetailLayout";
 import CardPlayOverlay from "@/components/CardPlayOverlay";
 import ViewTransitionLink from "@/components/ViewTransitionLink";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SeasonCarouselProps {
   seasons: Season[];
 }
 
 export default function SeasonCarousel({ seasons }: SeasonCarouselProps) {
+  useUILanguage();
   const sorted = seasons.slice().sort((a, b) => a.season_number - b.season_number);
   const { emblaRef, canScrollPrev, canScrollNext, scrollPrev, scrollNext } = useCarouselEmbla();
   const prefetchSeason = usePrefetchCatalogSeason();
@@ -22,8 +25,10 @@ export default function SeasonCarousel({ seasons }: SeasonCarouselProps) {
   return (
     <section className="group/carousel">
       <div className="mb-5 flex items-end justify-between gap-4">
-        <h2 className="text-xl font-semibold">Seasons</h2>
-        <span className="text-muted-foreground text-sm">{sorted.length} total</span>
+        <h2 className="text-xl font-semibold">{tr("pages.item_detail.season_carousel.seasons")}</h2>
+        <span className="text-muted-foreground text-sm">
+          {sorted.length} {tr("pages.item_detail.season_carousel.total")}
+        </span>
       </div>
 
       <div className="relative">
@@ -32,7 +37,7 @@ export default function SeasonCarousel({ seasons }: SeasonCarouselProps) {
             type="button"
             onClick={scrollPrev}
             className="from-background/90 absolute top-0 bottom-0 left-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-r to-transparent opacity-0 transition-opacity duration-200 group-hover/carousel:opacity-100 focus-visible:opacity-100"
-            aria-label="Scroll left"
+            aria-label={tr("pages.item_detail.season_carousel.scroll_left")}
           >
             <ChevronLeft className="text-foreground h-6 w-6" />
           </button>
@@ -63,7 +68,7 @@ export default function SeasonCarousel({ seasons }: SeasonCarouselProps) {
                     {/* Poster */}
                     <div className="group/media relative">
                       <ViewTransitionLink
-                        to={`/item/${season.content_id}`}
+                        to={"/item/" + season.content_id}
                         className="media-card-image relative block aspect-[2/3] overflow-hidden rounded-xl"
                       >
                         {season.poster_url ? (
@@ -112,7 +117,7 @@ export default function SeasonCarousel({ seasons }: SeasonCarouselProps) {
 
                     {/* Info — always the same height */}
                     <ViewTransitionLink
-                      to={`/item/${season.content_id}`}
+                      to={"/item/" + season.content_id}
                       className="block px-0.5 pt-2.5"
                     >
                       <div className="truncate text-[13px] font-semibold">
@@ -120,7 +125,13 @@ export default function SeasonCarousel({ seasons }: SeasonCarouselProps) {
                       </div>
                       <div className="text-muted-foreground text-xs">
                         {hasProgress
-                          ? `${userData.watched_count} of ${season.episode_count} episodes`
+                          ? tr(
+                              "pages.item_detail.season_carousel.watched_count_of_episode_count_episodes",
+                              {
+                                watched_count: userData.watched_count,
+                                episode_count: season.episode_count,
+                              },
+                            )
                           : formatSeasonMeta(season)}
                       </div>
                     </ViewTransitionLink>
@@ -136,7 +147,7 @@ export default function SeasonCarousel({ seasons }: SeasonCarouselProps) {
             type="button"
             onClick={scrollNext}
             className="from-background/90 absolute top-0 right-0 bottom-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-l to-transparent opacity-0 transition-opacity duration-200 group-hover/carousel:opacity-100 focus-visible:opacity-100"
-            aria-label="Scroll right"
+            aria-label={tr("pages.item_detail.season_carousel.scroll_right")}
           >
             <ChevronRight className="text-foreground h-6 w-6" />
           </button>

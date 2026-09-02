@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { type SwipeMode, useSwipeCards } from "@/hooks/queries/recommendations";
 import GenrePicker from "./watchtonight/GenrePicker";
 import CardStack from "./watchtonight/CardStack";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type Step = "mode-select" | "genre-picker" | "swipe-deck";
 
@@ -20,6 +22,7 @@ interface WatchTonightDialogProps {
 }
 
 export default function WatchTonightDialog({ open, onOpenChange }: WatchTonightDialogProps) {
+  useUILanguage();
   const [step, setStep] = useState<Step>("mode-select");
   const [mode, setMode] = useState<SwipeMode>("discover");
   const [genres, setGenres] = useState<string[]>([]);
@@ -88,15 +91,17 @@ export default function WatchTonightDialog({ open, onOpenChange }: WatchTonightD
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="text-primary h-5 w-5" />
-            Watch Tonight
+            {tr("components.watch_tonight_dialog.watch_tonight")}
           </DialogTitle>
           <DialogDescription>
-            {step === "mode-select" && "What are you in the mood for?"}
-            {step === "genre-picker" && "Pick some genres to narrow things down"}
+            {step === "mode-select" &&
+              tr("components.watch_tonight_dialog.what_are_you_in_the_mood_for")}
+            {step === "genre-picker" &&
+              tr("components.watch_tonight_dialog.pick_some_genres_to_narrow_things_down")}
             {step === "swipe-deck" &&
               (mode === "continue"
-                ? "Swipe through your in-progress titles"
-                : "Swipe right to play, left to skip")}
+                ? tr("components.watch_tonight_dialog.swipe_through_your_in_progress_titles")
+                : tr("components.watch_tonight_dialog.swipe_right_to_play_left_to_skip"))}
           </DialogDescription>
         </DialogHeader>
 
@@ -113,9 +118,13 @@ export default function WatchTonightDialog({ open, onOpenChange }: WatchTonightD
                   <History className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="font-semibold">Pick Up Where I Left Off</p>
+                  <p className="font-semibold">
+                    {tr("components.watch_tonight_dialog.pick_up_where_i_left_off")}
+                  </p>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    Continue in-progress titles or start what is next
+                    {tr(
+                      "components.watch_tonight_dialog.continue_in_progress_titles_or_start_what_is_next",
+                    )}
                   </p>
                 </div>
               </button>
@@ -129,9 +138,11 @@ export default function WatchTonightDialog({ open, onOpenChange }: WatchTonightD
                   <Sparkles className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="font-semibold">Find Something New</p>
+                  <p className="font-semibold">
+                    {tr("components.watch_tonight_dialog.find_something_new")}
+                  </p>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    Discover personalized recommendations
+                    {tr("components.watch_tonight_dialog.discover_personalized_recommendations")}
                   </p>
                 </div>
               </button>
@@ -148,10 +159,12 @@ export default function WatchTonightDialog({ open, onOpenChange }: WatchTonightD
                   onClick={() => setStep("mode-select")}
                   className="text-muted-foreground text-sm hover:underline"
                 >
-                  Back
+                  {tr("common.actions.back")}
                 </button>
                 <Button onClick={handleGenresConfirm} size="sm" className="gap-1.5">
-                  {genres.length === 0 ? "All Genres" : `Go (${genres.length})`}
+                  {genres.length === 0
+                    ? tr("components.watch_tonight_dialog.all_genres")
+                    : tr("components.watch_tonight_dialog.go_length", { length: genres.length })}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>

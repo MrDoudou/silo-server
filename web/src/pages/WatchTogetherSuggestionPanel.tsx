@@ -2,7 +2,9 @@ import { useCallback, useState } from "react";
 import { Play, Search, Trash2, TriangleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { WatchTogetherSuggestion } from "@/lib/watchTogether";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SuggestionPanelProps {
   suggestions: WatchTogetherSuggestion[];
@@ -32,6 +34,7 @@ function SuggestionCard({
   onPromote: () => void;
   onDelete: () => void;
 }) {
+  useUILanguage();
   const [posterLoaded, setPosterLoaded] = useState(false);
 
   return (
@@ -42,9 +45,10 @@ function SuggestionCard({
           <img
             src={suggestion.poster_url}
             alt={suggestion.title}
-            className={`h-full w-full object-cover transition-opacity duration-300 ${
-              posterLoaded ? "opacity-100" : "opacity-0"
-            }`}
+            className={
+              "h-full w-full object-cover transition-opacity duration-300 " +
+              (posterLoaded ? "opacity-100" : "opacity-0")
+            }
             loading="lazy"
             onLoad={() => setPosterLoaded(true)}
           />
@@ -63,16 +67,21 @@ function SuggestionCard({
           aria-pressed={suggestion.voted_by_me}
           aria-label={
             suggestion.voted_by_me
-              ? `Remove vote for ${suggestion.title}`
-              : `Vote for ${suggestion.title}`
+              ? tr("pages.watch_together_suggestion_panel.remove_vote_for_title", {
+                  title: suggestion.title,
+                })
+              : tr("pages.watch_together_suggestion_panel.vote_for_title", {
+                  title: suggestion.title,
+                })
           }
-          className={`absolute top-2 right-2 z-10 flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold tabular-nums backdrop-blur-sm transition-all duration-200 ${
-            suggestion.voted_by_me
+          className={
+            "absolute top-2 right-2 z-10 flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold tabular-nums backdrop-blur-sm transition-all duration-200 " +
+            (suggestion.voted_by_me
               ? "border-primary/40 bg-primary/20 text-primary"
-              : "border-white/20 bg-black/50 text-white/80 hover:border-white/40 hover:bg-black/70"
-          }`}
+              : "border-white/20 bg-black/50 text-white/80 hover:border-white/40 hover:bg-black/70")
+          }
         >
-          <TriangleIcon className={`size-2.5 ${suggestion.voted_by_me ? "fill-primary" : ""}`} />
+          <TriangleIcon className={"size-2.5 " + (suggestion.voted_by_me ? "fill-primary" : "")} />
           {suggestion.vote_count}
         </button>
 
@@ -83,7 +92,9 @@ function SuggestionCard({
               type="button"
               onClick={onPromote}
               disabled={isLoading}
-              aria-label={`Play ${suggestion.title} for everyone`}
+              aria-label={tr("pages.watch_together_suggestion_panel.play_title_for_everyone", {
+                title: suggestion.title,
+              })}
               className="pointer-events-auto z-10 flex size-10 items-center justify-center rounded-full border border-white/30 bg-white/15 text-white backdrop-blur-sm transition-transform duration-200 group-hover/suggestion:scale-100 focus-visible:opacity-100"
             >
               <Play className="size-4 fill-white" />
@@ -97,9 +108,11 @@ function SuggestionCard({
             type="button"
             onClick={onDelete}
             disabled={isLoading}
-            aria-label={`Remove suggestion ${suggestion.title}`}
+            aria-label={tr("pages.watch_together_suggestion_panel.remove_suggestion_title", {
+              title: suggestion.title,
+            })}
             className="absolute top-2 left-2 z-10 flex size-6 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white/60 opacity-0 backdrop-blur-sm transition-all duration-200 group-focus-within/suggestion:opacity-100 group-hover/suggestion:opacity-100 hover:border-red-500/40 hover:bg-red-500/20 hover:text-red-300 focus-visible:opacity-100"
-            title="Remove suggestion"
+            title={tr("pages.watch_together_suggestion_panel.remove_suggestion")}
           >
             <Trash2 className="size-3" />
           </button>
@@ -110,7 +123,10 @@ function SuggestionCard({
       <div className="px-0.5 pt-2.5">
         <div className="truncate text-[13px] font-semibold tracking-tight">{suggestion.title}</div>
         <div className="text-muted-foreground mt-0.5 text-[11px] font-medium tracking-[0.12em] uppercase">
-          {suggestion.subtitle || (suggestion.content_type === "episode" ? "Episode" : "Movie")}
+          {suggestion.subtitle ||
+            (suggestion.content_type === "episode"
+              ? tr("pages.watch_together_suggestion_panel.episode")
+              : tr("pages.watch_together_suggestion_panel.movie"))}
         </div>
       </div>
     </div>
@@ -127,6 +143,7 @@ export function WatchTogetherSuggestionPanel({
   onPromote,
   onOpenSearch,
 }: SuggestionPanelProps) {
+  useUILanguage();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const handleVoteToggle = useCallback(
@@ -139,7 +156,7 @@ export function WatchTogetherSuggestionPanel({
           await onVote(suggestion.id);
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Vote failed");
+        toast.error("errors.watch_together_suggestion_panel.vote_failed", { error: error });
       } finally {
         setLoadingId(null);
       }
@@ -153,7 +170,9 @@ export function WatchTogetherSuggestionPanel({
       try {
         await onDelete(id);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to remove suggestion");
+        toast.error("errors.watch_together_suggestion_panel.failed_to_remove_suggestion", {
+          error: error,
+        });
       } finally {
         setLoadingId(null);
       }
@@ -166,9 +185,11 @@ export function WatchTogetherSuggestionPanel({
       setLoadingId(id);
       try {
         await onPromote(id);
-        toast.success("Playing suggestion for everyone");
+        toast.success("feedback.watch_together_suggestion_panel.playing_suggestion_for_everyone");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to start suggestion");
+        toast.error("errors.watch_together_suggestion_panel.failed_to_start_suggestion", {
+          error: error,
+        });
       } finally {
         setLoadingId(null);
       }
@@ -184,11 +205,21 @@ export function WatchTogetherSuggestionPanel({
             <TriangleIcon className="size-3.5 fill-current" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Suggestions</h2>
+            <h2 className="text-lg font-semibold tracking-tight">
+              {tr("pages.watch_together_suggestion_panel.suggestions")}
+            </h2>
             <p className="text-muted-foreground mt-0.5 text-sm">
               {suggestions.length === 0
-                ? "No suggestions yet — search for something to add."
-                : `${suggestions.length} suggestion${suggestions.length !== 1 ? "s" : ""} from the room`}
+                ? tr(
+                    "pages.watch_together_suggestion_panel.no_suggestions_yet_search_for_something_to_add",
+                  )
+                : tr(
+                    "pages.watch_together_suggestion_panel.length_suggestion_value_from_the_room",
+                    {
+                      length: suggestions.length,
+                      value: suggestions.length !== 1 ? "s" : "",
+                    },
+                  )}
             </p>
           </div>
         </div>
@@ -200,7 +231,7 @@ export function WatchTogetherSuggestionPanel({
           className="shrink-0 gap-1.5"
         >
           <Search className="size-3.5" />
-          Suggest
+          {tr("pages.watch_together_suggestion_panel.suggest")}
         </Button>
       </div>
 

@@ -18,6 +18,8 @@ import {
 import { useDebounce } from "@/hooks/useDebounce";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { formatHoursMinutes } from "@/lib/audiobooks/duration";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface AudiobookGroupsViewProps {
   libraryId: number;
@@ -58,13 +60,15 @@ function groupInitials(name: string): string {
 
 /** Up to three overlapping square covers; falls back to an initials tile. */
 function CoverStack({ group, large }: { group: AudiobookGroup; large?: boolean }) {
+  useUILanguage();
   const posters = group.poster_urls.slice(0, 3);
   if (posters.length === 0) {
     return (
       <div
-        className={`bg-surface-raised text-muted-foreground flex shrink-0 items-center justify-center font-semibold ${
-          large ? "aspect-square w-full rounded-xl text-2xl" : "h-14 w-14 rounded-lg text-sm"
-        }`}
+        className={
+          "bg-surface-raised text-muted-foreground flex shrink-0 items-center justify-center font-semibold " +
+          (large ? "aspect-square w-full rounded-xl text-2xl" : "h-14 w-14 rounded-lg text-sm")
+        }
       >
         {groupInitials(group.name)}
       </div>
@@ -124,6 +128,7 @@ export default function AudiobookGroupsView({
   groupBy,
   onSelectGroup,
 }: AudiobookGroupsViewProps) {
+  useUILanguage();
   // Authors/narrators default to most-books-first (collection heavy hitters);
   // series read more naturally alphabetized.
   const [sort, setSort] = useState<AudiobookGroupSort>(groupBy === "series" ? "name" : "count");
@@ -165,7 +170,9 @@ export default function AudiobookGroupsView({
         <Input
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
-          placeholder={`Search ${noun}…`}
+          placeholder={tr("components.audiobooks.audiobook_groups_view.search_noun", {
+            noun: noun,
+          })}
           className="w-full max-w-xs"
         />
         <Select value={sort} onValueChange={(value) => setSort(value as AudiobookGroupSort)}>
@@ -173,9 +180,15 @@ export default function AudiobookGroupsView({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="name">Name</SelectItem>
-            <SelectItem value="count">Most books</SelectItem>
-            <SelectItem value="duration">Longest</SelectItem>
+            <SelectItem value="name">
+              {tr("components.audiobooks.audiobook_groups_view.name")}
+            </SelectItem>
+            <SelectItem value="count">
+              {tr("components.audiobooks.audiobook_groups_view.most_books")}
+            </SelectItem>
+            <SelectItem value="duration">
+              {tr("components.audiobooks.audiobook_groups_view.longest")}
+            </SelectItem>
           </SelectContent>
         </Select>
         {firstPage && (
@@ -204,7 +217,14 @@ export default function AudiobookGroupsView({
         )
       ) : groups.length === 0 ? (
         <p className="text-muted-foreground py-10 text-center text-sm">
-          {filter ? `No ${noun} match “${filter}”.` : `No ${noun} found in this library.`}
+          {filter
+            ? tr("components.audiobooks.audiobook_groups_view.no_noun_match_filter", {
+                noun: noun,
+                filter: filter,
+              })
+            : tr("components.audiobooks.audiobook_groups_view.no_noun_found_in_this_library", {
+                noun: noun,
+              })}
         </p>
       ) : isSeries ? (
         <>

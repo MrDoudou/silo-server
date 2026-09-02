@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "react-router";
 import { useViewTransitionNavigate } from "@/hooks/useViewTransition";
+
 import type { ItemDetail, MediaItemUserState } from "@/api/types";
 import { useOptionalAuth } from "@/hooks/useAuth";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
@@ -75,6 +76,8 @@ import {
   showsWatchedQuickAction,
   type CardQuickActionMode,
 } from "@/lib/cardQuickActions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type MediaItemType = ItemDetail["type"];
 
@@ -157,7 +160,13 @@ export function buildMediaItemMenuModel({
     entries.push({
       kind: "action",
       key: "playFromBeginning",
-      label: isAudiobook ? "Listen from Beginning" : "Play from Beginning",
+      get label() {
+        return tr(
+          isAudiobook
+            ? "components.media_item_menu.listen_from_beginning"
+            : "components.media_item_menu.play_from_beginning",
+        );
+      },
     });
   }
 
@@ -175,12 +184,24 @@ export function buildMediaItemMenuModel({
         {
           kind: "action",
           key: "toggleFavorite",
-          label: userState.is_favorite ? "Remove from Favorites" : "Add to Favorites",
+          get label() {
+            return tr(
+              userState.is_favorite
+                ? "components.media_item_menu.remove_from_favorites"
+                : "components.media_item_menu.add_to_favorites",
+            );
+          },
         },
         {
           kind: "action",
           key: "toggleWatchlist",
-          label: userState.in_watchlist ? "Remove from Watchlist" : "Add to Watchlist",
+          get label() {
+            return tr(
+              userState.in_watchlist
+                ? "components.media_item_menu.remove_from_watchlist"
+                : "components.media_item_menu.add_to_watchlist",
+            );
+          },
         },
       );
     }
@@ -188,7 +209,11 @@ export function buildMediaItemMenuModel({
 
   // Manga series get a local file inspector (folder path, per-volume files).
   if (mediaType === "manga") {
-    entries.push({ kind: "action", key: "viewDetails", label: "View Details" });
+    entries.push({
+      kind: "action",
+      key: "viewDetails",
+      label: tr("components.media_item_menu.view_details"),
+    });
   }
 
   if (isAdmin || canCurateMetadata) {
@@ -200,7 +225,7 @@ export function buildMediaItemMenuModel({
       entries.push({
         kind: "action",
         key: "viewPlayHistory",
-        label: "View Play History",
+        label: tr("components.media_item_menu.view_play_history"),
       });
     }
 
@@ -208,7 +233,7 @@ export function buildMediaItemMenuModel({
       entries.push({
         kind: "action",
         key: "refreshMetadata",
-        label: "Refresh Metadata",
+        label: tr("components.media_item_menu.refresh_metadata"),
       });
 
       if (mediaType === "movie" || mediaType === "series") {
@@ -216,12 +241,12 @@ export function buildMediaItemMenuModel({
           {
             kind: "action",
             key: "editMetadata",
-            label: "Edit Metadata",
+            label: tr("components.media_item_menu.edit_metadata"),
           },
           {
             kind: "action",
             key: "matchItem",
-            label: "Match Item",
+            label: tr("components.media_item_menu.match_item"),
           },
         );
       }
@@ -302,6 +327,7 @@ function MediaItemActionSheetRow({
   onSelect: () => void;
   children: ReactNode;
 }) {
+  useUILanguage();
   return (
     <button
       type="button"
@@ -337,6 +363,7 @@ function MediaItemActionSheet({
   isRefreshing: boolean;
   onSelectAction: (actionKey: MediaItemMenuActionKey) => void;
 }) {
+  useUILanguage();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -345,14 +372,18 @@ function MediaItemActionSheet({
         className="max-h-[80svh] gap-0 overflow-y-auto rounded-t-2xl p-0 pb-[env(safe-area-inset-bottom)]"
       >
         <SheetHeader className="px-5 pt-4 pb-2">
-          <SheetTitle className="truncate text-left text-base">{title ?? "Actions"}</SheetTitle>
-          <SheetDescription className="sr-only">Choose an action for this item.</SheetDescription>
+          <SheetTitle className="truncate text-left text-base">
+            {title ?? tr("components.media_item_menu.actions")}
+          </SheetTitle>
+          <SheetDescription className="sr-only">
+            {tr("components.media_item_menu.choose_an_action_for_this_item")}
+          </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col pb-3">
           {entries.map((entry, index) =>
             entry.kind === "separator" ? (
               <div
-                key={`separator-${index}`}
+                key={"separator-" + index}
                 aria-hidden="true"
                 className="bg-border/60 my-1.5 h-px"
               />
@@ -396,6 +427,7 @@ function CardQuickActionButton({
   onActivate: () => void;
   children: (isAnimating: boolean) => ReactNode;
 }) {
+  useUILanguage();
   const [isAnimating, setIsAnimating] = useState(false);
   const pointerStartRef = useRef<{
     pointerId: number;
@@ -530,6 +562,7 @@ export function PosterCardFavoriteButton({
   density?: PosterActionDensity;
   onToggle: () => void;
 }) {
+  useUILanguage();
   const label = isFavorite ? "Remove from favorites" : "Add to favorites";
 
   return (
@@ -574,6 +607,7 @@ function WatchedQuickActionButton({
   density: PosterActionDensity;
   onToggle: () => void;
 }) {
+  useUILanguage();
   const label = getWatchedActionLabel({ type: mediaType, user_data: { played: isWatched } });
   const Icon = isWatched ? Eye : EyeOff;
 
@@ -617,6 +651,7 @@ export function MetadataActionDialogHost({
   libraryId?: number;
   onClose: () => void;
 }) {
+  useUILanguage();
   const {
     data: item,
     error,
@@ -647,21 +682,23 @@ export function MetadataActionDialogHost({
         <DialogHeader>
           <DialogTitle>{actionLabel}</DialogTitle>
           <DialogDescription>
-            {loading ? "Loading the latest item details…" : "The item details could not be loaded."}
+            {loading
+              ? tr("components.media_item_menu.loading_the_latest_item_details")
+              : tr("components.media_item_menu.the_item_details_could_not_be_loaded")}
           </DialogDescription>
         </DialogHeader>
         {loading ? (
           <div className="text-muted-foreground flex items-center gap-2 text-sm">
             <LoaderCircle className="size-4 animate-spin" />
-            Loading…
+            {tr("components.media_item_menu.loading")}
           </div>
         ) : (
           <div className="flex items-center justify-between gap-3">
             <p className="text-muted-foreground text-sm">
-              {error instanceof Error ? error.message : "Please try again."}
+              {tr.error("errors.media_item_menu.please_try_again", error)}
             </p>
             <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
-              Try Again
+              {tr("components.media_item_menu.try_again")}
             </Button>
           </div>
         )}
@@ -686,6 +723,7 @@ export default function MediaItemMenu({
   longPressRef,
   itemTitle,
 }: MediaItemMenuProps) {
+  useUILanguage();
   const navigate = useViewTransitionNavigate();
   const location = useLocation();
   const playbackController = useWatchPlaybackController();
@@ -948,7 +986,12 @@ export default function MediaItemMenu({
         onPointerDown={stopMenuEvent}
       >
         {model.length === 0 ? (
-          <button type="button" aria-label="More actions" disabled className={triggerClassName}>
+          <button
+            type="button"
+            aria-label={tr("components.media_item_menu.more_actions")}
+            disabled
+            className={triggerClassName}
+          >
             <MoreVertical className={mediaItemMenuIconClassName(variant, posterActionDensity)} />
           </button>
         ) : (
@@ -969,7 +1012,7 @@ export default function MediaItemMenu({
               <button
                 ref={menuTriggerRef}
                 type="button"
-                aria-label="More actions"
+                aria-label={tr("components.media_item_menu.more_actions")}
                 className={triggerClassName}
                 onPointerDown={() => {
                   lastMenuInteractionRef.current = "pointer";
@@ -1005,7 +1048,7 @@ export default function MediaItemMenu({
             >
               {model.map((entry, index) => {
                 if (entry.kind === "separator") {
-                  return <DropdownMenuSeparator key={`separator-${index}`} />;
+                  return <DropdownMenuSeparator key={"separator-" + index} />;
                 }
 
                 return (

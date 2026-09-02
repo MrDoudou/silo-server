@@ -2,6 +2,8 @@ import { type ReactNode } from "react";
 import { Languages } from "lucide-react";
 import { decodeThumbhash } from "@/lib/thumbhash";
 import { useImageLoaded } from "@/hooks/useImageLoaded";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface DetailHeroProps {
   title: string;
@@ -63,6 +65,7 @@ export default function DetailHero({
   variant = "full",
   topNav,
 }: DetailHeroProps) {
+  useUILanguage();
   const { loaded: backdropLoaded, onLoad: onBackdropLoad } = useImageLoaded(backdropUrl);
   const { loaded: posterLoaded, onLoad: onPosterLoad } = useImageLoaded(posterUrl);
   const backdropPlaceholder = backdropThumbhash ? decodeThumbhash(backdropThumbhash) : "";
@@ -118,7 +121,10 @@ export default function DetailHero({
               src={backdropUrl}
               alt=""
               decoding="async"
-              className={`h-full w-full object-cover object-[center_20%] transition-opacity duration-300 ${backdropLoaded ? "opacity-100" : "opacity-0"}`}
+              className={
+                "h-full w-full object-cover object-[center_20%] transition-opacity duration-300 " +
+                (backdropLoaded ? "opacity-100" : "opacity-0")
+              }
               onLoad={onBackdropLoad}
             />
           )}
@@ -134,27 +140,35 @@ export default function DetailHero({
       <div className="detail-hero-scrim detail-hero-scrim-over" />
 
       <div
-        className={`page-shell-wide relative flex flex-col justify-end pb-8 ${
-          isCompact
+        className={
+          "page-shell-wide relative flex flex-col justify-end pb-8 " +
+          (isCompact
             ? // min-height (not fixed height) below lg: bottom-justified content
               // taller than the hero would otherwise overflow out the top, under
               // the floating back button.
               "min-h-[max(35vh,300px)] pt-20 lg:min-h-[42vh]"
-            : "min-h-[60dvh] pt-28 lg:min-h-[72dvh]"
-        }`}
+            : "min-h-[60dvh] pt-28 lg:min-h-[72dvh]")
+        }
       >
         <div
-          className={`grid gap-8 ${
-            !isCompact && aside ? "lg:grid-cols-[minmax(0,1fr)_280px] lg:items-end" : ""
-          }`}
+          className={
+            "grid gap-8 " +
+            (!isCompact && aside ? "lg:grid-cols-[minmax(0,1fr)_280px] lg:items-end" : "")
+          }
         >
           <div
-            className={`detail-hero-primary-content flex flex-col gap-6 ${!hidePoster ? "lg:flex-row lg:items-end" : ""}`}
+            className={
+              "detail-hero-primary-content flex flex-col gap-6 " +
+              (!hidePoster ? "lg:flex-row lg:items-end" : "")
+            }
           >
             {/* Poster */}
             {!hidePoster && (
               <div
-                className={`media-card-image border-border/20 relative border shadow-[var(--shadow-md)] ${posterSizeClass}`}
+                className={
+                  "media-card-image border-border/20 relative border shadow-[var(--shadow-md)] " +
+                  posterSizeClass
+                }
               >
                 {posterUrl ? (
                   <>
@@ -163,16 +177,22 @@ export default function DetailHero({
                       src={posterUrl}
                       alt={title}
                       decoding="async"
-                      className={`w-full object-cover ${posterAspect} ${posterLoaded ? "opacity-100" : "opacity-0"}`}
+                      className={
+                        "w-full object-cover " +
+                        posterAspect +
+                        " " +
+                        (posterLoaded ? "opacity-100" : "opacity-0")
+                      }
                       onLoad={onPosterLoad}
                     />
                     <span
-                      key={`placeholder-${posterUrl}`}
+                      key={"placeholder-" + posterUrl}
                       aria-hidden="true"
                       data-testid="detail-hero-poster-placeholder"
-                      className={`bg-surface pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-300 ${
-                        posterLoaded ? "opacity-0" : "opacity-100"
-                      }`}
+                      className={
+                        "bg-surface pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-300 " +
+                        (posterLoaded ? "opacity-0" : "opacity-100")
+                      }
                       style={
                         posterPlaceholder
                           ? { backgroundImage: `url(${posterPlaceholder})` }
@@ -182,7 +202,10 @@ export default function DetailHero({
                   </>
                 ) : (
                   <div
-                    className={`text-muted-foreground bg-surface flex items-center justify-center p-6 text-center text-sm ${posterAspect}`}
+                    className={
+                      "text-muted-foreground bg-surface flex items-center justify-center p-6 text-center text-sm " +
+                      posterAspect
+                    }
                   >
                     {title}
                   </div>
@@ -217,11 +240,12 @@ export default function DetailHero({
                 </>
               ) : (
                 <h1
-                  className={`text-foreground mb-3 font-extrabold tracking-tight ${
-                    isCompact
+                  className={
+                    "text-foreground mb-3 font-extrabold tracking-tight " +
+                    (isCompact
                       ? "font-display text-3xl leading-[1.1] sm:text-4xl"
-                      : "font-display text-4xl leading-[0.98] tracking-[-0.05em] sm:text-5xl lg:text-7xl"
-                  }`}
+                      : "font-display text-4xl leading-[0.98] tracking-[-0.05em] sm:text-5xl lg:text-7xl")
+                  }
                 >
                   {title}
                 </h1>
@@ -230,11 +254,12 @@ export default function DetailHero({
               {/* Tagline (italic) — falls back to subtitle */}
               {(tagline || subtitle) && (
                 <div
-                  className={`text-muted-foreground mb-4 text-[13px] ${
-                    tagline
+                  className={
+                    "text-muted-foreground mb-4 text-[13px] " +
+                    (tagline
                       ? "text-foreground/72 italic"
-                      : "text-muted-foreground text-base font-medium not-italic"
-                  }`}
+                      : "text-muted-foreground text-base font-medium not-italic")
+                  }
                 >
                   {tagline || subtitle}
                 </div>
@@ -247,16 +272,19 @@ export default function DetailHero({
               {overview && (
                 <div className="max-w-2xl">
                   <p
-                    className={`text-muted-foreground leading-7 ${
-                      isCompact ? "text-sm" : "text-foreground/72 text-sm sm:text-[15px]"
-                    } ${overviewTranslating ? "animate-pulse opacity-50" : ""}`}
+                    className={
+                      "text-muted-foreground leading-7 " +
+                      (isCompact ? "text-sm" : "text-foreground/72 text-sm sm:text-[15px]") +
+                      " " +
+                      (overviewTranslating ? "animate-pulse opacity-50" : "")
+                    }
                   >
                     {overview}
                   </p>
                   {overviewTranslating && (
                     <span className="text-muted-foreground/70 mt-1 inline-flex items-center gap-1.5 text-xs">
                       <Languages className="h-3 w-3 animate-pulse" />
-                      Translating…
+                      {tr("pages.item_detail.detail_hero.translating")}
                     </span>
                   )}
                   {!overviewTranslating && onTranslateOverview && (
@@ -266,7 +294,7 @@ export default function DetailHero({
                       className="text-muted-foreground hover:text-foreground border-border/60 mt-1.5 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors"
                     >
                       <Languages className="h-3 w-3" />
-                      Translate
+                      {tr("pages.item_detail.detail_hero.translate")}
                     </button>
                   )}
                 </div>

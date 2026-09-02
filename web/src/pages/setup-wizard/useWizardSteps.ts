@@ -1,4 +1,6 @@
 import { useWizardContext } from "./WizardContext";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface StepDef {
   id: string;
@@ -18,6 +20,7 @@ export type WizardStepId =
   | "nodes";
 
 export function useWizardSteps() {
+  useUILanguage();
   const { user, profiles, stepDone } = useWizardContext();
 
   const accountComplete = !!user;
@@ -43,37 +46,52 @@ export function useWizardSteps() {
   const steps: StepDef[] = [
     {
       id: "account",
-      label: "Account",
+      label: tr("pages.setup_wizard.use_wizard_steps.account"),
       complete: accountComplete,
       active: currentStep === "account",
     },
     {
       id: "profile",
-      label: "Profile",
+      label: tr("pages.setup_wizard.use_wizard_steps.profile"),
       complete: profileComplete,
       active: currentStep === "profile",
     },
-    { id: "server", label: "Server", complete: stepDone.server, active: currentStep === "server" },
+    {
+      id: "server",
+      label: tr("pages.setup_wizard.use_wizard_steps.server"),
+      complete: stepDone.server,
+      active: currentStep === "server",
+    },
     {
       id: "integrations",
-      label: "Integrations",
+      label: tr("pages.setup_wizard.use_wizard_steps.integrations"),
       complete: stepDone.integrations,
       active: currentStep === "integrations",
     },
     {
       id: "downloads",
-      label: "Downloads",
+      label: tr("pages.setup_wizard.use_wizard_steps.downloads"),
       complete: stepDone.downloads,
       active: currentStep === "downloads",
     },
     {
       id: "recommendations",
-      label: "Recs",
+      label: tr("pages.setup_wizard.use_wizard_steps.recs"),
       complete: stepDone.recommendations,
       active: currentStep === "recommendations",
     },
-    { id: "library", label: "Library", complete: libraryDone, active: currentStep === "library" },
-    { id: "nodes", label: "Finish", complete: false, active: currentStep === "nodes" },
+    {
+      id: "library",
+      label: tr("pages.setup_wizard.use_wizard_steps.library"),
+      complete: libraryDone,
+      active: currentStep === "library",
+    },
+    {
+      id: "nodes",
+      label: tr("pages.setup_wizard.use_wizard_steps.finish"),
+      complete: false,
+      active: currentStep === "nodes",
+    },
   ];
 
   return { steps, currentStep };

@@ -1,11 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { api } from "@/api/client";
 import {
   invalidateMediaSurfaceQueries,
   removeItemFromHomeSectionCaches,
 } from "./mediaSurfaceRefresh";
 import { bumpHomeRefreshSignal } from "@/pages/homeSurfaceRefresh";
+
+import { tr } from "@/i18n/translate";
 
 export type HomeDismissalSurface = "continue_watching" | "next_up";
 
@@ -28,10 +31,12 @@ function dismissalBody({ progressUpdatedAt, seriesId, surface }: DismissHomeItem
 }
 
 function dismissalSuccessLabel({ mediaType, surface }: DismissHomeItemVariables) {
-  if (surface === "next_up") return "Removed from Next Up";
-  if (mediaType === "audiobook") return "Removed from Continue Listening";
-  if (mediaType === "ebook") return "Removed from Continue Reading";
-  return "Removed from Continue Watching";
+  if (surface === "next_up") return tr("feedback.queries.home_dismissals.removed_from_next_up");
+  if (mediaType === "audiobook")
+    return tr("feedback.queries.home_dismissals.removed_from_continue_listening");
+  if (mediaType === "ebook")
+    return tr("feedback.queries.home_dismissals.removed_from_continue_reading");
+  return tr("feedback.queries.home_dismissals.removed_from_continue_watching");
 }
 
 export function useDismissHomeItem() {
@@ -43,7 +48,7 @@ export function useDismissHomeItem() {
         method: "DELETE",
       }),
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to undo removal");
+      toast.error("errors.queries.home_dismissals.failed_to_undo_removal", { error: error });
     },
     onSuccess: async (_data, variables) => {
       await invalidateMediaSurfaceQueries(queryClient, { itemId: variables.itemId });
@@ -58,15 +63,16 @@ export function useDismissHomeItem() {
         body: JSON.stringify(dismissalBody(variables)),
       }),
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to remove item");
+      toast.error("errors.queries.home_dismissals.failed_to_remove_item", { error: error });
     },
     onSuccess: async (_data, variables) => {
       removeItemFromHomeSectionCaches(queryClient, variables.itemId, variables.surface);
       await invalidateMediaSurfaceQueries(queryClient, { itemId: variables.itemId });
       bumpHomeRefreshSignal(queryClient);
-      toast.success(dismissalSuccessLabel(variables), {
+      toast.success("feedback.queries.home_dismissals.reported_message", {
+        values: { message: dismissalSuccessLabel(variables) },
         action: {
-          label: "Undo",
+          label: "hooks.queries.home_dismissals.undo",
           onClick: () => undoMutation.mutate(variables),
         },
       });

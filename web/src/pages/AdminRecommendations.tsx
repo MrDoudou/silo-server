@@ -32,6 +32,9 @@ import {
   matchRecommendationProviderPreset,
   type RecommendationProviderPreset,
 } from "@/lib/recommendation-provider-presets";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 interface RecLocalValues {
   [key: string]: string;
@@ -73,6 +76,7 @@ function RecSettingField({
   onCommit,
   onToggle,
 }: RecSettingFieldProps) {
+  useUILanguage();
   const { key, label, type, hint, defaultValue } = field;
   const effectiveServerValue = serverValue || defaultValue || "";
   const [confirmClear, setConfirmClear] = useState(false);
@@ -128,13 +132,13 @@ function RecSettingField({
             onClick={() => setConfirmClear(true)}
             disabled={isPending}
           >
-            Clear credential
+            {tr("pages.admin_recommendations.clear_credential")}
           </Button>
         )}
         {confirmClear && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-muted-foreground text-xs">
-              Remove this credential from the server?
+              {tr("pages.admin_recommendations.remove_this_credential_from_the_server")}
             </span>
             <Button
               type="button"
@@ -147,7 +151,7 @@ function RecSettingField({
               }}
               disabled={isPending}
             >
-              Confirm clear
+              {tr("pages.admin_recommendations.confirm_clear")}
             </Button>
             <Button
               type="button"
@@ -156,7 +160,7 @@ function RecSettingField({
               onClick={() => setConfirmClear(false)}
               disabled={isPending}
             >
-              Cancel
+              {tr("common.actions.cancel")}
             </Button>
           </div>
         )}
@@ -230,6 +234,7 @@ function RecJobStatusCard({
   onTrigger: () => void;
   triggerPending: boolean;
 }) {
+  useUILanguage();
   const hasProgress = total !== undefined && total > 0;
   const pct = hasProgress ? Math.round((count / total) * 100) : 0;
   const isDisabled = running || triggerPending;
@@ -241,8 +246,14 @@ function RecJobStatusCard({
           <span className="text-sm font-semibold">{title}</span>
           <p className="text-muted-foreground text-xs">
             {hasProgress
-              ? `${count.toLocaleString()} / ${total.toLocaleString()} items`
-              : `${count.toLocaleString()} ${count === 1 ? "entry" : "entries"}`}
+              ? tr("pages.admin_recommendations.value_value2_items", {
+                  value: count.toLocaleString(),
+                  value2: total.toLocaleString(),
+                })
+              : tr("pages.admin_recommendations.value_value2", {
+                  value: count.toLocaleString(),
+                  value2: count === 1 ? "entry" : "entries",
+                })}
           </p>
         </div>
         <Button
@@ -255,12 +266,12 @@ function RecJobStatusCard({
           {running ? (
             <>
               <Loader2 className="size-3.5 animate-spin" />
-              Running...
+              {tr("pages.admin_recommendations.running")}
             </>
           ) : (
             <>
               <Play className="size-3.5" />
-              Run
+              {tr("pages.admin_recommendations.run")}
             </>
           )}
         </Button>
@@ -286,6 +297,7 @@ function RecEmbeddingLockCard({
 }: {
   lock: ReturnType<typeof parseRecommendationEmbeddingLock>;
 }) {
+  useUILanguage();
   if (!lock) {
     return null;
   }
@@ -294,31 +306,36 @@ function RecEmbeddingLockCard({
     <div className="surface-panel max-w-3xl rounded-2xl border-0 px-5 py-4">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <h2 className="text-sm font-semibold">Embedding Lock</h2>
+          <h2 className="text-sm font-semibold">
+            {tr("pages.admin_recommendations.embedding_lock")}
+          </h2>
           <p className="text-muted-foreground text-sm">
-            This installation is locked to a specific embedding space after the first successful
-            embed.
+            {tr(
+              "pages.admin_recommendations.this_installation_is_locked_to_a_specific_embedding_space_after",
+            )}
           </p>
         </div>
         <Badge variant="outline" className="shrink-0">
-          Locked
+          {tr("pages.admin_recommendations.locked")}
         </Badge>
       </div>
 
       <dl className="mt-4 grid gap-4 sm:grid-cols-3">
         <div className="space-y-1">
-          <dt className="text-muted-foreground text-xs tracking-wide uppercase">Model</dt>
+          <dt className="text-muted-foreground text-xs tracking-wide uppercase">
+            {tr("pages.admin_recommendations.model")}
+          </dt>
           <dd className="text-sm font-medium">{lock.model}</dd>
         </div>
         <div className="space-y-1">
           <dt className="text-muted-foreground text-xs tracking-wide uppercase">
-            Source dimensions
+            {tr("pages.admin_recommendations.source_dimensions")}
           </dt>
           <dd className="text-sm font-medium">{lock.sourceDimensions}</dd>
         </div>
         <div className="space-y-1">
           <dt className="text-muted-foreground text-xs tracking-wide uppercase">
-            Storage dimensions
+            {tr("pages.admin_recommendations.storage_dimensions")}
           </dt>
           <dd className="text-sm font-medium">{lock.storageDimensions}</dd>
         </div>
@@ -330,6 +347,7 @@ function RecEmbeddingLockCard({
 }
 
 export default function AdminRecommendations() {
+  useUILanguage();
   const { data: settings, isLoading } = useAdminServerSettings();
   const { data: sensitiveData } = useAdminSensitiveStatus();
   const updateSettings = useUpdateServerSettings();
@@ -459,7 +477,7 @@ export default function AdminRecommendations() {
     } catch (error) {
       setConnectionResult({
         success: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error("errors.admin_recommendations.connection_check_failed", error),
       });
     }
   }
@@ -492,10 +510,13 @@ export default function AdminRecommendations() {
     <div className="page-shell space-y-6 py-4 sm:py-6">
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Recommendations</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_recommendations.recommendations")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Configure the AI-powered recommendation engine. Requires pgvector and an
-            OpenAI-compatible embedding endpoint.
+            {tr(
+              "pages.admin_recommendations.configure_the_ai_powered_recommendation_engine_requires_pgvector_and_an",
+            )}
           </p>
         </div>
       </div>
@@ -504,18 +525,21 @@ export default function AdminRecommendations() {
         <div className="border-warning/30 bg-warning/10 text-warning flex max-w-3xl items-center gap-3 rounded-xl border px-4 py-3 text-sm">
           <AlertTriangle className="h-4 w-4 flex-shrink-0" />
           <span>
-            One or more settings were changed. A server restart is required for changes to take
-            effect.
+            {tr(
+              "pages.admin_recommendations.one_or_more_settings_were_changed_a_server_restart_is",
+            )}
           </span>
         </div>
       )}
 
       {status && (
         <div className="space-y-3">
-          <h2 className="text-lg font-medium tracking-tight">Job status</h2>
+          <h2 className="text-lg font-medium tracking-tight">
+            {tr("pages.admin_recommendations.job_status")}
+          </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <RecJobStatusCard
-              title="Embeddings"
+              title={tr("pages.admin_recommendations.embeddings")}
               count={status.embeddings.count}
               total={status.embeddings.total}
               running={status.embeddings.running}
@@ -523,21 +547,21 @@ export default function AdminRecommendations() {
               triggerPending={triggerEmbeddings.isPending}
             />
             <RecJobStatusCard
-              title="Taste Profiles"
+              title={tr("pages.admin_recommendations.taste_profiles")}
               count={status.taste_profiles.count}
               running={status.taste_profiles.running}
               onTrigger={() => triggerTasteProfiles.mutate()}
               triggerPending={triggerTasteProfiles.isPending}
             />
             <RecJobStatusCard
-              title="Co-Watch Matrix"
+              title={tr("pages.admin_recommendations.co_watch_matrix")}
               count={status.cowatch.count}
               running={status.cowatch.running}
               onTrigger={() => triggerCowatch.mutate()}
               triggerPending={triggerCowatch.isPending}
             />
             <RecJobStatusCard
-              title="Recommendations"
+              title={tr("pages.admin_recommendations.recommendations")}
               count={status.recommendations.count}
               running={status.recommendations.running}
               onTrigger={() => triggerRecommendations.mutate()}
@@ -572,9 +596,13 @@ export default function AdminRecommendations() {
                   {section.title === EMBEDDING_SECTION_TITLE && (
                     <div className="space-y-3 py-3">
                       <div className="space-y-0.5">
-                        <Label className="text-sm font-medium">Provider Presets</Label>
+                        <Label className="text-sm font-medium">
+                          {tr("pages.admin_recommendations.provider_presets")}
+                        </Label>
                         <p className="text-muted-foreground text-xs">
-                          Choose a provider to fill the base URL and model.
+                          {tr(
+                            "pages.admin_recommendations.choose_a_provider_to_fill_the_base_url_and_model",
+                          )}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -587,11 +615,12 @@ export default function AdminRecommendations() {
                               aria-pressed={selected}
                               onClick={() => void applyEmbeddingPreset(preset)}
                               disabled={updateSettings.isPending}
-                              className={`min-w-[8.5rem] rounded-md border px-3 py-2 text-left transition-colors ${
-                                selected
+                              className={
+                                "min-w-[8.5rem] rounded-md border px-3 py-2 text-left transition-colors " +
+                                (selected
                                   ? "border-foreground/20 bg-foreground/10 text-foreground"
-                                  : "border-border bg-background hover:bg-accent/30 text-foreground"
-                              }`}
+                                  : "border-border bg-background hover:bg-accent/30 text-foreground")
+                              }
                             >
                               <div className="text-sm font-medium">{preset.label}</div>
                               {preset.tag && (

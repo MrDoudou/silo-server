@@ -10,6 +10,8 @@ import {
 import { useMangaSeriesFiles } from "@/hooks/queries/catalogRead";
 import { prettifyVolumeLabel } from "@/lib/mangaChapters";
 import { formatFileSize } from "@/lib/mediaFormat";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // fileRowLabel describes the chapter a file backs: its volume token when
 // present, otherwise a chapter form mirroring the series list labels.
@@ -37,6 +39,7 @@ export default function MangaFilesDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  useUILanguage();
   const { data, isLoading, error } = useMangaSeriesFiles(contentId, open);
   const files = data?.files ?? [];
   const totalBytes = files.reduce((sum, file) => sum + (file.file_size || 0), 0);
@@ -46,12 +49,18 @@ export default function MangaFilesDialog({
       <DialogContent className="max-h-[85vh] gap-4 sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="truncate pr-6">
-            {title ? `${title} — Files` : "Files"}
+            {title
+              ? tr("components.manga_files_dialog.title_files", { title: title })
+              : tr("components.manga_files_dialog.files")}
           </DialogTitle>
           <DialogDescription>
             {files.length > 0
-              ? `${files.length} ${files.length === 1 ? "file" : "files"} · ${formatFileSize(totalBytes)}`
-              : "Local files backing this series."}
+              ? tr("components.manga_files_dialog.length_value_value2", {
+                  length: files.length,
+                  value: files.length === 1 ? "file" : "files",
+                  value2: formatFileSize(totalBytes),
+                })
+              : tr("components.manga_files_dialog.local_files_backing_this_series")}
           </DialogDescription>
         </DialogHeader>
 
@@ -61,7 +70,7 @@ export default function MangaFilesDialog({
           </div>
         ) : error ? (
           <p className="text-destructive py-6 text-sm">
-            Couldn't load file details. Try again later.
+            {tr("components.manga_files_dialog.couldn_t_load_file_details_try_again_later")}
           </p>
         ) : (
           <div className="min-h-0 space-y-4 overflow-y-auto">
@@ -79,7 +88,9 @@ export default function MangaFilesDialog({
               </div>
             )}
             {files.length === 0 ? (
-              <p className="text-muted-foreground py-4 text-sm">No files found.</p>
+              <p className="text-muted-foreground py-4 text-sm">
+                {tr("components.manga_files_dialog.no_files_found")}
+              </p>
             ) : (
               <ul className="divide-border/40 border-border/40 divide-y rounded-md border">
                 {files.map((file) => (

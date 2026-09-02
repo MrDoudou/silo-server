@@ -42,8 +42,11 @@ import {
 } from "@/lib/permissions";
 import { formatRuntimeMinutes } from "@/lib/mediaFormat";
 import { useQualityPreference } from "@/hooks/queries/qualityPreference";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function EpisodeContent({ item }: { item: ItemDetail & { type: "episode" } }) {
+  useUILanguage();
   const { translating: overviewTranslating, onTranslate: onTranslateOverview } =
     useOnViewTranslation(item);
   const navigate = useNavigate();
@@ -256,7 +259,11 @@ export default function EpisodeContent({ item }: { item: ItemDetail & { type: "e
     breadcrumbSegments.push({ label: seasonLabel, href: seasonHref });
   }
   if (episodeNum != null) {
-    breadcrumbSegments.push({ label: `Episode ${episodeNum}` });
+    breadcrumbSegments.push({
+      get label() {
+        return tr("pages.item_detail.episode_content.episode_value1", { value1: episodeNum });
+      },
+    });
   }
 
   const contextLabel =
@@ -400,7 +407,7 @@ export default function EpisodeContent({ item }: { item: ItemDetail & { type: "e
       <div className="page-shell detail-supporting-content space-y-12 py-10 sm:space-y-14">
         {canCurateMetadata && (
           <MediaLocations
-            title="Media locations"
+            title={tr("pages.item_detail.episode_content.media_locations")}
             versions={item.versions}
             onShowMediaInfo={openMediaInfo}
           />
@@ -412,7 +419,9 @@ export default function EpisodeContent({ item }: { item: ItemDetail & { type: "e
         ) : (
           siblingEpisodes.length > 1 && (
             <div>
-              <h2 className="mb-5 text-xl font-semibold tracking-tight">More Episodes</h2>
+              <h2 className="mb-5 text-xl font-semibold tracking-tight">
+                {tr("pages.item_detail.episode_content.more_episodes")}
+              </h2>
               <EpisodeCarousel
                 episodes={siblingEpisodes}
                 currentEpisodeNumber={episodeNum ?? -1}
@@ -424,7 +433,9 @@ export default function EpisodeContent({ item }: { item: ItemDetail & { type: "e
 
         {item.cast && item.cast.length > 0 && (
           <div>
-            <h2 className="mb-5 text-xl font-semibold tracking-tight">Cast</h2>
+            <h2 className="mb-5 text-xl font-semibold tracking-tight">
+              {tr("pages.item_detail.episode_content.cast")}
+            </h2>
             <CastCarousel cast={item.cast} />
           </div>
         )}

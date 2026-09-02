@@ -53,6 +53,8 @@ import {
   useUpdateAutoscanConnection,
 } from "@/hooks/queries/useAutoscan";
 import { useRequestIntegrations } from "@/hooks/queries/useRequests";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // ---------------------------------------------------------------------------
 // Dialog mode types
@@ -111,6 +113,7 @@ function isArrKind(integration: RequestIntegration): boolean {
 // ---------------------------------------------------------------------------
 
 export default function ConnectionsPanel() {
+  useUILanguage();
   const connections = useAutoscanConnections();
   const requestIntegrations = useRequestIntegrations();
   const createConnection = useCreateAutoscanConnection();
@@ -271,29 +274,32 @@ export default function ConnectionsPanel() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
-            <CardTitle>Connections</CardTitle>
+            <CardTitle>{tr("pages.admin.autoscan.connections_panel.connections")}</CardTitle>
             <Button variant="outline" size="sm" onClick={openAddDialog}>
               <Plus />
-              Add connection
+              {tr("pages.admin.autoscan.connections_panel.add_connection")}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="px-0">
           {connections.isLoading ? (
-            <p className="text-muted-foreground px-6 py-4 text-sm">Loading…</p>
+            <p className="text-muted-foreground px-6 py-4 text-sm">
+              {tr("pages.admin.autoscan.connections_panel.loading")}
+            </p>
           ) : list.length === 0 ? (
             <p className="text-muted-foreground px-6 py-6 text-sm">
-              No connections yet. A connection holds credentials for a server-based source (e.g.
-              Sonarr/Radarr). Add one if your source needs to reach a server.
+              {tr(
+                "pages.admin.autoscan.connections_panel.no_connections_yet_a_connection_holds_credentials_for_a_server",
+              )}
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Kind</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>URL</TableHead>
+                  <TableHead>{tr("pages.admin.autoscan.connections_panel.name")}</TableHead>
+                  <TableHead>{tr("pages.admin.autoscan.connections_panel.kind")}</TableHead>
+                  <TableHead>{tr("pages.admin.autoscan.connections_panel.source")}</TableHead>
+                  <TableHead>{tr("pages.admin.autoscan.connections_panel.url")}</TableHead>
                   <TableHead className="w-0" />
                 </TableRow>
               </TableHeader>
@@ -304,9 +310,13 @@ export default function ConnectionsPanel() {
                     <TableCell>{connectionKindLabel(conn.kind)}</TableCell>
                     <TableCell>
                       {conn.request_integration_id ? (
-                        <Badge variant="secondary">Reused from Requests</Badge>
+                        <Badge variant="secondary">
+                          {tr("pages.admin.autoscan.connections_panel.reused_from_requests")}
+                        </Badge>
                       ) : (
-                        <Badge variant="outline">Own</Badge>
+                        <Badge variant="outline">
+                          {tr("pages.admin.autoscan.connections_panel.own")}
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground max-w-[240px] truncate">
@@ -317,7 +327,7 @@ export default function ConnectionsPanel() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label="Edit connection"
+                          aria-label={tr("pages.admin.autoscan.connections_panel.edit_connection")}
                           onClick={() => openEditDialog(conn)}
                         >
                           <Pencil />
@@ -325,7 +335,9 @@ export default function ConnectionsPanel() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label="Delete connection"
+                          aria-label={tr(
+                            "pages.admin.autoscan.connections_panel.delete_connection",
+                          )}
                           onClick={() => setDeleteTarget(conn)}
                         >
                           <Trash2 className="text-destructive" />
@@ -344,10 +356,15 @@ export default function ConnectionsPanel() {
       <Dialog open={dialog.open} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{dialog.editing ? "Edit connection" : "Add connection"}</DialogTitle>
+            <DialogTitle>
+              {dialog.editing
+                ? tr("pages.admin.autoscan.connections_panel.edit_connection")
+                : tr("pages.admin.autoscan.connections_panel.add_connection")}
+            </DialogTitle>
             <DialogDescription>
-              Reuse a server you already configured in Requests (Sonarr/Radarr), or enter your own
-              credentials.
+              {tr(
+                "pages.admin.autoscan.connections_panel.reuse_a_server_you_already_configured_in_requests_sonarr_radarr",
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -355,7 +372,7 @@ export default function ConnectionsPanel() {
             {/* Mode picker (only when creating) */}
             {!dialog.editing && (
               <div className="space-y-1.5">
-                <Label>Connection type</Label>
+                <Label>{tr("pages.admin.autoscan.connections_panel.connection_type")}</Label>
                 <Select
                   value={dialog.mode}
                   onValueChange={(v) => setDialog((d) => ({ ...d, mode: v as DialogMode }))}
@@ -365,9 +382,11 @@ export default function ConnectionsPanel() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="reuse" disabled={arrIntegrations.length === 0}>
-                      Reuse a server from Requests
+                      {tr("pages.admin.autoscan.connections_panel.reuse_a_server_from_requests")}
                     </SelectItem>
-                    <SelectItem value="own">Enter credentials manually</SelectItem>
+                    <SelectItem value="own">
+                      {tr("pages.admin.autoscan.connections_panel.enter_credentials_manually")}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -376,12 +395,16 @@ export default function ConnectionsPanel() {
             {/* Reuse mode */}
             {dialog.mode === "reuse" && (
               <div className="space-y-1.5">
-                <Label>Requests integration</Label>
+                <Label>{tr("pages.admin.autoscan.connections_panel.requests_integration")}</Label>
                 {requestIntegrations.isLoading ? (
-                  <p className="text-muted-foreground text-sm">Loading integrations…</p>
+                  <p className="text-muted-foreground text-sm">
+                    {tr("pages.admin.autoscan.connections_panel.loading_integrations")}
+                  </p>
                 ) : arrIntegrations.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
-                    No Sonarr/Radarr integrations found. Add one in the Requests page first.
+                    {tr(
+                      "pages.admin.autoscan.connections_panel.no_sonarr_radarr_integrations_found_add_one_in_the_requests",
+                    )}
                   </p>
                 ) : (
                   <Select
@@ -392,7 +415,11 @@ export default function ConnectionsPanel() {
                     }}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select an integration…" />
+                      <SelectValue
+                        placeholder={tr(
+                          "pages.admin.autoscan.connections_panel.select_an_integration",
+                        )}
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {arrIntegrations.map((integration) => (
@@ -410,16 +437,20 @@ export default function ConnectionsPanel() {
             {dialog.mode === "own" && (
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="conn-name">Name</Label>
+                  <Label htmlFor="conn-name">
+                    {tr("pages.admin.autoscan.connections_panel.name")}
+                  </Label>
                   <Input
                     id="conn-name"
-                    placeholder="My Sonarr"
+                    placeholder={tr("pages.admin.autoscan.connections_panel.my_sonarr")}
                     value={dialog.name}
                     onChange={(e) => setDialog((d) => ({ ...d, name: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="conn-kind">Kind</Label>
+                  <Label htmlFor="conn-kind">
+                    {tr("pages.admin.autoscan.connections_panel.kind")}
+                  </Label>
                   <Select
                     value={dialog.kind}
                     onValueChange={(v) => setDialog((d) => ({ ...d, kind: v }))}
@@ -428,16 +459,22 @@ export default function ConnectionsPanel() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="sonarr">Sonarr</SelectItem>
-                      <SelectItem value="radarr">Radarr</SelectItem>
+                      <SelectItem value="sonarr">
+                        {tr("pages.admin.autoscan.connections_panel.sonarr")}
+                      </SelectItem>
+                      <SelectItem value="radarr">
+                        {tr("pages.admin.autoscan.connections_panel.radarr")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="conn-url">Base URL</Label>
+                  <Label htmlFor="conn-url">
+                    {tr("pages.admin.autoscan.connections_panel.base_url")}
+                  </Label>
                   <Input
                     id="conn-url"
-                    placeholder="http://localhost:8989"
+                    placeholder={tr("pages.admin.autoscan.connections_panel.http_localhost_8989")}
                     value={dialog.baseUrl}
                     onChange={(e) => {
                       setTestResult(null);
@@ -447,17 +484,21 @@ export default function ConnectionsPanel() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="conn-key">
-                    API key
+                    {tr("pages.admin.autoscan.connections_panel.api_key")}
                     {dialog.editing?.has_api_key && (
                       <span className="text-muted-foreground ml-1 font-normal">
-                        (leave blank to keep existing)
+                        {tr("pages.admin.autoscan.connections_panel.leave_blank_to_keep_existing")}
                       </span>
                     )}
                   </Label>
                   <Input
                     id="conn-key"
                     type="password"
-                    placeholder={dialog.editing?.has_api_key ? "••••••••" : "Enter API key"}
+                    placeholder={
+                      dialog.editing?.has_api_key
+                        ? "••••••••"
+                        : tr("pages.admin.autoscan.connections_panel.enter_api_key")
+                    }
                     value={dialog.apiKey}
                     onChange={(e) => {
                       setTestResult(null);
@@ -473,11 +514,12 @@ export default function ConnectionsPanel() {
           {/* Inline test result (advisory) */}
           {testResult && (
             <div
-              className={`flex items-start gap-2 rounded-md border p-2.5 text-sm ${
-                testResult.ok
+              className={
+                "flex items-start gap-2 rounded-md border p-2.5 text-sm " +
+                (testResult.ok
                   ? "border-green-500/30 bg-green-500/10"
-                  : "border-destructive/30 bg-destructive/10"
-              }`}
+                  : "border-destructive/30 bg-destructive/10")
+              }
               role="status"
             >
               {testResult.ok ? (
@@ -491,8 +533,11 @@ export default function ConnectionsPanel() {
                 }
               >
                 {testResult.ok
-                  ? `Connected${testResult.version ? ` (v${testResult.version})` : ""}`
-                  : (testResult.error ?? "Connection failed")}
+                  ? tr("pages.admin.autoscan.connections_panel.connected_value", {
+                      value: testResult.version ? ` (v${testResult.version})` : "",
+                    })
+                  : (testResult.error ??
+                    tr("pages.admin.autoscan.connections_panel.connection_failed"))}
               </span>
             </div>
           )}
@@ -504,14 +549,20 @@ export default function ConnectionsPanel() {
               onClick={handleTest}
               disabled={!canTest || testConnection.isPending}
             >
-              {testConnection.isPending ? "Testing…" : "Test connection"}
+              {testConnection.isPending
+                ? tr("pages.admin.autoscan.connections_panel.testing")
+                : tr("pages.admin.autoscan.connections_panel.test_connection")}
             </Button>
             <div className="flex gap-2">
               <Button variant="outline" onClick={closeDialog} disabled={isSaving}>
-                Cancel
+                {tr("common.actions.cancel")}
               </Button>
               <Button onClick={handleSave} disabled={!canSave || isSaving}>
-                {isSaving ? "Saving…" : dialog.editing ? "Save changes" : "Add connection"}
+                {isSaving
+                  ? tr("pages.admin.autoscan.connections_panel.saving")
+                  : dialog.editing
+                    ? tr("pages.admin.autoscan.connections_panel.save_changes")
+                    : tr("pages.admin.autoscan.connections_panel.add_connection")}
               </Button>
             </div>
           </DialogFooter>
@@ -525,14 +576,19 @@ export default function ConnectionsPanel() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete connection?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {tr("pages.admin.autoscan.connections_panel.delete_connection_b03d526c")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{deleteTarget?.name}&rdquo; will be removed. Any scan sources bound to it will
-              lose their connection and will need to be reconfigured.
+              {tr("pages.admin.autoscan.connections_panel.ldquo")}
+              {deleteTarget?.name}
+              {tr(
+                "pages.admin.autoscan.connections_panel.rdquo_will_be_removed_any_scan_sources_bound_to_it",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={() => {
@@ -542,7 +598,7 @@ export default function ConnectionsPanel() {
                 }
               }}
             >
-              Delete
+              {tr("common.actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

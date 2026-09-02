@@ -23,6 +23,8 @@ import { useAdminUpdateDownloadedSubtitle } from "@/hooks/queries/admin/subtitle
 import { LANGUAGES, getLanguageName } from "@/player/utils/languageNames";
 import { cn } from "@/lib/utils";
 import { languageChipClass, providerBadgeClass, providerLabel } from "./subtitleAdminStyles";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface AdminSubtitleEditSheetProps {
   subtitle: AdminDownloadedSubtitle | null;
@@ -35,6 +37,7 @@ export default function AdminSubtitleEditSheet({
   open,
   onOpenChange,
 }: AdminSubtitleEditSheetProps) {
+  useUILanguage();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col sm:max-w-md">
@@ -47,7 +50,9 @@ export default function AdminSubtitleEditSheet({
         ) : (
           <>
             <SheetHeader>
-              <SheetTitle>Edit subtitle</SheetTitle>
+              <SheetTitle>
+                {tr("components.admin.subtitles.admin_subtitle_edit_sheet.edit_subtitle")}
+              </SheetTitle>
             </SheetHeader>
           </>
         )}
@@ -63,6 +68,7 @@ function AdminSubtitleEditForm({
   subtitle: AdminDownloadedSubtitle;
   onClose: () => void;
 }) {
+  useUILanguage();
   const updateMutation = useAdminUpdateDownloadedSubtitle();
   const [language, setLanguage] = useState(subtitle.language);
   const [releaseName, setReleaseName] = useState(subtitle.release_name);
@@ -85,15 +91,22 @@ function AdminSubtitleEditForm({
   return (
     <>
       <SheetHeader>
-        <SheetTitle>Edit subtitle</SheetTitle>
+        <SheetTitle>
+          {tr("components.admin.subtitles.admin_subtitle_edit_sheet.edit_subtitle")}
+        </SheetTitle>
         <SheetDescription>
-          Update stored metadata for this subtitle record. File content is not replaced.
+          {tr(
+            "components.admin.subtitles.admin_subtitle_edit_sheet.update_stored_metadata_for_this_subtitle_record_file_content_is",
+          )}
         </SheetDescription>
       </SheetHeader>
 
       <div className="space-y-6 px-1 py-2">
         <div className="surface-panel-subtle space-y-3 rounded-xl px-4 py-4">
-          <div className="text-sm font-semibold">{subtitle.media_title || "Unknown media"}</div>
+          <div className="text-sm font-semibold">
+            {subtitle.media_title ||
+              tr("components.admin.subtitles.admin_subtitle_edit_sheet.unknown_media")}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={cn(
@@ -115,7 +128,9 @@ function AdminSubtitleEditForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="subtitle-language">Language</Label>
+          <Label htmlFor="subtitle-language">
+            {tr("components.admin.subtitles.admin_subtitle_edit_sheet.language")}
+          </Label>
           <Select value={language} onValueChange={setLanguage}>
             <SelectTrigger id="subtitle-language">
               <SelectValue />
@@ -130,13 +145,17 @@ function AdminSubtitleEditForm({
           </Select>
           {languageChanged && (
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Updates stored language label; file content unchanged.
+              {tr(
+                "components.admin.subtitles.admin_subtitle_edit_sheet.updates_stored_language_label_file_content_unchanged",
+              )}
             </p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="subtitle-release-name">Release name</Label>
+          <Label htmlFor="subtitle-release-name">
+            {tr("components.admin.subtitles.admin_subtitle_edit_sheet.release_name")}
+          </Label>
           <Input
             id="subtitle-release-name"
             value={releaseName}
@@ -147,8 +166,14 @@ function AdminSubtitleEditForm({
 
         <div className="border-border/60 flex items-center justify-between rounded-xl border px-4 py-3">
           <div className="space-y-1">
-            <Label htmlFor="subtitle-hearing-impaired">Hearing impaired</Label>
-            <p className="text-muted-foreground text-xs">Marks this track as SDH/CC.</p>
+            <Label htmlFor="subtitle-hearing-impaired">
+              {tr("components.admin.subtitles.admin_subtitle_edit_sheet.hearing_impaired")}
+            </Label>
+            <p className="text-muted-foreground text-xs">
+              {tr(
+                "components.admin.subtitles.admin_subtitle_edit_sheet.marks_this_track_as_sdh_cc",
+              )}
+            </p>
           </div>
           <Switch
             id="subtitle-hearing-impaired"
@@ -160,10 +185,10 @@ function AdminSubtitleEditForm({
 
       <SheetFooter className="mt-auto gap-2 sm:justify-end">
         <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
+          {tr("common.actions.cancel")}
         </Button>
         <Button type="button" disabled={updateMutation.isPending} onClick={() => void handleSave()}>
-          Save changes
+          {tr("components.admin.subtitles.admin_subtitle_edit_sheet.save_changes")}
         </Button>
       </SheetFooter>
     </>

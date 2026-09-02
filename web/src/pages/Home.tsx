@@ -29,6 +29,8 @@ import {
   prefersReducedMotion,
 } from "@/hooks/useImmediateSidebarCollapse";
 import { SIDEBAR_DETAILS_REVEAL_DEADLINE_MS } from "@/components/sidebarItemNavigation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const MAX_CONCURRENT_SECTION_REQUESTS = 5;
 const SKELETON_CARD_COUNT = 7;
@@ -40,6 +42,7 @@ const HOME_ROW_RESTORE_MAX_DELAY_MS = 900;
 const DESKTOP_SIDEBAR_QUERY = "(min-width: 64rem)";
 
 export default function Home() {
+  useUILanguage();
   const queryClient = useQueryClient();
   const { data, isLoading, isError, refetch } = useHomeLayout();
   const { data: homeRefreshSignal = 0 } = useSectionRefreshSignal();
@@ -48,7 +51,7 @@ export default function Home() {
     () => !shouldWaitForSidebarReturn(),
   );
 
-  useDocumentTitle("Home");
+  useDocumentTitle(tr("pages.home.home"));
 
   const layout = useMemo(() => data?.sections ?? [], [data?.sections]);
   const layoutResetKey = layout
@@ -237,16 +240,16 @@ export default function Home() {
     return (
       <div className="page-shell flex min-h-[50vh] items-center justify-center py-12">
         <div className="surface-panel max-w-md rounded-[1.8rem] border-0 p-6 text-center shadow-none">
-          <p className="text-lg font-semibold">Unable to load the homepage</p>
+          <p className="text-lg font-semibold">{tr("pages.home.unable_to_load_the_homepage")}</p>
           <p className="text-muted-foreground mt-2 text-sm">
-            We couldn&apos;t load your section layout right now.
+            {tr("pages.home.we_couldn_t_load_your_section_layout_right_now")}
           </p>
           <button
             type="button"
             onClick={() => void refetch()}
             className="border-border hover:bg-muted/40 mt-4 rounded-lg border px-4 py-2 text-sm font-medium"
           >
-            Retry
+            {tr("common.actions.retry")}
           </button>
         </div>
       </div>
@@ -255,8 +258,8 @@ export default function Home() {
 
   return (
     <>
-      <h1 className="sr-only">Home</h1>
-      <div className={`space-y-10 ${hasHeroSlot ? "pb-2" : "pt-6 pb-2"}`}>
+      <h1 className="sr-only">{tr("pages.home.home")}</h1>
+      <div className={"space-y-10 " + (hasHeroSlot ? "pb-2" : "pt-6 pb-2")}>
         {heroSlot}
         <TasteSeedBanner />
 
@@ -297,10 +300,10 @@ export default function Home() {
           <div className="surface-panel flex h-64 flex-col items-center justify-center gap-3 rounded-[1.8rem] border-0 px-6 text-center">
             <LayoutDashboard className="text-muted-foreground h-10 w-10" />
             <p className="text-muted-foreground text-sm">
-              Your home screen is empty. Customize it by adding sections to display your media.
+              {tr("pages.home.your_home_screen_is_empty_customize_it_by_adding_sections")}
             </p>
             <Link to="/settings/home" className="text-primary text-sm font-medium hover:underline">
-              Customize Home Screen
+              {tr("pages.home.customize_home_screen")}
             </Link>
           </div>
         )}
@@ -447,21 +450,23 @@ function renderHeroSlot(hero: HomeSectionSlot | null, retrySection: (sectionId: 
   if (hero.state === "error") {
     return (
       <div
-        className={`bg-muted relative ${HERO_BANNER_SIZE} w-full overflow-hidden rounded-[1.8rem]`}
+        className={
+          "bg-muted relative " + HERO_BANNER_SIZE + " w-full overflow-hidden rounded-[1.8rem]"
+        }
       >
         <div className="from-background via-background/70 absolute inset-0 bg-gradient-to-t to-transparent" />
         <div className="relative flex h-full items-end px-4 pb-10 sm:px-6 sm:pb-12 lg:px-12 lg:pb-16">
           <div className="max-w-xl space-y-3">
             <p className="text-3xl font-bold">{hero.layout.title}</p>
             <p className="text-muted-foreground text-sm">
-              This featured section could not be loaded right now.
+              {tr("pages.home.this_featured_section_could_not_be_loaded_right_now")}
             </p>
             <button
               type="button"
               onClick={() => retrySection(hero.layout.id)}
               className="border-border hover:bg-muted/40 rounded-lg border px-4 py-2 text-sm font-medium"
             >
-              Retry section
+              {tr("pages.home.retry_section")}
             </button>
           </div>
         </div>
@@ -473,13 +478,14 @@ function renderHeroSlot(hero: HomeSectionSlot | null, retrySection: (sectionId: 
     return null;
   }
 
-  return <Skeleton className={`${HERO_BANNER_SIZE} w-full rounded-[1.8rem]`} />;
+  return <Skeleton className={HERO_BANNER_SIZE + " w-full rounded-[1.8rem]"} />;
 }
 
 function HomePageSkeleton() {
+  useUILanguage();
   return (
     <div className="space-y-8 py-4">
-      <Skeleton className={`${HERO_BANNER_SIZE} w-full rounded-[1.8rem]`} />
+      <Skeleton className={HERO_BANNER_SIZE + " w-full rounded-[1.8rem]"} />
       {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="space-y-3 px-4 sm:px-6 lg:px-12">
           <Skeleton className="h-6 w-48" />
@@ -498,6 +504,7 @@ function HomePageSkeleton() {
 }
 
 function SectionLoadingRow({ title }: { title: string }) {
+  useUILanguage();
   return (
     <section className="space-y-3 px-4 sm:px-6 lg:px-12">
       <h2 className="text-foreground h-6 text-sm font-semibold">{title}</h2>
@@ -514,17 +521,20 @@ function SectionLoadingRow({ title }: { title: string }) {
 }
 
 function SectionErrorRow({ title, onRetry }: { title: string; onRetry: () => void }) {
+  useUILanguage();
   return (
     <section className="space-y-3 px-4 sm:px-6 lg:px-12">
       <h2 className="text-foreground h-6 text-sm font-semibold">{title}</h2>
       <div className="surface-panel flex items-center justify-between rounded-[1.4rem] border-0 px-5 py-4">
-        <p className="text-muted-foreground text-sm">This section could not be loaded right now.</p>
+        <p className="text-muted-foreground text-sm">
+          {tr("pages.home.this_section_could_not_be_loaded_right_now")}
+        </p>
         <button
           type="button"
           onClick={onRetry}
           className="border-border hover:bg-muted/40 rounded-lg border px-4 py-2 text-sm font-medium"
         >
-          Retry
+          {tr("common.actions.retry")}
         </button>
       </div>
     </section>

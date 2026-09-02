@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { useWizardContext } from "../WizardContext";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const KEYS = [
   "download.enabled",
@@ -17,6 +19,7 @@ const KEYS = [
 ];
 
 export function DownloadsStep() {
+  useUILanguage();
   const { markDone } = useWizardContext();
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
   const [submitting, setSubmitting] = useState(false);
@@ -33,9 +36,9 @@ export function DownloadsStep() {
     try {
       await form.save();
       markDone("downloads");
-      toast.success("Download settings saved");
+      toast.success("feedback.setup_wizard.steps.downloads_step.download_settings_saved");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save download settings");
+      toast.error("errors.setup.downloads_save_failed", { error: err });
     } finally {
       setSubmitting(false);
     }
@@ -60,9 +63,11 @@ export function DownloadsStep() {
       <div className="border-foreground/[0.07] bg-foreground/[0.03] flex items-center justify-between rounded-xl border px-4 py-3.5">
         <div>
           <Label htmlFor="download-enabled" className="text-sm font-medium">
-            Enable downloads
+            {tr("pages.setup_wizard.steps.downloads_step.enable_downloads")}
           </Label>
-          <p className="text-muted-foreground/70 mt-0.5 text-xs">Let users save files locally</p>
+          <p className="text-muted-foreground/70 mt-0.5 text-xs">
+            {tr("pages.setup_wizard.steps.downloads_step.let_users_save_files_locally")}
+          </p>
         </div>
         <Switch
           id="download-enabled"
@@ -75,16 +80,18 @@ export function DownloadsStep() {
         <div className="border-foreground/[0.07] bg-foreground/[0.03] animate-[fade-in_0.15s_ease-out] space-y-3 rounded-xl border p-4">
           <div>
             <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.1em] uppercase">
-              Bandwidth limits
+              {tr("pages.setup_wizard.steps.downloads_step.bandwidth_limits")}
             </p>
             <p className="text-muted-foreground/70 mt-0.5 text-xs">
-              How much bandwidth can downloads consume? Does not affect streaming.
+              {tr(
+                "pages.setup_wizard.steps.downloads_step.how_much_bandwidth_can_downloads_consume_does_not_affect_streaming",
+              )}
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="dl-server-bw" className="text-xs">
-                Total download bandwidth
+                {tr("pages.setup_wizard.steps.downloads_step.total_download_bandwidth")}
               </Label>
               <div className="flex items-center gap-2">
                 <Input
@@ -94,15 +101,17 @@ export function DownloadsStep() {
                   onChange={(e) => form.setValue("download.server_bandwidth_mbps", e.target.value)}
                   className="w-24"
                 />
-                <span className="text-muted-foreground text-xs">Mbps</span>
+                <span className="text-muted-foreground text-xs">
+                  {tr("pages.setup_wizard.steps.downloads_step.mbps")}
+                </span>
               </div>
               <p className="text-muted-foreground/60 text-[11px]">
-                Shared across all users. 0 = unlimited.
+                {tr("pages.setup_wizard.steps.downloads_step.shared_across_all_users_0_unlimited")}
               </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="dl-user-bw" className="text-xs">
-                Per-user download bandwidth
+                {tr("pages.setup_wizard.steps.downloads_step.per_user_download_bandwidth")}
               </Label>
               <div className="flex items-center gap-2">
                 <Input
@@ -112,14 +121,18 @@ export function DownloadsStep() {
                   onChange={(e) => form.setValue("download.user_bandwidth_mbps", e.target.value)}
                   className="w-24"
                 />
-                <span className="text-muted-foreground text-xs">Mbps</span>
+                <span className="text-muted-foreground text-xs">
+                  {tr("pages.setup_wizard.steps.downloads_step.mbps")}
+                </span>
               </div>
-              <p className="text-muted-foreground/60 text-[11px]">0 = unlimited</p>
+              <p className="text-muted-foreground/60 text-[11px]">
+                {tr("pages.setup_wizard.steps.downloads_step.value_0_unlimited")}
+              </p>
             </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="dl-concurrent" className="text-xs">
-              Max concurrent per user
+              {tr("pages.setup_wizard.steps.downloads_step.max_concurrent_per_user")}
             </Label>
             <Input
               id="dl-concurrent"
@@ -128,14 +141,18 @@ export function DownloadsStep() {
               onChange={(e) => form.setValue("download.max_concurrent_per_user", e.target.value)}
               className="w-24"
             />
-            <p className="text-muted-foreground/60 text-[11px]">0 = unlimited</p>
+            <p className="text-muted-foreground/60 text-[11px]">
+              {tr("pages.setup_wizard.steps.downloads_step.value_0_unlimited")}
+            </p>
           </div>
         </div>
       )}
 
       <div className="flex gap-3 pt-2">
         <Button type="submit" disabled={submitting || form.isSaving}>
-          {submitting || form.isSaving ? "Saving..." : "Save & continue"}
+          {submitting || form.isSaving
+            ? tr("pages.setup_wizard.steps.downloads_step.saving")
+            : tr("pages.setup_wizard.steps.downloads_step.save_continue")}
         </Button>
         <Button
           type="button"
@@ -143,7 +160,7 @@ export function DownloadsStep() {
           onClick={handleSkip}
           disabled={submitting || form.isSaving}
         >
-          Skip
+          {tr("common.actions.skip")}
         </Button>
       </div>
     </form>

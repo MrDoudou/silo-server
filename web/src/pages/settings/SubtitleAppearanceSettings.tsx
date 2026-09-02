@@ -30,7 +30,9 @@ import {
   POSITION_OPTIONS,
 } from "@/lib/subtitleAppearance";
 import type { SubtitleAppearance } from "@/lib/subtitleAppearance";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /* Subtitle behavior is a profile preference; a device tunes only appearance. */
 /**
@@ -62,12 +64,13 @@ function ColorPalette({
   labelId,
   descriptionId,
 }: ColorPaletteProps) {
+  useUILanguage();
   return (
     <div
       role="group"
       aria-labelledby={labelId}
       aria-describedby={descriptionId}
-      className={`flex flex-wrap gap-2 ${disabled ? "opacity-40" : ""}`}
+      className={"flex flex-wrap gap-2 " + (disabled ? "opacity-40" : "")}
     >
       {colors.map((color) => (
         <button
@@ -98,6 +101,7 @@ interface SettingRowProps {
 }
 
 function SettingRow({ label, description, labelForControl = true, children }: SettingRowProps) {
+  useUILanguage();
   const controlId = useId();
   const labelId = useId();
   const descriptionId = useId();
@@ -126,6 +130,7 @@ function SettingRow({ label, description, labelForControl = true, children }: Se
 }
 
 export default function SubtitleAppearanceSettings() {
+  useUILanguage();
   const {
     appearance: effectiveSettings,
     hasDeviceOverride,
@@ -182,18 +187,22 @@ export default function SubtitleAppearanceSettings() {
   async function handleSave() {
     try {
       await saveAppearance(settings);
-      toast.success("Subtitle appearance saved");
+      toast.success("feedback.settings.subtitle_appearance_settings.subtitle_appearance_saved");
     } catch {
-      toast.error("Failed to save subtitle appearance");
+      toast.error(
+        "errors.settings.subtitle_appearance_settings.failed_to_save_subtitle_appearance",
+      );
     }
   }
 
   async function handleUseFallback() {
     try {
       await resetAppearance();
-      toast.success("Subtitle appearance reset");
+      toast.success("feedback.settings.subtitle_appearance_settings.subtitle_appearance_reset");
     } catch {
-      toast.error("Failed to reset subtitle appearance");
+      toast.error(
+        "errors.settings.subtitle_appearance_settings.failed_to_reset_subtitle_appearance",
+      );
     }
   }
 
@@ -206,7 +215,9 @@ export default function SubtitleAppearanceSettings() {
    * is and stay deliberately untouched here.
    */
   function saveBehavior(key: SettingKey, value: unknown) {
-    saveProfileDefault(key, value).catch(() => toast.error("Failed to save subtitle setting"));
+    saveProfileDefault(key, value).catch(() =>
+      toast.error("errors.settings.subtitle_appearance_settings.failed_to_save_subtitle_setting"),
+    );
   }
 
   const hasUnsavedChanges = JSON.stringify(settings) !== JSON.stringify(effectiveSettings);
@@ -219,20 +230,28 @@ export default function SubtitleAppearanceSettings() {
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="space-y-3">
-          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Subtitles</h2>
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {tr("pages.settings.subtitle_appearance_settings.subtitles")}
+          </h2>
           <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-            Choose when subtitles appear and how they look during playback.
+            {tr(
+              "pages.settings.subtitle_appearance_settings.choose_when_subtitles_appear_and_how_they_look_during_playback",
+            )}
           </p>
         </div>
       </div>
 
       <SettingsGroup
-        title="Behavior"
-        description="These preferences decide which subtitles Silo chooses by default."
+        title={tr("pages.settings.subtitle_appearance_settings.behavior")}
+        description={tr(
+          "pages.settings.subtitle_appearance_settings.these_preferences_decide_which_subtitles_silo_chooses_by_default",
+        )}
       >
         <SettingRow
-          label="Subtitle language"
-          description="Pick a subtitle language or leave subtitles off by default."
+          label={tr("pages.settings.subtitle_appearance_settings.subtitle_language")}
+          description={tr(
+            "pages.settings.subtitle_appearance_settings.pick_a_subtitle_language_or_leave_subtitles_off_by_default",
+          )}
         >
           {({ id, descriptionId }) => (
             <div className="w-full sm:w-[220px]">
@@ -242,7 +261,7 @@ export default function SubtitleAppearanceSettings() {
                 value={subtitleLanguage || "none"}
                 options={subtitleLanguageOptions}
                 disabled={behaviorPending}
-                placeholder="None"
+                placeholder={tr("pages.settings.subtitle_appearance_settings.none")}
                 className="w-full"
                 onValueChange={(value) =>
                   // The contract spells "no preference" as null, not the empty
@@ -253,13 +272,20 @@ export default function SubtitleAppearanceSettings() {
                   )
                 }
               >
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">
+                  {tr("pages.settings.subtitle_appearance_settings.none")}
+                </SelectItem>
               </LanguageSelect>
             </div>
           )}
         </SettingRow>
 
-        <SettingRow label="Subtitle behavior" description="Decide when subtitles should appear.">
+        <SettingRow
+          label={tr("pages.settings.subtitle_appearance_settings.subtitle_behavior")}
+          description={tr(
+            "pages.settings.subtitle_appearance_settings.decide_when_subtitles_should_appear",
+          )}
+        >
           {({ id, descriptionId }) => (
             <Select
               value={subtitleMode}
@@ -285,8 +311,10 @@ export default function SubtitleAppearanceSettings() {
         </SettingRow>
 
         <SettingRow
-          label="Show forced subtitles"
-          description="Display forced subtitles for foreign-language dialogue."
+          label={tr("pages.settings.subtitle_appearance_settings.show_forced_subtitles")}
+          description={tr(
+            "pages.settings.subtitle_appearance_settings.display_forced_subtitles_for_foreign_language_dialogue",
+          )}
         >
           {({ id, descriptionId }) => (
             <Switch
@@ -303,8 +331,10 @@ export default function SubtitleAppearanceSettings() {
       </SettingsGroup>
 
       <SettingsGroup
-        title="Preview"
-        description="This sample reflects the current subtitle appearance."
+        title={tr("pages.settings.subtitle_appearance_settings.preview")}
+        description={tr(
+          "pages.settings.subtitle_appearance_settings.this_sample_reflects_the_current_subtitle_appearance",
+        )}
       >
         <div
           className="surface-panel-subtle relative overflow-hidden rounded-[1.3rem]"
@@ -318,38 +348,43 @@ export default function SubtitleAppearanceSettings() {
               className="inline-block rounded px-3 py-1 text-center leading-snug"
               style={{ ...cueStyle, whiteSpace: "pre-line" }}
             >
-              Sample subtitle text
+              {tr("pages.settings.subtitle_appearance_settings.sample_subtitle_text")}
             </span>
             <span
               className="inline-block rounded px-3 py-1 text-center leading-snug"
               style={{ ...cueStyle, whiteSpace: "pre-line" }}
             >
-              tuned for readability
+              {tr("pages.settings.subtitle_appearance_settings.tuned_for_readability")}
             </span>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={handleSave} disabled={!hasUnsavedChanges || isSaving}>
-            Save Appearance
+            {tr("pages.settings.subtitle_appearance_settings.save_appearance")}
           </Button>
           <Button
             variant="outline"
             onClick={discardLocalChanges}
             disabled={!hasUnsavedChanges || isSaving}
           >
-            Discard Changes
+            {tr("pages.settings.subtitle_appearance_settings.discard_changes")}
           </Button>
           {hasDeviceOverride ? (
             <Button variant="ghost" onClick={handleUseFallback} disabled={isResetting}>
               <RotateCcw className="mr-2 h-4 w-4" />
-              Reset Appearance
+              {tr("pages.settings.subtitle_appearance_settings.reset_appearance")}
             </Button>
           ) : null}
         </div>
       </SettingsGroup>
 
-      <SettingsGroup title="Text" description="Adjust the look and readability of subtitle text.">
-        <SettingRow label="Font size">
+      <SettingsGroup
+        title={tr("pages.settings.subtitle_appearance_settings.text_c3328c39")}
+        description={tr(
+          "pages.settings.subtitle_appearance_settings.adjust_the_look_and_readability_of_subtitle_text",
+        )}
+      >
+        <SettingRow label={tr("pages.settings.subtitle_appearance_settings.font_size")}>
           {({ id, descriptionId }) => (
             <Select
               value={settings.fontSize}
@@ -369,7 +404,7 @@ export default function SubtitleAppearanceSettings() {
           )}
         </SettingRow>
 
-        <SettingRow label="Font family">
+        <SettingRow label={tr("pages.settings.subtitle_appearance_settings.font_family")}>
           {({ id, descriptionId }) => (
             <Select
               value={settings.fontFamily}
@@ -391,7 +426,10 @@ export default function SubtitleAppearanceSettings() {
           )}
         </SettingRow>
 
-        <SettingRow label="Font color" labelForControl={false}>
+        <SettingRow
+          label={tr("pages.settings.subtitle_appearance_settings.font_color")}
+          labelForControl={false}
+        >
           {({ labelId, descriptionId }) => (
             <ColorPalette
               colors={FONT_COLOR_PALETTE}
@@ -403,7 +441,7 @@ export default function SubtitleAppearanceSettings() {
           )}
         </SettingRow>
 
-        <SettingRow label="Text outline">
+        <SettingRow label={tr("pages.settings.subtitle_appearance_settings.text_outline")}>
           {({ id, descriptionId }) => (
             <Switch
               id={id}
@@ -415,9 +453,11 @@ export default function SubtitleAppearanceSettings() {
         </SettingRow>
 
         <SettingRow
-          label="Outline color"
+          label={tr("pages.settings.subtitle_appearance_settings.outline_color")}
           labelForControl={false}
-          description="Only used when text outline is enabled."
+          description={tr(
+            "pages.settings.subtitle_appearance_settings.only_used_when_text_outline_is_enabled",
+          )}
         >
           {({ labelId, descriptionId }) => (
             <ColorPalette
@@ -433,10 +473,12 @@ export default function SubtitleAppearanceSettings() {
       </SettingsGroup>
 
       <SettingsGroup
-        title="Background & Position"
-        description="Tune subtitle placement and contrast."
+        title={tr("pages.settings.subtitle_appearance_settings.background_position")}
+        description={tr(
+          "pages.settings.subtitle_appearance_settings.tune_subtitle_placement_and_contrast",
+        )}
       >
-        <SettingRow label="Background style">
+        <SettingRow label={tr("pages.settings.subtitle_appearance_settings.background_style")}>
           {({ id, descriptionId }) => (
             <Select
               value={settings.backgroundStyle}
@@ -458,7 +500,12 @@ export default function SubtitleAppearanceSettings() {
           )}
         </SettingRow>
 
-        <SettingRow label="Background opacity" description="Only used for boxed subtitles.">
+        <SettingRow
+          label={tr("pages.settings.subtitle_appearance_settings.background_opacity")}
+          description={tr(
+            "pages.settings.subtitle_appearance_settings.only_used_for_boxed_subtitles",
+          )}
+        >
           {({ descriptionId }) => (
             <div className="flex w-full max-w-[240px] items-center gap-3">
               <Slider
@@ -479,7 +526,10 @@ export default function SubtitleAppearanceSettings() {
           )}
         </SettingRow>
 
-        <SettingRow label="Background color" labelForControl={false}>
+        <SettingRow
+          label={tr("pages.settings.subtitle_appearance_settings.background_color")}
+          labelForControl={false}
+        >
           {({ labelId, descriptionId }) => (
             <ColorPalette
               colors={BG_COLOR_PALETTE}
@@ -492,7 +542,7 @@ export default function SubtitleAppearanceSettings() {
           )}
         </SettingRow>
 
-        <SettingRow label="Subtitle position">
+        <SettingRow label={tr("pages.settings.subtitle_appearance_settings.subtitle_position")}>
           {({ id, descriptionId }) => (
             <Select
               value={settings.position}

@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UNGROUPED_LABEL, buildGroupedSections } from "@/lib/collectionGroups";
 import type { GroupedSection } from "@/lib/collectionGroups";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const GROUP_DROPPABLE_PREFIX = "group:";
 const GROUP_BODY_DROPPABLE_PREFIX = "group-body:";
@@ -70,6 +72,7 @@ export function GroupedCollectionsBoard<T extends GroupedItem>({
   onRenameGroup,
   onDeleteGroup,
 }: GroupedCollectionsBoardProps<T>) {
+  useUILanguage();
   const sections: GroupedSection<T>[] = useMemo(
     () =>
       buildGroupedSections(items, groups, {
@@ -209,6 +212,7 @@ function SectionBlock<T extends GroupedItem>({
   onRenameGroup?: (id: string, title: string) => void;
   onDeleteGroup?: (id: string) => void;
 }) {
+  useUILanguage();
   // Whole section is droppable so empty groups still accept drops.
   const sectionKey = section.id ?? UNGROUPED_LABEL;
   const droppableId = `${GROUP_DROPPABLE_PREFIX}${sectionKey}`;
@@ -247,11 +251,12 @@ function SectionBlock<T extends GroupedItem>({
       />
       <div
         ref={setDroppableRef}
-        className={`rounded-2xl transition-colors ${
-          isOver && section.items.length === 0
+        className={
+          "rounded-2xl transition-colors " +
+          (isOver && section.items.length === 0
             ? "border-primary/40 border border-dashed bg-white/[0.02] p-4"
-            : ""
-        }`}
+            : "")
+        }
       >
         <SortableContext items={section.items.map(getItemId)} strategy={rectSortingStrategy}>
           {section.items.length === 0 ? (
@@ -290,6 +295,7 @@ function CollectionGroupHeader({
   onRename?: (title: string) => void;
   onDelete?: () => void;
 }) {
+  useUILanguage();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
 
@@ -308,7 +314,9 @@ function CollectionGroupHeader({
       {!readOnly && canManage ? (
         <button
           type="button"
-          aria-label={`Drag group ${title}`}
+          aria-label={tr("components.collections.grouped_collections_board.drag_group_title", {
+            title: title,
+          })}
           className="hover:bg-surface-hover -ml-1 cursor-grab touch-none rounded-md p-1 opacity-0 transition group-hover/header:opacity-100 [@media(pointer:coarse)]:opacity-100"
           {...dragAttributes}
           {...dragListeners}
@@ -330,7 +338,7 @@ function CollectionGroupHeader({
         />
       ) : (
         <h2
-          className={`text-2xl font-light tracking-tight ${muted ? "text-muted-foreground" : ""}`}
+          className={"text-2xl font-light tracking-tight " + (muted ? "text-muted-foreground" : "")}
         >
           {title}
         </h2>
@@ -343,7 +351,7 @@ function CollectionGroupHeader({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              aria-label="Save"
+              aria-label={tr("common.actions.save")}
               onClick={commit}
             >
               <Check className="h-3.5 w-3.5" />
@@ -352,7 +360,7 @@ function CollectionGroupHeader({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              aria-label="Cancel"
+              aria-label={tr("common.actions.cancel")}
               onClick={cancel}
             >
               <X className="h-3.5 w-3.5" />
@@ -365,7 +373,7 @@ function CollectionGroupHeader({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                aria-label="Rename group"
+                aria-label={tr("components.collections.grouped_collections_board.rename_group")}
                 onClick={() => {
                   setDraft(title);
                   setEditing(true);
@@ -379,7 +387,7 @@ function CollectionGroupHeader({
                 variant="ghost"
                 size="icon"
                 className="text-destructive hover:bg-destructive/10 hover:text-destructive h-7 w-7"
-                aria-label="Delete group"
+                aria-label={tr("components.collections.grouped_collections_board.delete_group")}
                 onClick={onDelete}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -393,14 +401,16 @@ function CollectionGroupHeader({
 }
 
 function EmptyGroupPlaceholder() {
+  useUILanguage();
   return (
     <div className="text-muted-foreground/60 rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-xs">
-      Drop a collection here
+      {tr("components.collections.grouped_collections_board.drop_a_collection_here")}
     </div>
   );
 }
 
 function AddGroupRow({ onAddGroup }: { onAddGroup: (title: string) => void }) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -409,7 +419,7 @@ function AddGroupRow({ onAddGroup }: { onAddGroup: (title: string) => void }) {
       <div className="pt-4">
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
           <Plus className="mr-1 h-4 w-4" />
-          Add group
+          {tr("components.collections.grouped_collections_board.add_group")}
         </Button>
       </div>
     );
@@ -427,7 +437,7 @@ function AddGroupRow({ onAddGroup }: { onAddGroup: (title: string) => void }) {
       <Input
         autoFocus
         value={draft}
-        placeholder="Group title"
+        placeholder={tr("components.collections.grouped_collections_board.group_title")}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit();
@@ -439,7 +449,7 @@ function AddGroupRow({ onAddGroup }: { onAddGroup: (title: string) => void }) {
         className="h-8 max-w-xs"
       />
       <Button variant="ghost" size="sm" onClick={commit}>
-        <Check className="mr-1 h-3.5 w-3.5" /> Add
+        <Check className="mr-1 h-3.5 w-3.5" /> {tr("common.actions.add")}
       </Button>
       <Button
         variant="ghost"
@@ -449,7 +459,7 @@ function AddGroupRow({ onAddGroup }: { onAddGroup: (title: string) => void }) {
           setOpen(false);
         }}
       >
-        Cancel
+        {tr("common.actions.cancel")}
       </Button>
     </div>
   );

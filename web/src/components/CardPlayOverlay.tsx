@@ -7,6 +7,8 @@ import { buildMediaPlayHref, isVideoWatchHref } from "@/lib/mediaNavigation";
 import { parseWatchHref } from "@/pages/watchRouteHelpers";
 import { useWatchPlaybackController } from "@/playback/watchPlaybackContext";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CardPlayOverlayProps {
   contentId: string;
@@ -25,6 +27,7 @@ export default function CardPlayOverlay({
   size = "standard",
   onPlaybackStart,
 }: CardPlayOverlayProps) {
+  useUILanguage();
   const location = useLocation();
   const playbackController = useWatchPlaybackController();
   const watchHref = buildMediaPlayHref({ contentId, type: mediaType, libraryId });
@@ -64,7 +67,7 @@ export default function CardPlayOverlay({
     <ViewTransitionLink
       to={watchHref}
       onClick={handleClick}
-      aria-label={`Play ${title}`}
+      aria-label={tr("components.card_play_overlay.play_title", { title: title })}
       className={cn(
         // media-card-play-trigger owns the hover/focus reveal so every card
         // surface shares one rule (app.css): a direct :hover selector gated on

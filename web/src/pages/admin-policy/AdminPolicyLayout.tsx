@@ -8,6 +8,8 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PolicyDecisionLogTable } from "./PolicyDecisionLogTable";
 import { PolicyDocumentList } from "./PolicyDocumentList";
 import { PolicyVendorViewer } from "./PolicyVendorViewer";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Tab ids are stable URL contract (?tab=); labels are presentation only.
 const POLICY_TABS = new Set(["documents", "vendor", "decisions"]);
@@ -19,22 +21,41 @@ function resolveTab(value: string | null) {
 const PIPELINE_STEPS = [
   {
     icon: PackageCheck,
-    title: "Silo decides the baseline",
-    detail: "Built-in rules ship with every release: profile restrictions, ratings, limits.",
+    get title() {
+      return tr("pages.admin_policy.admin_policy_layout.silo_decides_the_baseline");
+    },
+    get detail() {
+      return tr(
+        "pages.admin_policy.admin_policy_layout.built_in_rules_ship_with_every_release_profile_restrictions_ratings",
+      );
+    },
   },
   {
     icon: PenLine,
-    title: "Your overrides narrow it",
-    detail: "Custom rules can tighten the baseline — never grant more than it allows.",
+    get title() {
+      return tr("pages.admin_policy.admin_policy_layout.your_overrides_narrow_it");
+    },
+    get detail() {
+      return tr(
+        "pages.admin_policy.admin_policy_layout.custom_rules_can_tighten_the_baseline_never_grant_more_than",
+      );
+    },
   },
   {
     icon: ScrollText,
-    title: "Every decision is logged",
-    detail: "Denials are always recorded; allowed requests are sampled.",
+    get title() {
+      return tr("pages.admin_policy.admin_policy_layout.every_decision_is_logged");
+    },
+    get detail() {
+      return tr(
+        "pages.admin_policy.admin_policy_layout.denials_are_always_recorded_allowed_requests_are_sampled",
+      );
+    },
   },
 ] as const;
 
 function PolicyPipelineStrip() {
+  useUILanguage();
   return (
     <div className="surface-panel-subtle rounded-2xl p-4">
       <ol className="grid gap-4 md:grid-cols-3">
@@ -59,7 +80,8 @@ function PolicyPipelineStrip() {
 }
 
 export default function AdminPolicyLayout() {
-  useDocumentTitle("Policy");
+  useUILanguage();
+  useDocumentTitle(tr("pages.admin_policy.admin_policy_layout.policy"));
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = resolveTab(searchParams.get("tab"));
   const capability = usePolicyCapability();
@@ -84,22 +106,32 @@ export default function AdminPolicyLayout() {
     <div className="page-shell space-y-6 py-4 sm:py-6">
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Policy</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_policy.admin_policy_layout.policy")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Household access rules: what Silo allows by default, and where you tighten it.
+            {tr(
+              "pages.admin_policy.admin_policy_layout.household_access_rules_what_silo_allows_by_default_and_where",
+            )}
           </p>
         </div>
       </div>
 
       {capability.isLoading && (
-        <p className="text-muted-foreground text-sm">Loading policy capability...</p>
+        <p className="text-muted-foreground text-sm">
+          {tr("pages.admin_policy.admin_policy_layout.loading_policy_capability")}
+        </p>
       )}
 
       {unavailable && (
         <div className="surface-panel-subtle rounded-2xl p-6">
-          <h2 className="text-lg font-semibold">Policy workspace unavailable</h2>
+          <h2 className="text-lg font-semibold">
+            {tr("pages.admin_policy.admin_policy_layout.policy_workspace_unavailable")}
+          </h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            The policy engine or editor API is not available from this server process.
+            {tr(
+              "pages.admin_policy.admin_policy_layout.the_policy_engine_or_editor_api_is_not_available_from",
+            )}
           </p>
         </div>
       )}
@@ -110,9 +142,15 @@ export default function AdminPolicyLayout() {
 
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList>
-              <TabsTrigger value="documents">Overrides</TabsTrigger>
-              <TabsTrigger value="vendor">Baseline</TabsTrigger>
-              <TabsTrigger value="decisions">Decision Log</TabsTrigger>
+              <TabsTrigger value="documents">
+                {tr("pages.admin_policy.admin_policy_layout.overrides")}
+              </TabsTrigger>
+              <TabsTrigger value="vendor">
+                {tr("pages.admin_policy.admin_policy_layout.baseline")}
+              </TabsTrigger>
+              <TabsTrigger value="decisions">
+                {tr("pages.admin_policy.admin_policy_layout.decision_log")}
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="documents" className="space-y-5">

@@ -1,9 +1,12 @@
 import { useRef } from "react";
 import { Upload, Download } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { serializeTheme, downloadTheme, readThemeFile } from "@/lib/themeExport";
 import type { ThemeId } from "@/lib/themes";
 import type { ThemeVarOverrides } from "@/hooks/useCustomTheme";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ImportExportBarProps {
   currentTheme: ThemeId;
@@ -13,6 +16,7 @@ interface ImportExportBarProps {
 }
 
 export function ImportExportBar({ currentTheme, vars, customCss, onImport }: ImportExportBarProps) {
+  useUILanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleExport() {
@@ -29,9 +33,11 @@ export function ImportExportBar({ currentTheme, vars, customCss, onImport }: Imp
     try {
       const themeFile = await readThemeFile(file);
       onImport(themeFile.vars, themeFile.customCss, themeFile.baseTheme);
-      toast.success(`Imported "${themeFile.name}"`);
+      toast.success("feedback.theme.import_export_bar.imported_name", {
+        values: { name: themeFile.name },
+      });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to import theme file");
+      toast.error("errors.theme.import_export_bar.failed_to_import_theme_file", { error: err });
     }
   }
 
@@ -43,7 +49,7 @@ export function ImportExportBar({ currentTheme, vars, customCss, onImport }: Imp
         className="border-border text-foreground hover:bg-accent inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-colors"
       >
         <Download className="h-3.5 w-3.5" />
-        Export
+        {tr("components.theme.import_export_bar.export")}
       </button>
       <button
         type="button"
@@ -51,7 +57,7 @@ export function ImportExportBar({ currentTheme, vars, customCss, onImport }: Imp
         className="border-border text-foreground hover:bg-accent inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-colors"
       >
         <Upload className="h-3.5 w-3.5" />
-        Import
+        {tr("components.theme.import_export_bar.import")}
       </button>
       <input
         ref={fileInputRef}

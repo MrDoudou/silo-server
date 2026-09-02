@@ -3,6 +3,8 @@ import { rangeLabel, rangePhrase, WIDGET_RANGE_ORDER } from "./range";
 import { findDashboardWidget } from "./registry";
 import type { WidgetRange } from "./types";
 import { useWidgetRange } from "./widgetChrome";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * A compact segmented control for a widget's window.
@@ -24,6 +26,7 @@ export function RangeSegmentedControl({
   onChange: (range: WidgetRange) => void;
   className?: string;
 }) {
+  useUILanguage();
   if (options.length < 2) {
     return null;
   }
@@ -42,7 +45,9 @@ export function RangeSegmentedControl({
             key={range}
             type="button"
             aria-pressed={active}
-            aria-label={`Show ${rangePhrase(range)}`}
+            aria-label={tr("components.admin.dashboard.widget_range_picker.show_value", {
+              value: rangePhrase(range),
+            })}
             className={cn(
               "cursor-pointer rounded-full px-1.5 py-0.5 text-[10px] leading-none font-semibold tabular-nums transition-colors",
               "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",

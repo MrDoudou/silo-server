@@ -7,6 +7,8 @@ import { useGridLayout } from "@/hooks/useGridLayout";
 import { useOverlayPrefs } from "@/hooks/useOverlayPrefs";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { cardGridClasses, cardTextAreaHeight } from "@/lib/uiCustomization";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SharedItemGridProps {
   loading?: boolean;
@@ -41,6 +43,7 @@ function hasStaticItems(props: ItemGridProps): props is StaticItemGridProps {
 }
 
 export default function ItemGrid(props: ItemGridProps) {
+  useUILanguage();
   const {
     loading,
     sortField,
@@ -121,7 +124,9 @@ export default function ItemGrid(props: ItemGridProps) {
           ))}
         </div>
       ) : totalItems === 0 ? (
-        <div className="text-muted-foreground py-12 text-center">No items found.</div>
+        <div className="text-muted-foreground py-12 text-center">
+          {tr("components.item_grid.no_items_found")}
+        </div>
       ) : (
         <div
           style={{
@@ -154,7 +159,7 @@ export default function ItemGrid(props: ItemGridProps) {
 
                 if (!item) {
                   cells.push(
-                    <div key={`skeleton-${globalIndex}`} role="listitem">
+                    <div key={"skeleton-" + globalIndex} role="listitem">
                       <Skeleton className="aspect-[2/3] rounded-lg" />
                       <Skeleton className="mt-2 h-4 w-3/4" />
                     </div>,

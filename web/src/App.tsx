@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -66,7 +67,7 @@ import {
 } from "@/pages/catalogSearchParams";
 import { buildLegacyAutoscanRedirectTarget } from "@/pages/autoscanSearchParams";
 import { buildLegacyWebhookSyncRedirectTarget } from "@/lib/webhookSync";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { prewarmCodecDetection } from "@/player/hooks/useCodecDetection";
 import { prefetchRouteChunks, type RouteChunkImport } from "@/lib/routeChunkPrefetch";
 
@@ -182,16 +183,17 @@ function useScrollRestoration() {
 
 /** Announces route changes to screen readers via an aria-live region. */
 function RouteAnnouncer() {
+  const { t } = useTranslation(undefined);
   const location = useLocation();
   const [announcement, setAnnouncement] = useState("");
 
   useEffect(() => {
     // Small delay so document.title has time to update via useDocumentTitle hooks
     const id = setTimeout(() => {
-      setAnnouncement(document.title || "Page loaded");
+      setAnnouncement(document.title || t("common.status.page_loaded"));
     }, 100);
     return () => clearTimeout(id);
-  }, [location.pathname]);
+  }, [location.pathname, t]);
 
   return (
     <div aria-live="assertive" role="status" className="sr-only">
@@ -217,10 +219,12 @@ function NavigationDirectionManager() {
 }
 
 function RouteLoading() {
+  const { t } = useTranslation(undefined);
+
   return (
     <div className="p-8" role="status" aria-live="polite">
-      <span className="sr-only">Loading page</span>
-      Loading...
+      <span className="sr-only">{t("common.loading.page")}</span>
+      {t("common.loading.visible")}
     </div>
   );
 }
@@ -238,13 +242,14 @@ function guardRedirectTarget(base: string, location: ReturnType<typeof useLocati
 }
 
 function RequireAuth({ children }: { children: ReactNode }) {
+  const { t } = useTranslation(undefined);
   const { user, loading, setupLoading } = useAuth();
   const location = useLocation();
   if (loading || setupLoading) {
     return (
       <div className="p-8" role="status" aria-live="polite">
-        <span className="sr-only">Loading application</span>
-        Loading...
+        <span className="sr-only">{t("common.loading.application")}</span>
+        {t("common.loading.visible")}
       </div>
     );
   }
@@ -253,12 +258,13 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function SetupGate({ children }: { children: ReactNode }) {
+  const { t } = useTranslation(undefined);
   const { user, setupLoading, setupRequired } = useAuth();
   if (setupLoading) {
     return (
       <div className="p-8" role="status" aria-live="polite">
-        <span className="sr-only">Loading application</span>
-        Loading...
+        <span className="sr-only">{t("common.loading.application")}</span>
+        {t("common.loading.visible")}
       </div>
     );
   }
@@ -289,12 +295,13 @@ function RequirePrimaryOrAdmin({ children }: { children: ReactNode }) {
 }
 
 function RequireRequestsEnabled({ children }: { children: ReactNode }) {
+  const { t } = useTranslation(undefined);
   const status = useRequestFeatureStatus();
   if (status.isLoading) {
     return (
       <div className="p-8" role="status" aria-live="polite">
-        <span className="sr-only">Loading request availability</span>
-        Loading...
+        <span className="sr-only">{t("common.loading.request_availability")}</span>
+        {t("common.loading.visible")}
       </div>
     );
   }
@@ -378,7 +385,7 @@ function AppChrome() {
       await endImpersonation();
       navigate(returnPath, { replace: true });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to end impersonation");
+      toast.error("errors.auth.impersonation_end_failed", { error: error });
     }
   }
 

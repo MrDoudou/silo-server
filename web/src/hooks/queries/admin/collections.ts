@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { ApiClientError, api } from "@/api/client";
 import type {
   CreateLibraryCollectionRequest,
@@ -26,6 +27,7 @@ import type {
 import { adminKeys, sectionKeys } from "../keys";
 import { invalidateAdminCollectionQueries } from "../collectionSurfaceRefresh";
 import { runBulkDelete, type BulkDeleteProgress } from "../bulkDelete";
+import { tr } from "@/i18n/translate";
 
 const ADMIN_STALE_TIME = 30_000;
 
@@ -40,9 +42,13 @@ function isLikelyRequestTimeout(error: unknown): boolean {
 
 function applyTemplateBundleErrorMessage(error: unknown): string {
   if (isLikelyRequestTimeout(error)) {
-    return "The apply request timed out. Silo may still be creating collections; refresh in a minute.";
+    return tr(
+      "feedback.queries.admin.collections.the_apply_request_timed_out_silo_may_still_be_creating",
+    );
   }
-  return error instanceof Error ? error.message : "Failed to apply defaults";
+  return error instanceof Error
+    ? tr.error("errors.common.request_failed", error)
+    : tr("feedback.queries.admin.collections.failed_to_apply_defaults");
 }
 
 function buildCollectionFormData(
@@ -113,11 +119,11 @@ export function useCreateAdminCollection() {
       });
     },
     onSuccess: (_collection) => {
-      toast.success("Collection created");
+      toast.success("feedback.queries.admin.collections.collection_created");
       void invalidateAdminCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to save");
+      toast.error("errors.queries.admin.collections.failed_to_save", { error: error });
     },
   });
 }
@@ -149,22 +155,19 @@ export function useApplyCollectionTemplateBundle() {
         const deleteFailed = result.delete_failed?.length ?? 0;
         const failureCount = failed + deleteFailed;
         if (created > 0 || deleted > 0 || syncQueued > 0) {
-          const message = [
-            deleted > 0 ? `Deleted ${deleted}` : "",
-            created > 0 ? `created ${created}` : "",
-            syncQueued > 0 ? `queued ${syncQueued} syncs` : "",
-            failureCount > 0 ? `${failureCount} failed` : "",
-          ]
-            .filter(Boolean)
-            .join("; ");
-          toast.success(message);
+          toast.success(
+            "feedback.queries.admin.collections.collection_changes_created_created_deleted_deleted_queued_syncs_queued_failed",
+            { values: { created, deleted, queued: syncQueued, failed: failureCount } },
+          );
         }
         void invalidateAdminCollectionQueries(queryClient);
         void queryClient.invalidateQueries({ queryKey: sectionKeys.all });
       }
     },
     onError: (error) => {
-      toast.error(applyTemplateBundleErrorMessage(error));
+      toast.error("errors.queries.admin.collections.reported_message", {
+        values: { message: applyTemplateBundleErrorMessage(error) },
+      });
     },
   });
 }
@@ -190,14 +193,20 @@ export function useQueueCollectionTemplateBundleApply() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.jobs("template_bundle_apply") });
       void queryClient.invalidateQueries({ queryKey: adminKeys.jobs("__all") });
-      toast.success("Applying collection defaults in the background");
+      toast.success(
+        "feedback.queries.admin.collections.applying_collection_defaults_in_the_background",
+      );
     },
     onError: (error) => {
       if (error instanceof ApiClientError && error.status === 409) {
-        toast.error("A collection defaults apply is already running");
+        toast.error(
+          "errors.queries.admin.collections.a_collection_defaults_apply_is_already_running",
+        );
         return;
       }
-      toast.error(error instanceof Error ? error.message : "Failed to queue collection defaults");
+      toast.error("errors.queries.admin.collections.failed_to_queue_collection_defaults", {
+        error: error,
+      });
     },
   });
 }
@@ -241,11 +250,11 @@ export function useUpdateAdminCollection() {
       });
     },
     onSuccess: (_collection) => {
-      toast.success("Collection updated");
+      toast.success("feedback.queries.admin.collections.collection_updated");
       void invalidateAdminCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to save");
+      toast.error("errors.queries.admin.collections.failed_to_save", { error: error });
     },
   });
 }
@@ -259,11 +268,11 @@ export function useDeleteAdminCollection() {
         method: "DELETE",
       }).then(() => libraryId),
     onSuccess: (_libraryId) => {
-      toast.success("Collection deleted");
+      toast.success("feedback.queries.admin.collections.collection_deleted");
       void invalidateAdminCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to delete");
+      toast.error("errors.queries.admin.collections.failed_to_delete", { error: error });
     },
   });
 }
@@ -299,21 +308,42 @@ export function useDeleteAdminCollections() {
         setProgress,
       ),
     onSuccess: async ({ requested, deleted, kept, failed, firstError }) => {
-      const keptDescription = `Kept ${kept} collection${kept === 1 ? "" : "s"} in use by home or library sections`;
+      const keptDescription = tr(
+        kept === 1
+          ? "feedback.queries.admin.collections.kept_count_collection_in_use_by_home_or_library_sections"
+          : "feedback.queries.admin.collections.kept_count_collections_in_use_by_home_or_library_sections",
+        { count: kept },
+      );
 
       if (failed === 0 && kept === 0) {
-        toast.success(`Deleted ${deleted} collection${deleted === 1 ? "" : "s"}`);
+        toast.success("feedback.queries.admin.collections.deleted_count_collections", {
+          values: { count: deleted },
+        });
       } else if (failed === 0) {
-        toast.warning(`Deleted ${deleted} collection${deleted === 1 ? "" : "s"}`, {
-          description: keptDescription,
+        toast.warning("feedback.queries.admin.collections.deleted_count_collections", {
+          values: { count: deleted },
+          resolvedDescription: keptDescription,
         });
       } else if (deleted > 0 || kept > 0) {
-        toast.warning(`Deleted ${deleted} of ${requested} collections`, {
-          description: [kept > 0 ? keptDescription : "", firstError].filter(Boolean).join(". "),
-        });
+        toast.warning(
+          "feedback.queries.admin.collections.deleted_deleted_of_requested_collections",
+          {
+            values: {
+              deleted,
+              requested,
+            },
+            resolvedDescription: [
+              kept > 0 ? keptDescription : "",
+              firstError ? tr.remote({ message: firstError }) : "",
+            ]
+              .filter(Boolean)
+              .join(". "),
+          },
+        );
       } else {
-        toast.error(`Failed to delete ${failed} collection${failed === 1 ? "" : "s"}`, {
-          description: firstError,
+        toast.error("errors.queries.admin.collections.collections_not_deleted_count", {
+          values: { count: failed },
+          resolvedDescription: firstError ? tr.remote({ message: firstError }) : undefined,
         });
       }
       await invalidateAdminCollectionQueries(queryClient);
@@ -382,7 +412,7 @@ export function useReorderAdminCollections() {
       if (ctx?.snapshot) {
         queryClient.setQueryData(adminKeys.collections(ctx.libraryId), ctx.snapshot);
       }
-      toast.error(error instanceof Error ? error.message : "Failed to reorder");
+      toast.error("errors.queries.admin.collections.failed_to_reorder", { error: error });
     },
     onSettled: () => invalidateAdminCollectionQueries(queryClient),
   });
@@ -407,7 +437,8 @@ export function useCreateAdminCollectionGroup() {
         body: JSON.stringify({ name, slug, default_sort_mode: defaultSortMode }),
       }),
     onSuccess: () => invalidateAdminCollectionQueries(queryClient),
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to add group"),
+    onError: (err) =>
+      toast.error("errors.queries.admin.collections.failed_to_add_group", { error: err }),
   });
 }
 
@@ -428,7 +459,8 @@ export function useUpdateAdminCollectionGroup() {
         body: JSON.stringify({ name, default_sort_mode: defaultSortMode }),
       }),
     onSuccess: () => invalidateAdminCollectionQueries(queryClient),
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to rename group"),
+    onError: (err) =>
+      toast.error("errors.queries.admin.collections.failed_to_rename_group", { error: err }),
   });
 }
 
@@ -440,7 +472,8 @@ export function useDeleteAdminCollectionGroup() {
         method: "DELETE",
       }),
     onSuccess: () => invalidateAdminCollectionQueries(queryClient),
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to delete group"),
+    onError: (err) =>
+      toast.error("errors.queries.admin.collections.failed_to_delete_group", { error: err }),
   });
 }
 
@@ -471,7 +504,7 @@ export function useReorderAdminCollectionGroups() {
       if (ctx?.snapshot) {
         queryClient.setQueryData(adminKeys.collectionGroups(ctx.libraryId), ctx.snapshot);
       }
-      toast.error(err instanceof Error ? err.message : "Failed to reorder groups");
+      toast.error("errors.queries.admin.collections.failed_to_reorder_groups", { error: err });
     },
     onSettled: () => invalidateAdminCollectionQueries(queryClient),
   });
@@ -486,7 +519,7 @@ export function useReorderAdminCollectionItems(collectionId: string) {
         body: JSON.stringify({ ordered_ids: orderedIds }),
       }),
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to reorder items");
+      toast.error("errors.queries.admin.collections.failed_to_reorder_items", { error: error });
     },
     onSettled: () => invalidateAdminCollectionQueries(queryClient),
   });
@@ -509,11 +542,11 @@ export function useDeleteCollectionImage() {
         method: "DELETE",
       }).then(() => libraryId),
     onSuccess: (_libraryId) => {
-      toast.success("Image removed");
+      toast.success("feedback.queries.admin.collections.image_removed");
       void invalidateAdminCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to remove image");
+      toast.error("errors.queries.admin.collections.failed_to_remove_image", { error: error });
     },
   });
 }
@@ -527,13 +560,16 @@ export function useSyncAdminCollection() {
         method: "POST",
       }).then((data) => ({ data, libraryId })),
     onSuccess: ({ data, libraryId: _libraryId }) => {
-      toast.success(
-        data.status === "warning" ? "Collection synced with warnings" : "Collection synced",
-      );
+      toast.success("feedback.queries.admin.collections.reported_message", {
+        values: {
+          message:
+            data.status === "warning" ? "Collection synced with warnings" : "Collection synced",
+        },
+      });
       void invalidateAdminCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Sync failed");
+      toast.error("errors.queries.admin.collections.sync_failed", { error: error });
     },
   });
 }
@@ -562,15 +598,18 @@ export function useImportMDBListCollection() {
       });
     },
     onSuccess: (result) => {
-      toast.success(
-        result.sync_run?.status === "warning"
-          ? "MDBList imported with warnings"
-          : "MDBList imported",
-      );
+      toast.success("feedback.queries.admin.collections.reported_message", {
+        values: {
+          message:
+            result.sync_run?.status === "warning"
+              ? "MDBList imported with warnings"
+              : "MDBList imported",
+        },
+      });
       void invalidateAdminCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Import failed");
+      toast.error("errors.queries.admin.collections.import_failed", { error: error });
     },
   });
 }
@@ -599,15 +638,18 @@ export function useImportTMDBCollection() {
       });
     },
     onSuccess: (result) => {
-      toast.success(
-        result.sync_run?.status === "warning"
-          ? "TMDB collection imported with warnings"
-          : "TMDB collection imported",
-      );
+      toast.success("feedback.queries.admin.collections.reported_message", {
+        values: {
+          message:
+            result.sync_run?.status === "warning"
+              ? "TMDB collection imported with warnings"
+              : "TMDB collection imported",
+        },
+      });
       void invalidateAdminCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Import failed");
+      toast.error("errors.queries.admin.collections.import_failed", { error: error });
     },
   });
 }
@@ -641,11 +683,13 @@ export function useImportTraktCollection() {
         failed: "Trakt collection imported but sync failed",
       };
       const status = result.sync_run?.status ?? "";
-      toast.success(statusMessages[status] ?? "Trakt collection imported");
+      toast.success("feedback.queries.admin.collections.reported_message", {
+        values: { message: statusMessages[status] ?? "Trakt collection imported" },
+      });
       void invalidateAdminCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Import failed");
+      toast.error("errors.queries.admin.collections.import_failed", { error: error });
     },
   });
 }

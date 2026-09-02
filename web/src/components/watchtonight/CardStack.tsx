@@ -7,6 +7,8 @@ import { useWatchPlaybackController } from "@/playback/watchPlaybackContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import SwipeCard, { CardActions } from "./SwipeCard";
 import { buildMediaPlayHref, isVideoWatchHref } from "@/lib/mediaNavigation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Stack positioning for each depth level (0 = top, 1 = behind, 2 = further).
 const stackVariants = {
@@ -42,6 +44,7 @@ export default function CardStack({
   onClose,
   onReset,
 }: CardStackProps) {
+  useUILanguage();
   const [topIndex, setTopIndex] = useState(0);
   const prefetchTriggered = useRef(false);
   const location = useLocation();
@@ -115,7 +118,9 @@ export default function CardStack({
       <div className="flex flex-col items-center justify-center gap-4 py-12 text-center">
         <Tv className="text-muted-foreground h-12 w-12" />
         <p className="text-muted-foreground text-sm">
-          {"You've seen everything! Come back later for fresh picks."}
+          {tr(
+            "components.watchtonight.card_stack.you_ve_seen_everything_come_back_later_for_fresh_picks",
+          )}
         </p>
         <button
           type="button"
@@ -123,7 +128,7 @@ export default function CardStack({
           className="border-border hover:bg-muted/40 flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
         >
           <RefreshCw className="h-4 w-4" />
-          Start Over
+          {tr("components.watchtonight.card_stack.start_over")}
         </button>
       </div>
     );
@@ -136,7 +141,9 @@ export default function CardStack({
         <div className="relative h-80 w-full max-w-sm">
           <Skeleton className="h-full w-full rounded-2xl" />
         </div>
-        <p className="text-muted-foreground text-sm">Loading more picks...</p>
+        <p className="text-muted-foreground text-sm">
+          {tr("components.watchtonight.card_stack.loading_more_picks")}
+        </p>
       </div>
     );
   }
@@ -188,7 +195,10 @@ export default function CardStack({
 
       {/* Counter */}
       <p className="text-muted-foreground pt-1 text-xs">
-        {topIndex + 1} / {hasMore ? `${cards.length}+` : cards.length}
+        {topIndex + 1} /{" "}
+        {hasMore
+          ? tr("components.watchtonight.card_stack.length", { length: cards.length })
+          : cards.length}
       </p>
     </div>
   );

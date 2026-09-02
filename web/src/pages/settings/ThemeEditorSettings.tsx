@@ -11,8 +11,11 @@ import { useCustomTheme } from "@/hooks/useCustomTheme";
 import type { ThemeVarOverrides } from "@/hooks/useCustomTheme";
 import { useTheme } from "@/hooks/useTheme";
 import type { ThemeId } from "@/lib/themes";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function ThemeEditorSettings() {
+  useUILanguage();
   const { theme, setTheme } = useTheme();
   const { vars, customCss, setVar, resetVar, setCustomCss, resetAll, importOverrides } =
     useCustomTheme();
@@ -39,9 +42,13 @@ export default function ThemeEditorSettings() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Theme Editor</h2>
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {tr("pages.settings.theme_editor_settings.theme_editor")}
+          </h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Customize colors, fonts, and styles. Changes are layered on top of your active theme.
+            {tr(
+              "pages.settings.theme_editor_settings.customize_colors_fonts_and_styles_changes_are_layered_on_top",
+            )}
           </p>
         </div>
         <ImportExportBar
@@ -53,7 +60,10 @@ export default function ThemeEditorSettings() {
       </div>
 
       {/* Live preview */}
-      <SettingsGroup title="Preview" description="Live preview of your customizations.">
+      <SettingsGroup
+        title={tr("pages.settings.theme_editor_settings.preview")}
+        description={tr("pages.settings.theme_editor_settings.live_preview_of_your_customizations")}
+      >
         <ThemePreviewCard vars={vars} />
         {hasOverrides && (
           <div className="flex justify-end">
@@ -63,7 +73,7 @@ export default function ThemeEditorSettings() {
               className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
-              Reset all customizations
+              {tr("pages.settings.theme_editor_settings.reset_all_customizations")}
             </button>
           </div>
         )}
@@ -74,22 +84,24 @@ export default function ThemeEditorSettings() {
         <TabsList>
           <TabsTrigger value="tokens" className="gap-1.5">
             <Paintbrush className="h-3.5 w-3.5" />
-            Tokens
+            {tr("pages.settings.theme_editor_settings.tokens")}
           </TabsTrigger>
           <TabsTrigger value="css" className="gap-1.5">
             <Code className="h-3.5 w-3.5" />
-            Custom CSS
+            {tr("pages.settings.theme_editor_settings.custom_css")}
           </TabsTrigger>
           <TabsTrigger value="catalog" className="gap-1.5">
             <Store className="h-3.5 w-3.5" />
-            Catalog
+            {tr("pages.settings.theme_editor_settings.catalog")}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tokens">
           <SettingsGroup
-            title="Token Overrides"
-            description="Override individual design tokens. Changes layer on top of your active theme and apply instantly."
+            title={tr("pages.settings.theme_editor_settings.token_overrides")}
+            description={tr(
+              "pages.settings.theme_editor_settings.override_individual_design_tokens_changes_layer_on_top_of_your",
+            )}
           >
             <TokenEditor vars={vars} onSetVar={setVar} onResetVar={resetVar} />
           </SettingsGroup>
@@ -97,8 +109,10 @@ export default function ThemeEditorSettings() {
 
         <TabsContent value="css">
           <SettingsGroup
-            title="Custom CSS"
-            description="Write arbitrary CSS for advanced customization."
+            title={tr("pages.settings.theme_editor_settings.custom_css")}
+            description={tr(
+              "pages.settings.theme_editor_settings.write_arbitrary_css_for_advanced_customization",
+            )}
           >
             <RawCssEditor value={customCss} onChange={setCustomCss} />
           </SettingsGroup>
@@ -106,8 +120,10 @@ export default function ThemeEditorSettings() {
 
         <TabsContent value="catalog">
           <SettingsGroup
-            title="Community Themes"
-            description="Browse and install themes created by the community."
+            title={tr("pages.settings.theme_editor_settings.community_themes")}
+            description={tr(
+              "pages.settings.theme_editor_settings.browse_and_install_themes_created_by_the_community",
+            )}
           >
             <CatalogBrowser onInstall={handleCatalogInstall} />
           </SettingsGroup>

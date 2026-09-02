@@ -32,12 +32,15 @@ import { useSidebarItemDetailsGate } from "@/hooks/useSidebarItemDetailsGate";
 import { useViewTransitionNavigate } from "@/hooks/useViewTransition";
 import { catalogKeys } from "@/hooks/queries/keys";
 import { fetchCatalogItemDetail } from "@/hooks/queries/catalogRead";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
+  useUILanguage();
   const location = useLocation();
   const navigate = useViewTransitionNavigate();
   const queryClient = useQueryClient();
@@ -310,7 +313,7 @@ export default function Layout({ children }: LayoutProps) {
           href="#main-content"
           className="focus:bg-background focus:text-foreground focus:ring-ring sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:ring-2 focus:outline-none"
         >
-          Skip to content
+          {tr("components.layout.skip_to_content")}
         </a>
         <GlobalSearch />
         <div className="from-primary/8 pointer-events-none fixed inset-x-0 top-0 z-0 h-40 bg-gradient-to-b to-transparent blur-3xl" />
@@ -324,15 +327,16 @@ export default function Layout({ children }: LayoutProps) {
         {/* Mobile header — visible below lg. Slides up on scroll-down within
           the Calendar route to free vertical space; pulling up reveals it. */}
         <div
-          className={`mobile-header glass-dark border-border/70 sticky top-0 z-30 mx-3 mt-3 flex items-center justify-between rounded-2xl border px-4 py-3 transition-transform duration-200 ease-out lg:hidden ${
-            mobileHeaderHidden ? "-translate-y-[140%]" : "translate-y-0"
-          }`}
+          className={
+            "mobile-header glass-dark border-border/70 sticky top-0 z-30 mx-3 mt-3 flex items-center justify-between rounded-2xl border px-4 py-3 transition-transform duration-200 ease-out lg:hidden " +
+            (mobileHeaderHidden ? "-translate-y-[140%]" : "translate-y-0")
+          }
         >
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
               className="text-muted-foreground hover:text-foreground hover:bg-accent/60 flex h-10 w-10 items-center justify-center rounded-xl transition-all active:scale-[0.98]"
-              aria-label="Open menu"
+              aria-label={tr("components.layout.open_menu")}
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -350,7 +354,9 @@ export default function Layout({ children }: LayoutProps) {
             {showAdminActivity && <ServerActivity hideWhenEmpty />}
             <Link
               to="/settings"
-              aria-label={`${profile?.name ?? user?.username ?? "User"} settings`}
+              aria-label={tr("components.layout.value_settings", {
+                value: profile?.name ?? user?.username ?? "User",
+              })}
               className="flex h-9 w-9 items-center justify-center rounded-full transition-transform active:scale-[0.98]"
             >
               <Avatar className="h-9 w-9 shadow-[0_16px_32px_-22px_rgba(0,0,0,0.7)]">
@@ -371,7 +377,7 @@ export default function Layout({ children }: LayoutProps) {
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetContent side="left" className="w-[280px] p-0 sm:max-w-[280px]">
             <SheetHeader className="sr-only">
-              <SheetTitle>Navigation</SheetTitle>
+              <SheetTitle>{tr("components.layout.navigation")}</SheetTitle>
             </SheetHeader>
             <AppSidebar onNavigate={() => setMobileOpen(false)} />
           </SheetContent>
@@ -389,9 +395,12 @@ export default function Layout({ children }: LayoutProps) {
           id="main-content"
           data-sidebar-target-collapsed={targetDetailImmersion ? "true" : undefined}
           data-sidebar-visual-collapsed={visualDetailImmersion ? "true" : undefined}
-          className={`sidebar-main-stage relative min-h-screen ${
-            targetDetailImmersion ? "lg:ml-16" : "lg:ml-[260px]"
-          } ${hasBackgroundBar ? "pb-32 sm:pb-36" : ""}`}
+          className={
+            "sidebar-main-stage relative min-h-screen " +
+            (targetDetailImmersion ? "lg:ml-16" : "lg:ml-[260px]") +
+            " " +
+            (hasBackgroundBar ? "pb-32 sm:pb-36" : "")
+          }
           style={{ viewTransitionName: "main-content" }}
         >
           {needsNoPadding ? (

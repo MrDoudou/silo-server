@@ -67,6 +67,8 @@ import {
 } from "@/lib/scanRuns";
 import { cn } from "@/lib/utils";
 import { formatTime as formatTimePreferred, preferredDateLocale } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const HISTORY_PAGE_SIZE_OPTIONS = [25, 50, 100];
 const DEFAULT_HISTORY_PAGE_SIZE = 25;
@@ -116,25 +118,25 @@ function eventStatusTone(status: AutoscanEventStatus): {
   switch (status) {
     case "success":
       return {
-        label: "Success",
+        label: tr("pages.admin.autoscan.activity_panel.success"),
         icon: CheckCircle2,
         className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
       };
     case "running":
       return {
-        label: "Running",
+        label: tr("pages.admin.autoscan.activity_panel.running"),
         icon: RefreshCw,
         className: "border-primary/30 bg-primary/10 text-primary",
       };
     case "unresolved":
       return {
-        label: "Unresolved",
+        label: tr("pages.admin.autoscan.activity_panel.unresolved"),
         icon: AlertTriangle,
         className: "border-amber-500/30 bg-amber-500/10 text-amber-500",
       };
     case "error":
       return {
-        label: "Error",
+        label: tr("pages.admin.autoscan.activity_panel.error"),
         icon: AlertTriangle,
         className: "border-destructive/30 bg-destructive/10 text-destructive",
       };
@@ -184,6 +186,8 @@ function libraryName(librariesByID: Map<number, Library>, libraryID: number): st
 }
 
 function PollStatusBadge({ status }: { status: AutoscanEventStatus }) {
+  useUILanguage();
+  useUILanguage();
   const tone = eventStatusTone(status);
   const Icon = tone.icon;
   return (
@@ -195,6 +199,8 @@ function PollStatusBadge({ status }: { status: AutoscanEventStatus }) {
 }
 
 function ScanStatusBadge({ status }: { status: AutoscanScanStatus | ScanRun["status"] }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <Badge variant="outline" className={cn("capitalize tabular-nums", scanStatusClass(status))}>
       {scanStatusLabel(status)}
@@ -208,11 +214,17 @@ function ScanStatusBadge({ status }: { status: AutoscanScanStatus | ScanRun["sta
  * default and labeling every row would be noise.
  */
 function DeliveryBadge({ event }: { event: AutoscanEvent }) {
+  useUILanguage();
+  useUILanguage();
   if (event.delivery_mode !== "webhook") return null;
   return (
     <Badge variant="secondary" className="text-xs">
-      Webhook
-      {event.provider_event_type ? ` · ${event.provider_event_type}` : ""}
+      {tr("pages.admin.autoscan.activity_panel.webhook")}
+      {event.provider_event_type
+        ? tr("pages.admin.autoscan.activity_panel.provider_event_type", {
+            provider_event_type: event.provider_event_type,
+          })
+        : ""}
     </Badge>
   );
 }
@@ -220,6 +232,8 @@ function DeliveryBadge({ event }: { event: AutoscanEvent }) {
 // Shared desktop table chrome so the queue, scan history, and poll log read as
 // one family: clipped rounded border, muted sticky-feeling header band.
 function DataTable({ head, children }: { head: ReactNode; children: ReactNode }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="hidden overflow-hidden rounded-lg border lg:block">
       <Table>
@@ -233,8 +247,14 @@ function DataTable({ head, children }: { head: ReactNode; children: ReactNode })
 }
 
 function RunList({ runs }: { runs: AutoscanEventScanRun[] }) {
+  useUILanguage();
+  useUILanguage();
   if (runs.length === 0) {
-    return <span className="text-muted-foreground text-xs">No new scan rows were created.</span>;
+    return (
+      <span className="text-muted-foreground text-xs">
+        {tr("pages.admin.autoscan.activity_panel.no_new_scan_rows_were_created")}
+      </span>
+    );
   }
   return (
     <div className="space-y-2">
@@ -247,7 +267,7 @@ function RunList({ runs }: { runs: AutoscanEventScanRun[] }) {
           <div className="min-w-0">
             <div className="font-medium">{run.mode}</div>
             <div className="text-muted-foreground [overflow-wrap:anywhere]">
-              {run.path || "Entire library"}
+              {run.path || tr("pages.admin.autoscan.activity_panel.entire_library")}
             </div>
           </div>
           <div className="text-muted-foreground whitespace-nowrap tabular-nums">
@@ -260,13 +280,25 @@ function RunList({ runs }: { runs: AutoscanEventScanRun[] }) {
 }
 
 function PollMetricStrip({ event }: { event: AutoscanEvent }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
-      <span>{event.changes_returned} changes</span>
-      <span>{event.targets_claimed} targets</span>
-      <span>{event.scans_created} created</span>
-      <span>{event.scans_reused} reused</span>
-      <span>{event.scans_suppressed} suppressed</span>
+      <span>
+        {event.changes_returned} {tr("pages.admin.autoscan.activity_panel.changes")}
+      </span>
+      <span>
+        {event.targets_claimed} {tr("pages.admin.autoscan.activity_panel.targets")}
+      </span>
+      <span>
+        {event.scans_created} {tr("pages.admin.autoscan.activity_panel.created")}
+      </span>
+      <span>
+        {event.scans_reused} {tr("pages.admin.autoscan.activity_panel.reused")}
+      </span>
+      <span>
+        {event.scans_suppressed} {tr("pages.admin.autoscan.activity_panel.suppressed")}
+      </span>
     </div>
   );
 }
@@ -282,6 +314,8 @@ function QueueCard({
   cancellingLibraryID: number | null;
   onCancel: (libraryID: number) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const progress = formatActiveScanProgress(scan);
   return (
     <div className="border-border rounded-lg border p-4">
@@ -297,7 +331,7 @@ function QueueCard({
             <span>
               {scan.status === "running"
                 ? formatActiveScanTime(scan.started_at, "Started")
-                : "Waiting for capacity"}
+                : tr("pages.admin.autoscan.activity_panel.waiting_for_capacity")}
             </span>
           </div>
         </div>
@@ -307,13 +341,13 @@ function QueueCard({
           className="text-destructive h-8 w-8"
           disabled={cancellingLibraryID === scan.library_id}
           onClick={() => onCancel(scan.library_id)}
-          aria-label="Cancel scans for this library"
+          aria-label={tr("pages.admin.autoscan.activity_panel.cancel_scans_for_this_library")}
         >
           <Square className="h-3.5 w-3.5" />
         </Button>
       </div>
       <div className="text-muted-foreground mt-3 font-mono text-xs [overflow-wrap:anywhere]">
-        {scan.path || "Entire library"}
+        {scan.path || tr("pages.admin.autoscan.activity_panel.entire_library")}
       </div>
       {progress ? (
         <div className="text-muted-foreground mt-2 text-xs [overflow-wrap:anywhere]">
@@ -337,6 +371,8 @@ function AutoscanQueue({
   cancellingLibraryID: number | null;
   onCancel: (libraryID: number) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(scans.length / QUEUE_PAGE_SIZE));
   // Live scans complete out from under us; the active set length is known
@@ -350,12 +386,14 @@ function AutoscanQueue({
       <div className="border-border rounded-lg border border-dashed p-6">
         <div className="flex items-center gap-2 text-sm font-medium">
           <ScanLine className="text-muted-foreground h-4 w-4" />
-          Autoscan queue
+          {tr("pages.admin.autoscan.activity_panel.autoscan_queue")}
         </div>
         <p className="text-muted-foreground mt-2 text-sm">
           {statusActiveCount > 0
-            ? "Queue counts are active, but live scan details have not arrived yet."
-            : "No autoscan scans are queued or running."}
+            ? tr(
+                "pages.admin.autoscan.activity_panel.queue_counts_are_active_but_live_scan_details_have_not",
+              )
+            : tr("pages.admin.autoscan.activity_panel.no_autoscan_scans_are_queued_or_running")}
         </p>
       </div>
     );
@@ -367,14 +405,14 @@ function AutoscanQueue({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold">
             <ScanLine className="text-primary h-4 w-4" />
-            Autoscan queue
+            {tr("pages.admin.autoscan.activity_panel.autoscan_queue")}
           </div>
           <p className="text-muted-foreground mt-1 text-xs">
-            Live scans created by autoscan sources.
+            {tr("pages.admin.autoscan.activity_panel.live_scans_created_by_autoscan_sources")}
           </p>
         </div>
         <Badge variant="secondary" className="tabular-nums">
-          {scans.length} active
+          {scans.length} {tr("pages.admin.autoscan.activity_panel.active")}
         </Badge>
       </div>
 
@@ -393,11 +431,13 @@ function AutoscanQueue({
       <DataTable
         head={
           <>
-            <TableHead>Status</TableHead>
-            <TableHead>Library</TableHead>
-            <TableHead>Scope</TableHead>
-            <TableHead>Progress</TableHead>
-            <TableHead className="w-20 text-right">Action</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.status")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.library")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.scope")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.progress")}</TableHead>
+            <TableHead className="w-20 text-right">
+              {tr("pages.admin.autoscan.activity_panel.action")}
+            </TableHead>
           </>
         }
       >
@@ -413,13 +453,13 @@ function AutoscanQueue({
                 <div className="text-muted-foreground mt-1 text-xs">
                   {scan.status === "running"
                     ? formatActiveScanTime(scan.started_at, "Started")
-                    : "Waiting for capacity"}
+                    : tr("pages.admin.autoscan.activity_panel.waiting_for_capacity")}
                 </div>
               </TableCell>
               <TableCell className="max-w-xl">
                 <div className="text-sm">{formatActiveScanMode(scan)}</div>
                 <div className="text-muted-foreground mt-1 font-mono text-xs [overflow-wrap:anywhere]">
-                  {scan.path || "Entire library"}
+                  {scan.path || tr("pages.admin.autoscan.activity_panel.entire_library")}
                 </div>
               </TableCell>
               <TableCell className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
@@ -432,7 +472,9 @@ function AutoscanQueue({
                   className="text-destructive h-8 w-8"
                   disabled={cancellingLibraryID === scan.library_id}
                   onClick={() => onCancel(scan.library_id)}
-                  aria-label="Cancel scans for this library"
+                  aria-label={tr(
+                    "pages.admin.autoscan.activity_panel.cancel_scans_for_this_library",
+                  )}
                 >
                   <Square className="h-3.5 w-3.5" />
                 </Button>
@@ -462,6 +504,8 @@ function RunningPolls({
   polls: AutoscanRunningPoll[];
   lookups: SourceLabelLookups;
 }) {
+  useUILanguage();
+  useUILanguage();
   if (polls.length === 0) return null;
 
   return (
@@ -470,14 +514,16 @@ function RunningPolls({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold">
             <RefreshCw className="text-primary h-4 w-4 animate-spin" />
-            Polling now
+            {tr("pages.admin.autoscan.activity_panel.polling_now")}
           </div>
           <p className="text-muted-foreground mt-1 text-xs">
-            Scan-source plugin calls currently in progress.
+            {tr(
+              "pages.admin.autoscan.activity_panel.scan_source_plugin_calls_currently_in_progress",
+            )}
           </p>
         </div>
         <Badge variant="secondary" className="tabular-nums">
-          {polls.length} active
+          {polls.length} {tr("pages.admin.autoscan.activity_panel.active")}
         </Badge>
       </div>
 
@@ -494,8 +540,14 @@ function RunningPolls({
               <PollStatusBadge status="running" />
             </div>
             <div className="text-muted-foreground mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
-              <span>Started {formatTimestamp(poll.started_at)}</span>
-              <span>{formatDuration(poll.elapsed_ms)} elapsed</span>
+              <span>
+                {tr("pages.admin.autoscan.activity_panel.started")}{" "}
+                {formatTimestamp(poll.started_at)}
+              </span>
+              <span>
+                {formatDuration(poll.elapsed_ms)}{" "}
+                {tr("pages.admin.autoscan.activity_panel.elapsed")}
+              </span>
             </div>
           </div>
         ))}
@@ -513,6 +565,8 @@ function ScanHistoryCard({
   librariesByID: Map<number, Library>;
   lookups: SourceLabelLookups;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="border-border rounded-lg border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -532,7 +586,7 @@ function ScanHistoryCard({
         {scan.event_status ? <PollStatusBadge status={scan.event_status} /> : null}
       </div>
       <div className="text-muted-foreground mt-3 font-mono text-xs [overflow-wrap:anywhere]">
-        {scan.path || "Entire library"}
+        {scan.path || tr("pages.admin.autoscan.activity_panel.entire_library")}
       </div>
       {scan.error_message ? (
         <div className="text-destructive mt-2 text-xs [overflow-wrap:anywhere]">
@@ -555,6 +609,8 @@ function ScanHistoryTable({
   librariesByID: Map<number, Library>;
   lookups: SourceLabelLookups;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <>
       <div className="space-y-3 lg:hidden">
@@ -570,12 +626,12 @@ function ScanHistoryTable({
       <DataTable
         head={
           <>
-            <TableHead>Status</TableHead>
-            <TableHead>Library</TableHead>
-            <TableHead>Source</TableHead>
-            <TableHead>Scope</TableHead>
-            <TableHead>Time</TableHead>
-            <TableHead>Poll</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.status")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.library")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.source")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.scope")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.time")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.poll")}</TableHead>
           </>
         }
       >
@@ -592,7 +648,7 @@ function ScanHistoryTable({
             <TableCell className="max-w-xl">
               <div className="text-sm">{formatActiveScanMode(scan)}</div>
               <div className="text-muted-foreground mt-1 font-mono text-xs [overflow-wrap:anywhere]">
-                {scan.path || "Entire library"}
+                {scan.path || tr("pages.admin.autoscan.activity_panel.entire_library")}
               </div>
               {scan.error_message ? (
                 <div className="text-destructive mt-1 text-xs [overflow-wrap:anywhere]">
@@ -614,6 +670,8 @@ function ScanHistoryTable({
 }
 
 function PollEventCard({ event, lookups }: { event: AutoscanEvent; lookups: SourceLabelLookups }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="border-border rounded-lg border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -637,7 +695,10 @@ function PollEventCard({ event, lookups }: { event: AutoscanEvent; lookups: Sour
       ) : null}
       <details className="mt-3">
         <summary className="text-muted-foreground cursor-pointer text-xs">
-          {event.scan_runs.length} linked scan {event.scan_runs.length === 1 ? "run" : "runs"}
+          {event.scan_runs.length} {tr("pages.admin.autoscan.activity_panel.linked_scan")}{" "}
+          {event.scan_runs.length === 1
+            ? tr("pages.admin.autoscan.activity_panel.run")
+            : tr("pages.admin.autoscan.activity_panel.runs")}
         </summary>
         <div className="mt-2">
           <RunList runs={event.scan_runs} />
@@ -654,6 +715,8 @@ function PollEventTable({
   events: AutoscanEvent[];
   lookups: SourceLabelLookups;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <>
       <div className="space-y-3 lg:hidden">
@@ -664,12 +727,12 @@ function PollEventTable({
       <DataTable
         head={
           <>
-            <TableHead>Status</TableHead>
-            <TableHead>Source</TableHead>
-            <TableHead>Counts</TableHead>
-            <TableHead>Scans</TableHead>
-            <TableHead>Duration</TableHead>
-            <TableHead>Time</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.status")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.source")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.counts")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.scans")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.duration")}</TableHead>
+            <TableHead>{tr("pages.admin.autoscan.activity_panel.time")}</TableHead>
           </>
         }
       >
@@ -695,7 +758,7 @@ function PollEventTable({
             <TableCell>
               <details>
                 <summary className="text-muted-foreground cursor-pointer text-xs">
-                  {event.scan_runs.length} linked
+                  {event.scan_runs.length} {tr("pages.admin.autoscan.activity_panel.linked")}
                 </summary>
                 <div className="mt-2 w-[min(42rem,70vw)]">
                   <RunList runs={event.scan_runs} />
@@ -716,6 +779,8 @@ function PollEventTable({
 }
 
 function HistorySkeleton() {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="space-y-3" aria-hidden="true">
       {Array.from({ length: 6 }).map((_, i) => (
@@ -734,6 +799,8 @@ function StatTile({
   value: ReactNode;
   icon?: typeof ScanLine;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div>
       <div className="text-muted-foreground flex items-center gap-2 text-xs">
@@ -746,6 +813,8 @@ function StatTile({
 }
 
 export default function ActivityPanel() {
+  useUILanguage();
+  useUILanguage();
   useEventChannel("scans");
   const [historyView, setHistoryView] = useState<HistoryView>("scans");
   const [historyQuery, setHistoryQuery] = useState("");
@@ -836,19 +905,37 @@ export default function ActivityPanel() {
   return (
     <div className="space-y-6">
       <div className="border-border grid gap-4 rounded-lg border p-4 sm:grid-cols-5">
-        <StatTile label="Active" value={queue?.active_scans ?? 0} icon={ScanLine} />
-        <StatTile label="Queued" value={queue?.accepted_scans ?? 0} />
-        <StatTile label="Running scans" value={queue?.running_scans ?? 0} />
-        <StatTile label="Polling" value={queue?.running_polls?.length ?? 0} icon={RefreshCw} />
+        <StatTile
+          label={tr("pages.admin.autoscan.activity_panel.active_a733b809")}
+          value={queue?.active_scans ?? 0}
+          icon={ScanLine}
+        />
+        <StatTile
+          label={tr("pages.admin.autoscan.activity_panel.queued")}
+          value={queue?.accepted_scans ?? 0}
+        />
+        <StatTile
+          label={tr("pages.admin.autoscan.activity_panel.running_scans")}
+          value={queue?.running_scans ?? 0}
+        />
+        <StatTile
+          label={tr("pages.admin.autoscan.activity_panel.polling")}
+          value={queue?.running_polls?.length ?? 0}
+          icon={RefreshCw}
+        />
         <div className="flex items-start justify-between gap-3 sm:block">
-          <StatTile label="Latest poll" value={formatTime(queue?.latest_event_at)} icon={Clock} />
+          <StatTile
+            label={tr("pages.admin.autoscan.activity_panel.latest_poll")}
+            value={formatTime(queue?.latest_event_at)}
+            icon={Clock}
+          />
           <Button
             variant="outline"
             size="icon"
             className="sm:mt-2"
             onClick={refresh}
             disabled={isRefreshing}
-            aria-label="Refresh autoscan activity"
+            aria-label={tr("pages.admin.autoscan.activity_panel.refresh_autoscan_activity")}
           >
             <RefreshCw className={cn(isRefreshing && "animate-spin")} />
           </Button>
@@ -874,12 +961,18 @@ export default function ActivityPanel() {
               ) : (
                 <History className="text-primary h-4 w-4" />
               )}
-              {historyView === "scans" ? "Scan history" : "Poll log"}
+              {historyView === "scans"
+                ? tr("pages.admin.autoscan.activity_panel.scan_history")
+                : tr("pages.admin.autoscan.activity_panel.poll_log")}
             </div>
             <p className="text-muted-foreground mt-1 text-xs">
               {historyView === "scans"
-                ? "Real scan rows created by autoscan, searchable by path, library, source, status, or scan id."
-                : "Diagnostic poll records from scan-source plugins."}
+                ? tr(
+                    "pages.admin.autoscan.activity_panel.real_scan_rows_created_by_autoscan_searchable_by_path_library",
+                  )
+                : tr(
+                    "pages.admin.autoscan.activity_panel.diagnostic_poll_records_from_scan_source_plugins",
+                  )}
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_10rem_auto] lg:w-[50rem]">
@@ -891,7 +984,7 @@ export default function ActivityPanel() {
                 className="h-7"
                 onClick={() => switchHistoryView("scans")}
               >
-                Scans
+                {tr("pages.admin.autoscan.activity_panel.scans")}
               </Button>
               <Button
                 type="button"
@@ -900,7 +993,7 @@ export default function ActivityPanel() {
                 className="h-7"
                 onClick={() => switchHistoryView("polls")}
               >
-                Polls
+                {tr("pages.admin.autoscan.activity_panel.polls")}
               </Button>
             </div>
             <div className="relative min-w-0">
@@ -911,7 +1004,11 @@ export default function ActivityPanel() {
                   setHistoryQuery(event.target.value);
                   setPage(0);
                 }}
-                placeholder={historyView === "scans" ? "Search scan history" : "Search poll log"}
+                placeholder={
+                  historyView === "scans"
+                    ? tr("pages.admin.autoscan.activity_panel.search_scan_history")
+                    : tr("pages.admin.autoscan.activity_panel.search_poll_log")
+                }
                 className="pr-9 pl-9"
               />
               {historyQuery ? (
@@ -919,7 +1016,7 @@ export default function ActivityPanel() {
                   type="button"
                   className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 rounded p-1 transition-colors"
                   onClick={() => setHistoryQuery("")}
-                  aria-label="Clear history search"
+                  aria-label={tr("pages.admin.autoscan.activity_panel.clear_history_search")}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -937,12 +1034,24 @@ export default function ActivityPanel() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="accepted">Queued</SelectItem>
-                  <SelectItem value="running">Running</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="all">
+                    {tr("pages.admin.autoscan.activity_panel.all_statuses")}
+                  </SelectItem>
+                  <SelectItem value="accepted">
+                    {tr("pages.admin.autoscan.activity_panel.queued")}
+                  </SelectItem>
+                  <SelectItem value="running">
+                    {tr("pages.admin.autoscan.activity_panel.running")}
+                  </SelectItem>
+                  <SelectItem value="completed">
+                    {tr("pages.admin.autoscan.activity_panel.completed")}
+                  </SelectItem>
+                  <SelectItem value="failed">
+                    {tr("pages.admin.autoscan.activity_panel.failed")}
+                  </SelectItem>
+                  <SelectItem value="cancelled">
+                    {tr("pages.admin.autoscan.activity_panel.cancelled")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             ) : (
@@ -957,16 +1066,26 @@ export default function ActivityPanel() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="running">Running</SelectItem>
-                  <SelectItem value="success">Success</SelectItem>
-                  <SelectItem value="unresolved">Unresolved</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
+                  <SelectItem value="all">
+                    {tr("pages.admin.autoscan.activity_panel.all_statuses")}
+                  </SelectItem>
+                  <SelectItem value="running">
+                    {tr("pages.admin.autoscan.activity_panel.running")}
+                  </SelectItem>
+                  <SelectItem value="success">
+                    {tr("pages.admin.autoscan.activity_panel.success")}
+                  </SelectItem>
+                  <SelectItem value="unresolved">
+                    {tr("pages.admin.autoscan.activity_panel.unresolved")}
+                  </SelectItem>
+                  <SelectItem value="error">
+                    {tr("pages.admin.autoscan.activity_panel.error")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             )}
             <Button variant="outline" onClick={resetHistoryFilters} disabled={!hasHistoryFilters}>
-              Reset
+              {tr("common.actions.reset")}
             </Button>
           </div>
         </div>
@@ -975,19 +1094,27 @@ export default function ActivityPanel() {
           <HistorySkeleton />
         ) : activeQuery.isError ? (
           <div className="border-destructive/30 bg-destructive/5 rounded-lg border p-8 text-center">
-            <p className="text-destructive text-sm">Failed to load autoscan activity.</p>
+            <p className="text-destructive text-sm">
+              {tr("pages.admin.autoscan.activity_panel.failed_to_load_autoscan_activity")}
+            </p>
             <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
-              Try again
+              {tr("pages.admin.autoscan.activity_panel.try_again")}
             </Button>
           </div>
         ) : activeRows.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
             <p className="text-muted-foreground text-sm">
               {hasHistoryFilters
-                ? "No autoscan activity matches those filters."
+                ? tr(
+                    "pages.admin.autoscan.activity_panel.no_autoscan_activity_matches_those_filters",
+                  )
                 : historyView === "scans"
-                  ? "No autoscan scans have been created yet."
-                  : "No autoscan polls have been recorded yet."}
+                  ? tr(
+                      "pages.admin.autoscan.activity_panel.no_autoscan_scans_have_been_created_yet",
+                    )
+                  : tr(
+                      "pages.admin.autoscan.activity_panel.no_autoscan_polls_have_been_recorded_yet",
+                    )}
             </p>
           </div>
         ) : (

@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { useWatchPlaybackController } from "@/playback/watchPlaybackContext";
 import { parseWatchHref } from "@/pages/watchRouteHelpers";
 import { buildItemHref, buildMediaPlayHref, isVideoWatchHref } from "@/lib/mediaNavigation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const sourceLabels: Record<string, string> = {
-  continue_watching: "Continue",
-  next_up: "Next Up",
-  recommendation: "For You",
+  continue_watching: "components.watch_tonight_card.continue",
+  next_up: "components.watch_tonight_card.next_up",
+  recommendation: "components.watch_tonight_card.for_you",
 };
 
 interface WatchTonightCardProps {
@@ -20,6 +22,7 @@ interface WatchTonightCardProps {
 }
 
 export default function WatchTonightCard({ item, onPlay }: WatchTonightCardProps) {
+  useUILanguage();
   const location = useLocation();
   const playbackController = useWatchPlaybackController();
 
@@ -81,7 +84,7 @@ export default function WatchTonightCard({ item, onPlay }: WatchTonightCardProps
     [watchHref, location.pathname, location.search, playbackController, onPlay],
   );
 
-  const badgeLabel = sourceLabels[source];
+  const badgeLabel = sourceLabels[source] ? tr(sourceLabels[source]) : undefined;
 
   return (
     <div className="group/card flex gap-5 rounded-xl p-3 transition-colors hover:bg-white/5">
@@ -89,7 +92,10 @@ export default function WatchTonightCard({ item, onPlay }: WatchTonightCardProps
       <ViewTransitionLink
         to={watchHref}
         onClick={handlePlayClick}
-        aria-label={`${playVerb} ${heading}`}
+        aria-label={tr("components.watch_tonight_card.play_verb_heading", {
+          playVerb: playVerb,
+          heading: heading,
+        })}
         className="group/play relative w-44 shrink-0"
       >
         <div className="relative aspect-video overflow-hidden rounded-lg">
@@ -109,7 +115,7 @@ export default function WatchTonightCard({ item, onPlay }: WatchTonightCardProps
             />
           ) : (
             <div className="text-muted-foreground bg-surface flex h-full w-full items-center justify-center text-xs">
-              No Image
+              {tr("components.watch_tonight_card.no_image")}
             </div>
           )}
 

@@ -13,6 +13,8 @@ import type { HWAccelInfo } from "@/hooks/queries/admin/system";
 
 import { parseHWDeviceList, toggleHWDevice } from "@/lib/hwDevices";
 
+import { tr } from "@/i18n/translate";
+
 export { parseHWDeviceList, toggleHWDevice };
 
 export interface HWDeviceRow {
@@ -51,7 +53,9 @@ export function buildHWDeviceRows(
     if (rows.some((row) => row.path === path)) continue;
     rows.push({
       path,
-      description: "Configured device not detected",
+      description: tr(
+        "pages.admin_settings.playback_settings_utils.configured_device_not_detected",
+      ),
       detected: false,
       missingOnNodes: missingOn(path),
     });
@@ -106,9 +110,18 @@ export function chapterThumbnailExecutionOptions(
   transcodeNodeAvailable: boolean,
 ): ChapterThumbnailExecutionOption[] {
   return [
-    { value: CHAPTER_THUMBNAIL_EXECUTION_DEFAULT, label: "This server" },
-    { value: "prefer_transcode_nodes", label: "Transcode nodes when available" },
-    { value: "transcode_nodes_only", label: "Transcode nodes only" },
+    {
+      value: CHAPTER_THUMBNAIL_EXECUTION_DEFAULT,
+      label: tr("pages.admin_settings.playback_settings_utils.this_server"),
+    },
+    {
+      value: "prefer_transcode_nodes",
+      label: tr("pages.admin_settings.playback_settings_utils.transcode_nodes_when_available"),
+    },
+    {
+      value: "transcode_nodes_only",
+      label: tr("pages.admin_settings.playback_settings_utils.transcode_nodes_only"),
+    },
   ].map((option) => ({
     ...option,
     disabled:
@@ -126,5 +139,8 @@ function detectedDevices(
     return detection.render_device_details;
   }
   // Older nodes report only render_devices paths.
-  return (detection.render_devices ?? []).map((path) => ({ path, description: "GPU" }));
+  return (detection.render_devices ?? []).map((path) => ({
+    path,
+    description: tr("pages.admin_settings.playback_settings_utils.gpu"),
+  }));
 }

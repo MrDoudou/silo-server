@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, Layers3, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,8 @@ import { useUserCollectionTemplates } from "@/hooks/queries/userCollectionImport
 import { CollectionTemplateCard } from "./CollectionTemplateCard";
 import { CollectionTemplateConfigForm } from "./CollectionTemplateConfigForm";
 import { UserCollectionTemplateConfigForm } from "./UserCollectionTemplateConfigForm";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type ActiveCategory = CollectionTemplateCategory | "all";
 
@@ -65,6 +68,7 @@ interface UserProps {
 type Props = AdminProps | UserProps;
 
 export function CollectionTemplateGallery(props: Props) {
+  useUILanguage();
   const isUserMode = props.mode === "user";
   const adminTemplates = useCollectionTemplates(!isUserMode && props.open);
   const adminBundles = useCollectionTemplateBundles(!isUserMode && props.open);
@@ -126,18 +130,26 @@ export function CollectionTemplateGallery(props: Props) {
                 }}
                 className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm font-medium"
               >
-                <ChevronLeft className="h-4 w-4" /> Back
+                <ChevronLeft className="h-4 w-4" /> {tr("common.actions.back")}
               </button>
             ) : (
-              "Browse Collection Templates"
+              tr(
+                "components.collection_template_gallery.collection_template_gallery.browse_collection_templates",
+              )
             )}
           </DialogTitle>
           <DialogDescription>
             {picked
-              ? "Confirm details, then we'll create and sync the collection for you."
+              ? tr(
+                  "components.collection_template_gallery.collection_template_gallery.confirm_details_then_we_ll_create_and_sync_the_collection",
+                )
               : pickedBundle
-                ? "Choose libraries, preview the defaults, then apply the bundle."
-                : "Pick a curated source — TMDB, Trakt, or MDBList — and we'll seed a synced collection."}
+                ? tr(
+                    "components.collection_template_gallery.collection_template_gallery.choose_libraries_preview_the_defaults_then_apply_the_bundle",
+                  )
+                : tr(
+                    "components.collection_template_gallery.collection_template_gallery.pick_a_curated_source_tmdb_trakt_or_mdblist_and_we",
+                  )}
           </DialogDescription>
         </DialogHeader>
 
@@ -226,10 +238,14 @@ function GalleryView({
   onPick,
   onPickBundle,
 }: GalleryViewProps) {
+  useUILanguage();
   if (error) {
     return (
       <div className="text-destructive rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm">
-        Failed to load templates: {error instanceof Error ? error.message : String(error)}
+        {tr(
+          "components.collection_template_gallery.collection_template_gallery.failed_to_load_templates",
+        )}{" "}
+        {tr.error("errors.common.request_failed", error)}
       </div>
     );
   }
@@ -252,7 +268,10 @@ function GalleryView({
                   {bundle.description}
                 </span>
                 <span className="text-muted-foreground block text-xs">
-                  {bundle.template_ids.length} templates
+                  {bundle.template_ids.length}{" "}
+                  {tr(
+                    "components.collection_template_gallery.collection_template_gallery.templates",
+                  )}
                 </span>
               </span>
             </button>
@@ -265,14 +284,16 @@ function GalleryView({
         <Input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search templates"
+          placeholder={tr(
+            "components.collection_template_gallery.collection_template_gallery.search_templates",
+          )}
           className="pl-9"
         />
       </div>
 
       <div className="-mx-1 flex flex-wrap gap-2 px-1">
         <CategoryPill
-          label="All"
+          label={tr("components.collection_template_gallery.collection_template_gallery.all")}
           active={activeCategory === "all"}
           onClick={() => setActiveCategory("all")}
         />
@@ -294,7 +315,9 @@ function GalleryView({
         </div>
       ) : totalMatches === 0 ? (
         <div className="text-muted-foreground rounded-md border border-dashed py-10 text-center text-sm">
-          No templates match your filters.
+          {tr(
+            "components.collection_template_gallery.collection_template_gallery.no_templates_match_your_filters",
+          )}
         </div>
       ) : (
         <div className="space-y-6">
@@ -329,6 +352,7 @@ function TemplateBundleApplyView({
   groups: CollectionTemplateGroup[];
   onApplied?: () => void;
 }) {
+  useUILanguage();
   const initialIds = useMemo(() => {
     if (initialLibraryId) return [initialLibraryId];
     return libraries.map((library) => library.id);
@@ -429,14 +453,17 @@ function TemplateBundleApplyView({
         <p className="text-muted-foreground mt-1 text-xs leading-snug">{bundle.description}</p>
         {queuesInitialSyncs ? (
           <p className="text-muted-foreground mt-2 text-xs leading-snug">
-            Collections are created first; initial syncs are queued so this large bundle can finish
-            without waiting on every source.
+            {tr(
+              "components.collection_template_gallery.collection_template_gallery.collections_are_created_first_initial_syncs_are_queued_so_this",
+            )}
           </p>
         ) : null}
       </div>
 
       <div className="space-y-2">
-        <div className="text-sm font-medium">Libraries</div>
+        <div className="text-sm font-medium">
+          {tr("components.collection_template_gallery.collection_template_gallery.libraries")}
+        </div>
         <LibraryMultiSelect
           libraries={libraries}
           value={libraryIds}
@@ -448,20 +475,32 @@ function TemplateBundleApplyView({
 
       <div className="space-y-3 rounded-md border p-3">
         <div>
-          <div className="text-sm font-semibold">Featured Sections</div>
+          <div className="text-sm font-semibold">
+            {tr(
+              "components.collection_template_gallery.collection_template_gallery.featured_sections",
+            )}
+          </div>
           <p className="text-muted-foreground mt-1 text-xs leading-snug">
-            Create one hero section for Home and one for each selected library.
+            {tr(
+              "components.collection_template_gallery.collection_template_gallery.create_one_hero_section_for_home_and_one_for_each",
+            )}
           </p>
         </div>
 
         <div className="space-y-2">
-          <Label>Home Hero</Label>
+          <Label>
+            {tr("components.collection_template_gallery.collection_template_gallery.home_hero")}
+          </Label>
           <Select value={effectiveHomeFeatured} onValueChange={setHomeFeatured}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No home hero</SelectItem>
+              <SelectItem value="none">
+                {tr(
+                  "components.collection_template_gallery.collection_template_gallery.no_home_hero",
+                )}
+              </SelectItem>
               {selectedLibraries.flatMap((library) =>
                 eligibleBundleTemplates(bundle, templatesById, library).map((template) => (
                   <SelectItem
@@ -490,7 +529,11 @@ function TemplateBundleApplyView({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No library hero</SelectItem>
+                  <SelectItem value="none">
+                    {tr(
+                      "components.collection_template_gallery.collection_template_gallery.no_library_hero",
+                    )}
+                  </SelectItem>
                   {eligibleBundleTemplates(bundle, templatesById, library).map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.title}
@@ -505,9 +548,15 @@ function TemplateBundleApplyView({
 
       <label className="flex items-center justify-between gap-3 rounded-md border p-3">
         <span className="space-y-1">
-          <span className="block text-sm font-medium">Delete Existing Server Collections</span>
+          <span className="block text-sm font-medium">
+            {tr(
+              "components.collection_template_gallery.collection_template_gallery.delete_existing_server_collections",
+            )}
+          </span>
           <span className="text-muted-foreground block text-xs">
-            Remove current server collections in the selected libraries before applying defaults.
+            {tr(
+              "components.collection_template_gallery.collection_template_gallery.remove_current_server_collections_in_the_selected_libraries_before_applying",
+            )}
           </span>
         </span>
         <Switch checked={deleteExisting} onCheckedChange={setDeleteExisting} />
@@ -515,10 +564,14 @@ function TemplateBundleApplyView({
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" disabled={disabled} onClick={preview}>
-          Preview
+          {tr("components.collection_template_gallery.collection_template_gallery.preview")}
         </Button>
         <Button type="button" disabled={disabled} onClick={apply}>
-          {queueBundleApply.isPending ? "Queueing..." : "Apply Defaults"}
+          {queueBundleApply.isPending
+            ? tr("components.collection_template_gallery.collection_template_gallery.queueing")
+            : tr(
+                "components.collection_template_gallery.collection_template_gallery.apply_defaults",
+              )}
         </Button>
       </div>
 
@@ -622,6 +675,7 @@ function buildFeaturedBundleRequest(
 }
 
 function BundleApplyResult({ result }: { result: ApplyCollectionTemplateBundleResponse }) {
+  useUILanguage();
   const actionLabel = result.dry_run ? "Would create" : "Created";
   const deleteActionLabel = result.dry_run ? "Would delete" : "Deleted";
   const created = result.created ?? [];
@@ -638,26 +692,51 @@ function BundleApplyResult({ result }: { result: ApplyCollectionTemplateBundleRe
       <div className="font-medium">
         {result.delete_existing ? (
           <>
-            {deleteActionLabel} {deleted.length}; delete skipped {deleteSkipped.length}; delete
-            failed {deleteFailed.length};{" "}
+            {deleteActionLabel} {deleted.length}
+            {tr(
+              "components.collection_template_gallery.collection_template_gallery.delete_skipped",
+            )}{" "}
+            {deleteSkipped.length}
+            {tr(
+              "components.collection_template_gallery.collection_template_gallery.delete_failed",
+            )}{" "}
+            {deleteFailed.length};{" "}
           </>
         ) : null}
-        {actionLabel} {created.length}; skipped {skipped.length}; failed {failed.length}
-        {syncQueued.length > 0 ? `; sync queued ${syncQueued.length}` : ""}; featured{" "}
-        {featured.length}; featured failed {featuredFailed.length}
+        {actionLabel} {created.length}
+        {tr("components.collection_template_gallery.collection_template_gallery.skipped")}{" "}
+        {skipped.length}
+        {tr("components.collection_template_gallery.collection_template_gallery.failed")}{" "}
+        {failed.length}
+        {syncQueued.length > 0
+          ? tr(
+              "components.collection_template_gallery.collection_template_gallery.sync_queued_length",
+              { length: syncQueued.length },
+            )
+          : ""}
+        {tr("components.collection_template_gallery.collection_template_gallery.featured")}{" "}
+        {featured.length}
+        {tr(
+          "components.collection_template_gallery.collection_template_gallery.featured_failed",
+        )}{" "}
+        {featuredFailed.length}
       </div>
       {syncQueued.length > 0 ? (
         <div className="text-muted-foreground text-xs leading-snug">
-          Initial syncs are running in the background. Collections are available now; items appear
-          as each sync finishes.
+          {tr(
+            "components.collection_template_gallery.collection_template_gallery.initial_syncs_are_running_in_the_background_collections_are_available",
+          )}
         </div>
       ) : null}
       {deleteFailed.length > 0 ? (
         <div className="text-destructive space-y-1 text-xs">
           {deleteFailed.slice(0, 5).map((entry) => (
-            <div key={`delete:${entry.library_id}:${entry.collection_id}`}>
+            <div key={"delete:" + entry.library_id + ":" + entry.collection_id}>
               {entry.library_name} / {entry.collection_title ?? entry.collection_id}:{" "}
-              {entry.reason ?? "failed"}
+              {entry.reason ??
+                tr(
+                  "components.collection_template_gallery.collection_template_gallery.failed_5f5f8758",
+                )}
             </div>
           ))}
         </div>
@@ -666,7 +745,11 @@ function BundleApplyResult({ result }: { result: ApplyCollectionTemplateBundleRe
         <div className="text-destructive space-y-1 text-xs">
           {failed.slice(0, 5).map((entry) => (
             <div key={`${entry.library_id}:${entry.template_id}`}>
-              {entry.library_name} / {entry.template_title}: {entry.reason ?? "failed"}
+              {entry.library_name} / {entry.template_title}:{" "}
+              {entry.reason ??
+                tr(
+                  "components.collection_template_gallery.collection_template_gallery.failed_5f5f8758",
+                )}
             </div>
           ))}
         </div>
@@ -675,10 +758,23 @@ function BundleApplyResult({ result }: { result: ApplyCollectionTemplateBundleRe
         <div className="text-destructive space-y-1 text-xs">
           {featuredFailed.slice(0, 5).map((entry) => (
             <div
-              key={`featured:${entry.surface}:${entry.library_id ?? "home"}:${entry.template_id}`}
+              key={
+                "featured:" +
+                entry.surface +
+                ":" +
+                (entry.library_id ?? "home") +
+                ":" +
+                entry.template_id
+              }
             >
-              {entry.surface === "home" ? "Home" : entry.library_name} / {entry.template_title}:{" "}
-              {entry.reason ?? "failed"}
+              {entry.surface === "home"
+                ? tr("components.collection_template_gallery.collection_template_gallery.home")
+                : entry.library_name}{" "}
+              / {entry.template_title}:{" "}
+              {entry.reason ??
+                tr(
+                  "components.collection_template_gallery.collection_template_gallery.failed_5f5f8758",
+                )}
             </div>
           ))}
         </div>
@@ -696,6 +792,7 @@ function CategoryPill({
   active: boolean;
   onClick: () => void;
 }) {
+  useUILanguage();
   return (
     <button
       type="button"

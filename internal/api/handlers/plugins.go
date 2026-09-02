@@ -930,6 +930,7 @@ func (h *PluginHandler) HandlePutInstallationConfig(w http.ResponseWriter, r *ht
 	if h.rejectBuiltinInstallation(w, r, id) {
 		return
 	}
+	pluginID := h.pluginIDForInstallation(r.Context(), id)
 
 	if err := h.service.SetGlobalConfigWithClears(
 		r.Context(), id, req.Key, req.Value, req.ClearSecrets,
@@ -937,12 +938,12 @@ func (h *PluginHandler) HandlePutInstallationConfig(w http.ResponseWriter, r *ht
 		var validationErr *plugins.ConfigValidationError
 		switch {
 		case errors.As(err, &validationErr):
-			writeError(w, http.StatusBadRequest, "bad_request", validationErr.Error())
+			writePluginError(w, http.StatusBadRequest, "bad_request", validationErr.Error(), pluginID)
 		case errors.Is(err, plugins.ErrInstallationNotFound):
 			writeError(w, http.StatusNotFound, "not_found", "Plugin installation not found")
 		default:
 			slog.ErrorContext(r.Context(), "setting plugin global config", "component", "api", "installation_id", id, "error", err)
-			writeError(w, http.StatusInternalServerError, "internal_error", "Failed to save plugin config")
+			writePluginError(w, http.StatusInternalServerError, "internal_error", "Failed to save plugin config", pluginID)
 		}
 		return
 	}
@@ -973,6 +974,7 @@ func (h *PluginHandler) HandleTestInstallationConfig(w http.ResponseWriter, r *h
 	if h.rejectBuiltinInstallation(w, r, id) {
 		return
 	}
+	pluginID := h.pluginIDForInstallation(r.Context(), id)
 
 	if err := h.service.TestGlobalConfigWithClears(
 		r.Context(), id, req.Key, req.Value, req.ClearSecrets,
@@ -985,21 +987,38 @@ func (h *PluginHandler) HandleTestInstallationConfig(w http.ResponseWriter, r *h
 		var connectionErr *plugins.ConnectionTestError
 		if errors.As(err, &connectionErr) {
 			writeJSON(w, http.StatusOK, connectionCheckResponse{
-				Success: false,
-				Message: connectionErr.Error(),
+				Success:     false,
+				Message:     connectionErr.Error(),
+				TranslationKey: "api.responses.connection_check_failed",
+				Error:          "connection_check_failed",
+				Params:      map[string]any{"reason": connectionErr.Error()},
+				PluginID:    pluginID,
 			})
 			return
 		}
 
 		slog.ErrorContext(r.Context(), "testing plugin config", "component", "api", "installation_id", id, "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to test plugin config")
+		writePluginError(w, http.StatusInternalServerError, "internal_error", "Failed to test plugin config", pluginID)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, connectionCheckResponse{
-		Success: true,
-		Message: "Connection successful.",
+		Success:     true,
+		Message:     "Connection successful.",
+		TranslationKey: "api.responses.connection_successful",
+		PluginID:    pluginID,
 	})
+}
+
+func (h *PluginHandler) pluginIDForInstallation(ctx context.Context, installationID int) string {
+	if h.service == nil {
+		return ""
+	}
+	manifest, err := h.service.ManifestForInstallation(ctx, installationID)
+	if err != nil {
+		return ""
+	}
+	return manifest.GetPluginId()
 }
 
 func (h *PluginHandler) HandlePutAuthBinding(w http.ResponseWriter, r *http.Request) {

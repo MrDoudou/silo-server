@@ -18,12 +18,15 @@ import {
   useLibraryMetadataMatchQueues,
   useRetryLibraryMetadataMatchQueue,
 } from "@/hooks/queries/admin/libraries";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function formatFailureKind(kind: string): string {
   return kind.replace(/_/g, " ");
 }
 
 export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library[] }) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const [selectedLibraryID, setSelectedLibraryID] = useState<number | null>(null);
   const [detailOffset, setDetailOffset] = useState(0);
@@ -75,7 +78,16 @@ export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library
             path: entry.file_path,
             state: "pending" as const,
             failureKind: null,
-            message: identity ? `Awaiting initial match: ${identity}` : "Awaiting initial match",
+            get message() {
+              return identity
+                ? tr(
+                    "components.admin.libraries.metadata_matcher_queues_section.awaiting_initial_match_identity",
+                    { identity },
+                  )
+                : tr(
+                    "components.admin.libraries.metadata_matcher_queues_section.awaiting_initial_match",
+                  );
+            },
             decision: undefined,
           };
         }),
@@ -86,8 +98,10 @@ export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library
 
   return (
     <CollapsibleDiagnosticsSection
-      title="Metadata Matcher"
-      description="Pending and parked items that still need a provider match."
+      title={tr("components.admin.libraries.metadata_matcher_queues_section.metadata_matcher")}
+      description={tr(
+        "components.admin.libraries.metadata_matcher_queues_section.pending_and_parked_items_that_still_need_a_provider_match",
+      )}
       count={total}
       icon={<Wrench className="h-4 w-4 text-amber-500" />}
       open={open}
@@ -103,9 +117,15 @@ export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Library</TableHead>
-              <TableHead className="text-right">Pending</TableHead>
-              <TableHead className="text-right">Parked</TableHead>
+              <TableHead>
+                {tr("components.admin.libraries.metadata_matcher_queues_section.library")}
+              </TableHead>
+              <TableHead className="text-right">
+                {tr("components.admin.libraries.metadata_matcher_queues_section.pending")}
+              </TableHead>
+              <TableHead className="text-right">
+                {tr("components.admin.libraries.metadata_matcher_queues_section.parked")}
+              </TableHead>
               <TableHead className="w-28" />
             </TableRow>
           </TableHeader>
@@ -123,7 +143,11 @@ export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library
                     }}
                   >
                     <TableCell className="font-medium">
-                      {library?.name ?? `Library ${queue.library_id}`}
+                      {library?.name ??
+                        tr(
+                          "components.admin.libraries.metadata_matcher_queues_section.library_library_id",
+                          { library_id: queue.library_id },
+                        )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{queue.pending_count}</TableCell>
                     <TableCell className="text-right tabular-nums">
@@ -145,7 +169,7 @@ export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library
                           retry.mutate(queue.library_id);
                         }}
                       >
-                        Retry now
+                        {tr("components.admin.libraries.metadata_matcher_queues_section.retry_now")}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -187,20 +211,38 @@ export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library
                                       >
                                         <span className="text-foreground font-medium">
                                           {candidate.title}
-                                          {candidate.year ? ` (${candidate.year})` : ""}
+                                          {candidate.year
+                                            ? tr(
+                                                "components.admin.libraries.metadata_matcher_queues_section.year",
+                                                { year: candidate.year },
+                                              )
+                                            : ""}
                                         </span>
                                         <span className="tabular-nums">
-                                          score {candidate.score.toFixed(1)} / {decision.threshold}
+                                          {tr(
+                                            "components.admin.libraries.metadata_matcher_queues_section.score",
+                                          )}{" "}
+                                          {candidate.score.toFixed(1)} / {decision.threshold}
                                         </span>
                                         {candidate.matched_title &&
                                         candidate.matched_title !== candidate.title ? (
-                                          <span>matched “{candidate.matched_title}”</span>
+                                          <span>
+                                            {tr(
+                                              "components.admin.libraries.metadata_matcher_queues_section.matched",
+                                            )}
+                                            {candidate.matched_title}”
+                                          </span>
                                         ) : null}
                                         {candidate.reasons?.length ? (
                                           <span>{candidate.reasons.join(", ")}</span>
                                         ) : null}
                                         {candidate.sources?.length ? (
-                                          <span>via {candidate.sources.join(", ")}</span>
+                                          <span>
+                                            {tr(
+                                              "components.admin.libraries.metadata_matcher_queues_section.via",
+                                            )}{" "}
+                                            {candidate.sources.join(", ")}
+                                          </span>
                                         ) : null}
                                       </div>
                                     ))}
@@ -211,13 +253,18 @@ export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library
                           })}
                           {detail && detailEntries.length === 0 ? (
                             <p className="text-muted-foreground text-center">
-                              No queued item details.
+                              {tr(
+                                "components.admin.libraries.metadata_matcher_queues_section.no_queued_item_details",
+                              )}
                             </p>
                           ) : null}
                           {hasPreviousDetailPage || hasNextDetailPage ? (
                             <div className="flex items-center justify-between pt-1">
                               <span className="text-muted-foreground text-xs">
-                                Page {Math.floor(detailOffset / detailLimit) + 1}
+                                {tr(
+                                  "components.admin.libraries.metadata_matcher_queues_section.page",
+                                )}{" "}
+                                {Math.floor(detailOffset / detailLimit) + 1}
                               </span>
                               <div className="flex gap-2">
                                 <Button
@@ -229,7 +276,7 @@ export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library
                                     setDetailOffset((current) => Math.max(0, current - detailLimit))
                                   }
                                 >
-                                  Previous
+                                  {tr("common.actions.previous")}
                                 </Button>
                                 <Button
                                   type="button"
@@ -240,7 +287,7 @@ export function MetadataMatcherQueuesSection({ libraries }: { libraries: Library
                                     setDetailOffset((current) => current + detailLimit)
                                   }
                                 >
-                                  Next
+                                  {tr("common.actions.next")}
                                 </Button>
                               </div>
                             </div>

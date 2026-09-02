@@ -91,6 +91,8 @@ import {
 } from "@/lib/mediaRequests";
 import { applyExclusivity } from "./requestExclusivity";
 import { supportedMediaTypesForConfig } from "./requestIntegrationMediaTypes";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type StatusFilter = MediaRequestStatus | "all";
 type OutcomeFilter = MediaRequestOutcome | "all";
@@ -105,6 +107,7 @@ function normalizeAdminRequestTab(value: string | null): AdminRequestTab {
 }
 
 export default function AdminRequests() {
+  useUILanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = normalizeAdminRequestTab(searchParams.get("tab"));
 
@@ -126,10 +129,12 @@ export default function AdminRequests() {
       <div className="page-header">
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-normal text-balance sm:text-4xl">
-            Requests
+            {tr("pages.admin_requests.requests")}
           </h1>
           <p className="text-muted-foreground max-w-2xl text-sm leading-6">
-            Review media requests, set limits, and manage Radarr or Sonarr routing.
+            {tr(
+              "pages.admin_requests.review_media_requests_set_limits_and_manage_radarr_or_sonarr",
+            )}
           </p>
         </div>
       </div>
@@ -138,13 +143,15 @@ export default function AdminRequests() {
         <div className="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:thin] sm:mx-0 sm:px-0">
           <TabsList
             variant="line"
-            aria-label="Request administration sections"
+            aria-label={tr("pages.admin_requests.request_administration_sections")}
             className="border-border w-max min-w-full justify-start border-b"
           >
-            <TabsTrigger value="queue">Queue</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-            <TabsTrigger value="integrations">Integrations</TabsTrigger>
-            <TabsTrigger value="overrides">User Overrides</TabsTrigger>
+            <TabsTrigger value="queue">{tr("pages.admin_requests.queue")}</TabsTrigger>
+            <TabsTrigger value="settings">{tr("pages.admin_requests.settings")}</TabsTrigger>
+            <TabsTrigger value="integrations">
+              {tr("pages.admin_requests.integrations")}
+            </TabsTrigger>
+            <TabsTrigger value="overrides">{tr("pages.admin_requests.user_overrides")}</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="queue">
@@ -165,6 +172,7 @@ export default function AdminRequests() {
 }
 
 function RequestQueueTab() {
+  useUILanguage();
   const [status, setStatus] = useState<StatusFilter>("all");
   const [outcome, setOutcome] = useState<OutcomeFilter>("all");
   const requests = useAdminMediaRequests({ status, outcome, limit: 100 });
@@ -200,7 +208,9 @@ function RequestQueueTab() {
           <SelectContent>
             {REQUEST_STATUSES.map((value) => (
               <SelectItem key={value} value={value}>
-                {value === "all" ? "All statuses" : formatRequestStatus(value)}
+                {value === "all"
+                  ? tr("pages.admin_requests.all_statuses")
+                  : formatRequestStatus(value)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -212,7 +222,9 @@ function RequestQueueTab() {
           <SelectContent>
             {REQUEST_OUTCOMES.map((value) => (
               <SelectItem key={value} value={value}>
-                {value === "all" ? "All outcomes" : formatRequestOutcome(value)}
+                {value === "all"
+                  ? tr("pages.admin_requests.all_outcomes")
+                  : formatRequestOutcome(value)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -224,32 +236,35 @@ function RequestQueueTab() {
           disabled={requests.isFetching}
         >
           <RefreshCw className="h-4 w-4" />
-          Refresh
+          {tr("common.actions.refresh")}
         </Button>
       </div>
 
       {requests.isLoading ? (
         <RowsSkeleton />
       ) : requests.isError ? (
-        <EmptyPanel title="Requests failed" detail="The request queue could not be loaded." />
+        <EmptyPanel
+          title={tr("pages.admin_requests.requests_failed")}
+          detail={tr("pages.admin_requests.the_request_queue_could_not_be_loaded")}
+        />
       ) : (
         <div className="border-border bg-card overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Requested</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Outcome</TableHead>
-                <TableHead>Integration</TableHead>
-                <TableHead className="w-[240px]">Actions</TableHead>
+                <TableHead>{tr("pages.admin_requests.title")}</TableHead>
+                <TableHead>{tr("pages.admin_requests.requested")}</TableHead>
+                <TableHead>{tr("pages.admin_requests.status")}</TableHead>
+                <TableHead>{tr("pages.admin_requests.outcome")}</TableHead>
+                <TableHead>{tr("pages.admin_requests.integration")}</TableHead>
+                <TableHead className="w-[240px]">{tr("pages.admin_requests.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(requests.data ?? []).length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
-                    No requests match the current filters.
+                    {tr("pages.admin_requests.no_requests_match_the_current_filters")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -286,22 +301,25 @@ function RequestQueueTab() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Decline request</DialogTitle>
+            <DialogTitle>{tr("pages.admin_requests.decline_request")}</DialogTitle>
             <DialogDescription>
               {declineTarget
-                ? `"${declineTarget.title}" will be marked declined. Add an optional note for the requester.`
+                ? tr(
+                    "pages.admin_requests.title_will_be_marked_declined_add_an_optional_note_for",
+                    { title: declineTarget.title },
+                  )
                 : null}
             </DialogDescription>
           </DialogHeader>
           <Label htmlFor="decline-reason" className="text-sm">
-            Reason (optional)
+            {tr("pages.admin_requests.reason_optional")}
           </Label>
           <textarea
             id="decline-reason"
             className="border-input bg-background text-foreground focus-visible:ring-ring min-h-[88px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
             value={declineReason}
             onChange={(event) => setDeclineReason(event.target.value)}
-            placeholder="e.g. duplicate of an existing request"
+            placeholder={tr("pages.admin_requests.e_g_duplicate_of_an_existing_request")}
           />
           <DialogFooter>
             <Button
@@ -311,10 +329,10 @@ function RequestQueueTab() {
                 setDeclineReason("");
               }}
             >
-              Cancel
+              {tr("common.actions.cancel")}
             </Button>
             <Button onClick={confirmDecline} disabled={decline.isPending}>
-              Decline
+              {tr("pages.admin_requests.decline")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -342,6 +360,7 @@ function RequestQueueRow({
   onDecline: () => void;
   onRetry: () => void;
 }) {
+  useUILanguage();
   const canApprove = request.status === "pending" && request.outcome === "active";
   const canDecline = request.status !== "completed" && request.outcome === "active";
   const canRetry = request.outcome === "failed";
@@ -360,10 +379,12 @@ function RequestQueueRow({
           </div>
           <div className="text-muted-foreground mt-1 flex flex-wrap gap-x-3 text-xs">
             {request.year ? <span>{request.year}</span> : null}
-            <span>TMDB {request.tmdb_id}</span>
+            <span>
+              {tr("pages.admin_requests.tmdb")} {request.tmdb_id}
+            </span>
             {request.requested_by_user_id ? (
               <Link
-                to={`/admin/users/${request.requested_by_user_id}`}
+                to={"/admin/users/" + request.requested_by_user_id}
                 className="hover:text-foreground hover:underline"
               >
                 {requesterLabel}
@@ -371,11 +392,11 @@ function RequestQueueRow({
             ) : null}
             {request.library_content_id ? (
               <Link
-                to={`/item/${encodeURIComponent(request.library_content_id)}`}
+                to={"/item/" + encodeURIComponent(request.library_content_id)}
                 className="hover:text-foreground inline-flex items-center gap-1 hover:underline"
               >
                 <Library className="h-3 w-3" />
-                Library
+                {tr("pages.admin_requests.library")}
               </Link>
             ) : null}
           </div>
@@ -400,7 +421,7 @@ function RequestQueueRow({
           <div className="flex flex-col gap-1.5">
             {request.is_anime ? (
               <Badge variant="secondary" className="w-fit">
-                Anime
+                {tr("pages.admin_requests.anime")}
               </Badge>
             ) : null}
             {request.targets.map((target) => (
@@ -408,7 +429,7 @@ function RequestQueueRow({
             ))}
           </div>
         ) : (
-          "Not submitted"
+          tr("pages.admin_requests.not_submitted")
         )}
       </TableCell>
       <TableCell>
@@ -420,7 +441,7 @@ function RequestQueueRow({
             disabled={!canApprove || approving}
           >
             <Check className="h-4 w-4" />
-            Approve
+            {tr("pages.admin_requests.approve")}
           </Button>
           <Button
             size="sm"
@@ -429,11 +450,11 @@ function RequestQueueRow({
             disabled={!canDecline || declining}
           >
             <X className="h-4 w-4" />
-            Decline
+            {tr("pages.admin_requests.decline")}
           </Button>
           <Button size="sm" variant="outline" onClick={onRetry} disabled={!canRetry || retrying}>
             <RefreshCw className="h-4 w-4" />
-            Retry
+            {tr("common.actions.retry")}
           </Button>
         </div>
       </TableCell>
@@ -442,6 +463,7 @@ function RequestQueueRow({
 }
 
 function RequestTargetBadge({ target }: { target: RequestTarget }) {
+  useUILanguage();
   const qualityLabel = target.quality === "2160p" ? "2160p" : "1080p";
   const instanceLabel = target.instance_name || target.integration_kind || "Unknown";
   const failed = target.status === "failed";
@@ -474,20 +496,32 @@ type SettingsFormState = {
 };
 
 function RequestSettingsTab() {
+  useUILanguage();
   const settings = useRequestSettings();
 
   if (settings.isLoading) return <RowsSkeleton />;
   if (settings.isError) {
-    return <EmptyPanel title="Settings failed" detail="Request settings could not be loaded." />;
+    return (
+      <EmptyPanel
+        title={tr("pages.admin_requests.settings_failed")}
+        detail={tr("pages.admin_requests.request_settings_could_not_be_loaded")}
+      />
+    );
   }
   if (!settings.data) {
-    return <EmptyPanel title="No settings" detail="Request settings are not available." />;
+    return (
+      <EmptyPanel
+        title={tr("pages.admin_requests.no_settings")}
+        detail={tr("pages.admin_requests.request_settings_are_not_available")}
+      />
+    );
   }
 
   return <RequestSettingsForm key={settings.data.updated_at} settings={settings.data} />;
 }
 
 function RequestSettingsForm({ settings }: { settings: RequestSettings }) {
+  useUILanguage();
   const updateSettings = useUpdateRequestSettings();
   const [form, setForm] = useState<SettingsFormState>(() => ({
     requests_enabled: settings.requests_enabled,
@@ -514,25 +548,27 @@ function RequestSettingsForm({ settings }: { settings: RequestSettings }) {
     <div className="border-border bg-card max-w-3xl space-y-5 rounded-lg border p-5">
       <div className="flex items-center gap-2">
         <Settings2 className="text-primary h-4 w-4" />
-        <h2 className="text-lg font-semibold tracking-normal">Global Settings</h2>
+        <h2 className="text-lg font-semibold tracking-normal">
+          {tr("pages.admin_requests.global_settings")}
+        </h2>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <SwitchField
-          label="Requests enabled"
+          label={tr("pages.admin_requests.requests_enabled")}
           checked={form.requests_enabled}
           onCheckedChange={(checked) =>
             setForm((current) => ({ ...current, requests_enabled: checked }))
           }
         />
         <SwitchField
-          label="Auto approval"
+          label={tr("pages.admin_requests.auto_approval")}
           checked={form.global_auto_approval_enabled}
           onCheckedChange={(checked) =>
             setForm((current) => ({ ...current, global_auto_approval_enabled: checked }))
           }
         />
-        <Field label="Max requests">
+        <Field label={tr("pages.admin_requests.max_requests")}>
           <Input
             type="number"
             min={0}
@@ -542,7 +578,7 @@ function RequestSettingsForm({ settings }: { settings: RequestSettings }) {
             }
           />
         </Field>
-        <Field label="Window days">
+        <Field label={tr("pages.admin_requests.window_days")}>
           <Input
             type="number"
             min={1}
@@ -554,8 +590,10 @@ function RequestSettingsForm({ settings }: { settings: RequestSettings }) {
         </Field>
         <div className="sm:col-span-2">
           <SwitchField
-            label="Always fulfill in both 1080p and 4K"
-            description="Applies to all requests when both a Default HD and Default 4K instance exist, regardless of user role."
+            label={tr("pages.admin_requests.always_fulfill_in_both_1080p_and_4_k")}
+            description={tr(
+              "pages.admin_requests.applies_to_all_requests_when_both_a_default_hd_and",
+            )}
             checked={form.force_dual_quality}
             onCheckedChange={(checked) =>
               setForm((current) => ({ ...current, force_dual_quality: checked }))
@@ -566,7 +604,7 @@ function RequestSettingsForm({ settings }: { settings: RequestSettings }) {
 
       <Button onClick={saveSettings} disabled={updateSettings.isPending}>
         <Save className="h-4 w-4" />
-        Save Settings
+        {tr("pages.admin_requests.save_settings")}
       </Button>
     </div>
   );
@@ -635,12 +673,16 @@ function installationOptionValue(entry: RequestRouterInstallation): string {
 }
 
 function RequestIntegrationsTab() {
+  useUILanguage();
   const integrations = useRequestIntegrations();
 
   if (integrations.isLoading) return <RowsSkeleton />;
   if (integrations.isError) {
     return (
-      <EmptyPanel title="Integrations failed" detail="Request integrations could not be loaded." />
+      <EmptyPanel
+        title={tr("pages.admin_requests.integrations_failed")}
+        detail={tr("pages.admin_requests.request_integrations_could_not_be_loaded")}
+      />
     );
   }
 
@@ -771,6 +813,7 @@ function useConnectionOptions(
 }
 
 function RequestIntegrationsForm({ integrations }: { integrations: RequestIntegration[] }) {
+  useUILanguage();
   const installationsQuery = useAdminPluginInstallations();
   const routerInstallations = useMemo(
     () => requestRouterInstallations(installationsQuery.data ?? []),
@@ -843,7 +886,9 @@ function RequestIntegrationsForm({ integrations }: { integrations: RequestIntegr
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold tracking-normal">Connections</h2>
+        <h2 className="text-lg font-semibold tracking-normal">
+          {tr("pages.admin_requests.connections")}
+        </h2>
         <Button
           type="button"
           variant="outline"
@@ -852,18 +897,21 @@ function RequestIntegrationsForm({ integrations }: { integrations: RequestIntegr
           disabled={noRouterPlugin}
         >
           <Plus className="h-4 w-4" />
-          Add connection
+          {tr("pages.admin_requests.add_connection")}
         </Button>
       </div>
       {noRouterPlugin ? (
         <EmptyPanel
-          title="No request-router plugin installed"
-          detail={`Install a plugin that exposes the ${REQUEST_ROUTER_CAPABILITY} capability before adding connections.`}
+          title={tr("pages.admin_requests.no_request_router_plugin_installed")}
+          detail={tr(
+            "pages.admin_requests.install_a_plugin_that_exposes_the_value1_capability_before_adding",
+            { value1: REQUEST_ROUTER_CAPABILITY },
+          )}
         />
       ) : cards.length === 0 ? (
         <EmptyPanel
-          title="No connections"
-          detail="Add a connection and pick a plugin to route requests."
+          title={tr("pages.admin_requests.no_connections")}
+          detail={tr("pages.admin_requests.add_a_connection_and_pick_a_plugin_to_route_requests")}
         />
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
@@ -905,6 +953,7 @@ function IntegrationEditor({
   onConfigChange: (config: Record<string, unknown>) => void;
   onRemove: () => void;
 }) {
+  useUILanguage();
   const isNew = form.id === "";
   const createIntegration = useCreateRequestIntegration();
   const updateIntegration = useUpdateRequestIntegration();
@@ -1074,11 +1123,17 @@ function IntegrationEditor({
         <div className="flex items-center gap-2">
           <Plug className="text-primary h-4 w-4" />
           <h2 className="text-lg font-semibold tracking-normal">{title}</h2>
-          {form.has_api_key ? <Badge variant="secondary">Key saved</Badge> : null}
-          {isNew ? <Badge variant="outline">New</Badge> : null}
+          {form.has_api_key ? (
+            <Badge variant="secondary">{tr("pages.admin_requests.key_saved")}</Badge>
+          ) : null}
+          {isNew ? <Badge variant="outline">{tr("pages.admin_requests.new")}</Badge> : null}
         </div>
         <label className="flex cursor-pointer items-center gap-2 text-sm select-none">
-          <span className="text-muted-foreground">{form.enabled ? "Enabled" : "Disabled"}</span>
+          <span className="text-muted-foreground">
+            {form.enabled
+              ? tr("pages.admin_requests.enabled")
+              : tr("pages.admin_requests.disabled")}
+          </span>
           <Switch checked={form.enabled} onCheckedChange={(enabled) => patchForm({ enabled })} />
         </label>
       </div>
@@ -1090,37 +1145,43 @@ function IntegrationEditor({
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Name">
+        <Field label={tr("pages.admin_requests.name")}>
           <Input
             value={form.name}
             onChange={(event) => patchForm({ name: event.target.value })}
-            placeholder="Connection name"
+            placeholder={tr("pages.admin_requests.connection_name")}
           />
         </Field>
-        <Field label="API key or setting key">
+        <Field label={tr("pages.admin_requests.api_key_or_setting_key")}>
           <Input
             value={form.api_key_ref}
             onChange={(event) => patchForm({ api_key_ref: event.target.value })}
-            placeholder={form.has_api_key ? "Leave blank to keep saved key" : "API key"}
+            placeholder={
+              form.has_api_key
+                ? tr("pages.admin_requests.leave_blank_to_keep_saved_key")
+                : tr("pages.admin_requests.api_key")
+            }
           />
         </Field>
       </div>
 
-      <Field label="Base URL">
+      <Field label={tr("pages.admin_requests.base_url")}>
         <Input
           value={form.base_url}
           onChange={(event) => patchForm({ base_url: event.target.value })}
-          placeholder="http://localhost:7878"
+          placeholder={tr("pages.admin_requests.http_localhost_7878")}
         />
       </Field>
 
-      <Field label="Plugin">
+      <Field label={tr("pages.admin_requests.plugin")}>
         {installationsLoading ? (
           <Skeleton className="h-9 w-full rounded-md" />
         ) : installations.length === 0 ? (
           <p className="text-destructive text-xs">
-            No installed plugin exposes the {REQUEST_ROUTER_CAPABILITY} capability. Install a
-            request-router plugin before adding connections.
+            {tr("pages.admin_requests.no_installed_plugin_exposes_the")} {REQUEST_ROUTER_CAPABILITY}{" "}
+            {tr(
+              "pages.admin_requests.capability_install_a_request_router_plugin_before_adding_connections",
+            )}
           </p>
         ) : (
           <Select
@@ -1128,7 +1189,7 @@ function IntegrationEditor({
             onValueChange={handlePluginChange}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select plugin" />
+              <SelectValue placeholder={tr("pages.admin_requests.select_plugin")} />
             </SelectTrigger>
             <SelectContent>
               {installations.map((entry) => (
@@ -1143,7 +1204,9 @@ function IntegrationEditor({
           </Select>
         )}
         {!installationsLoading && installations.length > 0 && !hasInstallation ? (
-          <p className="text-destructive text-xs">Select a plugin to fulfill this connection.</p>
+          <p className="text-destructive text-xs">
+            {tr("pages.admin_requests.select_a_plugin_to_fulfill_this_connection")}
+          </p>
         ) : null}
       </Field>
 
@@ -1157,37 +1220,36 @@ function IntegrationEditor({
             optionsLoading={optionsStatus === "loading"}
             errors={fieldErrors}
             onValidityChange={setSchemaValid}
-            idPrefix={`conn-${form.id || form.installation_id || "new"}`}
+            idPrefix={"conn-" + (form.id || form.installation_id || "new")}
           />
           {optionsStatus === "error" && form.base_url.trim().length > 0 ? (
             <p className="border-destructive/40 bg-destructive/10 text-destructive flex items-start gap-2 rounded-md border px-3 py-2 text-xs">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Couldn&apos;t load options from the service — check the base URL and API key, then
-                edit a field to retry.
+                {tr("pages.admin_requests.couldn_t_load_options_from_the_service_check_the_base")}
               </span>
             </p>
           ) : null}
         </div>
       ) : hasInstallation ? (
         <p className="text-muted-foreground text-sm">
-          This plugin does not expose a connection configuration form.
+          {tr("pages.admin_requests.this_plugin_does_not_expose_a_connection_configuration_form")}
         </p>
       ) : (
         <p className="text-muted-foreground text-sm">
-          Select a plugin to configure this connection.
+          {tr("pages.admin_requests.select_a_plugin_to_configure_this_connection")}
         </p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" onClick={handleSave} disabled={!canSave || saving}>
           <Save className="h-4 w-4" />
-          {isNew ? "Create connection" : "Save"}
+          {isNew ? tr("pages.admin_requests.create_connection") : tr("common.actions.save")}
         </Button>
         {isNew ? (
           <Button type="button" variant="ghost" onClick={onRemove}>
             <X className="h-4 w-4" />
-            Discard
+            {tr("pages.admin_requests.discard")}
           </Button>
         ) : (
           <Button
@@ -1198,7 +1260,7 @@ function IntegrationEditor({
             disabled={deleteIntegration.isPending}
           >
             <Trash2 className="h-4 w-4" />
-            Delete
+            {tr("common.actions.delete")}
           </Button>
         )}
       </div>
@@ -1211,14 +1273,17 @@ function IntegrationEditor({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete connection</DialogTitle>
+            <DialogTitle>{tr("pages.admin_requests.delete_connection")}</DialogTitle>
             <DialogDescription>
-              {`"${form.name.trim() || title}" will be permanently removed. New requests will no longer route to this connection.`}
+              {tr(
+                "pages.admin_requests.value_will_be_permanently_removed_new_requests_will_no_longer",
+                { value: form.name.trim() || title },
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-              Cancel
+              {tr("common.actions.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -1229,7 +1294,7 @@ function IntegrationEditor({
               disabled={deleteIntegration.isPending}
             >
               <Trash2 className="h-4 w-4" />
-              Delete
+              {tr("common.actions.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1246,6 +1311,7 @@ type UserLimitFormState = {
 };
 
 function UserOverridesTab() {
+  useUILanguage();
   const users = useAdminUsers();
   const [selectedUserID, setSelectedUserID] = useState<number | undefined>();
   const effectiveUserID = selectedUserID ?? users.data?.[0]?.id;
@@ -1258,23 +1324,30 @@ function UserOverridesTab() {
 
   if (users.isLoading) return <RowsSkeleton />;
   if (users.isError) {
-    return <EmptyPanel title="Users failed" detail="Users could not be loaded." />;
+    return (
+      <EmptyPanel
+        title={tr("pages.admin_requests.users_failed")}
+        detail={tr("pages.admin_requests.users_could_not_be_loaded")}
+      />
+    );
   }
 
   return (
     <div className="border-border bg-card max-w-3xl space-y-5 rounded-lg border p-5">
       <div className="flex items-center gap-2">
         <SlidersHorizontal className="text-primary h-4 w-4" />
-        <h2 className="text-lg font-semibold tracking-normal">User Overrides</h2>
+        <h2 className="text-lg font-semibold tracking-normal">
+          {tr("pages.admin_requests.user_overrides")}
+        </h2>
       </div>
 
-      <Field label="User">
+      <Field label={tr("pages.admin_requests.user")}>
         <Select
           value={effectiveUserID ? String(effectiveUserID) : ""}
           onValueChange={(value) => setSelectedUserID(Number(value))}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select user" />
+            <SelectValue placeholder={tr("pages.admin_requests.select_user")} />
           </SelectTrigger>
           <SelectContent>
             {(users.data ?? []).map((user) => (
@@ -1289,7 +1362,10 @@ function UserOverridesTab() {
       {limit.isLoading ? (
         <RowsSkeleton />
       ) : limit.isError || !limit.data || !effectiveUserID ? (
-        <EmptyPanel title="Limit failed" detail="The selected user limit could not be loaded." />
+        <EmptyPanel
+          title={tr("pages.admin_requests.limit_failed")}
+          detail={tr("pages.admin_requests.the_selected_user_limit_could_not_be_loaded")}
+        />
       ) : (
         <UserLimitEditor
           key={userLimitFormKey(limit.data)}
@@ -1311,6 +1387,7 @@ function UserLimitEditor({
   limit: RequestUserLimit;
   userAvailable: boolean;
 }) {
+  useUILanguage();
   const updateLimit = useUpdateRequestUserLimit();
   const [form, setForm] = useState<UserLimitFormState>(() => ({
     limit_mode: limit.limit_mode,
@@ -1334,7 +1411,7 @@ function UserLimitEditor({
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Limit mode">
+        <Field label={tr("pages.admin_requests.limit_mode")}>
           <Select
             value={form.limit_mode}
             onValueChange={(value) =>
@@ -1345,14 +1422,14 @@ function UserLimitEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="inherit">Inherit</SelectItem>
-              <SelectItem value="custom">Custom</SelectItem>
-              <SelectItem value="unlimited">Unlimited</SelectItem>
-              <SelectItem value="blocked">Blocked</SelectItem>
+              <SelectItem value="inherit">{tr("pages.admin_requests.inherit")}</SelectItem>
+              <SelectItem value="custom">{tr("pages.admin_requests.custom")}</SelectItem>
+              <SelectItem value="unlimited">{tr("pages.admin_requests.unlimited")}</SelectItem>
+              <SelectItem value="blocked">{tr("pages.admin_requests.blocked")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Approval mode">
+        <Field label={tr("pages.admin_requests.approval_mode")}>
           <Select
             value={form.approval_mode}
             onValueChange={(value) =>
@@ -1366,16 +1443,16 @@ function UserLimitEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="inherit">Inherit</SelectItem>
-              <SelectItem value="manual">Manual</SelectItem>
-              <SelectItem value="auto">Auto</SelectItem>
-              <SelectItem value="blocked">Blocked</SelectItem>
+              <SelectItem value="inherit">{tr("pages.admin_requests.inherit")}</SelectItem>
+              <SelectItem value="manual">{tr("pages.admin_requests.manual")}</SelectItem>
+              <SelectItem value="auto">{tr("pages.admin_requests.auto")}</SelectItem>
+              <SelectItem value="blocked">{tr("pages.admin_requests.blocked")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
         {form.limit_mode === "custom" ? (
           <>
-            <Field label="Max requests">
+            <Field label={tr("pages.admin_requests.max_requests")}>
               <Input
                 type="number"
                 min={0}
@@ -1385,7 +1462,7 @@ function UserLimitEditor({
                 }
               />
             </Field>
-            <Field label="Window days">
+            <Field label={tr("pages.admin_requests.window_days")}>
               <Input
                 type="number"
                 min={1}
@@ -1401,7 +1478,7 @@ function UserLimitEditor({
 
       <Button onClick={saveLimit} disabled={!userAvailable || updateLimit.isPending}>
         <Save className="h-4 w-4" />
-        Save Override
+        {tr("pages.admin_requests.save_override")}
       </Button>
     </>
   );
@@ -1412,6 +1489,7 @@ function userLimitFormKey(limit: RequestUserLimit): string {
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
+  useUILanguage();
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
@@ -1433,6 +1511,7 @@ function SwitchField({
   description?: string;
   disabled?: boolean;
 }) {
+  useUILanguage();
   return (
     <div className="border-border flex items-center justify-between gap-3 rounded-lg border p-3">
       <div className="space-y-1">
@@ -1445,6 +1524,7 @@ function SwitchField({
 }
 
 function RowsSkeleton() {
+  useUILanguage();
   return (
     <div className="space-y-2">
       {Array.from({ length: 5 }).map((_, index) => (
@@ -1455,6 +1535,7 @@ function RowsSkeleton() {
 }
 
 function EmptyPanel({ title, detail }: { title: string; detail: string }) {
+  useUILanguage();
   return (
     <div className="border-border bg-card flex flex-col items-center justify-center gap-2 rounded-lg border px-4 py-10 text-center">
       <p className="text-sm font-semibold">{title}</p>

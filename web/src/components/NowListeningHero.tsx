@@ -14,6 +14,8 @@ import { audiobookFilesFromVersions } from "@/lib/audiobooks/files";
 import { buildItemHref, buildMediaPlayHref } from "@/lib/mediaNavigation";
 import { decodeThumbhash } from "@/lib/thumbhash";
 import { useAudiobookPlaybackController } from "@/pages/audiobooks/player/audiobookPlaybackContext";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface NowListeningHeroProps {
   /** A resolved continue-listening section; items are in-progress audiobooks. */
@@ -37,6 +39,7 @@ function namesFromPeople(people: Array<{ name?: string }> | undefined): string |
  * row with the rest of the in-progress books.
  */
 export default function NowListeningHero({ section, libraryId }: NowListeningHeroProps) {
+  useUILanguage();
   const deck = section.items[0];
   const rest = section.items.slice(1);
   const { prefs: overlayPrefs, quickActionMode } = useOverlayPrefs();
@@ -124,7 +127,7 @@ export default function NowListeningHero({ section, libraryId }: NowListeningHer
     <>
       <section
         className="relative -mt-[96px] w-full overflow-hidden sm:-mt-[104px]"
-        aria-label="Now listening"
+        aria-label={tr("components.now_listening_hero.now_listening")}
       >
         {/* The book's own cover, blurred, stands in for a backdrop and warms
             the section with the cover's palette alongside the ambient glow. */}
@@ -175,7 +178,9 @@ export default function NowListeningHero({ section, libraryId }: NowListeningHer
 
             <div className="min-w-0 flex-1">
               <p className="hero-eyebrow mb-3">
-                <span className="hero-eyebrow-strong">Now Listening</span>
+                <span className="hero-eyebrow-strong">
+                  {tr("components.now_listening_hero.now_listening_993be2f5")}
+                </span>
               </p>
               <h1
                 className="font-display max-w-3xl text-3xl font-extrabold tracking-[-0.03em] text-balance sm:text-4xl lg:text-5xl"
@@ -187,7 +192,10 @@ export default function NowListeningHero({ section, libraryId }: NowListeningHer
                 <p className="text-foreground/70 mt-2 max-w-2xl truncate text-sm sm:text-base">
                   {author}
                   {author && narrator ? " · " : ""}
-                  {narrator && `Narrated by ${narrator}`}
+                  {narrator &&
+                    tr("components.now_listening_hero.narrated_by_narrator", {
+                      narrator: narrator,
+                    })}
                 </p>
               )}
 
@@ -222,7 +230,7 @@ export default function NowListeningHero({ section, libraryId }: NowListeningHer
                   className="pill pill-glass transition-colors duration-(--duration-fast)"
                 >
                   <Info className="h-4 w-4" />
-                  More Info
+                  {tr("components.now_listening_hero.more_info")}
                 </ViewTransitionLink>
               </div>
             </div>

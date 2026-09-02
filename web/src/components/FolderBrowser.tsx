@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import PathAutocompleteInput from "@/components/PathAutocompleteInput";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 interface FolderBrowserProps {
   open: boolean;
@@ -31,6 +34,7 @@ export default function FolderBrowser({
   onSelect,
   existingPaths = [],
 }: FolderBrowserProps) {
+  useUILanguage();
   const [currentPath, setCurrentPath] = useState(ROOT_PATH);
   const [draftPath, setDraftPath] = useState(ROOT_PATH);
   const [validationError, setValidationError] = useState("");
@@ -87,7 +91,7 @@ export default function FolderBrowser({
   async function handleBrowseSubmit() {
     const trimmed = draftPath.trim();
     if (!trimmed.startsWith(ROOT_PATH)) {
-      setValidationError("Use an absolute path that starts with /.");
+      setValidationError(tr("components.folder_browser.use_an_absolute_path_that_starts_with"));
       return;
     }
 
@@ -101,7 +105,7 @@ export default function FolderBrowser({
       setCurrentPath(nextFolder.path);
       setDraftPath(nextFolder.path);
     } catch (err) {
-      setValidationError(err instanceof Error ? err.message : "Failed to browse folder");
+      setValidationError(tr.error("errors.folder_browser.failed_to_browse_folder", err));
     }
   }
 
@@ -150,7 +154,7 @@ export default function FolderBrowser({
     >
       <DialogContent className="overflow-x-hidden sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Browse Library Folders</DialogTitle>
+          <DialogTitle>{tr("components.folder_browser.browse_library_folders")}</DialogTitle>
         </DialogHeader>
 
         <div className="min-w-0 space-y-3">
@@ -161,7 +165,7 @@ export default function FolderBrowser({
                 setValidationError("");
                 setDraftPath(value);
               }}
-              placeholder="/mnt/media"
+              placeholder={tr("components.folder_browser.mnt_media")}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -170,24 +174,26 @@ export default function FolderBrowser({
               }}
             />
             <Button type="button" variant="outline" onClick={() => void handleBrowseSubmit()}>
-              Browse
+              {tr("components.folder_browser.browse")}
             </Button>
           </div>
 
           {validationError ? <p className="text-destructive text-sm">{validationError}</p> : null}
-          {!validationError && error instanceof Error ? (
-            <p className="text-destructive text-sm">{error.message}</p>
+          {!validationError && error ? (
+            <p className="text-destructive text-sm">
+              {tr.error("errors.common.request_failed", error)}
+            </p>
           ) : null}
           {alreadyAdded ? (
             <p className="text-muted-foreground text-sm">
-              This folder is already listed on the library.
+              {tr("components.folder_browser.this_folder_is_already_listed_on_the_library")}
             </p>
           ) : null}
 
           <div className="border-border/60 overflow-hidden rounded-md border">
             <div className="border-border/60 flex items-center justify-between border-b px-3 py-2 text-sm">
               <div className="min-w-0 overflow-x-auto">
-                <p className="font-medium">Current folder</p>
+                <p className="font-medium">{tr("components.folder_browser.current_folder")}</p>
                 <p className="text-muted-foreground font-mono text-xs whitespace-nowrap">
                   {resolvedPath}
                 </p>
@@ -201,10 +207,10 @@ export default function FolderBrowser({
                   onClick={() => navigate(parentPath)}
                 >
                   <ArrowUp className="mr-1 h-3.5 w-3.5" />
-                  Up
+                  {tr("components.folder_browser.up")}
                 </Button>
                 <Button type="button" variant="ghost" size="icon" onClick={() => refetch()}>
-                  <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+                  <RefreshCw className={"h-3.5 w-3.5 " + (isFetching ? "animate-spin" : "")} />
                 </Button>
               </div>
             </div>
@@ -221,7 +227,7 @@ export default function FolderBrowser({
 
                 {!isLoading && data?.entries.length === 0 ? (
                   <p className="text-muted-foreground px-2 py-6 text-sm">
-                    No subfolders found here.
+                    {tr("components.folder_browser.no_subfolders_found_here")}
                   </p>
                 ) : null}
 
@@ -233,9 +239,12 @@ export default function FolderBrowser({
                     return (
                       <div
                         key={entry.path}
-                        className={`flex items-center gap-0 rounded-md transition-colors ${
-                          isSelected ? "bg-primary/10 ring-primary/30 ring-1" : "hover:bg-muted/60"
-                        }`}
+                        className={
+                          "flex items-center gap-0 rounded-md transition-colors " +
+                          (isSelected
+                            ? "bg-primary/10 ring-primary/30 ring-1"
+                            : "hover:bg-muted/60")
+                        }
                       >
                         {/* Checkbox area */}
                         <button
@@ -243,16 +252,23 @@ export default function FolderBrowser({
                           className="flex shrink-0 items-center justify-center px-2 py-2"
                           onClick={() => !isExisting && toggleSelected(entry.path)}
                           disabled={isExisting}
-                          title={isExisting ? "Already added" : isSelected ? "Deselect" : "Select"}
+                          title={
+                            isExisting
+                              ? tr("components.folder_browser.already_added")
+                              : isSelected
+                                ? tr("components.folder_browser.deselect")
+                                : tr("components.folder_browser.select")
+                          }
                         >
                           <div
-                            className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
-                              isSelected
+                            className={
+                              "flex h-4 w-4 items-center justify-center rounded border transition-colors " +
+                              (isSelected
                                 ? "border-primary bg-primary text-primary-foreground"
                                 : isExisting
                                   ? "border-muted-foreground/30 bg-muted/50"
-                                  : "border-muted-foreground/40 hover:border-primary/60"
-                            }`}
+                                  : "border-muted-foreground/40 hover:border-primary/60")
+                            }
                           >
                             {(isSelected || isExisting) && <Check className="h-3 w-3" />}
                           </div>
@@ -278,20 +294,25 @@ export default function FolderBrowser({
         <DialogFooter className="flex-row items-center gap-2 sm:justify-between">
           <div className="text-muted-foreground text-xs">
             {selectedPaths.size > 0
-              ? `${selectedPaths.size} folder${selectedPaths.size !== 1 ? "s" : ""} selected`
-              : "Select folders or use current"}
+              ? tr("components.folder_browser.size_folder_value_selected", {
+                  size: selectedPaths.size,
+                  value: selectedPaths.size !== 1 ? "s" : "",
+                })
+              : tr("components.folder_browser.select_folders_or_use_current")}
           </div>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {tr("common.actions.cancel")}
             </Button>
             {addableSelected > 0 ? (
               <Button type="button" onClick={handleAddSelected}>
-                Add {addableSelected} Folder{addableSelected !== 1 ? "s" : ""}
+                {tr("common.actions.add")} {addableSelected}{" "}
+                {tr("components.folder_browser.folder")}
+                {addableSelected !== 1 ? tr("components.folder_browser.s") : ""}
               </Button>
             ) : (
               <Button type="button" onClick={handleSelectCurrent} disabled={alreadyAdded}>
-                Use Current Folder
+                {tr("components.folder_browser.use_current_folder")}
               </Button>
             )}
           </div>

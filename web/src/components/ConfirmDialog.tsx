@@ -8,6 +8,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -30,6 +32,7 @@ export function ConfirmDialog({
   onConfirm,
   isPending,
 }: ConfirmDialogProps) {
+  useUILanguage();
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -38,7 +41,7 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             variant={variant === "destructive" ? "destructive" : "default"}

@@ -1,4 +1,4 @@
-.PHONY: frontend build dev-frontend dev-backend dev-proxy dev-transcode lint test test-go test-web embed-stub clean jellyfin-web migrate-continuum-check verify-local-paths install-hooks migrate-create migrate-validate migrate-status migrate-up migrate-down-to settings-bindings verify-settings-bindings verify-settings-bindings-web verify-settings-bindings-all playback-fixtures verify-playback-fixtures
+.PHONY: frontend build dev-frontend dev-backend dev-proxy dev-transcode lint test test-go test-web embed-stub clean jellyfin-web migrate-continuum-check verify-local-paths verify-i18n install-hooks migrate-create migrate-validate migrate-status migrate-up migrate-down-to settings-bindings verify-settings-bindings verify-settings-bindings-web verify-settings-bindings-all playback-fixtures verify-playback-fixtures
 
 GIT_COMMON_DIR := $(strip $(shell git rev-parse --git-common-dir 2>/dev/null))
 MAIN_CHECKOUT_ROOT := $(if $(GIT_COMMON_DIR),$(abspath $(GIT_COMMON_DIR)/..))
@@ -179,6 +179,11 @@ verify-playback-fixtures:
 # Check committed content for local machine path leaks.
 verify-local-paths:
 	scripts/check-local-path-leaks.sh
+
+# Keep semantic catalogs, static usages, backend API mappings, visible
+# descriptors, and interpolation placeholders in sync.
+verify-i18n:
+	cd web && pnpm run i18n:sync:check && pnpm run i18n:check
 
 # Create a timestamped Goose SQL migration. Usage: make migrate-create NAME=add_thing
 migrate-create:

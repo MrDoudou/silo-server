@@ -30,6 +30,9 @@ import { cn } from "@/lib/utils";
 import { LANGUAGES, getLanguageName } from "@/player/utils/languageNames";
 import { SubtitleUploadForm } from "@/components/subtitles/SubtitleUploadForm";
 import { buildQualitySummary } from "./VersionFlyout";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 interface SubtitleSearchDialogProps {
   open: boolean;
@@ -80,6 +83,7 @@ export default function SubtitleSearchDialog({
   version,
   title,
 }: SubtitleSearchDialogProps) {
+  useUILanguage();
   const downloadSubtitleMutation = useDownloadSubtitle();
   const uploadSubtitleMutation = useUploadSubtitle();
   const downloadedQuery = useDownloadedSubtitles(open ? version?.file_id : undefined);
@@ -158,7 +162,9 @@ export default function SubtitleSearchDialog({
     } catch (err) {
       if (controller.signal.aborted) return;
       setResults([]);
-      setSearchError(err instanceof Error ? err.message : "Search failed");
+      setSearchError(
+        tr.error("errors.item_detail.components.subtitle_search_dialog.search_failed", err),
+      );
     } finally {
       if (!controller.signal.aborted) {
         setSearching(false);
@@ -229,10 +235,16 @@ export default function SubtitleSearchDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl overflow-hidden sm:max-w-3xl">
         <DialogHeader className="min-w-0">
-          <DialogTitle>Add Subtitles</DialogTitle>
+          <DialogTitle>
+            {tr("pages.item_detail.components.subtitle_search_dialog.add_subtitles")}
+          </DialogTitle>
           <DialogDescription className="truncate">
             {title}
-            {versionLabel ? ` \u00B7 ${versionLabel}` : ""}
+            {versionLabel
+              ? tr("pages.item_detail.components.subtitle_search_dialog.version_label", {
+                  versionLabel: versionLabel,
+                })
+              : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -250,11 +262,17 @@ export default function SubtitleSearchDialog({
             )}
 
             <div className="space-y-2">
-              <p className="text-sm font-medium">Search online</p>
+              <p className="text-sm font-medium">
+                {tr("pages.item_detail.components.subtitle_search_dialog.search_online")}
+              </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
                   <SelectTrigger className="w-full sm:w-[220px]">
-                    <SelectValue placeholder="Language" />
+                    <SelectValue
+                      placeholder={tr(
+                        "pages.item_detail.components.subtitle_search_dialog.language",
+                      )}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {LANGUAGES.map((language) => (
@@ -271,7 +289,7 @@ export default function SubtitleSearchDialog({
                   ) : (
                     <Search className="size-4" />
                   )}
-                  Search
+                  {tr("common.actions.search")}
                 </Button>
               </div>
             </div>
@@ -321,7 +339,10 @@ export default function SubtitleSearchDialog({
                           tone.bg,
                           tone.ring,
                         )}
-                        aria-label={`Match score ${score}`}
+                        aria-label={tr(
+                          "pages.item_detail.components.subtitle_search_dialog.match_score_score",
+                          { score: score },
+                        )}
                       >
                         <span
                           className={cn(
@@ -337,7 +358,7 @@ export default function SubtitleSearchDialog({
                             tone.text,
                           )}
                         >
-                          Score
+                          {tr("pages.item_detail.components.subtitle_search_dialog.score")}
                         </span>
                       </div>
 
@@ -354,13 +375,18 @@ export default function SubtitleSearchDialog({
                           </Badge>
                           {result.hearing_impaired && (
                             <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[10px]">
-                              <Ear className="size-2.5" /> HI
+                              <Ear className="size-2.5" />{" "}
+                              {tr("pages.item_detail.components.subtitle_search_dialog.hi")}
                             </Badge>
                           )}
                           {result.downloads > 0 && (
                             <span className="text-muted-foreground ml-0.5 text-[11px] tabular-nums">
                               {result.downloads.toLocaleString()}{" "}
-                              {result.downloads === 1 ? "download" : "downloads"}
+                              {result.downloads === 1
+                                ? tr("pages.item_detail.components.subtitle_search_dialog.download")
+                                : tr(
+                                    "pages.item_detail.components.subtitle_search_dialog.downloads",
+                                  )}
                             </span>
                           )}
                         </div>
@@ -383,7 +409,13 @@ export default function SubtitleSearchDialog({
                               {hasExtras ? (
                                 <div className="space-y-1.5">
                                   <p className="text-muted-foreground font-sans text-[10px] tracking-[0.12em] uppercase">
-                                    {names.length} release name{names.length === 1 ? "" : "s"}
+                                    {names.length}{" "}
+                                    {tr(
+                                      "pages.item_detail.components.subtitle_search_dialog.release_name",
+                                    )}
+                                    {names.length === 1
+                                      ? ""
+                                      : tr("pages.item_detail.components.subtitle_search_dialog.s")}
                                   </p>
                                   <ul className="space-y-1 leading-snug">
                                     {names.map((name, i) => (
@@ -419,8 +451,14 @@ export default function SubtitleSearchDialog({
                                 )}
                               />
                               {expanded
-                                ? "Collapse"
-                                : `${extras.length} more variant${extras.length === 1 ? "" : "s"}`}
+                                ? tr("pages.item_detail.components.subtitle_search_dialog.collapse")
+                                : tr(
+                                    "pages.item_detail.components.subtitle_search_dialog.length_more_variant_value",
+                                    {
+                                      length: extras.length,
+                                      value: extras.length === 1 ? "" : "s",
+                                    },
+                                  )}
                             </button>
                           )}
                         </div>
@@ -439,7 +477,9 @@ export default function SubtitleSearchDialog({
                           ) : (
                             <Download className="size-4" />
                           )}
-                          {isDownloading ? "Downloading" : "Download"}
+                          {isDownloading
+                            ? tr("pages.item_detail.components.subtitle_search_dialog.downloading")
+                            : tr("common.actions.download")}
                         </Button>
                       </div>
                     </div>
@@ -451,7 +491,9 @@ export default function SubtitleSearchDialog({
               !searching &&
               !searchError && (
                 <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-center text-sm">
-                  No subtitles found for this version and language.
+                  {tr(
+                    "pages.item_detail.components.subtitle_search_dialog.no_subtitles_found_for_this_version_and_language",
+                  )}
                 </div>
               )
             )}

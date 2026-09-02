@@ -24,21 +24,23 @@ import { SETTING_KEYS } from "@/lib/settingsContract";
 import { cn } from "@/lib/utils";
 import type { AdminDeviceSetting } from "@/hooks/queries/admin/users";
 import { formatRelativeTime } from "@/lib/date";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export const UNKNOWN_PROFILE_ID = "unknown-profile";
 
 export type PlatformKind = "tv" | "mobile" | "tablet" | "desktop" | "unknown";
 
 const PLATFORM_KIND_LABELS: Record<PlatformKind, string> = {
-  tv: "TV",
-  mobile: "Mobile",
-  tablet: "Tablet",
-  desktop: "Desktop",
-  unknown: "Other",
+  tv: "components.admin.device_overrides.tv",
+  mobile: "components.admin.device_overrides.mobile",
+  tablet: "components.admin.device_overrides.tablet",
+  desktop: "components.admin.device_overrides.desktop",
+  unknown: "components.admin.device_overrides.other",
 };
 
 export function platformKindLabel(kind: PlatformKind): string {
-  return PLATFORM_KIND_LABELS[kind];
+  return tr(PLATFORM_KIND_LABELS[kind]);
 }
 
 export function classifyPlatform(raw: string | undefined): PlatformKind {
@@ -308,6 +310,7 @@ export function DeviceOverrideRow({
   onEditJson,
   onReset,
 }: DeviceOverrideRowProps) {
+  useUILanguage();
   const definition = getSettingDefinition(setting.key);
   // Object-valued settings have no inline widget: they open a bespoke panel
   // (subtitle appearance) or the raw JSON editor.
@@ -340,12 +343,12 @@ export function DeviceOverrideRow({
           {isOverride ? (
             <span
               className="bg-foreground/80 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-              title="Override is set on this device"
-              aria-label="overridden"
+              title={tr("components.admin.device_overrides.override_is_set_on_this_device")}
+              aria-label={tr("components.admin.device_overrides.overridden")}
             />
           ) : (
             <span className="text-muted-foreground/60 border-border/50 rounded-full border px-1.5 py-px text-[9.5px] font-medium tracking-[0.05em] uppercase">
-              default
+              {tr("components.admin.device_overrides.default")}
             </span>
           )}
           {anomaly && (
@@ -373,7 +376,8 @@ export function DeviceOverrideRow({
           {!isJsonOnly && definition && (
             <span className="text-muted-foreground/60">
               {" "}
-              · default {formatSettingValue(setting.key, defaultValueToString(definition))}
+              {tr("components.admin.device_overrides.default_0044b483")}{" "}
+              {formatSettingValue(setting.key, defaultValueToString(definition))}
             </span>
           )}
         </div>
@@ -388,7 +392,9 @@ export function DeviceOverrideRow({
       <div className="flex flex-col items-stretch gap-2 md:min-w-[220px] md:items-end">
         {isJsonOnly || !definition ? (
           <Button variant="outline" size="sm" onClick={() => onEditJson(setting, isOverride)}>
-            {setting.key === SETTING_KEYS.PLAYBACK_SUBTITLE_APPEARANCE ? "Customize" : "Edit JSON"}
+            {setting.key === SETTING_KEYS.PLAYBACK_SUBTITLE_APPEARANCE
+              ? tr("components.admin.device_overrides.customize")
+              : tr("components.admin.device_overrides.edit_json")}
           </Button>
         ) : (
           <RegistrySettingControl
@@ -405,11 +411,11 @@ export function DeviceOverrideRow({
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 self-end text-[11.5px] transition-colors"
           >
             <RotateCcw className="h-3 w-3" />
-            Reset
+            {tr("common.actions.reset")}
           </button>
         ) : (
           <span className="text-muted-foreground/60 self-end text-[11px] italic">
-            change to add override
+            {tr("components.admin.device_overrides.change_to_add_override")}
           </span>
         )}
       </div>
@@ -530,6 +536,7 @@ export function DeviceProfileTabs({
   updatePending,
   resetPending = false,
 }: DeviceProfileTabsProps) {
+  useUILanguage();
   const [activeId, setActiveId] = useState<string | null>(initialProfileId ?? null);
 
   const active = useMemo(
@@ -570,7 +577,7 @@ export function DeviceProfileTabs({
     <div className="flex h-full min-h-0 flex-col">
       <div
         role="tablist"
-        aria-label="Profiles on this device"
+        aria-label={tr("components.admin.device_overrides.profiles_on_this_device")}
         className="border-border/60 scrollbar-thin flex shrink-0 gap-0.5 overflow-x-auto border-b px-2 pt-2"
       >
         {profiles.map((profile) => {
@@ -607,7 +614,7 @@ export function DeviceProfileTabs({
                 {initial}
               </span>
               <span className="max-w-[120px] truncate text-[12.5px] font-medium">
-                {profile.profileName || "Unnamed"}
+                {profile.profileName || tr("components.admin.device_overrides.unnamed")}
               </span>
               <span
                 className={cn(
@@ -648,11 +655,13 @@ export function DeviceProfileTabs({
           <span className="text-muted-foreground/40">·</span>
           <span className="tabular-nums">
             <span className="text-foreground/80 font-medium">{overrideCount}</span>{" "}
-            {overrideCount === 1 ? "override" : "overrides"}
+            {overrideCount === 1
+              ? tr("components.admin.device_overrides.override")
+              : tr("components.admin.device_overrides.overrides")}
             {showAllSettings && rows.length > overrideCount && (
               <span className="text-muted-foreground/60">
                 {" "}
-                · {rows.length - overrideCount} default
+                · {rows.length - overrideCount} {tr("components.admin.device_overrides.default")}
               </span>
             )}
           </span>
@@ -661,10 +670,12 @@ export function DeviceProfileTabs({
               <span className="text-muted-foreground/40">·</span>
               <span
                 className="text-destructive bg-destructive/10 inline-flex items-center gap-1 rounded px-1.5 py-px text-[10px] font-medium tracking-[0.04em] uppercase"
-                title="One or more overrides in this profile look suspect — see the highlighted rows below."
+                title={tr(
+                  "components.admin.device_overrides.one_or_more_overrides_in_this_profile_look_suspect_see",
+                )}
               >
                 <AlertTriangle className="h-2.5 w-2.5" />
-                {anomalyCountInProfile} suspect
+                {anomalyCountInProfile} {tr("components.admin.device_overrides.suspect")}
               </span>
             </>
           )}
@@ -678,7 +689,7 @@ export function DeviceProfileTabs({
           className="text-muted-foreground hover:text-foreground disabled:hover:text-muted-foreground inline-flex items-center gap-1 text-[11.5px] transition-colors disabled:opacity-40"
         >
           <RotateCcw className="h-3 w-3" />
-          Reset all overrides
+          {tr("components.admin.device_overrides.reset_all_overrides")}
         </button>
       </div>
 

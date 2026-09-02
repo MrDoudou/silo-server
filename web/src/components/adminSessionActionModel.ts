@@ -1,5 +1,7 @@
 import type { AdminSession } from "@/api/types";
 
+import { tr } from "@/i18n/translate";
+
 export type AdminSessionActionName = "pause" | "resume";
 
 export function isSessionPaused(session: AdminSession): boolean {
@@ -11,7 +13,7 @@ export function getPrimaryPlaybackAction(session: AdminSession): {
   label: string;
 } {
   if (isSessionPaused(session)) {
-    return { action: "resume", label: "Resume" };
+    return { action: "resume", label: tr("components.admin_session_action_model.resume") };
   }
-  return { action: "pause", label: "Pause" };
+  return { action: "pause", label: tr("common.actions.pause") };
 }

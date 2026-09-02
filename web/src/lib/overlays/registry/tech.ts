@@ -1,6 +1,8 @@
 import { compactHdrSuffix, prettyResolution } from "@/lib/mediaFormat";
 import type { OverlayDef, OverlayIconId } from "../types";
 
+import { tr } from "@/i18n/translate";
+
 // Tech overlays — derived from the media file (codec, container, resolution,
 // audio properties). All data flows through OverlaySummary on the backend.
 
@@ -32,8 +34,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "resolution",
     category: "tech",
-    label: "Resolution",
-    description: "Video resolution (4K, 1080p, 720p, etc.)",
+    get label() {
+      return tr("lib.overlays.registry.tech.resolution");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.video_resolution_4_k_1080p_720p_etc");
+    },
     defaultPosition: "top-left",
     defaultEnabled: true,
     iconId: "monitor",
@@ -43,8 +49,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "hdr",
     category: "tech",
-    label: "HDR / Dolby Vision",
-    description: "Dynamic range format (HDR10, DV, HLG)",
+    get label() {
+      return tr("lib.overlays.registry.tech.hdr_dolby_vision");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.dynamic_range_format_hdr10_dv_hlg");
+    },
     defaultPosition: "top-left",
     defaultEnabled: true,
     iconCapable: true,
@@ -54,8 +64,14 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "resolution_hdr",
     category: "tech",
-    label: "Resolution + HDR (combined)",
-    description: 'Single badge combining resolution and dynamic range (e.g. "4K DV", "1080p HDR")',
+    get label() {
+      return tr("lib.overlays.registry.tech.resolution_hdr_combined");
+    },
+    get description() {
+      return tr(
+        "lib.overlays.registry.tech.single_badge_combining_resolution_and_dynamic_range_e_g_4",
+      );
+    },
     defaultPosition: "top-left",
     defaultEnabled: false,
     iconCapable: true,
@@ -72,8 +88,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "audio",
     category: "tech",
-    label: "Audio Codec",
-    description: "Audio codec (Atmos, DTS-HD, TrueHD, etc.)",
+    get label() {
+      return tr("lib.overlays.registry.tech.audio_codec");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.audio_codec_atmos_dts_hd_true_hd_etc");
+    },
     defaultPosition: "top-left",
     defaultEnabled: true,
     iconCapable: true,
@@ -83,8 +103,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "audio_channels",
     category: "tech",
-    label: "Audio Channels",
-    description: "Channel layout (Stereo, 5.1, 7.1)",
+    get label() {
+      return tr("lib.overlays.registry.tech.audio_channels");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.channel_layout_stereo_5_1_7_1");
+    },
     defaultPosition: "top-left",
     defaultEnabled: false,
     iconId: "volume",
@@ -94,8 +118,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "video_codec",
     category: "tech",
-    label: "Video Codec",
-    description: "Video codec (H.264, H.265, AV1)",
+    get label() {
+      return tr("lib.overlays.registry.tech.video_codec");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.video_codec_h_264_h_265_av1");
+    },
     defaultPosition: "top-left",
     defaultEnabled: false,
     iconId: "film",
@@ -106,8 +134,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "container",
     category: "tech",
-    label: "Container",
-    description: "File container (MKV, MP4, etc.)",
+    get label() {
+      return tr("lib.overlays.registry.tech.container");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.file_container_mkv_mp4_etc");
+    },
     defaultPosition: "bottom-left",
     defaultEnabled: false,
     iconCapable: false,
@@ -116,8 +148,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "aspect_ratio",
     category: "tech",
-    label: "Aspect Ratio",
-    description: "Display aspect ratio (16:9, 2.39:1, etc.)",
+    get label() {
+      return tr("lib.overlays.registry.tech.aspect_ratio");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.display_aspect_ratio_16_9_2_39_1_etc");
+    },
     defaultPosition: "bottom-right",
     defaultEnabled: false,
     iconId: "layout",
@@ -127,8 +163,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "release_type",
     category: "tech",
-    label: "Release Type",
-    description: "Source format (REMUX, BluRay, WEB-DL, etc.)",
+    get label() {
+      return tr("lib.overlays.registry.tech.release_type");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.source_format_remux_blu_ray_web_dl_etc");
+    },
     defaultPosition: "bottom-left",
     defaultEnabled: true,
     iconCapable: false,
@@ -137,8 +177,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "edition",
     category: "tech",
-    label: "Edition",
-    description: "Edition label from the best available media version",
+    get label() {
+      return tr("lib.overlays.registry.tech.edition");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.edition_label_from_the_best_available_media_version");
+    },
     defaultPosition: "bottom-left",
     defaultEnabled: false,
     iconCapable: false,
@@ -147,8 +191,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "multi_audio",
     category: "tech",
-    label: "Multi-Audio",
-    description: "Shown when the file has audio in 2+ languages",
+    get label() {
+      return tr("lib.overlays.registry.tech.multi_audio");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.shown_when_the_file_has_audio_in_2_languages");
+    },
     defaultPosition: "bottom-right",
     defaultEnabled: false,
     iconId: "languages",
@@ -158,8 +206,12 @@ export const TECH_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "multi_sub",
     category: "tech",
-    label: "Subtitles Available",
-    description: "Shown when the file has any subtitle track",
+    get label() {
+      return tr("lib.overlays.registry.tech.subtitles_available");
+    },
+    get description() {
+      return tr("lib.overlays.registry.tech.shown_when_the_file_has_any_subtitle_track");
+    },
     defaultPosition: "bottom-right",
     defaultEnabled: false,
     iconId: "subtitles",

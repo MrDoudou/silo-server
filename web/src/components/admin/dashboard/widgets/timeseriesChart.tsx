@@ -5,6 +5,8 @@ import { ChartEmptyState, ChartSkeleton, LineChart } from "../charts";
 import type { LineChartOverlay, LineChartPoint } from "../charts";
 import { SectionError } from "../feedback";
 
+import { tr } from "@/i18n/translate";
+
 export interface TimeseriesChartBodyProps {
   query: UseQueryResult<AdminTimeseries>;
   points: readonly LineChartPoint[];
@@ -66,7 +68,9 @@ export function TimeseriesChartBody({
         fill={fill}
         message={emptyMessage}
         since={query.data?.oldest_sample_at ?? null}
-        detail="The metrics sampler collects one sample a minute while the server runs."
+        detail={tr(
+          "components.admin.dashboard.widgets.timeseries_chart.the_metrics_sampler_collects_one_sample_a_minute_while_the",
+        )}
       />
     );
   }

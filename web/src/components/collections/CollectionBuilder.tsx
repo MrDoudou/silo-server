@@ -44,6 +44,8 @@ import {
   SMART_COLLECTION_MAX_LIMIT,
   withSmartCollectionLimit,
 } from "./smartCollectionLimits";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface CollectionBuilderValue {
   title: string;
@@ -131,6 +133,7 @@ export default function CollectionBuilder({
   sidebarContent,
   children,
 }: CollectionBuilderProps) {
+  useUILanguage();
   const [advanced, setAdvanced] = useState(defaultAdvanced);
 
   const previewRequest = buildCollectionBuilderPreviewRequest(value);
@@ -142,7 +145,9 @@ export default function CollectionBuilder({
       <div className="space-y-4">
         {sidebarContent}
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Preview</h2>
+          <h2 className="text-lg font-semibold">
+            {tr("components.collections.collection_builder.preview")}
+          </h2>
           <CollectionPreviewPane
             preview={previewQuery.data}
             enabled
@@ -158,24 +163,30 @@ export default function CollectionBuilder({
     <>
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Basics</h2>
+          <h2 className="text-lg font-semibold">
+            {tr("components.collections.collection_builder.basics")}
+          </h2>
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => setAdvanced((current) => !current)}
           >
-            {advanced ? "Switch to Guided" : "Switch to Advanced"}
+            {advanced
+              ? tr("components.collections.collection_builder.switch_to_guided")
+              : tr("components.collections.collection_builder.switch_to_advanced")}
           </Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor={`collection-title-${mode}`}>
-              {mode === "admin" ? "Title" : "Name"}
+            <Label htmlFor={"collection-title-" + mode}>
+              {mode === "admin"
+                ? tr("components.collections.collection_builder.title")
+                : tr("components.collections.collection_builder.name")}
             </Label>
             <Input
-              id={`collection-title-${mode}`}
+              id={"collection-title-" + mode}
               value={value.title}
               onChange={(event) => onChange({ ...value, title: event.target.value })}
               disabled={readOnly}
@@ -184,7 +195,7 @@ export default function CollectionBuilder({
           </div>
 
           <div className="space-y-2">
-            <Label>Collection Mode</Label>
+            <Label>{tr("components.collections.collection_builder.collection_mode")}</Label>
             <Select
               value={value.collection_type}
               onValueChange={(next) =>
@@ -203,8 +214,12 @@ export default function CollectionBuilder({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="smart">Smart</SelectItem>
-                <SelectItem value="manual">Manual</SelectItem>
+                <SelectItem value="smart">
+                  {tr("components.collections.collection_builder.smart")}
+                </SelectItem>
+                <SelectItem value="manual">
+                  {tr("components.collections.collection_builder.manual")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -213,7 +228,9 @@ export default function CollectionBuilder({
         {mode === "admin" ? (
           <>
             <div className="space-y-2">
-              <Label htmlFor="collection-description">Description</Label>
+              <Label htmlFor="collection-description">
+                {tr("components.collections.collection_builder.description")}
+              </Label>
               <textarea
                 id="collection-description"
                 rows={4}
@@ -226,7 +243,7 @@ export default function CollectionBuilder({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Visibility</Label>
+                <Label>{tr("components.collections.collection_builder.visibility")}</Label>
                 <Select
                   value={value.visibility}
                   onValueChange={(next) =>
@@ -238,15 +255,21 @@ export default function CollectionBuilder({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="visible">Visible</SelectItem>
-                    <SelectItem value="hidden">Hidden</SelectItem>
+                    <SelectItem value="visible">
+                      {tr("components.collections.collection_builder.visible")}
+                    </SelectItem>
+                    <SelectItem value="hidden">
+                      {tr("components.collections.collection_builder.hidden")}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <ToggleRow
-                title="Featured"
-                description="Surface this collection near the top of the library."
+                title={tr("components.collections.collection_builder.featured")}
+                description={tr(
+                  "components.collections.collection_builder.surface_this_collection_near_the_top_of_the_library",
+                )}
                 checked={value.featured}
                 onCheckedChange={(checked) => onChange({ ...value, featured: checked })}
                 disabled={readOnly}
@@ -265,7 +288,11 @@ export default function CollectionBuilder({
       {value.collection_type === "smart" ? (
         <>
           <section className="space-y-4">
-            <h2 className="text-lg font-semibold">{advanced ? "Rules" : "Filters"}</h2>
+            <h2 className="text-lg font-semibold">
+              {advanced
+                ? tr("components.collections.collection_builder.rules")
+                : tr("components.collections.collection_builder.filters")}
+            </h2>
             {advanced ? (
               <CollectionRulesEditor
                 value={value.query_definition}
@@ -290,7 +317,9 @@ export default function CollectionBuilder({
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-lg font-semibold">Limit</h2>
+            <h2 className="text-lg font-semibold">
+              {tr("components.collections.collection_builder.limit")}
+            </h2>
             <SmartCollectionLimitField
               query={value.query_definition}
               onQueryChange={(query_definition) => onChange({ ...value, query_definition })}
@@ -300,7 +329,9 @@ export default function CollectionBuilder({
 
           {advanced ? (
             <section className="space-y-4">
-              <h2 className="text-lg font-semibold">Ordering</h2>
+              <h2 className="text-lg font-semibold">
+                {tr("components.collections.collection_builder.ordering")}
+              </h2>
               <CollectionOrderingEditor
                 query={value.query_definition}
                 sortConfig={value.sort_config}
@@ -314,16 +345,22 @@ export default function CollectionBuilder({
         </>
       ) : (
         <section className="space-y-2">
-          <h2 className="text-lg font-semibold">Ordering</h2>
+          <h2 className="text-lg font-semibold">
+            {tr("components.collections.collection_builder.ordering")}
+          </h2>
           <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-5 text-sm">
-            Manual collections are curated after save by adding titles directly.
+            {tr(
+              "components.collections.collection_builder.manual_collections_are_curated_after_save_by_adding_titles_directly",
+            )}
           </div>
         </section>
       )}
 
       {allowAccessControls ? (
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Access</h2>
+          <h2 className="text-lg font-semibold">
+            {tr("components.collections.collection_builder.access")}
+          </h2>
           <CollectionAccessEditor
             value={value.access}
             onChange={(access) => onChange({ ...value, access })}
@@ -336,10 +373,16 @@ export default function CollectionBuilder({
 
       {mode === "user" ? (
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Library Collections tab</h2>
+          <h2 className="text-lg font-semibold">
+            {tr("components.collections.collection_builder.library_collections_tab")}
+          </h2>
           <ToggleRow
-            title="Show in my library Collections tab"
-            description="Pin this collection to your library's Collections tab alongside the admin shelves. Only you see it — personal collections are private to your user."
+            title={tr(
+              "components.collections.collection_builder.show_in_my_library_collections_tab",
+            )}
+            description={tr(
+              "components.collections.collection_builder.pin_this_collection_to_your_library_s_collections_tab_alongside",
+            )}
             checked={value.include_in_server_collections}
             onCheckedChange={(checked) =>
               onChange({ ...value, include_in_server_collections: checked })
@@ -350,7 +393,7 @@ export default function CollectionBuilder({
       ) : null}
 
       <Button type="submit" className="w-full" disabled={isPending || readOnly}>
-        {isPending ? "Saving..." : submitLabel}
+        {isPending ? tr("components.collections.collection_builder.saving") : submitLabel}
       </Button>
     </>
   );
@@ -387,6 +430,7 @@ export function SmartCollectionLimitField({
   onQueryChange: (query: QueryDefinition) => void;
   readOnly?: boolean;
 }) {
+  useUILanguage();
   function commit(input: HTMLInputElement) {
     const parsed = Number.parseInt(input.value, 10);
     const limit =
@@ -402,9 +446,12 @@ export function SmartCollectionLimitField({
   return (
     <div className="grid gap-3 rounded-lg border px-4 py-3 sm:grid-cols-[minmax(0,1fr)_8rem] sm:items-center">
       <div>
-        <Label htmlFor="smart-collection-limit">Max items</Label>
+        <Label htmlFor="smart-collection-limit">
+          {tr("components.collections.collection_builder.max_items")}
+        </Label>
         <p className="text-muted-foreground mt-1 text-xs">
-          Caps saved collection results. Use 1-{SMART_COLLECTION_MAX_LIMIT}.
+          {tr("components.collections.collection_builder.caps_saved_collection_results_use_1")}
+          {SMART_COLLECTION_MAX_LIMIT}.
         </p>
       </div>
       <Input
@@ -438,6 +485,7 @@ function DisplayFilterControls({
   onChange: (value: CollectionBuilderValue) => void;
   readOnly?: boolean;
 }) {
+  useUILanguage();
   const { watch, media } = queryDefinitionToDisplayFilters(value.display_query_definition);
 
   function commit(nextWatch: UserCollectionWatchFilter, nextMedia: UserCollectionMediaFilter) {
@@ -450,20 +498,26 @@ function DisplayFilterControls({
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Display filters</h2>
+        <h2 className="text-lg font-semibold">
+          {tr("components.collections.collection_builder.display_filters")}
+        </h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Uses the active profile&rsquo;s watched state. Shared profiles may see different results.
+          {tr(
+            "components.collections.collection_builder.uses_the_active_profile_rsquo_s_watched_state_shared_profiles",
+          )}
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor={`collection-watch-filter-${mode}`}>Watch state</Label>
+          <Label htmlFor={"collection-watch-filter-" + mode}>
+            {tr("components.collections.collection_builder.watch_state")}
+          </Label>
           <Select
             value={watch}
             onValueChange={(next) => commit(next as UserCollectionWatchFilter, media)}
             disabled={readOnly}
           >
-            <SelectTrigger id={`collection-watch-filter-${mode}`}>
+            <SelectTrigger id={"collection-watch-filter-" + mode}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -476,13 +530,15 @@ function DisplayFilterControls({
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor={`collection-media-filter-${mode}`}>Content</Label>
+          <Label htmlFor={"collection-media-filter-" + mode}>
+            {tr("components.collections.collection_builder.content")}
+          </Label>
           <Select
             value={media}
             onValueChange={(next) => commit(watch, next as UserCollectionMediaFilter)}
             disabled={readOnly}
           >
-            <SelectTrigger id={`collection-media-filter-${mode}`}>
+            <SelectTrigger id={"collection-media-filter-" + mode}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -512,6 +568,7 @@ function ToggleRow({
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
 }) {
+  useUILanguage();
   return (
     <div className="border-border flex items-center justify-between rounded-lg border px-4 py-3">
       <div className="pr-4">

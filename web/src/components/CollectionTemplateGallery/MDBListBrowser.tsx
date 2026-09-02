@@ -6,12 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMDBListSearch, useMDBListTop } from "@/hooks/queries/userCollectionImports";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 interface Props {
   onPick: (list: MDBListListSummary, jsonURL: string) => void;
 }
 
 export function MDBListBrowser({ onPick }: Props) {
+  useUILanguage();
   const [query, setQuery] = useState("");
   const [showTop, setShowTop] = useState(false);
 
@@ -27,9 +31,17 @@ export function MDBListBrowser({ onPick }: Props) {
     return (
       <div className="border-border bg-muted/30 rounded-md border border-dashed px-3 py-2 text-xs">
         <p className="text-muted-foreground">
-          MDBList list search isn&rsquo;t available — an admin needs to add an MDBList API key under{" "}
-          <span className="font-medium">Settings → Subtitles &amp; Metadata</span>. You can still
-          paste a list URL below.
+          {tr(
+            "components.collection_template_gallery.mdblist_browser.mdblist_list_search_isn_rsquo_t_available_an_admin_needs",
+          )}{" "}
+          <span className="font-medium">
+            {tr(
+              "components.collection_template_gallery.mdblist_browser.settings_subtitles_metadata",
+            )}
+          </span>
+          {tr(
+            "components.collection_template_gallery.mdblist_browser.you_can_still_paste_a_list_url_below",
+          )}
         </p>
       </div>
     );
@@ -42,13 +54,17 @@ export function MDBListBrowser({ onPick }: Props) {
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="mdblist-search">Search MDBList</Label>
+      <Label htmlFor="mdblist-search">
+        {tr("components.collection_template_gallery.mdblist_browser.search_mdblist")}
+      </Label>
       <div className="flex gap-2">
         <Input
           id="mdblist-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="e.g. horror, oscar winners, netflix"
+          placeholder={tr(
+            "components.collection_template_gallery.mdblist_browser.e_g_horror_oscar_winners_netflix",
+          )}
         />
         <Button
           type="button"
@@ -59,18 +75,20 @@ export function MDBListBrowser({ onPick }: Props) {
             setShowTop(true);
           }}
         >
-          Top lists
+          {tr("components.collection_template_gallery.mdblist_browser.top_lists")}
         </Button>
       </div>
 
       {error ? (
         <p className="text-destructive text-xs">
-          {error instanceof Error ? error.message : "Search failed"}
+          {tr.error("errors.collection_template_gallery.mdblist_browser.search_failed", error)}
         </p>
       ) : null}
 
       {isLoading ? (
-        <p className="text-muted-foreground text-xs">Searching…</p>
+        <p className="text-muted-foreground text-xs">
+          {tr("components.collection_template_gallery.mdblist_browser.searching")}
+        </p>
       ) : lists && lists.length > 0 ? (
         <ul className="border-border divide-border/60 max-h-72 divide-y overflow-y-auto rounded-md border">
           {lists.map((list) => {
@@ -85,9 +103,21 @@ export function MDBListBrowser({ onPick }: Props) {
                   <div className="min-w-0 space-y-0.5">
                     <p className="truncate text-sm font-medium">{list.name}</p>
                     <p className="text-muted-foreground truncate text-xs">
-                      by {list.user_name} · {list.mediatype === "show" ? "TV" : list.mediatype} ·{" "}
-                      {list.items.toLocaleString()} item{list.items === 1 ? "" : "s"}
-                      {list.likes > 0 ? ` · ♥ ${list.likes.toLocaleString()}` : ""}
+                      {tr("components.collection_template_gallery.mdblist_browser.by")}{" "}
+                      {list.user_name} ·{" "}
+                      {list.mediatype === "show"
+                        ? tr("components.collection_template_gallery.mdblist_browser.tv")
+                        : list.mediatype}{" "}
+                      · {list.items.toLocaleString()}{" "}
+                      {tr("components.collection_template_gallery.mdblist_browser.item")}
+                      {list.items === 1
+                        ? ""
+                        : tr("components.collection_template_gallery.mdblist_browser.s")}
+                      {list.likes > 0
+                        ? tr("components.collection_template_gallery.mdblist_browser.value", {
+                            value: list.likes.toLocaleString(),
+                          })
+                        : ""}
                     </p>
                     {list.description ? (
                       <p className="text-muted-foreground line-clamp-2 text-xs">
@@ -102,7 +132,11 @@ export function MDBListBrowser({ onPick }: Props) {
         </ul>
       ) : showingResults && search.data ? (
         <p className="text-muted-foreground text-xs">
-          No public lists matched &ldquo;{debouncedQuery}&rdquo;.
+          {tr(
+            "components.collection_template_gallery.mdblist_browser.no_public_lists_matched_ldquo",
+          )}
+          {debouncedQuery}
+          {tr("components.collection_template_gallery.mdblist_browser.rdquo")}
         </p>
       ) : null}
     </div>

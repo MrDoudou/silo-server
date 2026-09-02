@@ -9,6 +9,8 @@ import { formatFileSize, mapAudioLabel } from "@/lib/mediaFormat";
 import { videoRangeLabel } from "@/lib/videoRange";
 import { extractSourceHint } from "./versionFormatUtils";
 import { resolutionScore } from "./versionRankingUtils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // ---------------------------------------------------------------------------
 // Exported helper functions (also used by tests)
@@ -57,11 +59,14 @@ interface VersionFlyoutItemsProps {
 }
 
 export default function VersionFlyoutItems({ versions, onPlayVersion }: VersionFlyoutItemsProps) {
+  useUILanguage();
   const sorted = sortByResolution(versions);
 
   return (
     <>
-      <DropdownMenuLabel>Play Version</DropdownMenuLabel>
+      <DropdownMenuLabel>
+        {tr("pages.item_detail.components.version_flyout.play_version")}
+      </DropdownMenuLabel>
       <DropdownMenuSeparator />
 
       {sorted.map((version) => {

@@ -20,6 +20,8 @@ import { createCatalogSearchState, fetchCatalogPage } from "@/hooks/queries/cata
 import { catalogKeys } from "@/hooks/queries/keys";
 import { useSortableList } from "@/hooks/useSortableList";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ManualCollectionItemsEditorProps {
   collectionId: string;
@@ -44,6 +46,7 @@ function AddItemPanel({
   source: "user" | "library";
   existingIds: Set<string>;
 }) {
+  useUILanguage();
   const [query, setQuery] = useState("");
   const debounced = useDebounce(query.trim(), DEBOUNCE_MS);
   const addItem = useAddItemToCollection();
@@ -78,7 +81,9 @@ function AddItemPanel({
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search the catalog to add titles…"
+          placeholder={tr(
+            "components.collections.manual_collection_items_editor.search_the_catalog_to_add_titles",
+          )}
           className="pl-9"
           autoComplete="off"
         />
@@ -86,11 +91,11 @@ function AddItemPanel({
       {debounced.length === 0 ? null : results.isLoading ? (
         <div className="text-muted-foreground flex items-center gap-2 px-3 py-3 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Searching…
+          {tr("components.collections.manual_collection_items_editor.searching")}
         </div>
       ) : items.length === 0 ? (
         <div className="text-muted-foreground border-border/60 rounded-md border border-dashed px-3 py-3 text-sm">
-          No matches.
+          {tr("components.collections.manual_collection_items_editor.no_matches")}
         </div>
       ) : (
         <ul className="border-border/60 divide-border/60 max-h-72 divide-y overflow-y-auto rounded-md border">
@@ -110,7 +115,11 @@ function AddItemPanel({
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{item.title}</div>
                   <div className="text-muted-foreground text-xs">
-                    {item.year ? `${item.year} · ` : ""}
+                    {item.year
+                      ? tr("components.collections.manual_collection_items_editor.year", {
+                          year: item.year,
+                        })
+                      : ""}
                     {item.type}
                   </div>
                 </div>
@@ -128,7 +137,9 @@ function AddItemPanel({
                   className="gap-1.5"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  {already ? "Added" : "Add"}
+                  {already
+                    ? tr("components.collections.manual_collection_items_editor.added")
+                    : tr("common.actions.add")}
                 </Button>
               </li>
             );
@@ -144,6 +155,7 @@ export function ManualCollectionItemsEditor({
   readOnly = false,
   source = "user",
 }: ManualCollectionItemsEditorProps) {
+  useUILanguage();
   const { data, isLoading } = useCollectionItems(collectionId);
   const items = useMemo(() => data ?? [], [data]);
   const reorderMutation = useReorderCollectionItems(collectionId);
@@ -173,7 +185,9 @@ export function ManualCollectionItemsEditor({
       )}
       {items.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-5 text-sm">
-          No items yet. Search above to add titles.
+          {tr(
+            "components.collections.manual_collection_items_editor.no_items_yet_search_above_to_add_titles",
+          )}
         </div>
       ) : (
         <DndContext
@@ -214,6 +228,7 @@ function SortableItemRow({
   readOnly: boolean;
   onRemove: () => void;
 }) {
+  useUILanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.media_item_id,
     disabled: readOnly,
@@ -233,7 +248,12 @@ function SortableItemRow({
       {!readOnly ? (
         <button
           type="button"
-          aria-label={`Drag item ${item.media_item_id}`}
+          aria-label={tr(
+            "components.collections.manual_collection_items_editor.drag_item_media_item_id",
+            {
+              media_item_id: item.media_item_id,
+            },
+          )}
           className="hover:bg-surface-hover cursor-grab touch-none rounded-md p-1 transition-colors"
           {...attributes}
           {...listeners}
@@ -252,7 +272,12 @@ function SortableItemRow({
           variant="ghost"
           size="icon"
           className="text-destructive hover:bg-destructive/10 hover:text-destructive h-7 w-7"
-          aria-label={`Remove item ${item.media_item_id}`}
+          aria-label={tr(
+            "components.collections.manual_collection_items_editor.remove_item_media_item_id",
+            {
+              media_item_id: item.media_item_id,
+            },
+          )}
           onClick={onRemove}
         >
           <Trash2 className="h-3 w-3" />

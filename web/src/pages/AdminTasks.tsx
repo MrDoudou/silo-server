@@ -18,22 +18,24 @@ import type { TaskCategory, TaskInfo, TriggerConfig } from "@/api/types";
 import { formatRelativeTime } from "@/lib/date";
 import { formatDateTime as formatPreferredDateTime } from "@/lib/datetime";
 import { clampTaskProgress, formatTaskProgress } from "@/lib/taskProgress";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const CATEGORY_ORDER: TaskCategory[] = ["library", "metadata", "system"];
 const RUN_BUTTON_MIN_VISIBLE_MS = 1_000;
 
 const CATEGORY_LABELS: Record<TaskCategory, string> = {
-  library: "Library",
-  metadata: "Metadata",
-  system: "System",
+  library: "pages.admin_tasks.library",
+  metadata: "pages.admin_tasks.metadata",
+  system: "pages.admin_tasks.system",
 };
 
 const REFRESH_REASON_LABELS: Record<string, string> = {
-  episode_incomplete: "Episode incomplete",
-  stale_provider_id: "Stale provider ID",
-  refresh_failure: "Refresh failure",
-  core_metadata_incomplete: "Core metadata incomplete",
-  trailers_requested: "Trailers requested",
+  episode_incomplete: "pages.admin_tasks.episode_incomplete",
+  stale_provider_id: "pages.admin_tasks.stale_provider_id",
+  refresh_failure: "pages.admin_tasks.refresh_failure",
+  core_metadata_incomplete: "pages.admin_tasks.core_metadata_incomplete",
+  trailers_requested: "pages.admin_tasks.trailers_requested",
 };
 
 function useTaskClock() {
@@ -144,29 +146,30 @@ function delay(ms: number) {
 }
 
 function RefreshMetadataSummary({ metrics }: { metrics: MetadataRefreshMetrics }) {
+  useUILanguage();
   const topReasons = metrics.reason_counts.filter((entry) => entry.count > 0);
 
   return (
     <div className="bg-muted/20 mt-3 rounded-xl p-3">
       <div className="grid gap-2 text-xs sm:grid-cols-5">
         <div>
-          <div className="text-muted-foreground">Refresh Backlog</div>
+          <div className="text-muted-foreground">{tr("pages.admin_tasks.refresh_backlog")}</div>
           <div className="text-foreground font-medium">{metrics.total}</div>
         </div>
         <div>
-          <div className="text-muted-foreground">Due for Refresh</div>
+          <div className="text-muted-foreground">{tr("pages.admin_tasks.due_for_refresh")}</div>
           <div className="text-foreground font-medium">{metrics.due}</div>
         </div>
         <div>
-          <div className="text-muted-foreground">Processing</div>
+          <div className="text-muted-foreground">{tr("pages.admin_tasks.processing")}</div>
           <div className="text-foreground font-medium">{metrics.leased}</div>
         </div>
         <div>
-          <div className="text-muted-foreground">Waiting Since</div>
+          <div className="text-muted-foreground">{tr("pages.admin_tasks.waiting_since")}</div>
           <div className="text-foreground font-medium">{formatDateTime(metrics.oldest_due_at)}</div>
         </div>
         <div>
-          <div className="text-muted-foreground">Next Claim Timeout</div>
+          <div className="text-muted-foreground">{tr("pages.admin_tasks.next_claim_timeout")}</div>
           <div className="text-foreground font-medium">
             {formatDateTime(metrics.oldest_lease_expires_at)}
           </div>
@@ -177,7 +180,7 @@ function RefreshMetadataSummary({ metrics }: { metrics: MetadataRefreshMetrics }
         <div className="mt-3 flex flex-wrap gap-2">
           {topReasons.map((entry) => (
             <Badge key={entry.reason} variant="secondary">
-              {REFRESH_REASON_LABELS[entry.reason] ?? entry.reason}: {entry.count}
+              {tr(REFRESH_REASON_LABELS[entry.reason] ?? entry.reason)}: {entry.count}
             </Badge>
           ))}
         </div>
@@ -195,6 +198,7 @@ function TaskRow({
   refreshMetrics?: MetadataRefreshMetrics;
   now: number;
 }) {
+  useUILanguage();
   const runTask = useRunTask();
   const cancelTask = useCancelTask();
   const runFeedbackStartedAtRef = useRef<number | null>(null);
@@ -227,7 +231,7 @@ function TaskRow({
     <div className="border-border flex flex-col gap-4 border-b px-4 py-4 last:border-b-0 sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
         <Link
-          to={`/admin/tasks/${task.key}`}
+          to={"/admin/tasks/" + task.key}
           className="text-foreground hover:text-primary text-sm font-medium transition-colors"
         >
           {task.name}
@@ -237,29 +241,39 @@ function TaskRow({
           {task.state === "idle" && (
             <>
               {describeSchedule(task.triggers) && <span>{describeSchedule(task.triggers)}</span>}
-              {!describeSchedule(task.triggers) && <span>No schedule</span>}
+              {!describeSchedule(task.triggers) && (
+                <span>{tr("pages.admin_tasks.no_schedule")}</span>
+              )}
               {task.last_execution && (
                 <span className="ml-2">
-                  · Last run:{" "}
+                  {tr("pages.admin_tasks.last_run")}{" "}
                   {formatRelativeTime(task.last_execution.completed_at, { rounding: "floor" }) ??
                     "—"}
                   {typeof task.last_execution.duration_ms === "number"
-                    ? ` · Duration: ${formatDuration(task.last_execution.duration_ms)}`
+                    ? tr("pages.admin_tasks.duration_value", {
+                        value: formatDuration(task.last_execution.duration_ms),
+                      })
                     : ""}
-                  {resultSummary ? ` · Result: ${resultSummary}` : ""}
+                  {resultSummary
+                    ? tr("pages.admin_tasks.result_result_summary", {
+                        resultSummary: resultSummary,
+                      })
+                    : ""}
                 </span>
               )}
               {!task.last_execution && !describeSchedule(task.triggers) && (
-                <span> · Never run</span>
+                <span> {tr("pages.admin_tasks.never_run")}</span>
               )}
               {task.next_run_at &&
                 (isOverdue(task.next_run_at, now) ? (
                   <span className="text-warning ml-2 inline-flex items-center gap-1 font-medium">
                     <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                    Overdue
+                    {tr("pages.admin_tasks.overdue")}
                   </span>
                 ) : (
-                  <span className="ml-2">· Next: {formatNextRun(task.next_run_at, now)}</span>
+                  <span className="ml-2">
+                    {tr("pages.admin_tasks.next")} {formatNextRun(task.next_run_at, now)}
+                  </span>
                 ))}
             </>
           )}
@@ -269,15 +283,18 @@ function TaskRow({
           <div className="mt-1.5 space-y-1">
             <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
               <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  task.state === "cancelling" ? "bg-yellow-500" : "bg-primary"
-                }`}
+                className={
+                  "h-full rounded-full transition-all duration-300 " +
+                  (task.state === "cancelling" ? "bg-yellow-500" : "bg-primary")
+                }
                 style={{ width: `${Math.max(clampTaskProgress(task.progress), 2)}%` }}
               />
             </div>
             <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs">
               <p className="min-w-0 truncate">
-                {task.state === "cancelling" ? "Cancelling..." : task.progress_message || "Running"}
+                {task.state === "cancelling"
+                  ? tr("pages.admin_tasks.cancelling")
+                  : task.progress_message || tr("pages.admin_tasks.running")}
               </p>
               {task.state !== "cancelling" && task.progress > 0 && (
                 <span className="shrink-0 font-medium tabular-nums">
@@ -309,7 +326,7 @@ function TaskRow({
           )}
           onClick={() => cancelTask.mutate(task.key)}
           disabled={!isRunning || cancelTask.isPending || task.state === "cancelling"}
-          title={isRunning ? "Stop this task run" : undefined}
+          title={isRunning ? tr("pages.admin_tasks.stop_this_task_run") : undefined}
           aria-busy={isShowingRunFeedback}
         >
           {task.state === "cancelling" ? (
@@ -319,7 +336,11 @@ function TaskRow({
           ) : (
             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
           )}
-          {task.state === "cancelling" ? "Stopping..." : isRunning ? "Stop" : "Starting..."}
+          {task.state === "cancelling"
+            ? tr("pages.admin_tasks.stopping")
+            : isRunning
+              ? tr("common.actions.stop")
+              : tr("pages.admin_tasks.starting")}
         </Button>
       ) : (
         <Button
@@ -332,7 +353,7 @@ function TaskRow({
           disabled={runTask.isPending}
         >
           <Play className="mr-1.5 h-3.5 w-3.5" />
-          Run Now
+          {tr("pages.admin_tasks.run_now")}
         </Button>
       )}
     </div>
@@ -340,6 +361,7 @@ function TaskRow({
 }
 
 export default function AdminTasks() {
+  useUILanguage();
   useEventChannel("tasks");
   const now = useTaskClock();
   const { data: tasks, isLoading } = useTasks();
@@ -347,7 +369,7 @@ export default function AdminTasks() {
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
     category: cat,
-    label: CATEGORY_LABELS[cat],
+    label: tr(CATEGORY_LABELS[cat]),
     tasks: (tasks ?? []).filter((t) => t.category === cat),
   })).filter((g) => g.tasks.length > 0);
 
@@ -355,15 +377,20 @@ export default function AdminTasks() {
     <div className="page-shell space-y-6 py-4 sm:py-6">
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Scheduled Tasks</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_tasks.scheduled_tasks")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            View and manage background tasks. You can trigger tasks manually or adjust their
-            schedules, including whether a task runs on server startup.
+            {tr(
+              "pages.admin_tasks.view_and_manage_background_tasks_you_can_trigger_tasks_manually",
+            )}
           </p>
         </div>
       </div>
 
-      {isLoading && <p className="text-muted-foreground text-sm">Loading tasks...</p>}
+      {isLoading && (
+        <p className="text-muted-foreground text-sm">{tr("pages.admin_tasks.loading_tasks")}</p>
+      )}
 
       {grouped.map((group) => (
         <div key={group.category} className="space-y-3">

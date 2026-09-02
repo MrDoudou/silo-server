@@ -20,6 +20,8 @@ import {
   type CollectionSourceType,
 } from "./adminCollectionsShared";
 import SmartCollectionWizard from "./SmartCollectionWizard";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function inferCollectionSourceType(collectionType?: string): CollectionSourceType {
   if (collectionType === "mdblist") return "mdblist";
@@ -33,6 +35,7 @@ function isImportedAdminCollectionType(collectionType?: string): boolean {
 }
 
 export default function AdminCollectionEditor() {
+  useUILanguage();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -53,25 +56,34 @@ export default function AdminCollectionEditor() {
     : sourceType;
 
   const sourceTypeTitles: Record<CollectionSourceType, string> = {
-    manual: "New Manual Collection",
-    mdblist: "Import MDBList Collection",
-    tmdb: "Import TMDB Collection",
-    trakt: "Import Trakt Collection",
+    manual: "pages.admin_collection_editor.new_manual_collection",
+    mdblist: "pages.admin_collection_editor.import_mdblist_collection",
+    tmdb: "pages.admin_collection_editor.import_tmdb_collection",
+    trakt: "pages.admin_collection_editor.import_trakt_collection",
   };
   const title = collection
-    ? `Edit ${collection.title}`
-    : (activeSourceType && sourceTypeTitles[activeSourceType]) || "Add Collection";
+    ? tr("pages.admin_collection_editor.edit_title", { title: collection.title })
+    : tr(
+        (activeSourceType && sourceTypeTitles[activeSourceType]) ||
+          "pages.admin_collection_editor.add_collection",
+      );
 
-  const description = collection
-    ? "Collections now open in a dedicated workspace so rules, artwork, and preview can stay visible."
-    : activeSourceType === null
-      ? "Choose how this collection should be created."
-      : "Build the collection in a full-page editor instead of a cramped dialog.";
+  const description = tr(
+    collection
+      ? "pages.admin_collection_editor.collections_now_open_in_a_dedicated_workspace_so_rules_artwork"
+      : activeSourceType === null
+        ? "pages.admin_collection_editor.choose_how_this_collection_should_be_created"
+        : "pages.admin_collection_editor.build_the_collection_in_a_full_page_editor_instead_of",
+  );
 
   useDocumentTitle(title);
 
   if (isLoading && libraries.length === 0) {
-    return <div className="page-shell py-8">Loading collection editor...</div>;
+    return (
+      <div className="page-shell py-8">
+        {tr("pages.admin_collection_editor.loading_collection_editor")}
+      </div>
+    );
   }
 
   if (!isCreate && !collection && !isLoading) {
@@ -80,13 +92,15 @@ export default function AdminCollectionEditor() {
         <Button asChild variant="ghost" className="w-fit px-0">
           <Link to={returnPath}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Collections
+            {tr("pages.admin_collection_editor.back_to_collections")}
           </Link>
         </Button>
         <Card className="surface-panel rounded-2xl border-0 shadow-none">
           <CardHeader>
-            <CardTitle>Collection not found</CardTitle>
-            <CardDescription>The selected collection could not be loaded.</CardDescription>
+            <CardTitle>{tr("pages.admin_collection_editor.collection_not_found")}</CardTitle>
+            <CardDescription>
+              {tr("pages.admin_collection_editor.the_selected_collection_could_not_be_loaded")}
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -117,7 +131,7 @@ export default function AdminCollectionEditor() {
           <Button asChild variant="ghost" className="w-fit px-0">
             <Link to={returnPath}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Collections
+              {tr("pages.admin_collection_editor.back_to_collections")}
             </Link>
           </Button>
           <div>
@@ -128,7 +142,7 @@ export default function AdminCollectionEditor() {
 
         {!collection && activeSourceType !== null ? (
           <Button variant="outline" onClick={() => setSourceType(null)}>
-            Change Source Type
+            {tr("pages.admin_collection_editor.change_source_type")}
           </Button>
         ) : null}
       </div>
@@ -136,10 +150,11 @@ export default function AdminCollectionEditor() {
       {!collection && activeSourceType === null ? (
         <Card className="surface-panel rounded-2xl border-0 shadow-none">
           <CardHeader>
-            <CardTitle>Choose a Collection Type</CardTitle>
+            <CardTitle>{tr("pages.admin_collection_editor.choose_a_collection_type")}</CardTitle>
             <CardDescription>
-              Smart/manual collections open the full query builder. Imports keep their
-              source-specific setup.
+              {tr(
+                "pages.admin_collection_editor.smart_manual_collections_open_the_full_query_builder_imports_keep",
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>

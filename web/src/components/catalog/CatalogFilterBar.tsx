@@ -17,6 +17,8 @@ import {
   normalizeQuerySortForScope,
   type QuerySortRelevanceScope,
 } from "@/lib/querySortOptions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CatalogFilterBarProps {
   state: GuidedFormState;
@@ -35,14 +37,54 @@ interface CatalogFilterBarProps {
 export const CATALOG_SOURCE_ORDER_SORT_FIELD = "__source_order";
 
 export const CATALOG_MEDIA_SCOPE_OPTIONS = [
-  { value: "all", label: "All Media" },
-  { value: "video", label: "Movies & Series" },
-  { value: "movie", label: "Movies" },
-  { value: "series", label: "Series" },
-  { value: "episode", label: "Episodes" },
-  { value: "audiobook", label: "Audiobooks" },
-  { value: "ebook", label: "Ebooks" },
-  { value: "manga", label: "Manga" },
+  {
+    value: "all",
+    get label() {
+      return tr("components.catalog.catalog_filter_bar.all_media");
+    },
+  },
+  {
+    value: "video",
+    get label() {
+      return tr("components.catalog.catalog_filter_bar.movies_series");
+    },
+  },
+  {
+    value: "movie",
+    get label() {
+      return tr("components.catalog.catalog_filter_bar.movies");
+    },
+  },
+  {
+    value: "series",
+    get label() {
+      return tr("components.catalog.catalog_filter_bar.series");
+    },
+  },
+  {
+    value: "episode",
+    get label() {
+      return tr("components.catalog.catalog_filter_bar.episodes");
+    },
+  },
+  {
+    value: "audiobook",
+    get label() {
+      return tr("components.catalog.catalog_filter_bar.audiobooks");
+    },
+  },
+  {
+    value: "ebook",
+    get label() {
+      return tr("components.catalog.catalog_filter_bar.ebooks");
+    },
+  },
+  {
+    value: "manga",
+    get label() {
+      return tr("components.catalog.catalog_filter_bar.manga");
+    },
+  },
 ] as const;
 
 export default function CatalogFilterBar({
@@ -58,6 +100,7 @@ export default function CatalogFilterBar({
   sourceOrderLabel,
   allowEpisodeMediaScope = true,
 }: CatalogFilterBarProps) {
+  useUILanguage();
   const sortOptions = getCollectionSortOptions(allowPersonalizedSorts, sortRelevanceScope);
   const mediaScopeOptions = allowEpisodeMediaScope
     ? CATALOG_MEDIA_SCOPE_OPTIONS
@@ -184,8 +227,12 @@ export default function CatalogFilterBar({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="desc">Descending</SelectItem>
-            <SelectItem value="asc">Ascending</SelectItem>
+            <SelectItem value="desc">
+              {tr("components.catalog.catalog_filter_bar.descending")}
+            </SelectItem>
+            <SelectItem value="asc">
+              {tr("components.catalog.catalog_filter_bar.ascending")}
+            </SelectItem>
           </SelectContent>
         </Select>
       )}
@@ -193,7 +240,7 @@ export default function CatalogFilterBar({
       {/* Filters button */}
       <Button variant="outline" size="sm" onClick={onOpenFilters} className="gap-2">
         <SlidersHorizontal className="h-4 w-4" />
-        Filters
+        {tr("components.catalog.catalog_filter_bar.filters")}
         {activeFilterCount > 0 && (
           <Badge variant="default" className="ml-1 px-1.5 py-0 text-[10px]">
             {activeFilterCount}
@@ -203,7 +250,7 @@ export default function CatalogFilterBar({
       {resultCountLoading ? (
         <Loader2
           className="text-muted-foreground size-4 animate-spin"
-          aria-label="Loading item count"
+          aria-label={tr("components.catalog.catalog_filter_bar.loading_item_count")}
         />
       ) : resultCountLabel ? (
         <span className="text-muted-foreground text-sm tabular-nums" aria-live="polite">

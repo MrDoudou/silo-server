@@ -13,30 +13,35 @@ import { DownloadsStep } from "./setup-wizard/steps/DownloadsStep";
 import { RecommendationsStep } from "./setup-wizard/steps/RecommendationsStep";
 import { NodesFinishStep } from "./setup-wizard/steps/NodesFinishStep";
 import type { WizardStepId } from "./setup-wizard/useWizardSteps";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const STEP_TITLES: Record<WizardStepId, string> = {
-  account: "Create your account",
-  profile: "Add a profile",
-  server: "Server & storage",
-  integrations: "Integrations",
-  downloads: "Downloads",
-  recommendations: "Recommendations",
-  library: "Add a library",
-  nodes: "You're all set",
+  account: "pages.setup_wizard.create_your_account",
+  profile: "pages.setup_wizard.add_a_profile",
+  server: "pages.setup_wizard.server_storage",
+  integrations: "pages.setup_wizard.integrations",
+  downloads: "pages.setup_wizard.downloads",
+  recommendations: "pages.setup_wizard.recommendations",
+  library: "pages.setup_wizard.add_a_library",
+  nodes: "pages.setup_wizard.you_re_all_set",
 };
 
 const STEP_DESCRIPTIONS: Record<WizardStepId, string> = {
-  account: "This will be the admin account for managing your server.",
-  profile: "Profiles let different people track their own watch history and preferences.",
-  server: "Configure core infrastructure. All fields are optional and can be changed later.",
-  integrations: "Configure subtitle providers for automatic subtitle downloading.",
-  downloads: "Allow users to download media files for offline viewing.",
-  recommendations: "AI-powered recommendations using embeddings. Requires pgvector.",
-  library: "Point Silo at your media files. You can add more libraries later.",
-  nodes: "Silo is ready. Start exploring or fine-tune in admin settings.",
+  account: "pages.setup_wizard.this_will_be_the_admin_account_for_managing_your_server",
+  profile: "pages.setup_wizard.profiles_let_different_people_track_their_own_watch_history_and",
+  server: "pages.setup_wizard.configure_core_infrastructure_all_fields_are_optional_and_can_be",
+  integrations:
+    "pages.setup_wizard.configure_subtitle_providers_for_automatic_subtitle_downloading",
+  downloads: "pages.setup_wizard.allow_users_to_download_media_files_for_offline_viewing",
+  recommendations:
+    "pages.setup_wizard.ai_powered_recommendations_using_embeddings_requires_pgvector",
+  library: "pages.setup_wizard.point_silo_at_your_media_files_you_can_add_more",
+  nodes: "pages.setup_wizard.silo_is_ready_start_exploring_or_fine_tune_in_admin",
 };
 
 function WizardContent() {
+  useUILanguage();
   const { user, profiles, librariesLoading, profilesLoading } = useWizardContext();
   const { steps, currentStep } = useWizardSteps();
   const isAdmin = user?.role === "admin";
@@ -68,10 +73,10 @@ function WizardContent() {
         <div className="mb-10">
           <StepIndicator steps={steps} />
           <h1 className="text-foreground mt-6 text-[1.7rem] leading-tight font-bold tracking-[-0.03em] sm:text-3xl">
-            {STEP_TITLES[currentStep]}
+            {tr(STEP_TITLES[currentStep])}
           </h1>
           <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-            {STEP_DESCRIPTIONS[currentStep]}
+            {tr(STEP_DESCRIPTIONS[currentStep])}
           </p>
         </div>
 
@@ -92,11 +97,14 @@ function WizardContent() {
 }
 
 export default function SetupWizard() {
+  useUILanguage();
   const { user, loading, setupLoading, setupRequired } = useAuth();
-  useDocumentTitle("Setup");
+  useDocumentTitle(tr("pages.setup_wizard.setup"));
 
   if (loading || setupLoading) {
-    return <div className="text-muted-foreground p-8 text-sm">Loading...</div>;
+    return (
+      <div className="text-muted-foreground p-8 text-sm">{tr("pages.setup_wizard.loading")}</div>
+    );
   }
 
   if (!setupRequired && !user) {

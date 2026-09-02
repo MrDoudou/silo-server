@@ -58,6 +58,8 @@ import {
   nodeUsesCUDADevices,
   parseHWDeviceOverride,
 } from "./adminNodesPresentation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type NodeType = "proxy" | "transcode";
 
@@ -102,6 +104,8 @@ const NODE_STATE_DOT: Record<NodeState, string> = {
 
 /** Micro-caps block label inside a node unit; the app's existing eyebrow idiom. */
 function UnitLabel({ children }: { children: ReactNode }) {
+  useUILanguage();
+  useUILanguage();
   return <p className="hero-eyebrow mb-2.5 text-[0.62rem]">{children}</p>;
 }
 
@@ -116,6 +120,8 @@ function UnitLabel({ children }: { children: ReactNode }) {
  * a stub, so that it stays distinguishable from no measurement.
  */
 function LoadMeter({ fill, warning }: { fill: number | null; warning?: boolean }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="h-[3px]" aria-hidden="true">
       {fill !== null && (
@@ -149,6 +155,8 @@ const METRIC_GRID = "grid grid-cols-[auto_minmax(2rem,1fr)_auto] items-center ga
 
 /** One derived reading, as three cells of the enclosing metric grid. */
 function NodeMetricRow({ metric }: { metric: ResourceMetric }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <>
       <span className="text-muted-foreground text-[11px]" title={metric.title}>
@@ -170,13 +178,15 @@ function NodeMetricRow({ metric }: { metric: ResourceMetric }) {
 }
 
 function NodeLoadBlock({ node }: { node: StreamNode }) {
+  useUILanguage();
+  useUILanguage();
   const system = describeNodeSystem(node);
   return (
     <div>
-      <UnitLabel>Load</UnitLabel>
+      <UnitLabel>{tr("pages.admin_nodes.load")}</UnitLabel>
       {system.kind === "unreported" ? (
         <p className="text-muted-foreground text-xs" title={system.title}>
-          No resource sample
+          {tr("pages.admin_nodes.no_resource_sample")}
         </p>
       ) : (
         <div className={METRIC_GRID}>
@@ -191,9 +201,11 @@ function NodeLoadBlock({ node }: { node: StreamNode }) {
 }
 
 function NodeCapacityBlock({ node, showEgress }: { node: StreamNode; showEgress: boolean }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div>
-      <UnitLabel>Capacity</UnitLabel>
+      <UnitLabel>{tr("pages.admin_nodes.capacity")}</UnitLabel>
       <div className={METRIC_GRID}>
         <NodeMetricRow metric={describeNodeJobs(node)} />
         {showEgress && <NodeMetricRow metric={describeNodeEgress(node)} />}
@@ -203,13 +215,13 @@ function NodeCapacityBlock({ node, showEgress }: { node: StreamNode; showEgress:
           reader do that subtraction on every unit. The stamp stays in the title
           for when the exact moment matters.
         */}
-        <span className="text-muted-foreground text-[11px]">Checked</span>
+        <span className="text-muted-foreground text-[11px]">{tr("pages.admin_nodes.checked")}</span>
         <span />
         <span
           className="text-right font-mono text-[11px] tabular-nums"
           title={node.last_health_check ? formatDateTime(node.last_health_check) : undefined}
         >
-          {formatRelativeTime(node.last_health_check) ?? "Never"}
+          {formatRelativeTime(node.last_health_check) ?? tr("pages.admin_nodes.never")}
         </span>
       </div>
     </div>
@@ -218,6 +230,8 @@ function NodeCapacityBlock({ node, showEgress }: { node: StreamNode; showEgress:
 
 /** The "override: qsv" line, or nothing on a node that inherits the cluster. */
 function NodeOverrideLine({ node }: { node: StreamNode }) {
+  useUILanguage();
+  useUILanguage();
   const override = describeNodeAccelerationOverride(node);
   if (!override) {
     return null;
@@ -235,6 +249,8 @@ function NodeOverrideLine({ node }: { node: StreamNode }) {
  * reading job counts, not a fault.
  */
 function NodeSharedGPUBadge({ node, allNodes }: { node: StreamNode; allNodes: StreamNode[] }) {
+  useUILanguage();
+  useUILanguage();
   const shared = describeSharedGPU(node, allNodes);
   if (!shared) {
     return null;
@@ -256,6 +272,8 @@ function NodeSharedGPUBadge({ node, allNodes }: { node: StreamNode; allNodes: St
  * operator has to act on, and the Health column will not show it.
  */
 function NodeDriftBadge({ node }: { node: StreamNode }) {
+  useUILanguage();
+  useUILanguage();
   const drift = describeCapabilityDrift(node);
   if (!drift) {
     return null;
@@ -300,6 +318,8 @@ function staleInventoryTitle(reason: NodeCapabilityStaleReason, node: StreamNode
  * compared at a glance.
  */
 function NodeEngineRow({ device }: { device: NodeGPULiveDevice }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <>
       <span
@@ -326,11 +346,13 @@ function NodeEngineRow({ device }: { device: NodeGPULiveDevice }) {
 }
 
 function NodeAccelerationBlock({ node, allNodes }: { node: StreamNode; allNodes: StreamNode[] }) {
+  useUILanguage();
+  useUILanguage();
   const gpu = describeNodeGPU(node);
   if (gpu.kind === "awaiting") {
     return (
       <div>
-        <UnitLabel>Acceleration</UnitLabel>
+        <UnitLabel>{tr("pages.admin_nodes.acceleration")}</UnitLabel>
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-muted-foreground text-xs" title={gpu.title}>
@@ -346,7 +368,7 @@ function NodeAccelerationBlock({ node, allNodes }: { node: StreamNode; allNodes:
 
   return (
     <div>
-      <UnitLabel>Acceleration</UnitLabel>
+      <UnitLabel>{tr("pages.admin_nodes.acceleration")}</UnitLabel>
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className={gpu.backend.badgeClass} title={gpu.backend.title}>
@@ -363,7 +385,13 @@ function NodeAccelerationBlock({ node, allNodes }: { node: StreamNode; allNodes:
             >
               <AlertTriangle
                 className="h-3.5 w-3.5"
-                aria-label={`${gpu.failures.length} hardware backend probe failure(s) on ${node.name}`}
+                aria-label={tr(
+                  "pages.admin_nodes.length_hardware_backend_probe_failure_s_on_name",
+                  {
+                    length: gpu.failures.length,
+                    name: node.name,
+                  },
+                )}
               />
             </span>
           )}
@@ -372,7 +400,7 @@ function NodeAccelerationBlock({ node, allNodes }: { node: StreamNode; allNodes:
               className="text-muted-foreground text-xs"
               title={staleInventoryTitle(gpu.stale, node)}
             >
-              stale
+              {tr("pages.admin_nodes.stale")}
             </span>
           )}
         </div>
@@ -417,6 +445,8 @@ function GroupChip({
   title?: string;
   onClick: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <button
       type="button"
@@ -473,17 +503,19 @@ function NodeGroupFilter({
   total: number;
   onSelect: (group: string | null) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   if (options.length < 2) {
     return null;
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <p className="hero-eyebrow mr-1 text-[0.62rem]">Groups</p>
+      <p className="hero-eyebrow mr-1 text-[0.62rem]">{tr("pages.admin_nodes.groups")}</p>
       <GroupChip
-        label="All"
+        label={tr("pages.admin_nodes.all")}
         count={total}
         active={active === null}
-        title="Every node, grouped or not."
+        title={tr("pages.admin_nodes.every_node_grouped_or_not")}
         onClick={() => onSelect(null)}
       />
       {options.map((option) => (
@@ -541,6 +573,8 @@ function NodeUnit({
   onReprobe,
   isReprobing,
 }: NodeUnitProps) {
+  useUILanguage();
+  useUILanguage();
   const state = nodeState(node);
   // See nodeReportsAcceleration: a proxy reports no hardware, so it has neither
   // an acceleration block to draw nor hardware to re-probe.
@@ -587,9 +621,11 @@ function NodeUnit({
           {node.public_url && (
             <p
               className="text-muted-foreground truncate font-mono text-xs"
-              title={`Streaming clients connect here; the server uses the address above.`}
+              title={tr(
+                "pages.admin_nodes.streaming_clients_connect_here_the_server_uses_the_address_above",
+              )}
             >
-              public: {node.public_url}
+              {tr("pages.admin_nodes.public")} {node.public_url}
             </p>
           )}
         </div>
@@ -598,7 +634,7 @@ function NodeUnit({
           {/* Out of the table, this switch has no column header to name it. */}
           <Switch
             checked={node.enabled}
-            aria-label={`Enable ${node.name}`}
+            aria-label={tr("pages.admin_nodes.enable_name", { name: node.name })}
             onCheckedChange={() => onToggle(node)}
           />
           <span aria-hidden="true" className="bg-border/70 mx-1.5 h-5 w-px" />
@@ -607,11 +643,11 @@ function NodeUnit({
             size="icon"
             className="h-7 w-7"
             disabled={isChecking}
-            aria-label={`Check health of ${node.name}`}
+            aria-label={tr("pages.admin_nodes.check_health_of_name", { name: node.name })}
             onClick={() => onCheckHealth(node)}
           >
             <RefreshCw
-              className={`h-3 w-3 ${isChecking ? "animate-spin" : ""}`}
+              className={"h-3 w-3 " + (isChecking ? "animate-spin" : "")}
               aria-hidden="true"
             />
           </Button>
@@ -621,12 +657,14 @@ function NodeUnit({
               size="icon"
               className="h-7 w-7"
               disabled={isReprobing}
-              aria-label={`Re-probe hardware on ${node.name}`}
-              title="Re-verify this node's hardware against live devices. Use after a driver or device change; it can take a couple of minutes, and is refused while the node is transcoding."
+              aria-label={tr("pages.admin_nodes.re_probe_hardware_on_name", { name: node.name })}
+              title={tr(
+                "pages.admin_nodes.re_verify_this_node_s_hardware_against_live_devices_use",
+              )}
               onClick={() => onReprobe(node)}
             >
               <ScanSearch
-                className={`h-3 w-3 ${isReprobing ? "animate-pulse" : ""}`}
+                className={"h-3 w-3 " + (isReprobing ? "animate-pulse" : "")}
                 aria-hidden="true"
               />
             </Button>
@@ -635,7 +673,7 @@ function NodeUnit({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            aria-label={`Edit ${node.name}`}
+            aria-label={tr("pages.admin_nodes.edit_name", { name: node.name })}
             onClick={() => onEdit(node)}
           >
             <Pencil className="h-3 w-3" aria-hidden="true" />
@@ -644,7 +682,7 @@ function NodeUnit({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            aria-label={`Delete ${node.name}`}
+            aria-label={tr("pages.admin_nodes.delete_name", { name: node.name })}
             onClick={() => onDelete(node)}
           >
             <Trash2 className="h-3 w-3" aria-hidden="true" />
@@ -706,17 +744,21 @@ function NodeSection({
   onReprobe,
   reprobingId,
 }: NodeSectionProps) {
+  useUILanguage();
+  useUILanguage();
   const label = type === "proxy" ? "Proxy" : "Transcode";
 
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">{label} Nodes</h2>
+          <h2 className="text-lg font-semibold">
+            {label} {tr("pages.admin_nodes.nodes")}
+          </h2>
           <Badge variant="secondary">{nodes.length}</Badge>
         </div>
         <Button size="sm" onClick={onAdd}>
-          <Plus className="mr-1 h-4 w-4" /> Add {label}
+          <Plus className="mr-1 h-4 w-4" /> {tr("common.actions.add")} {label}
         </Button>
       </div>
 
@@ -734,19 +776,19 @@ function NodeSection({
           <p className="text-muted-foreground mx-auto max-w-md text-sm">
             {activeGroup !== null
               ? type === "proxy"
-                ? "No proxy node in this group. Transcodes here are served by any proxy in the cluster rather than staying on one LAN."
-                : "No transcode node in this group. Nothing is pinned to its proxies."
+                ? tr("pages.admin_nodes.no_proxy_node_in_this_group_transcodes_here_are_served")
+                : tr("pages.admin_nodes.no_transcode_node_in_this_group_nothing_is_pinned_to")
               : type === "proxy"
-                ? "No proxy nodes yet. Add one to deliver streams from somewhere other than this server."
-                : "No transcode nodes yet. Add one to move transcoding off this server."}
+                ? tr("pages.admin_nodes.no_proxy_nodes_yet_add_one_to_deliver_streams_from")
+                : tr("pages.admin_nodes.no_transcode_nodes_yet_add_one_to_move_transcoding_off")}
           </p>
           {activeGroup !== null ? (
             <Button variant="outline" size="sm" onClick={onClearGroup}>
-              Show all groups
+              {tr("pages.admin_nodes.show_all_groups")}
             </Button>
           ) : (
             <Button variant="outline" size="sm" onClick={onAdd}>
-              <Plus className="mr-1 h-4 w-4" /> Add {label}
+              <Plus className="mr-1 h-4 w-4" /> {tr("common.actions.add")} {label}
             </Button>
           )}
         </div>
@@ -791,6 +833,8 @@ function NodeDevicePicker({
   onToggle: (path: string) => void;
   onInherit: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const selectedCount = rows.filter((row) => row.selected).length;
 
   return (
@@ -806,7 +850,7 @@ function NodeDevicePicker({
             </div>
             <Switch
               checked={row.selected}
-              aria-label={`Transcode on ${row.path}`}
+              aria-label={tr("pages.admin_nodes.transcode_on_path", { path: row.path })}
               onCheckedChange={() => onToggle(row.path)}
             />
           </div>
@@ -820,14 +864,16 @@ function NodeDevicePicker({
             not know which.
           */}
           {selectedCount === 0
-            ? "Using the cluster-wide device setting."
+            ? tr("pages.admin_nodes.using_the_cluster_wide_device_setting")
             : selectedCount === 1
-              ? "All transcodes on this node run on the selected device."
-              : "Transcodes on this node balance across the selected devices (least loaded first)."}
+              ? tr("pages.admin_nodes.all_transcodes_on_this_node_run_on_the_selected_device")
+              : tr(
+                  "pages.admin_nodes.transcodes_on_this_node_balance_across_the_selected_devices_least",
+                )}
         </p>
         {selectedCount > 0 && (
           <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={onInherit}>
-            Use cluster default
+            {tr("pages.admin_nodes.use_cluster_default")}
           </Button>
         )}
       </div>
@@ -852,6 +898,8 @@ function NodeForm({
   defaultGroup: string;
   onClose: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const [name, setName] = useState(node?.name ?? "");
   const [url, setUrl] = useState(node?.url ?? "");
   const [publicUrl, setPublicUrl] = useState(node?.public_url ?? "");
@@ -946,24 +994,28 @@ function NodeForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label>Name</Label>
+        <Label>{tr("pages.admin_nodes.name")}</Label>
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={nodeType === "proxy" ? "Proxy Node 1" : "Transcode Node 1"}
+          placeholder={
+            nodeType === "proxy"
+              ? tr("pages.admin_nodes.proxy_node_1")
+              : tr("pages.admin_nodes.transcode_node_1")
+          }
           required
         />
       </div>
 
       <div className="space-y-2">
-        <Label>Type</Label>
+        <Label>{tr("pages.admin_nodes.type")}</Label>
         <Badge variant="secondary" className="text-sm">
-          {nodeType === "proxy" ? "Proxy" : "Transcode"}
+          {nodeType === "proxy" ? tr("pages.admin_nodes.proxy") : tr("pages.admin_nodes.transcode")}
         </Badge>
       </div>
 
       <div className="space-y-2">
-        <Label>URL</Label>
+        <Label>{tr("pages.admin_nodes.url")}</Label>
         <Input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
@@ -972,75 +1024,74 @@ function NodeForm({
         />
         {nodeType === "transcode" ? (
           <p className="text-muted-foreground text-sm">
-            Must be reachable from proxy nodes and the backend server. A private/internal IP or
-            localhost is fine — no public URL needed.
+            {tr("pages.admin_nodes.must_be_reachable_from_proxy_nodes_and_the_backend_server")}
           </p>
         ) : (
           <p className="text-muted-foreground text-sm">
-            How the server reaches this node — health checks and capability fetches use it, so a
-            private/internal address is fine and keeps that traffic off the public network. Without
-            a Public URL below, streaming clients use this address too, so it must then be publicly
-            accessible.
+            {tr("pages.admin_nodes.how_the_server_reaches_this_node_health_checks_and_capability")}
           </p>
         )}
       </div>
 
       {nodeType === "proxy" && (
         <div className="space-y-2">
-          <Label>Public URL</Label>
+          <Label>{tr("pages.admin_nodes.public_url")}</Label>
           <Input
             value={publicUrl}
             onChange={(e) => setPublicUrl(e.target.value)}
-            placeholder="Same as URL"
+            placeholder={tr("pages.admin_nodes.same_as_url")}
           />
           <p className="text-muted-foreground text-sm">
-            Optional. What streaming clients connect to, when it differs from the URL above — a CDN
-            or load-balancer hostname in front of this node. Stream and download links are built on
-            it; everything the server does keeps using the URL above. Leave empty to give clients
-            the URL above.
+            {tr(
+              "pages.admin_nodes.optional_what_streaming_clients_connect_to_when_it_differs_from",
+            )}
           </p>
         </div>
       )}
 
       <div className="space-y-2">
-        <Label>Group</Label>
-        <Input value={group} onChange={(e) => setGroup(e.target.value)} placeholder="e.g. rack-1" />
+        <Label>{tr("pages.admin_nodes.group")}</Label>
+        <Input
+          value={group}
+          onChange={(e) => setGroup(e.target.value)}
+          placeholder={tr("pages.admin_nodes.e_g_rack_1")}
+        />
         <p className="text-muted-foreground text-sm">
-          Optional. Nodes in the same group are treated as co-located: transcoded streams are served
-          by a proxy from the transcode node's group, keeping traffic on the same LAN. A group is
-          only used while all of its nodes are healthy.
+          {tr("pages.admin_nodes.optional_nodes_in_the_same_group_are_treated_as_co")}
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label>{nodeType === "proxy" ? "Max Streams" : "Max Transcodes"}</Label>
+        <Label>
+          {nodeType === "proxy"
+            ? tr("pages.admin_nodes.max_streams")
+            : tr("pages.admin_nodes.max_transcodes")}
+        </Label>
         <Input
           type="number"
           min={0}
           value={maxJobs}
           onChange={(e) => setMaxJobs(e.target.value)}
-          placeholder="Unlimited"
+          placeholder={tr("pages.admin_nodes.unlimited")}
         />
         <p className="text-muted-foreground text-sm">
-          Optional concurrency cap for this node. Leave empty (or 0) for unlimited.
+          {tr("pages.admin_nodes.optional_concurrency_cap_for_this_node_leave_empty_or_0")}
         </p>
       </div>
 
       {nodeType === "proxy" && (
         <div className="space-y-2">
-          <Label>Max Egress Bandwidth (Mbps)</Label>
+          <Label>{tr("pages.admin_nodes.max_egress_bandwidth_mbps")}</Label>
           <Input
             type="number"
             min={0}
             step="any"
             value={maxBandwidthMbps}
             onChange={(e) => setMaxBandwidthMbps(e.target.value)}
-            placeholder="Unlimited"
+            placeholder={tr("pages.admin_nodes.unlimited")}
           />
           <p className="text-muted-foreground text-sm">
-            Optional. New streams are routed elsewhere once this node's measured egress (plus the
-            expected bitrate of the new stream) would exceed the cap. Active streams are never
-            interrupted. Leave empty (or 0) for unlimited.
+            {tr("pages.admin_nodes.optional_new_streams_are_routed_elsewhere_once_this_node_s")}
           </p>
         </div>
       )}
@@ -1054,7 +1105,9 @@ function NodeForm({
       {node && nodeType === "transcode" && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="node-hw-accel-override">Hardware Acceleration</Label>
+            <Label htmlFor="node-hw-accel-override">
+              {tr("pages.admin_nodes.hardware_acceleration")}
+            </Label>
             <Select value={hwAccelOverride} onValueChange={selectHWAccelOverride}>
               <SelectTrigger id="node-hw-accel-override" className="w-full">
                 <SelectValue />
@@ -1068,11 +1121,9 @@ function NodeForm({
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-sm">
-              Optional. Overrides the cluster-wide Hardware Acceleration setting for this node only
-              — use it when this node's hardware differs from the rest of the cluster. The cluster
-              default is Auto unless changed on the Playback settings page, and Auto detects this
-              node's own hardware, not the server's. Applies to new transcodes within a minute;
-              restart the node to re-prime its encoder for the new backend.
+              {tr(
+                "pages.admin_nodes.optional_overrides_the_cluster_wide_hardware_acceleration_setting_for_this",
+              )}
             </p>
             {effectiveAcceleration && (
               <p className="text-muted-foreground text-sm">{effectiveAcceleration}</p>
@@ -1081,7 +1132,7 @@ function NodeForm({
 
           <div className="space-y-2">
             <Label htmlFor={hasDeviceInventory ? undefined : "node-hw-device-override"}>
-              GPU Devices
+              {tr("pages.admin_nodes.gpu_devices")}
             </Label>
             {hasDeviceInventory ? (
               <NodeDevicePicker
@@ -1097,7 +1148,7 @@ function NodeForm({
                   id="node-hw-device-override"
                   value={hwDeviceOverride}
                   onChange={(e) => setHwDeviceOverride(e.target.value)}
-                  placeholder="Cluster default"
+                  placeholder={tr("pages.admin_nodes.cluster_default")}
                 />
                 {/*
                   Each branch is a whole sentence rather than a shared tail: an
@@ -1116,20 +1167,27 @@ function NodeForm({
                 <p className="text-muted-foreground text-sm">
                   {usesCUDADevices ? (
                     <>
-                      Optional. The CUDA device this node encodes on — an index or a GPU UUID (e.g.{" "}
-                      <span className="font-mono">0</span> or{" "}
-                      <span className="font-mono">GPU-a1b2c3d4</span>). NVENC addresses GPUs by CUDA
-                      identity, not by <span className="font-mono">/dev/dri</span> render path, so
-                      the device picker does not apply to it. Leaving this empty inherits the
-                      cluster-wide device setting, which must itself be a CUDA identity for NVENC to
-                      use it — set one here when the cluster is configured with render paths.
+                      {tr(
+                        "pages.admin_nodes.optional_the_cuda_device_this_node_encodes_on_an_index",
+                      )}{" "}
+                      <span className="font-mono">{tr("pages.admin_nodes.value_0")}</span>{" "}
+                      {tr("pages.admin_nodes.or")}{" "}
+                      <span className="font-mono">{tr("pages.admin_nodes.gpu_a1b2c3d4")}</span>
+                      {tr("pages.admin_nodes.nvenc_addresses_gpus_by_cuda_identity_not_by")}{" "}
+                      <span className="font-mono">{tr("pages.admin_nodes.dev_dri")}</span>{" "}
+                      {tr("pages.admin_nodes.render_path_so_the_device_picker_does_not_apply_to")}
                     </>
                   ) : (
                     <>
-                      Optional. Comma-separated render device paths this node transcodes on (e.g.{" "}
-                      <span className="font-mono">/dev/dri/renderD128,/dev/dri/renderD129</span>).
-                      This node has reported no device inventory yet, so there is nothing to pick
-                      from. Leave empty to inherit the cluster-wide device setting.
+                      {tr(
+                        "pages.admin_nodes.optional_comma_separated_render_device_paths_this_node_transcodes_on",
+                      )}{" "}
+                      <span className="font-mono">
+                        {tr("pages.admin_nodes.dev_dri_render_d128_dev_dri_render_d129")}
+                      </span>
+                      {tr(
+                        "pages.admin_nodes.this_node_has_reported_no_device_inventory_yet_so_there",
+                      )}
                     </>
                   )}
                 </p>
@@ -1140,13 +1198,15 @@ function NodeForm({
       )}
 
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Saving..." : "Save"}
+        {isPending ? tr("pages.admin_nodes.saving") : tr("common.actions.save")}
       </Button>
     </form>
   );
 }
 
 export default function AdminNodes() {
+  useUILanguage();
+  useUILanguage();
   const { data: nodes = [], isLoading } = useAdminNodes();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<StreamNode | null>(null);
@@ -1210,16 +1270,20 @@ export default function AdminNodes() {
     }
   }
 
-  if (isLoading) return <div className="page-shell py-8">Loading nodes...</div>;
+  if (isLoading)
+    return <div className="page-shell py-8">{tr("pages.admin_nodes.loading_nodes")}</div>;
 
   return (
     <div className="page-shell space-y-8 py-4 sm:py-6">
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Stream Nodes</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_nodes.stream_nodes")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Manage proxy and transcode workers that distribute playback load across your
-            infrastructure.
+            {tr(
+              "pages.admin_nodes.manage_proxy_and_transcode_workers_that_distribute_playback_load_across",
+            )}
           </p>
         </div>
       </div>
@@ -1236,9 +1300,11 @@ export default function AdminNodes() {
         onOpenChange={(open) => {
           if (!open) setConfirmDeleteNode(null);
         }}
-        title="Delete node"
-        description={`Delete stream node "${confirmDeleteNode?.name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
+        title={tr("pages.admin_nodes.delete_node")}
+        description={tr("pages.admin_nodes.delete_stream_node_name_this_action_cannot_be_undone", {
+          name: confirmDeleteNode?.name,
+        })}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         onConfirm={() => {
           if (confirmDeleteNode) deleteMutation.mutate(confirmDeleteNode.id);
@@ -1263,7 +1329,7 @@ export default function AdminNodes() {
         infoBanner={
           <div className="surface-panel-subtle text-info flex items-start gap-2 rounded-xl p-3 text-sm">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>Proxy nodes relay streams to end users. The URL must be publicly accessible.</p>
+            <p>{tr("pages.admin_nodes.proxy_nodes_relay_streams_to_end_users_the_url_must")}</p>
           </div>
         }
       />
@@ -1286,9 +1352,11 @@ export default function AdminNodes() {
           <div className="surface-panel-subtle text-warning flex items-start gap-2 rounded-xl p-3 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
-              Transcode nodes handle video transcoding internally.{" "}
-              <strong>Must be on the same network as proxy nodes and the backend.</strong> Does not
-              need a public URL.
+              {tr("pages.admin_nodes.transcode_nodes_handle_video_transcoding_internally")}{" "}
+              <strong>
+                {tr("pages.admin_nodes.must_be_on_the_same_network_as_proxy_nodes_and")}
+              </strong>{" "}
+              {tr("pages.admin_nodes.does_not_need_a_public_url")}
             </p>
           </div>
         }
@@ -1299,8 +1367,10 @@ export default function AdminNodes() {
           <DialogHeader>
             <DialogTitle>
               {editingNode
-                ? "Edit Node"
-                : `Add ${resolvedNodeType === "proxy" ? "Proxy" : "Transcode"} Node`}
+                ? tr("pages.admin_nodes.edit_node")
+                : tr("pages.admin_nodes.add_value_node", {
+                    value: resolvedNodeType === "proxy" ? "Proxy" : "Transcode",
+                  })}
             </DialogTitle>
           </DialogHeader>
           <NodeForm

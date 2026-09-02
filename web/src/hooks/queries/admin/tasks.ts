@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { api, ApiClientError } from "@/api/client";
 import type { ExecutionResult, TaskInfo, TriggerConfig } from "@/api/types";
 import { adminKeys } from "@/hooks/queries/keys";
@@ -85,13 +85,13 @@ export function useRunTask() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
       queryClient.invalidateQueries({ queryKey: adminKeys.taskMetrics("refresh_metadata") });
-      toast.success("Task started");
+      toast.success("feedback.queries.admin.tasks.task_started");
     },
     onError: (error: Error) => {
       if (error instanceof ApiClientError && error.status === 409) {
-        toast.error("Task is already running");
+        toast.error("errors.queries.admin.tasks.task_is_already_running");
       } else {
-        toast.error("Failed to start task");
+        toast.error("errors.queries.admin.tasks.failed_to_start_task");
       }
     },
   });
@@ -107,10 +107,10 @@ export function useCancelTask() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
       queryClient.invalidateQueries({ queryKey: adminKeys.taskMetrics("refresh_metadata") });
-      toast.success("Cancellation requested");
+      toast.success("feedback.queries.admin.tasks.cancellation_requested");
     },
     onError: () => {
-      toast.error("Failed to cancel task");
+      toast.error("errors.queries.admin.tasks.failed_to_cancel_task");
     },
   });
 }
@@ -127,10 +127,10 @@ export function useUpdateTriggers() {
       queryClient.invalidateQueries({ queryKey: adminKeys.task(key) });
       queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
       queryClient.invalidateQueries({ queryKey: adminKeys.taskMetrics(key) });
-      toast.success("Schedule updated");
+      toast.success("feedback.queries.admin.tasks.schedule_updated");
     },
     onError: () => {
-      toast.error("Failed to update schedule");
+      toast.error("errors.queries.admin.tasks.failed_to_update_schedule");
     },
   });
 }

@@ -34,9 +34,11 @@ import { storage } from "@/utils/storage";
 import { useWatchPlaybackController } from "@/playback/watchPlaybackContext";
 import { useWatchTogetherRoomConnection } from "@/player/hooks/useWatchTogetherRoomConnection";
 import { useDebounce } from "@/hooks/useDebounce";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { decodeThumbhash } from "@/lib/thumbhash";
 import { WatchTogetherSuggestionPanel } from "./WatchTogetherSuggestionPanel";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function describeRoomError(error: unknown) {
   if (error === "not_found") {
@@ -95,6 +97,7 @@ function SearchPosterCard({
   onClick: () => void;
   index: number;
 }) {
+  useUILanguage();
   const [loaded, setLoaded] = useState(false);
   const thumbhashUrl = item.poster_thumbhash ? decodeThumbhash(item.poster_thumbhash) : "";
 
@@ -106,9 +109,10 @@ function SearchPosterCard({
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div
-        className={`media-card-image relative aspect-[2/3] transition-all duration-200 ${
-          selected ? "ring-primary ring-offset-background ring-2 ring-offset-2" : ""
-        }`}
+        className={
+          "media-card-image relative aspect-[2/3] transition-all duration-200 " +
+          (selected ? "ring-primary ring-offset-background ring-2 ring-offset-2" : "")
+        }
         style={
           thumbhashUrl
             ? {
@@ -123,9 +127,10 @@ function SearchPosterCard({
           <img
             src={item.poster_url}
             alt={item.title}
-            className={`h-full w-full object-cover transition-opacity duration-300 ${
-              loaded ? "opacity-100" : "opacity-0"
-            }`}
+            className={
+              "h-full w-full object-cover transition-opacity duration-300 " +
+              (loaded ? "opacity-100" : "opacity-0")
+            }
             loading="lazy"
             onLoad={() => setLoaded(true)}
           />
@@ -139,7 +144,7 @@ function SearchPosterCard({
         {/* Type badge */}
         {item.type === "series" && (
           <span className="glass-subtle absolute right-2 bottom-2 flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/90">
-            Series <ChevronRight className="size-2.5" />
+            {tr("pages.watch_together_room_page.series")} <ChevronRight className="size-2.5" />
           </span>
         )}
       </div>
@@ -171,6 +176,7 @@ function CandidateSpotlight({
   onConfirm: () => void;
   onDismiss: () => void;
 }) {
+  useUILanguage();
   const [backdropLoaded, setBackdropLoaded] = useState(false);
   const [posterLoaded, setPosterLoaded] = useState(false);
   const thumbhashUrl = candidate.poster_thumbhash
@@ -192,9 +198,10 @@ function CandidateSpotlight({
         <img
           src={candidate.backdrop_url}
           alt=""
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
-            backdropLoaded ? "opacity-30" : "opacity-0"
-          }`}
+          className={
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-500 " +
+            (backdropLoaded ? "opacity-30" : "opacity-0")
+          }
           onLoad={() => setBackdropLoaded(true)}
         />
       )}
@@ -219,14 +226,15 @@ function CandidateSpotlight({
               <img
                 src={candidate.poster_url}
                 alt={candidate.title}
-                className={`h-full w-full object-cover transition-opacity duration-300 ${
-                  posterLoaded ? "opacity-100" : "opacity-0"
-                }`}
+                className={
+                  "h-full w-full object-cover transition-opacity duration-300 " +
+                  (posterLoaded ? "opacity-100" : "opacity-0")
+                }
                 onLoad={() => setPosterLoaded(true)}
               />
             ) : (
               <div className="bg-surface flex h-full items-center justify-center text-xs">
-                No poster
+                {tr("pages.watch_together_room_page.no_poster")}
               </div>
             )}
           </div>
@@ -236,7 +244,9 @@ function CandidateSpotlight({
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
           <div>
             <div className="text-muted-foreground text-[10px] font-semibold tracking-[0.18em] uppercase">
-              {pendingAction === "suggest" ? "Your Suggestion" : "Ready to Play"}
+              {pendingAction === "suggest"
+                ? tr("pages.watch_together_room_page.your_suggestion")
+                : tr("pages.watch_together_room_page.ready_to_play")}
             </div>
             <h3 className="mt-1.5 text-xl font-semibold tracking-tight sm:text-2xl">
               {candidate.title}
@@ -267,7 +277,7 @@ function CandidateSpotlight({
               className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm transition-colors"
             >
               <X className="size-3.5" />
-              Cancel
+              {tr("common.actions.cancel")}
             </button>
           </div>
         </div>
@@ -286,6 +296,7 @@ function NowPlayingHero({
   type: string;
   backdropUrl?: string;
 }) {
+  useUILanguage();
   const [loaded, setLoaded] = useState(false);
 
   return (
@@ -294,9 +305,10 @@ function NowPlayingHero({
         <img
           src={backdropUrl}
           alt=""
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
-            loaded ? "opacity-25" : "opacity-0"
-          }`}
+          className={
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-700 " +
+            (loaded ? "opacity-25" : "opacity-0")
+          }
           onLoad={() => setLoaded(true)}
         />
       )}
@@ -306,7 +318,7 @@ function NowPlayingHero({
         <div className="flex items-center gap-2">
           <div className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
           <span className="text-[11px] font-semibold tracking-[0.18em] text-green-400/90 uppercase">
-            Now Playing
+            {tr("pages.watch_together_room_page.now_playing")}
           </span>
         </div>
         <h3 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h3>
@@ -326,6 +338,7 @@ function RoomTerminalState({
   description: string;
   children?: ReactNode;
 }) {
+  useUILanguage();
   return (
     <div
       role="alert"
@@ -342,7 +355,8 @@ function RoomTerminalState({
 }
 
 export default function WatchTogetherRoomPage() {
-  useDocumentTitle("Watch Party");
+  useUILanguage();
+  useDocumentTitle(tr("pages.watch_together_room_page.watch_party"));
   const { roomId } = useParams<{ roomId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -491,7 +505,7 @@ export default function WatchTogetherRoomPage() {
         });
         setCandidate(null);
         setCandidateContext(null);
-        toast.success("Suggestion added");
+        toast.success("feedback.watch_together_room_page.suggestion_added");
       } else {
         await roomConnection.selectItem({
           content_id: candidate.content_id,
@@ -500,7 +514,7 @@ export default function WatchTogetherRoomPage() {
         setCandidateContext(null);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update room");
+      toast.error("errors.watch_together_room_page.failed_to_update_room", { error: error });
     } finally {
       setSubmitting(false);
     }
@@ -567,11 +581,13 @@ export default function WatchTogetherRoomPage() {
   if (!roomId || !roomToken) {
     return (
       <RoomTerminalState
-        title="This invite link is incomplete"
-        description="The link is missing its access token, so the room can't be opened. Ask the host for a fresh invite, or join with a room code instead."
+        title={tr("pages.watch_together_room_page.this_invite_link_is_incomplete")}
+        description={tr(
+          "pages.watch_together_room_page.the_link_is_missing_its_access_token_so_the_room",
+        )}
       >
         <Button type="button" onClick={() => navigate("/rooms/join")}>
-          Join with a code
+          {tr("pages.watch_together_room_page.join_with_a_code")}
         </Button>
       </RoomTerminalState>
     );
@@ -581,10 +597,12 @@ export default function WatchTogetherRoomPage() {
     return (
       <RoomTerminalState
         title={describeRoomError(roomConnection.closedReason)}
-        description="Start a new watch party or join another room to keep watching together."
+        description={tr(
+          "pages.watch_together_room_page.start_a_new_watch_party_or_join_another_room_to",
+        )}
       >
         <Button type="button" onClick={() => navigate("/rooms/join")}>
-          Start a new party
+          {tr("pages.watch_together_room_page.start_a_new_party")}
         </Button>
       </RoomTerminalState>
     );
@@ -603,7 +621,7 @@ export default function WatchTogetherRoomPage() {
         <div className="flex items-center gap-4">
           <div>
             <div className="text-muted-foreground text-[10px] font-semibold tracking-[0.2em] uppercase">
-              Watch Party
+              {tr("pages.watch_together_room_page.watch_party")}
             </div>
             <div className="mt-0.5 text-lg font-semibold tracking-tight">
               {roomConnection.room?.code ?? "…"}
@@ -634,10 +652,12 @@ export default function WatchTogetherRoomPage() {
               size="sm"
               onClick={() => void handleCopyInvite()}
               className="gap-1.5"
-              aria-label="Copy invite link"
+              aria-label={tr("pages.watch_together_room_page.copy_invite_link")}
             >
               <LinkIcon className="size-3.5" />
-              <span className="hidden sm:inline">Invite</span>
+              <span className="hidden sm:inline">
+                {tr("pages.watch_together_room_page.invite")}
+              </span>
             </Button>
           ) : null}
           {isHost ? (
@@ -652,8 +672,8 @@ export default function WatchTogetherRoomPage() {
                 <ShieldCheck className="size-3.5" />
                 <span className="hidden sm:inline">
                   {roomConnection.room?.guest_control_policy === "guest_play_pause"
-                    ? "Host Only"
-                    : "Allow Pause"}
+                    ? tr("pages.watch_together_room_page.host_only")
+                    : tr("pages.watch_together_room_page.allow_pause")}
                 </span>
               </Button>
               <Button
@@ -662,7 +682,7 @@ export default function WatchTogetherRoomPage() {
                 size="sm"
                 onClick={() => setEndConfirmOpen(true)}
               >
-                End
+                {tr("pages.watch_together_room_page.end")}
               </Button>
             </>
           ) : null}
@@ -675,7 +695,7 @@ export default function WatchTogetherRoomPage() {
               className="gap-1.5"
             >
               <LogOut className="size-3.5" />
-              Leave
+              {tr("pages.watch_together_room_page.leave")}
             </Button>
           ) : null}
         </div>
@@ -691,18 +711,23 @@ export default function WatchTogetherRoomPage() {
             >
               <span
                 aria-hidden="true"
-                className={`inline-block h-1.5 w-1.5 rounded-full ${
-                  member.connected ? "bg-emerald-400" : "bg-white/25"
-                }`}
+                className={
+                  "inline-block h-1.5 w-1.5 rounded-full " +
+                  (member.connected ? "bg-emerald-400" : "bg-white/25")
+                }
               />
               <span className="font-medium">
                 {member.display_name}
-                {member.is_self ? " (you)" : ""}
+                {member.is_self ? tr("pages.watch_together_room_page.you") : ""}
               </span>
-              <span className="sr-only">{member.connected ? "Connected" : "Disconnected"}</span>
+              <span className="sr-only">
+                {member.connected
+                  ? tr("pages.watch_together_room_page.connected")
+                  : tr("pages.watch_together_room_page.disconnected")}
+              </span>
               {member.is_host ? (
                 <span className="text-muted-foreground rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
-                  Host
+                  {tr("pages.watch_together_room_page.host")}
                 </span>
               ) : null}
             </div>
@@ -713,7 +738,7 @@ export default function WatchTogetherRoomPage() {
       {/* ─── Now Playing hero ─── */}
       {isPlaying && roomConnection.room?.selected_content_id ? (
         <NowPlayingHero
-          title={selectedItemQuery.data?.title ?? "Loading..."}
+          title={selectedItemQuery.data?.title ?? tr("pages.watch_together_room_page.loading")}
           type={selectedItemQuery.data?.type === "episode" ? "Episode" : "Movie"}
           backdropUrl={selectedItemQuery.data?.backdrop_url}
         />
@@ -746,9 +771,11 @@ export default function WatchTogetherRoomPage() {
                 setSearchStep({ stage: "results" });
               }}
               placeholder={
-                isVoteMode ? "Search to suggest something..." : "Search movies and series..."
+                isVoteMode
+                  ? tr("pages.watch_together_room_page.search_to_suggest_something")
+                  : tr("pages.watch_together_room_page.search_movies_and_series")
               }
-              aria-label="Search movies and series"
+              aria-label={tr("pages.watch_together_room_page.search_movies_and_series_fbac21ac")}
               className="border-border bg-surface placeholder:text-muted-foreground h-12 w-full rounded-xl border py-3 pr-4 pl-11 text-sm shadow-sm transition-all duration-200 outline-none focus:border-white/30 focus:ring-1 focus:ring-white/10"
             />
             {query && (
@@ -758,7 +785,7 @@ export default function WatchTogetherRoomPage() {
                   setQuery("");
                   setSearchStep({ stage: "results" });
                 }}
-                aria-label="Clear search"
+                aria-label={tr("pages.watch_together_room_page.clear_search")}
                 className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2 transition-colors"
               >
                 <X className="size-4" />
@@ -775,7 +802,9 @@ export default function WatchTogetherRoomPage() {
                 className="text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1.5 text-sm font-medium transition-colors"
               >
                 <ChevronLeft className="size-3.5" />
-                {searchStep.stage === "episodes" ? searchStep.series.title : "Back to results"}
+                {searchStep.stage === "episodes"
+                  ? searchStep.series.title
+                  : tr("pages.watch_together_room_page.back_to_results")}
               </button>
 
               {searchStep.stage === "seasons" ? (
@@ -792,7 +821,9 @@ export default function WatchTogetherRoomPage() {
                       <h3 className="text-lg font-semibold tracking-tight">
                         {searchStep.series.title}
                       </h3>
-                      <div className="text-muted-foreground text-sm">Pick a season</div>
+                      <div className="text-muted-foreground text-sm">
+                        {tr("pages.watch_together_room_page.pick_a_season")}
+                      </div>
                     </div>
                   </div>
 
@@ -816,11 +847,18 @@ export default function WatchTogetherRoomPage() {
                           >
                             <div>
                               <div className="text-sm font-semibold">
-                                {season.is_specials ? "Specials" : `Season ${season.season_number}`}
+                                {season.is_specials
+                                  ? tr("pages.watch_together_room_page.specials")
+                                  : tr("pages.watch_together_room_page.season_season_number", {
+                                      season_number: season.season_number,
+                                    })}
                               </div>
                               <div className="text-muted-foreground mt-0.5 text-xs">
-                                {season.episode_count} episode
-                                {season.episode_count !== 1 ? "s" : ""}
+                                {season.episode_count}{" "}
+                                {tr("pages.watch_together_room_page.episode")}
+                                {season.episode_count !== 1
+                                  ? tr("pages.watch_together_room_page.s")
+                                  : ""}
                               </div>
                             </div>
                             <ChevronRight className="text-muted-foreground size-4 transition-transform group-hover:translate-x-0.5" />
@@ -845,7 +883,7 @@ export default function WatchTogetherRoomPage() {
                         {searchStep.series.title}
                       </h3>
                       <div className="text-muted-foreground text-sm">
-                        Season {searchStep.seasonNumber}
+                        {tr("pages.watch_together_room_page.season")} {searchStep.seasonNumber}
                       </div>
                     </div>
                   </div>
@@ -892,7 +930,7 @@ export default function WatchTogetherRoomPage() {
                     (episodesQuery.data?.episodes ?? []).filter((ep) => ep.files.length > 0)
                       .length === 0 ? (
                       <div className="text-muted-foreground rounded-lg border border-white/5 px-4 py-8 text-center text-sm">
-                        No playable episodes in this season.
+                        {tr("pages.watch_together_room_page.no_playable_episodes_in_this_season")}
                       </div>
                     ) : null}
                   </div>
@@ -928,7 +966,7 @@ export default function WatchTogetherRoomPage() {
                 </div>
               ) : (
                 <div className="text-muted-foreground py-12 text-center text-sm">
-                  No matches found. Try a different search.
+                  {tr("pages.watch_together_room_page.no_matches_found_try_a_different_search")}
                 </div>
               )}
             </div>
@@ -940,10 +978,12 @@ export default function WatchTogetherRoomPage() {
               <Search className="size-8 opacity-30" />
               <p className="text-sm">
                 {isPlaying
-                  ? "Search to switch what everyone is watching."
+                  ? tr("pages.watch_together_room_page.search_to_switch_what_everyone_is_watching")
                   : isVoteMode
-                    ? "Search for something to suggest to the room."
-                    : "Find something for everyone to watch."}
+                    ? tr(
+                        "pages.watch_together_room_page.search_for_something_to_suggest_to_the_room",
+                      )
+                    : tr("pages.watch_together_room_page.find_something_for_everyone_to_watch")}
               </p>
             </div>
           ) : null}
@@ -954,11 +994,17 @@ export default function WatchTogetherRoomPage() {
           <div className="bg-surface flex size-16 items-center justify-center rounded-2xl border border-white/10">
             <Users className="text-muted-foreground size-7" />
           </div>
-          <h2 className="mt-2 text-lg font-semibold">Waiting for the host</h2>
+          <h2 className="mt-2 text-lg font-semibold">
+            {tr("pages.watch_together_room_page.waiting_for_the_host")}
+          </h2>
           <p className="text-muted-foreground max-w-sm text-sm">
             {isPlaying
-              ? "The host already started playback. You'll enter together."
-              : "The host will choose a movie or episode for the room."}
+              ? tr(
+                  "pages.watch_together_room_page.the_host_already_started_playback_you_ll_enter_together",
+                )
+              : tr(
+                  "pages.watch_together_room_page.the_host_will_choose_a_movie_or_episode_for_the",
+                )}
           </p>
         </section>
       )}

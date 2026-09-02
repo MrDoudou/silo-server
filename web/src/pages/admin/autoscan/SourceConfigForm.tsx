@@ -7,6 +7,8 @@ import { SchemaForm } from "@/components/admin/plugins/SchemaForm";
 import { useAdminLibraries } from "@/hooks/queries/admin/libraries";
 
 import { configFields, fillValueFromLibraries } from "./sourceDescriptor";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Renders a scan source's per-source configuration from its descriptor, using
@@ -38,6 +40,7 @@ export function SourceConfigForm({
   /** Reports whether every required/validated field is satisfied. */
   onValidityChange?: (valid: boolean) => void;
 }) {
+  useUILanguage();
   const libraries = useAdminLibraries();
   const form = descriptor.config_form;
   const fields = useMemo(() => configFields(descriptor), [descriptor]);
@@ -83,10 +86,15 @@ export function SourceConfigForm({
               variant="outline"
               size="sm"
               onClick={() => applyFill(field.key, value)}
-              title={`Replace ${field.label} with the paths of your enabled libraries`}
+              title={tr(
+                "pages.admin.autoscan.source_config_form.replace_label_with_the_paths_of_your_enabled_libraries",
+                {
+                  label: field.label,
+                },
+              )}
             >
               <LibraryIcon className="size-3.5" />
-              Use library paths for {field.label}
+              {tr("pages.admin.autoscan.source_config_form.use_library_paths_for")} {field.label}
             </Button>
           ))}
         </div>

@@ -14,6 +14,8 @@ import { resolveVersionAudioLanguage } from "@/player/utils/effectiveAudioLangua
 import { isBitmapCodec } from "@/player/utils/subtitleCodecs";
 import { resolveSubtitleAutoSelect } from "@/player/utils/subtitleSort";
 
+import { tr } from "@/i18n/translate";
+
 export interface WatchRouteRequest {
   contentId: string;
   fileId?: number;
@@ -213,12 +215,15 @@ function buildInitialSubtitleTrackIndexes({
       index,
       language: track.language?.trim() || "unknown",
       codec: track.codec,
-      label:
-        track.title?.trim() ||
-        track.embedded_title?.trim() ||
-        track.file_name?.trim() ||
-        track.language?.trim() ||
-        `Subtitle ${index + 1}`,
+      get label() {
+        return (
+          track.title?.trim() ||
+          track.embedded_title?.trim() ||
+          track.file_name?.trim() ||
+          track.language?.trim() ||
+          tr("pages.watch_route_helpers.subtitle_track_number", { trackNumber: index + 1 })
+        );
+      },
       source: track.external ? "external" : "embedded",
       forced: track.forced,
       hearing_impaired: track.hearing_impaired,

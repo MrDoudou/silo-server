@@ -4,6 +4,8 @@ import { formatTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { chartSeriesColor, stackSegments } from "./chartMath";
 import { ChartLegend, ChartTooltip, ChartTooltipRow } from "./chartChrome";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface StackedColumnBucket {
   /** Bucket start in epoch milliseconds. */
@@ -60,6 +62,7 @@ export function StackedColumnChart({
   ariaLabel,
   className,
 }: StackedColumnChartProps) {
+  useUILanguage();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const columns = useMemo(
@@ -113,7 +116,13 @@ export function StackedColumnChart({
                 activeIndex === index && "bg-foreground/5",
               )}
               tabIndex={0}
-              aria-label={`${formatBucket(column.t)}: ${formatValue(column.total)}`}
+              aria-label={tr(
+                "components.admin.dashboard.charts.stacked_column_chart.value_value2",
+                {
+                  value: formatBucket(column.t),
+                  value2: formatValue(column.total),
+                },
+              )}
               onPointerEnter={() => setActiveIndex(index)}
               onFocus={() => setActiveIndex(index)}
               onBlur={() => setActiveIndex(null)}

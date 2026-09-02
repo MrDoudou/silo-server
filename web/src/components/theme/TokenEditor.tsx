@@ -11,6 +11,8 @@ import type { ThemeToken, TokenMeta } from "@/lib/themeTokens";
 import { useTheme } from "@/hooks/useTheme";
 import type { ThemeVarOverrides } from "@/hooks/useCustomTheme";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface TokenEditorProps {
   vars: ThemeVarOverrides;
@@ -52,6 +54,7 @@ function ColorTokenInput({
   onSet: (value: string) => void;
   onReset: () => void;
 }) {
+  useUILanguage();
   const displayValue = value ?? computedValue;
   const hexValue = toHex(displayValue);
   const isOverridden = value !== undefined;
@@ -75,7 +78,7 @@ function ColorTokenInput({
               type="button"
               onClick={onReset}
               className="text-muted-foreground hover:text-foreground"
-              title="Reset to theme default"
+              title={tr("components.theme.token_editor.reset_to_theme_default")}
             >
               <RotateCcw className="h-3 w-3" />
             </button>
@@ -98,6 +101,7 @@ function RadiusInput({
   onSet: (value: string) => void;
   onReset: () => void;
 }) {
+  useUILanguage();
   const currentRem = parseFloat(value ?? computedValue) || 0.5;
   const isOverridden = value !== undefined;
 
@@ -105,19 +109,24 @@ function RadiusInput({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-medium">Border Radius</span>
+          <span className="text-[13px] font-medium">
+            {tr("components.theme.token_editor.border_radius")}
+          </span>
           {isOverridden && (
             <button
               type="button"
               onClick={onReset}
               className="text-muted-foreground hover:text-foreground"
-              title="Reset to theme default"
+              title={tr("components.theme.token_editor.reset_to_theme_default")}
             >
               <RotateCcw className="h-3 w-3" />
             </button>
           )}
         </div>
-        <span className="text-muted-foreground font-mono text-[11px]">{currentRem}rem</span>
+        <span className="text-muted-foreground font-mono text-[11px]">
+          {currentRem}
+          {tr("components.theme.token_editor.rem")}
+        </span>
       </div>
       <Slider
         value={[currentRem]}
@@ -152,19 +161,22 @@ function FontInput({
   onSet: (value: string) => void;
   onReset: () => void;
 }) {
+  useUILanguage();
   const currentFont = value ?? computedValue.split(",")[0]?.replace(/["']/g, "").trim() ?? "Outfit";
   const isOverridden = value !== undefined;
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <span className="text-[13px] font-medium">Font Family</span>
+        <span className="text-[13px] font-medium">
+          {tr("components.theme.token_editor.font_family")}
+        </span>
         {isOverridden && (
           <button
             type="button"
             onClick={onReset}
             className="text-muted-foreground hover:text-foreground"
-            title="Reset to theme default"
+            title={tr("components.theme.token_editor.reset_to_theme_default")}
           >
             <RotateCcw className="h-3 w-3" />
           </button>
@@ -193,6 +205,7 @@ function FontInput({
 }
 
 export function TokenEditor({ vars, onSetVar, onResetVar }: TokenEditorProps) {
+  useUILanguage();
   const { theme } = useTheme();
 
   // Recompute when the base theme changes so fallback values stay current

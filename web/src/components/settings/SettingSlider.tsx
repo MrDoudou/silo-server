@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Slider } from "@/components/ui/slider";
 import { SETTINGS_CONTROL_WIDTH } from "@/pages/admin-settings/SettingField";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SettingSliderProps {
   /** The persisted value. The thumb returns here if a save is rejected. */
@@ -40,6 +42,7 @@ export function SettingSlider({
   onCommit,
   className,
 }: SettingSliderProps) {
+  useUILanguage();
   const [draft, setDraft] = useState<number | null>(null);
   const shown = draft ?? value;
 
@@ -64,7 +67,7 @@ export function SettingSlider({
       />
       <span className="text-muted-foreground min-w-16 text-right text-xs font-medium tabular-nums">
         {shown}
-        {unit ? ` ${unit}` : ""}
+        {unit ? tr("components.settings.setting_slider.unit", { unit: unit }) : ""}
       </span>
     </div>
   );

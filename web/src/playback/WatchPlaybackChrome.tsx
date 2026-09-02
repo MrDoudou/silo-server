@@ -33,6 +33,7 @@ import { applyPlaybackProgressToCache } from "@/hooks/queries/playbackProgressCa
 import { invalidatePlaybackSurfaceQueries } from "@/hooks/queries/playbackSurfaceRefresh";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
+
 import { useViewTransitionNavigate } from "@/hooks/useViewTransition";
 import { PlayerConfigProvider, type PlayerConfig } from "@/player/context/PlayerConfigContext";
 import type {
@@ -58,6 +59,8 @@ import {
   type WatchRouteRequest,
 } from "@/pages/watchRouteHelpers";
 import { canEditMarkers as canEditMarkersForUser } from "@/lib/permissions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const WatchPage = lazy(() =>
   import("@/player/components/WatchPage").then((module) => ({ default: module.WatchPage })),
@@ -151,6 +154,7 @@ function buildWatchLocationState(request: WatchRouteRequest) {
 }
 
 function PlaybackPreparingScreen() {
+  useUILanguage();
   return (
     <div
       className="bg-background fixed inset-0 z-50 flex items-center justify-center px-6"
@@ -160,9 +164,11 @@ function PlaybackPreparingScreen() {
       <div className="surface-panel-subtle animate-in fade-in flex min-w-[260px] flex-col items-center gap-4 rounded-[1.8rem] px-8 py-7 text-center duration-300">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
         <div className="space-y-1">
-          <p className="text-sm font-medium text-white">Preparing playback</p>
+          <p className="text-sm font-medium text-white">
+            {tr("playback.watch_playback_chrome.preparing_playback")}
+          </p>
           <p className="text-xs text-white/55">
-            Loading stream details, subtitles, and resume state.
+            {tr("playback.watch_playback_chrome.loading_stream_details_subtitles_and_resume_state")}
           </p>
         </div>
       </div>
@@ -171,6 +177,7 @@ function PlaybackPreparingScreen() {
 }
 
 export function WatchPlaybackProvider({ children }: { children: ReactNode }) {
+  useUILanguage();
   const navigate = useViewTransitionNavigate();
   const [state, dispatch] = useReducer(watchPlaybackReducer, undefined, createEmptyPlaybackState);
   const stateRef = useRef(state);
@@ -397,6 +404,7 @@ export function WatchPlaybackProvider({ children }: { children: ReactNode }) {
 }
 
 export function WatchPlaybackHost() {
+  useUILanguage();
   const controller = useContext(WatchPlaybackControllerContext);
   if (!controller) {
     throw new Error("Watch playback host is unavailable outside WatchPlaybackProvider");
@@ -866,9 +874,11 @@ export function WatchPlaybackHost() {
       <div className="bg-background fixed inset-0 z-50 flex items-center justify-center px-6">
         <div className="surface-panel-subtle flex max-w-md flex-col items-center gap-4 rounded-[1.8rem] px-8 py-8 text-center">
           <div className="space-y-2">
-            <p className="text-base font-semibold text-white">Playback unavailable</p>
+            <p className="text-base font-semibold text-white">
+              {tr("playback.watch_playback_chrome.playback_unavailable")}
+            </p>
             <div className="text-sm text-white/60">
-              {error instanceof Error ? error.message : "Item not found"}
+              {tr.error("errors.playback.watch_playback_chrome.item_not_found", error)}
             </div>
           </div>
           <button
@@ -876,7 +886,7 @@ export function WatchPlaybackHost() {
             type="button"
             className="rounded-[0.95rem] bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
           >
-            Go Back
+            {tr("playback.watch_playback_chrome.go_back")}
           </button>
         </div>
       </div>
@@ -986,6 +996,7 @@ export function WatchPlaybackHost() {
 }
 
 export function WatchPlaybackBar() {
+  useUILanguage();
   const controller = useContext(WatchPlaybackControllerContext);
   if (!controller) {
     throw new Error("Watch playback bar is unavailable outside WatchPlaybackProvider");
@@ -1018,13 +1029,16 @@ export function WatchPlaybackBar() {
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-white">{title}</div>
                 <div className="text-xs text-white/60">
-                  {subtitle ?? (snapshot ? "Background playback" : "Preparing playback")}
+                  {subtitle ??
+                    (snapshot
+                      ? tr("playback.watch_playback_chrome.background_playback")
+                      : tr("playback.watch_playback_chrome.preparing_playback"))}
                 </div>
               </div>
               {state.pictureInPictureActive && (
                 <div className="hidden shrink-0 items-center gap-1 rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-medium text-white/75 sm:flex">
                   <PictureInPicture2 className="h-3.5 w-3.5" />
-                  PiP
+                  {tr("playback.watch_playback_chrome.pi_p")}
                 </div>
               )}
             </div>
@@ -1049,7 +1063,11 @@ export function WatchPlaybackBar() {
               />
               <div className="flex items-center justify-between text-[11px] text-white/55 tabular-nums">
                 <span>{formatTime(displayedTime)}</span>
-                <span>{snapshot ? formatTime(snapshot.duration) : "0:00"}</span>
+                <span>
+                  {snapshot
+                    ? formatTime(snapshot.duration)
+                    : tr("playback.watch_playback_chrome.value_0_00")}
+                </span>
               </div>
             </div>
           </div>
@@ -1061,7 +1079,7 @@ export function WatchPlaybackBar() {
               className="h-10 w-10 rounded-full"
               onClick={() => transport?.seekBy(-10)}
               disabled={!transport}
-              title="Back 10 seconds"
+              title={tr("playback.watch_playback_chrome.back_10_seconds")}
             >
               <SkipBack className="h-4 w-4" />
             </Button>
@@ -1075,7 +1093,7 @@ export function WatchPlaybackBar() {
               ) : (
                 <Play className="mr-2 h-4 w-4 fill-current" />
               )}
-              {snapshot?.playing ? "Pause" : "Play"}
+              {snapshot?.playing ? tr("common.actions.pause") : tr("common.actions.play")}
             </Button>
             <Button
               variant="glass"
@@ -1083,7 +1101,7 @@ export function WatchPlaybackBar() {
               className="h-10 w-10 rounded-full"
               onClick={() => transport?.seekBy(10)}
               disabled={!transport}
-              title="Forward 10 seconds"
+              title={tr("playback.watch_playback_chrome.forward_10_seconds")}
             >
               <SkipForward className="h-4 w-4" />
             </Button>
@@ -1091,17 +1109,17 @@ export function WatchPlaybackBar() {
               variant="glass"
               className="h-10 rounded-full px-4"
               onClick={returnToWatch}
-              title="Return to player"
+              title={tr("playback.watch_playback_chrome.return_to_player")}
             >
               <Tv className="mr-2 h-4 w-4" />
-              Watch
+              {tr("playback.watch_playback_chrome.watch")}
             </Button>
             <Button
               variant="glass"
               size="icon"
               className="h-10 w-10 rounded-full"
               onClick={stopPlayback}
-              title="Stop playback"
+              title={tr("playback.watch_playback_chrome.stop_playback")}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -1113,6 +1131,7 @@ export function WatchPlaybackBar() {
 }
 
 function WatchPlaybackTitle({ title }: { title: string }) {
+  useUILanguage();
   useDocumentTitle(title);
   return null;
 }

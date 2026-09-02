@@ -4,6 +4,8 @@ import type { PolicyDocument } from "@/api/types";
 import { cn } from "@/lib/utils";
 
 import { formatPolicyDomain } from "./policyPageUtils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface PolicyDomainMeta {
   icon: LucideIcon;
@@ -25,7 +27,9 @@ export interface PolicyDomainMeta {
 const DOMAIN_META: Record<string, PolicyDomainMeta> = {
   scope: {
     icon: Eye,
-    title: "Library visibility",
+    get title() {
+      return tr("pages.admin_policy.policy_presentation.library_visibility");
+    },
     governs:
       "What each profile can see: allowed libraries, the content-rating ceiling, and the playback-quality ceiling. Evaluated on every signed-in request.",
     example: "“After 21:00, cap every profile at PG.”",
@@ -41,7 +45,9 @@ const DOMAIN_META: Record<string, PolicyDomainMeta> = {
   },
   permission: {
     icon: KeyRound,
-    title: "Admin & permissions",
+    get title() {
+      return tr("pages.admin_policy.policy_presentation.admin_permissions");
+    },
     governs:
       "The acting-admin gate and per-user permissions such as marker editing and metadata curation.",
     example: "“Deny metadata curation on weekends.”",
@@ -56,7 +62,9 @@ const DOMAIN_META: Record<string, PolicyDomainMeta> = {
   },
   action: {
     icon: MonitorPlay,
-    title: "Downloads & playback",
+    get title() {
+      return tr("pages.admin_policy.policy_presentation.downloads_playback");
+    },
     governs:
       "Download and transcode eligibility, plus how many concurrent streams and transcodes a user may run.",
     example: "“No downloads between 22:00 and 07:00.”",
@@ -72,7 +80,9 @@ const DOMAIN_META: Record<string, PolicyDomainMeta> = {
 
 const FALLBACK_META: PolicyDomainMeta = {
   icon: ScrollText,
-  title: "Policy",
+  get title() {
+    return tr("pages.admin_policy.policy_presentation.policy");
+  },
   governs: "Custom decisions for this domain.",
   example: "",
   baseline: [],
@@ -91,9 +101,24 @@ export function policyDocumentStatus(document: PolicyDocument): PolicyDocumentSt
 }
 
 const STATUS_PRESENTATION: Record<PolicyDocumentStatus, { label: string; dot: string }> = {
-  live: { label: "Live", dot: "bg-emerald-400" },
-  draft: { label: "Draft", dot: "bg-amber-400" },
-  disabled: { label: "Disabled", dot: "bg-muted-foreground/50" },
+  live: {
+    get label() {
+      return tr("pages.admin_policy.policy_presentation.live");
+    },
+    dot: "bg-emerald-400",
+  },
+  draft: {
+    get label() {
+      return tr("pages.admin_policy.policy_presentation.draft");
+    },
+    dot: "bg-amber-400",
+  },
+  disabled: {
+    get label() {
+      return tr("pages.admin_policy.policy_presentation.disabled");
+    },
+    dot: "bg-muted-foreground/50",
+  },
 };
 
 interface PolicyStatusPillProps {
@@ -104,6 +129,7 @@ interface PolicyStatusPillProps {
 }
 
 export function PolicyStatusPill({ status, versionNumber, className }: PolicyStatusPillProps) {
+  useUILanguage();
   const presentation = STATUS_PRESENTATION[status];
   return (
     <span
@@ -115,7 +141,10 @@ export function PolicyStatusPill({ status, versionNumber, className }: PolicySta
       <span aria-hidden className={cn("size-1.5 rounded-full", presentation.dot)} />
       {presentation.label}
       {status === "live" && versionNumber !== undefined && (
-        <span className="text-muted-foreground">v{versionNumber}</span>
+        <span className="text-muted-foreground">
+          {tr("pages.admin_policy.policy_presentation.v")}
+          {versionNumber}
+        </span>
       )}
     </span>
   );

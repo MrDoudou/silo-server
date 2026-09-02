@@ -10,6 +10,8 @@ import {
 import { getDefaultQuerySortOrder } from "@/lib/querySortOptions";
 
 import { getCollectionSortOptions } from "./collectionBuilderFields";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CollectionOrderingEditorProps {
   query: QueryDefinition;
@@ -28,6 +30,7 @@ export default function CollectionOrderingEditor({
   allowPersonalizedSorts = false,
   readOnly = false,
 }: CollectionOrderingEditorProps) {
+  useUILanguage();
   const orderingMode = sortConfig.mode === "manual_pins" ? "manual_pins" : "query_sort";
   const sortOptions = getCollectionSortOptions(allowPersonalizedSorts);
 
@@ -35,7 +38,7 @@ export default function CollectionOrderingEditor({
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2">
-          <Label>Sort By</Label>
+          <Label>{tr("components.collections.collection_ordering_editor.sort_by")}</Label>
           <Select
             value={query.sort.field}
             onValueChange={(field) =>
@@ -64,7 +67,7 @@ export default function CollectionOrderingEditor({
         </div>
 
         <div className="space-y-2">
-          <Label>Order</Label>
+          <Label>{tr("components.collections.collection_ordering_editor.order")}</Label>
           <Select
             value={query.sort.order}
             onValueChange={(order) =>
@@ -82,14 +85,18 @@ export default function CollectionOrderingEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="desc">Descending</SelectItem>
-              <SelectItem value="asc">Ascending</SelectItem>
+              <SelectItem value="desc">
+                {tr("components.collections.collection_ordering_editor.descending")}
+              </SelectItem>
+              <SelectItem value="asc">
+                {tr("components.collections.collection_ordering_editor.ascending")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2">
-          <Label>Manual Pins</Label>
+          <Label>{tr("components.collections.collection_ordering_editor.manual_pins")}</Label>
           <Select
             value={orderingMode}
             onValueChange={(mode) =>
@@ -104,16 +111,21 @@ export default function CollectionOrderingEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="query_sort">Follow Query Sort</SelectItem>
-              <SelectItem value="manual_pins">Preserve Manual Pins</SelectItem>
+              <SelectItem value="query_sort">
+                {tr("components.collections.collection_ordering_editor.follow_query_sort")}
+              </SelectItem>
+              <SelectItem value="manual_pins">
+                {tr("components.collections.collection_ordering_editor.preserve_manual_pins")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
       <p className="text-muted-foreground text-xs">
-        Smart collections always preview using the query sort. Manual pins are stored for the saved
-        collection so curated items can stay near the top later.
+        {tr(
+          "components.collections.collection_ordering_editor.smart_collections_always_preview_using_the_query_sort_manual_pins",
+        )}
       </p>
     </div>
   );

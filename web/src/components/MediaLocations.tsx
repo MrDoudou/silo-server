@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import { Copy, Info } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import type { FileVersion } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { resolutionScore } from "@/pages/ItemDetail/components/versionRankingUtils";
 import { buildQualitySummary } from "@/pages/ItemDetail/components/VersionFlyout";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface MediaLocationsProps {
   title: string;
@@ -83,9 +85,11 @@ function deriveMediaLocationsWithSummary(
 async function copyText(text: string, successMessage: string) {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success(successMessage);
+    toast.success("feedback.media_locations.reported_message", {
+      values: { message: successMessage },
+    });
   } catch {
-    toast.error("Failed to copy path");
+    toast.error("errors.media_locations.failed_to_copy_path");
   }
 }
 
@@ -98,6 +102,7 @@ export default function MediaLocations({
   summaryBuilder = buildQualitySummary,
   onShowMediaInfo,
 }: MediaLocationsProps) {
+  useUILanguage();
   const locations = useMemo(
     () => deriveMediaLocationsWithSummary(versions, summaryBuilder),
     [versions, summaryBuilder],
@@ -137,7 +142,9 @@ export default function MediaLocations({
                     <span
                       className="text-muted-foreground"
                       title={location.folderPath}
-                      aria-label={`Parent folder ${location.folderPath}`}
+                      aria-label={tr("components.media_locations.parent_folder_folder_path", {
+                        folderPath: location.folderPath,
+                      })}
                     >
                       {location.folderName}/
                     </span>
@@ -154,8 +161,10 @@ export default function MediaLocations({
                     size="icon"
                     className="text-muted-foreground hover:text-foreground h-7 w-7"
                     onClick={() => onShowMediaInfo(location.fileId)}
-                    title="View media info"
-                    aria-label={`View media info for ${location.fileName}`}
+                    title={tr("components.media_locations.view_media_info")}
+                    aria-label={tr("components.media_locations.view_media_info_for_file_name", {
+                      fileName: location.fileName,
+                    })}
                   >
                     <Info className="h-3.5 w-3.5" />
                   </Button>
@@ -167,8 +176,13 @@ export default function MediaLocations({
                     size="icon"
                     className="text-muted-foreground hover:text-foreground h-7 w-7"
                     onClick={() => copyText(location.folderPath, "Copied folder path")}
-                    title="Copy full folder path"
-                    aria-label={`Copy full folder path for ${location.fileName}`}
+                    title={tr("components.media_locations.copy_full_folder_path")}
+                    aria-label={tr(
+                      "components.media_locations.copy_full_folder_path_for_file_name",
+                      {
+                        fileName: location.fileName,
+                      },
+                    )}
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </Button>

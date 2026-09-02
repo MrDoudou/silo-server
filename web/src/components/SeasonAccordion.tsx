@@ -7,12 +7,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import EpisodeRow from "@/components/EpisodeRow";
 import CardPlayOverlay from "@/components/CardPlayOverlay";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SeasonAccordionProps {
   seasons: Season[];
 }
 
 export default function SeasonAccordion({ seasons }: SeasonAccordionProps) {
+  useUILanguage();
   const sorted = seasons.slice().sort((a, b) => a.season_number - b.season_number);
 
   const [activeSeason, setActiveSeason] = useState(sorted[sorted.length - 1]?.content_id ?? "");
@@ -29,12 +32,14 @@ export default function SeasonAccordion({ seasons }: SeasonAccordionProps) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-[20px] font-bold">Episodes</h2>
-          <span className="text-muted-foreground text-base">{current.episode_count} Episodes</span>
+          <h2 className="text-[20px] font-bold">{tr("components.season_accordion.episodes")}</h2>
+          <span className="text-muted-foreground text-base">
+            {current.episode_count} {tr("components.season_accordion.episodes")}
+          </span>
         </div>
         <Button asChild variant="outline" size="sm">
-          <ViewTransitionLink to={`/item/${current.content_id}`}>
-            Season Page
+          <ViewTransitionLink to={"/item/" + current.content_id}>
+            {tr("components.season_accordion.season_page")}
             <ArrowUpRight className="h-4 w-4" />
           </ViewTransitionLink>
         </Button>
@@ -45,7 +50,7 @@ export default function SeasonAccordion({ seasons }: SeasonAccordionProps) {
         <div className="flex min-w-0 items-center gap-3">
           {current.poster_url && (
             <div className="group/media relative h-14 w-10 shrink-0">
-              <ViewTransitionLink to={`/item/${current.content_id}`}>
+              <ViewTransitionLink to={"/item/" + current.content_id}>
                 <img
                   src={current.poster_url}
                   alt={currentTitle}
@@ -62,7 +67,7 @@ export default function SeasonAccordion({ seasons }: SeasonAccordionProps) {
               ) : null}
             </div>
           )}
-          <ViewTransitionLink to={`/item/${current.content_id}`} className="min-w-0">
+          <ViewTransitionLink to={"/item/" + current.content_id} className="min-w-0">
             <div className="text-sm font-medium">{currentTitle}</div>
             {current.air_date && (
               <div className="text-muted-foreground text-xs">{current.air_date}</div>
@@ -74,10 +79,17 @@ export default function SeasonAccordion({ seasons }: SeasonAccordionProps) {
             )}
             {current.user_data && (
               <div className="text-muted-foreground mt-1 flex flex-wrap gap-2 text-[11px]">
-                <span>{current.user_data.watched_count} watched</span>
-                <span>{current.user_data.unplayed_count} left</span>
+                <span>
+                  {current.user_data.watched_count} {tr("components.season_accordion.watched")}
+                </span>
+                <span>
+                  {current.user_data.unplayed_count} {tr("components.season_accordion.left")}
+                </span>
                 {current.user_data.in_progress_count > 0 && (
-                  <span>{current.user_data.in_progress_count} in progress</span>
+                  <span>
+                    {current.user_data.in_progress_count}{" "}
+                    {tr("components.season_accordion.in_progress")}
+                  </span>
                 )}
               </div>
             )}
@@ -96,25 +108,30 @@ export default function SeasonAccordion({ seasons }: SeasonAccordionProps) {
             <button
               key={season.content_id}
               role="tab"
-              id={`season-tab-${season.content_id}`}
+              id={"season-tab-" + season.content_id}
               aria-selected={isActive}
               onClick={() => setActiveSeason(season.content_id)}
-              className={`cursor-pointer rounded-md px-5 py-2 text-[13px] font-medium transition-colors duration-150 ${
-                isActive ? "text-primary bg-accent" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={
+                "cursor-pointer rounded-md px-5 py-2 text-[13px] font-medium transition-colors duration-150 " +
+                (isActive
+                  ? "text-primary bg-accent"
+                  : "text-muted-foreground hover:text-foreground")
+              }
             >
               {season.is_specials || season.season_number === 0
-                ? "Specials"
+                ? tr("components.season_accordion.specials")
                 : season.title && season.title !== `Season ${season.season_number}`
                   ? season.title
-                  : `Season ${season.season_number}`}
+                  : tr("components.season_accordion.season_season_number", {
+                      season_number: season.season_number,
+                    })}
             </button>
           );
         })}
       </div>
 
       {/* Episode list for active season */}
-      <div role="tabpanel" aria-labelledby={`season-tab-${current.content_id}`}>
+      <div role="tabpanel" aria-labelledby={"season-tab-" + current.content_id}>
         <SeasonPanel key={current.content_id} seasonId={current.content_id} />
       </div>
     </div>
@@ -122,6 +139,7 @@ export default function SeasonAccordion({ seasons }: SeasonAccordionProps) {
 }
 
 function SeasonPanel({ seasonId }: { seasonId: string | undefined }) {
+  useUILanguage();
   const { data, isLoading } = useItemEpisodes(seasonId);
   const episodes = data?.episodes ?? [];
 
@@ -138,7 +156,7 @@ function SeasonPanel({ seasonId }: { seasonId: string | undefined }) {
   if (episodes.length === 0) {
     return (
       <div className="border-border text-muted-foreground bg-surface rounded-lg border p-5 text-sm">
-        No episodes are available for this season yet.
+        {tr("components.season_accordion.no_episodes_are_available_for_this_season_yet")}
       </div>
     );
   }

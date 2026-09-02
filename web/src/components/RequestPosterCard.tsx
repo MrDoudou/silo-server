@@ -4,6 +4,8 @@ import type { MediaRequest, RequestMediaResult } from "@/api/types";
 import { cn } from "@/lib/utils";
 import { formatRequestReason, formatRequestStatus, tmdbImageURL } from "@/lib/mediaRequests";
 import ViewTransitionLink from "@/components/ViewTransitionLink";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const POSTER_WIDTH = "w-[148px] sm:w-[164px] lg:w-[184px]";
 
@@ -51,6 +53,7 @@ function DiscoverCard({
   onRequest?: () => void;
   fluid?: boolean;
 }) {
+  useUILanguage();
   const poster = tmdbImageURL(item.poster_path);
   const requestable = item.request.requestable;
   const statusLabel = item.request.status ? formatRequestStatus(item.request.status) : null;
@@ -61,7 +64,7 @@ function DiscoverCard({
   const ribbon: { kind: RibbonKind; label: string } | null = statusLabel
     ? { kind: (item.request.status as RibbonKind) ?? "pending", label: statusLabel }
     : availableInLibrary
-      ? { kind: "completed", label: "In library" }
+      ? { kind: "completed", label: tr("components.request_poster_card.in_library") }
       : reasonLabel
         ? { kind: "blocked", label: reasonLabel }
         : null;
@@ -74,7 +77,7 @@ function DiscoverCard({
       )}
     >
       <Link
-        to={`/requests/${item.media_type}/${item.tmdb_id}`}
+        to={"/requests/" + item.media_type + "/" + item.tmdb_id}
         className="block focus:outline-none focus-visible:outline-none"
       >
         <PosterFrame
@@ -121,12 +124,12 @@ function DiscoverCard({
             {isSubmitting ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Sending
+                {tr("components.request_poster_card.sending")}
               </>
             ) : (
               <>
                 <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                Request
+                {tr("components.request_poster_card.request")}
               </>
             )}
           </button>
@@ -141,6 +144,7 @@ function DiscoverCard({
 }
 
 function MineCard({ request, fluid }: { request: MediaRequest; fluid?: boolean }) {
+  useUILanguage();
   const poster = tmdbImageURL(request.poster_path);
   const isCompleted = request.status === "completed";
   const isFailed =
@@ -159,7 +163,7 @@ function MineCard({ request, fluid }: { request: MediaRequest; fluid?: boolean }
       )}
     >
       <Link
-        to={`/requests/${request.media_type}/${request.tmdb_id}`}
+        to={"/requests/" + request.media_type + "/" + request.tmdb_id}
         className="block focus:outline-none focus-visible:outline-none"
       >
         <PosterFrame
@@ -178,7 +182,7 @@ function MineCard({ request, fluid }: { request: MediaRequest; fluid?: boolean }
             <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center bg-gradient-to-t from-emerald-950/90 via-emerald-900/40 to-transparent p-3">
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-emerald-200 ring-1 ring-emerald-400/30">
                 <Check className="h-3 w-3 stroke-[2.5]" />
-                Ready to watch
+                {tr("components.request_poster_card.ready_to_watch")}
               </span>
             </div>
           )}
@@ -204,14 +208,15 @@ function MineCard({ request, fluid }: { request: MediaRequest; fluid?: boolean }
 }
 
 function LibraryCardLink({ contentID, title }: { contentID: string; title: string }) {
+  useUILanguage();
   return (
     <ViewTransitionLink
-      to={`/item/${encodeURIComponent(contentID)}`}
-      aria-label={`Open ${title} in library`}
+      to={"/item/" + encodeURIComponent(contentID)}
+      aria-label={tr("components.request_poster_card.open_title_in_library", { title: title })}
       className="absolute top-2 left-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-full bg-black/70 px-2 py-[3px] text-[10px] leading-none font-semibold tracking-[0.06em] text-white uppercase shadow-sm ring-1 shadow-white/15 backdrop-blur-md transition-colors hover:bg-black/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
     >
       <Library className="h-3 w-3 shrink-0" strokeWidth={2.4} aria-hidden />
-      <span className="truncate">Library</span>
+      <span className="truncate">{tr("components.request_poster_card.library")}</span>
     </ViewTransitionLink>
   );
 }
@@ -229,12 +234,17 @@ function PosterFrame({
   dim?: boolean;
   children?: React.ReactNode;
 }) {
+  useUILanguage();
   return (
     <div className="media-card-image relative aspect-[2/3]">
       {poster ? (
         <img
           src={poster}
-          alt={title ? `${title} poster` : "Poster"}
+          alt={
+            title
+              ? tr("components.request_poster_card.title_poster", { title: title })
+              : tr("components.request_poster_card.poster")
+          }
           loading="lazy"
           className={cn(
             "h-full w-full object-cover transition-[transform,filter] duration-300 group-hover/req-card:scale-[1.04]",
@@ -260,6 +270,7 @@ function PosterFallback({
   mediaType: "movie" | "series";
   dim?: boolean;
 }) {
+  useUILanguage();
   const hue = stringHue(title);
   const Icon = mediaType === "series" ? Tv : Film;
   return (
@@ -286,7 +297,9 @@ function PosterFallback({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
       <div className="relative space-y-1.5">
         <span className="text-[9px] font-semibold tracking-[0.22em] text-white/45 uppercase">
-          {mediaType === "series" ? "Series" : "Motion picture"}
+          {mediaType === "series"
+            ? tr("components.request_poster_card.series")
+            : tr("components.request_poster_card.motion_picture")}
         </span>
         <h4 className="font-display line-clamp-4 text-[15px] leading-tight font-bold tracking-tight text-balance text-white/90">
           {title}
@@ -315,6 +328,7 @@ function CardMeta({
   rating?: number;
   mediaType?: "movie" | "series";
 }) {
+  useUILanguage();
   const Icon = mediaType === "series" ? Tv : Film;
   const hasMeta = mediaType || year !== undefined || rating !== undefined;
   return (
@@ -327,7 +341,11 @@ function CardMeta({
           {mediaType && (
             <>
               <Icon className="h-3 w-3 shrink-0 opacity-60" strokeWidth={2} aria-hidden />
-              <span>{mediaType === "series" ? "Series" : "Movie"}</span>
+              <span>
+                {mediaType === "series"
+                  ? tr("components.request_poster_card.series")
+                  : tr("components.request_poster_card.movie")}
+              </span>
             </>
           )}
           {mediaType && year ? (
@@ -374,6 +392,7 @@ function StatusRibbon({
   label: string;
   reserveLibrarySpace?: boolean;
 }) {
+  useUILanguage();
   const kind = (RIBBON_STYLES[status as RibbonKind] ? status : "blocked") as RibbonKind;
   return (
     <span

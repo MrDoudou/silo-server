@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Check, Monitor, RotateCcw, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { Button } from "@/components/ui/button";
@@ -26,17 +26,19 @@ import {
   type PrimaryMenuItem,
 } from "@/lib/uiCustomization";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const CLIENT_SCOPE = { scope: "profile_client" } as const;
 
 const BUILTIN_LABELS: Record<string, string> = {
-  home: "Home",
-  movies: "Movies",
-  series: "TV Shows",
-  music: "Music",
-  audiobooks: "Audiobooks",
-  for_you: "For You",
-  calendar: "Calendar",
+  home: "pages.settings.interface_settings.home",
+  movies: "pages.settings.interface_settings.movies",
+  series: "pages.settings.interface_settings.tv_shows",
+  music: "pages.settings.interface_settings.music",
+  audiobooks: "pages.settings.interface_settings.audiobooks",
+  for_you: "pages.settings.interface_settings.for_you",
+  calendar: "pages.settings.interface_settings.calendar",
 };
 
 const ADDABLE_WEB_BUILTINS: PrimaryMenuItem[] = [
@@ -48,10 +50,16 @@ const ADDABLE_WEB_BUILTINS: PrimaryMenuItem[] = [
 ];
 
 function menuItemLabel(item: PrimaryMenuItem): string {
-  if (item.type === "builtin") return BUILTIN_LABELS[item.destination] ?? item.destination;
-  if (item.type === "library") return `${item.label} · Library`;
-  if (item.type === "section") return `${item.label} · Section`;
-  return `${item.label} · Collection`;
+  if (item.type === "builtin") {
+    return tr(BUILTIN_LABELS[item.destination] ?? item.destination);
+  }
+  if (item.type === "library") {
+    return tr("pages.settings.interface_settings.value_library", { value: item.label });
+  }
+  if (item.type === "section") {
+    return tr("pages.settings.interface_settings.value_section", { value: item.label });
+  }
+  return tr("pages.settings.interface_settings.value_collection", { value: item.label });
 }
 
 function samePresentation(left: CardPresentation, right: CardPresentation) {
@@ -59,6 +67,7 @@ function samePresentation(left: CardPresentation, right: CardPresentation) {
 }
 
 function CardPreview({ presentation }: { presentation: CardPresentation }) {
+  useUILanguage();
   const widths =
     presentation.poster_size === "compact"
       ? ["w-12", "w-12", "w-12", "w-12"]
@@ -85,18 +94,23 @@ function CardPreview({ presentation }: { presentation: CardPresentation }) {
 }
 
 function InterfaceHeader() {
+  useUILanguage();
   return (
     <header className="space-y-2">
-      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Navigation & cards</h2>
+      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        {tr("pages.settings.interface_settings.navigation_cards")}
+      </h2>
       <p className="text-muted-foreground text-sm">
-        These choices sync between web browsers signed into this profile. TV, mobile, tablet, and
-        desktop-native apps keep their own matching-device layouts.
+        {tr(
+          "pages.settings.interface_settings.these_choices_sync_between_web_browsers_signed_into_this_profile",
+        )}
       </p>
     </header>
   );
 }
 
 export default function InterfaceSettings() {
+  useUILanguage();
   const { data: libraries = [] } = useUserLibraries();
   const customization = useUICustomization();
   const setValue = useSetSettingValue();
@@ -160,7 +174,9 @@ export default function InterfaceSettings() {
         identity: CLIENT_SCOPE,
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save card layout");
+      toast.error("errors.settings.interface_settings.could_not_save_card_layout", {
+        error: error,
+      });
     }
   }
 
@@ -170,9 +186,11 @@ export default function InterfaceSettings() {
         key: SETTING_KEYS.UI_CARD_PRESENTATION,
         identity: CLIENT_SCOPE,
       });
-      toast.success("Web-family card layout reset");
+      toast.success("feedback.settings.interface_settings.web_family_card_layout_reset");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not reset card layout");
+      toast.error("errors.settings.interface_settings.could_not_reset_card_layout", {
+        error: error,
+      });
     }
   }
 
@@ -182,11 +200,21 @@ export default function InterfaceSettings() {
   ) {
     try {
       await clearValue.mutateAsync({ key, identity: { scope: "profile_device" } });
-      toast.success(`${label} now follows the web-family preference`);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : `Could not clear ${label.toLowerCase()}`,
+      toast.success(
+        "feedback.settings.interface_settings.setting_now_follows_the_web_family_preference",
+        {
+          values: {
+            setting: label,
+          },
+        },
       );
+    } catch (error) {
+      toast.error("errors.settings.interface_settings.reported_message", {
+        values: {
+          message:
+            error instanceof Error ? error.message : `Could not clear ${label.toLowerCase()}`,
+        },
+      });
     }
   }
 
@@ -223,9 +251,9 @@ export default function InterfaceSettings() {
           dirty: false,
         };
       });
-      toast.success("Web navigation saved");
+      toast.success("feedback.settings.interface_settings.web_navigation_saved");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save navigation");
+      toast.error("errors.settings.interface_settings.could_not_save_navigation", { error: error });
     }
   }
 
@@ -233,7 +261,7 @@ export default function InterfaceSettings() {
     const pendingClientOverride = menuDraft?.pendingBaselineKey !== undefined;
     if (!menuClientOverride && !pendingClientOverride) {
       setMenuDraft(null);
-      toast.success("Web navigation reset");
+      toast.success("feedback.settings.interface_settings.web_navigation_reset");
       return;
     }
     try {
@@ -242,9 +270,11 @@ export default function InterfaceSettings() {
         identity: CLIENT_SCOPE,
       });
       setMenuDraft(null);
-      toast.success("Web navigation reset");
+      toast.success("feedback.settings.interface_settings.web_navigation_reset");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not reset navigation");
+      toast.error("errors.settings.interface_settings.could_not_reset_navigation", {
+        error: error,
+      });
     }
   }
 
@@ -253,7 +283,7 @@ export default function InterfaceSettings() {
       <div className="space-y-6">
         <InterfaceHeader />
         <div className="surface-panel-subtle text-muted-foreground rounded-xl border p-5 text-sm">
-          Checking server support…
+          {tr("pages.settings.interface_settings.checking_server_support")}
         </div>
       </div>
     );
@@ -264,10 +294,13 @@ export default function InterfaceSettings() {
       <div className="space-y-6">
         <InterfaceHeader />
         <div className="surface-panel-subtle rounded-xl border p-5" role="alert">
-          <p className="font-medium">Customization unavailable</p>
+          <p className="font-medium">
+            {tr("pages.settings.interface_settings.customization_unavailable")}
+          </p>
           <p className="text-muted-foreground mt-1 text-sm">
-            Saved navigation and card settings could not be loaded. Editing stays disabled to
-            protect your existing choices.
+            {tr(
+              "pages.settings.interface_settings.saved_navigation_and_card_settings_could_not_be_loaded_editing",
+            )}
           </p>
         </div>
       </div>
@@ -279,9 +312,13 @@ export default function InterfaceSettings() {
       <div className="space-y-6">
         <InterfaceHeader />
         <div className="surface-panel-subtle rounded-xl border p-5" role="alert">
-          <p className="font-medium">Server upgrade required</p>
+          <p className="font-medium">
+            {tr("pages.settings.interface_settings.server_upgrade_required")}
+          </p>
           <p className="text-muted-foreground mt-1 text-sm">
-            This server does not support synchronized navigation and card customization yet.
+            {tr(
+              "pages.settings.interface_settings.this_server_does_not_support_synchronized_navigation_and_card_customization",
+            )}
           </p>
         </div>
       </div>
@@ -293,14 +330,17 @@ export default function InterfaceSettings() {
       <InterfaceHeader />
 
       <SettingsGroup
-        title="Card preset"
-        description="Start with a complete layout, then adjust poster size or captions below."
+        title={tr("pages.settings.interface_settings.card_preset")}
+        description={tr(
+          "pages.settings.interface_settings.start_with_a_complete_layout_then_adjust_poster_size_or",
+        )}
       >
         {cardDeviceOverride ? (
           <div className="border-border/70 bg-muted/25 mb-4 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-muted-foreground text-sm">
-              This browser has a higher-priority device override. Clear it before editing the
-              preference shared by web browsers.
+              {tr(
+                "pages.settings.interface_settings.this_browser_has_a_higher_priority_device_override_clear_it",
+              )}
             </p>
             <Button
               type="button"
@@ -310,7 +350,7 @@ export default function InterfaceSettings() {
                 void clearDeviceOverride(SETTING_KEYS.UI_CARD_PRESENTATION, "Card layout")
               }
             >
-              Use web-family layout
+              {tr("pages.settings.interface_settings.use_web_family_layout")}
             </Button>
           </div>
         ) : null}
@@ -346,14 +386,22 @@ export default function InterfaceSettings() {
       </SettingsGroup>
 
       <SettingsGroup
-        title="Poster cards"
-        description="Fine-tune density and the rows shown below artwork. Changes apply immediately."
+        title={tr("pages.settings.interface_settings.poster_cards")}
+        description={tr(
+          "pages.settings.interface_settings.fine_tune_density_and_the_rows_shown_below_artwork_changes",
+        )}
       >
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)]">
           <div className="space-y-5">
             <div className="space-y-2">
-              <p className="text-sm font-medium">Poster size</p>
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Poster size">
+              <p className="text-sm font-medium">
+                {tr("pages.settings.interface_settings.poster_size")}
+              </p>
+              <div
+                className="flex flex-wrap gap-2"
+                role="radiogroup"
+                aria-label={tr("pages.settings.interface_settings.poster_size")}
+              >
                 {(
                   [
                     ["compact", "Compact"],
@@ -382,8 +430,14 @@ export default function InterfaceSettings() {
               </div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium">Caption</p>
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Card caption">
+              <p className="text-sm font-medium">
+                {tr("pages.settings.interface_settings.caption")}
+              </p>
+              <div
+                className="flex flex-wrap gap-2"
+                role="radiogroup"
+                aria-label={tr("pages.settings.interface_settings.card_caption")}
+              >
                 {(
                   [
                     ["title_metadata", "Title & metadata"],
@@ -417,7 +471,9 @@ export default function InterfaceSettings() {
         {cardClientOverride ? (
           <div className="border-border/70 mt-5 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p id="card-layout-reset-description" className="text-muted-foreground text-sm">
-              Remove the layout shared by web browsers and inherit the profile or app default.
+              {tr(
+                "pages.settings.interface_settings.remove_the_layout_shared_by_web_browsers_and_inherit_the",
+              )}
             </p>
             <Button
               type="button"
@@ -427,26 +483,29 @@ export default function InterfaceSettings() {
               onClick={() => void resetCardPresentation()}
             >
               <RotateCcw className="mr-1.5 h-4 w-4" />
-              Reset web-family card layout
+              {tr("pages.settings.interface_settings.reset_web_family_card_layout")}
             </Button>
           </div>
         ) : null}
       </SettingsGroup>
 
       <SettingsGroup
-        title="Primary menu"
-        description="Choose the ordered shortcuts at the top of the web menu. Home stays available; search and profile controls are fixed."
+        title={tr("pages.settings.interface_settings.primary_menu")}
+        description={tr(
+          "pages.settings.interface_settings.choose_the_ordered_shortcuts_at_the_top_of_the_web",
+        )}
       >
         <div className="space-y-4">
           <div className="text-muted-foreground flex items-center gap-2 text-xs">
             <Monitor className="h-4 w-4" />
-            Web browsers
+            {tr("pages.settings.interface_settings.web_browsers")}
           </div>
           {menuDeviceOverride ? (
             <div className="border-border/70 bg-muted/25 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-muted-foreground text-sm">
-                This browser has a higher-priority device menu. Clear it before editing the menu
-                shared by web browsers.
+                {tr(
+                  "pages.settings.interface_settings.this_browser_has_a_higher_priority_device_menu_clear_it",
+                )}
               </p>
               <Button
                 type="button"
@@ -456,7 +515,7 @@ export default function InterfaceSettings() {
                   void clearDeviceOverride(SETTING_KEYS.NAV_PRIMARY_MENU, "Navigation")
                 }
               >
-                Use web-family menu
+                {tr("pages.settings.interface_settings.use_web_family_menu")}
               </Button>
             </div>
           ) : null}
@@ -480,7 +539,9 @@ export default function InterfaceSettings() {
                       variant="ghost"
                       size="icon"
                       disabled={menuMutationPending || menuDeviceOverride || index === 0}
-                      aria-label={`Move ${menuItemLabel(item)} up`}
+                      aria-label={tr("pages.settings.interface_settings.move_value_up", {
+                        value: menuItemLabel(item),
+                      })}
                       onClick={() => updateMenu(moveMenuItem(menuItems, index, -1))}
                     >
                       <ArrowUp className="h-4 w-4" />
@@ -492,7 +553,9 @@ export default function InterfaceSettings() {
                       disabled={
                         menuMutationPending || menuDeviceOverride || index === menuItems.length - 1
                       }
-                      aria-label={`Move ${menuItemLabel(item)} down`}
+                      aria-label={tr("pages.settings.interface_settings.move_value_down", {
+                        value: menuItemLabel(item),
+                      })}
                       onClick={() => updateMenu(moveMenuItem(menuItems, index, 1))}
                     >
                       <ArrowDown className="h-4 w-4" />
@@ -502,7 +565,13 @@ export default function InterfaceSettings() {
                       variant="ghost"
                       size="icon"
                       disabled={menuMutationPending || menuDeviceOverride || home}
-                      aria-label={home ? "Home cannot be removed" : `Remove ${menuItemLabel(item)}`}
+                      aria-label={
+                        home
+                          ? tr("pages.settings.interface_settings.home_cannot_be_removed")
+                          : tr("pages.settings.interface_settings.remove_value", {
+                              value: menuItemLabel(item),
+                            })
+                      }
                       onClick={() =>
                         updateMenu(menuItems.filter((_, itemIndex) => itemIndex !== index))
                       }
@@ -523,7 +592,11 @@ export default function InterfaceSettings() {
                 disabled={menuMutationPending || menuDeviceOverride || menuAtLimit}
               >
                 <SelectTrigger className="w-full sm:max-w-sm">
-                  <SelectValue placeholder="Choose destination or shortcut" />
+                  <SelectValue
+                    placeholder={tr(
+                      "pages.settings.interface_settings.choose_destination_or_shortcut",
+                    )}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {availableItems.map((item) => (
@@ -545,7 +618,7 @@ export default function InterfaceSettings() {
                   setAddItemKey("");
                 }}
               >
-                Add to menu
+                {tr("pages.settings.interface_settings.add_to_menu")}
               </Button>
             </div>
           ) : null}
@@ -556,7 +629,7 @@ export default function InterfaceSettings() {
               onClick={() => void saveMenu()}
               disabled={!menuDirty || menuMutationPending || menuDeviceOverride}
             >
-              Save menu
+              {tr("pages.settings.interface_settings.save_menu")}
             </Button>
             <Button
               type="button"
@@ -565,7 +638,7 @@ export default function InterfaceSettings() {
               disabled={menuMutationPending || menuDeviceOverride}
             >
               <RotateCcw className="mr-1.5 h-4 w-4" />
-              Reset to default
+              {tr("pages.settings.interface_settings.reset_to_default")}
             </Button>
           </div>
         </div>

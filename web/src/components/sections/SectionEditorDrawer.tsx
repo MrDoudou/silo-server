@@ -39,17 +39,19 @@ import {
   type CollectionOption,
 } from "@/hooks/queries/useAllUserCollections";
 import { randomUUID } from "@/lib/uuid";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const CATEGORY_LABELS: Record<Category, string> = {
-  library_staples: "Library",
-  personalized: "For You",
-  discovery: "Discovery",
-  editorial: "Editorial",
-  seasonal: "Seasonal",
-  mood: "Mood",
-  social: "Social",
-  hand_picked: "Hand Picked",
-  custom: "Custom",
+  library_staples: "components.sections.section_editor_drawer.library",
+  personalized: "components.sections.section_editor_drawer.for_you",
+  discovery: "components.sections.section_editor_drawer.discovery",
+  editorial: "components.sections.section_editor_drawer.editorial",
+  seasonal: "components.sections.section_editor_drawer.seasonal",
+  mood: "components.sections.section_editor_drawer.mood",
+  social: "components.sections.section_editor_drawer.social",
+  hand_picked: "components.sections.section_editor_drawer.hand_picked",
+  custom: "components.sections.section_editor_drawer.custom",
 };
 
 function getCollectionId(config?: Record<string, unknown>): string {
@@ -239,6 +241,7 @@ type AdminDrawerProps = {
 type SectionEditorDrawerProps = ProfileDrawerProps | AdminDrawerProps;
 
 export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
+  useUILanguage();
   const isProfile = props.mode === "profile";
   const isEdit = props.section !== null;
   const lockSectionType = isProfile && props.section !== null && !props.section.is_custom;
@@ -359,15 +362,21 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
       <SheetContent side="right" className="overflow-y-auto sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>{isEdit ? "Edit Section" : "Add Section"}</SheetTitle>
+          <SheetTitle>
+            {isEdit
+              ? tr("components.sections.section_editor_drawer.edit_section")
+              : tr("components.sections.section_editor_drawer.add_section")}
+          </SheetTitle>
           <SheetDescription>
-            {isEdit ? "Modify this section's settings" : "Configure a new section."}
+            {isEdit
+              ? tr("components.sections.section_editor_drawer.modify_this_section_s_settings")
+              : tr("components.sections.section_editor_drawer.configure_a_new_section")}
           </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-4 px-4">
           <div className="space-y-2">
-            <Label>Section Type</Label>
+            <Label>{tr("components.sections.section_editor_drawer.section_type")}</Label>
             {lockSectionType ? (
               <div className="bg-muted text-muted-foreground rounded-md px-3 py-2 text-sm">
                 {sectionTypeLabel(sectionType)}
@@ -393,13 +402,18 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
                   {catalogCategories.length > 0
                     ? catalogCategories.map((category) => (
                         <SelectGroup key={category}>
-                          <SelectLabel>{CATEGORY_LABELS[category] ?? category}</SelectLabel>
+                          <SelectLabel>{tr(CATEGORY_LABELS[category] ?? category)}</SelectLabel>
                           {(props.recipeCatalog?.categories[category] ?? []).map((definition) => {
                             const label = definition.presets[0]?.display_name ?? definition.type;
                             const icon = definition.presets[0]?.icon;
                             return (
                               <SelectItem key={definition.type} value={definition.type}>
-                                {icon ? `${icon} ${label}` : label}
+                                {icon
+                                  ? tr("components.sections.section_editor_drawer.icon_label", {
+                                      icon: icon,
+                                      label: label,
+                                    })
+                                  : label}
                               </SelectItem>
                             );
                           })}
@@ -416,7 +430,7 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Title</Label>
+            <Label>{tr("components.sections.section_editor_drawer.title")}</Label>
             <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
@@ -425,7 +439,7 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Item Limit</Label>
+            <Label>{tr("components.sections.section_editor_drawer.item_limit")}</Label>
             <Input
               type="number"
               value={itemLimit}
@@ -437,9 +451,13 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
 
           <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-3">
             <div className="space-y-1">
-              <Label htmlFor="section-featured">Featured</Label>
+              <Label htmlFor="section-featured">
+                {tr("components.sections.section_editor_drawer.featured")}
+              </Label>
               <p className="text-muted-foreground text-sm">
-                Use this section as the hero banner on the home screen.
+                {tr(
+                  "components.sections.section_editor_drawer.use_this_section_as_the_hero_banner_on_the_home",
+                )}
               </p>
             </div>
             <Switch id="section-featured" checked={featured} onCheckedChange={setFeatured} />
@@ -447,7 +465,9 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
 
           {props.mode === "admin" ? (
             <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-3">
-              <Label htmlFor="section-enabled">Enabled</Label>
+              <Label htmlFor="section-enabled">
+                {tr("components.sections.section_editor_drawer.enabled")}
+              </Label>
               <Switch id="section-enabled" checked={enabled} onCheckedChange={setEnabled} />
             </div>
           ) : null}
@@ -456,7 +476,7 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
 
           {showCollectionPicker ? (
             <div className="space-y-2">
-              <Label>Collection</Label>
+              <Label>{tr("components.sections.section_editor_drawer.collection")}</Label>
               <CollectionSearchableSelect
                 options={collections}
                 value={selectedCollectionId}
@@ -471,7 +491,7 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Media Scope</Label>
+                  <Label>{tr("components.sections.section_editor_drawer.media_scope")}</Label>
                   <Select
                     value={queryDefinition.media_scope ?? "all"}
                     onValueChange={(value) =>
@@ -488,17 +508,29 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Media</SelectItem>
-                      <SelectItem value="movie">Movies</SelectItem>
-                      <SelectItem value="series">Series</SelectItem>
-                      <SelectItem value="episode">Episodes</SelectItem>
-                      <SelectItem value="audiobook">Audiobooks</SelectItem>
-                      <SelectItem value="ebook">Ebooks</SelectItem>
+                      <SelectItem value="all">
+                        {tr("components.sections.section_editor_drawer.all_media")}
+                      </SelectItem>
+                      <SelectItem value="movie">
+                        {tr("components.sections.section_editor_drawer.movies")}
+                      </SelectItem>
+                      <SelectItem value="series">
+                        {tr("components.sections.section_editor_drawer.series")}
+                      </SelectItem>
+                      <SelectItem value="episode">
+                        {tr("components.sections.section_editor_drawer.episodes")}
+                      </SelectItem>
+                      <SelectItem value="audiobook">
+                        {tr("components.sections.section_editor_drawer.audiobooks")}
+                      </SelectItem>
+                      <SelectItem value="ebook">
+                        {tr("components.sections.section_editor_drawer.ebooks")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Libraries</Label>
+                  <Label>{tr("components.sections.section_editor_drawer.libraries")}</Label>
                   <LibraryMultiSelect
                     libraries={props.libraries}
                     value={queryDefinition.library_ids}
@@ -509,23 +541,29 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Filter Rules</Label>
+                <Label>{tr("components.sections.section_editor_drawer.filter_rules")}</Label>
                 <div className="mb-3 flex items-center gap-1 text-xs">
                   <button
                     type="button"
                     onClick={() => setFilterMode("easy")}
-                    className={`rounded px-2 py-0.5 ${filterMode === "easy" ? "bg-indigo-500 text-white" : "bg-white/5"}`}
+                    className={
+                      "rounded px-2 py-0.5 " +
+                      (filterMode === "easy" ? "bg-indigo-500 text-white" : "bg-white/5")
+                    }
                     aria-pressed={filterMode === "easy"}
                   >
-                    Easy
+                    {tr("components.sections.section_editor_drawer.easy")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setFilterMode("advanced")}
-                    className={`rounded px-2 py-0.5 ${filterMode === "advanced" ? "bg-indigo-500 text-white" : "bg-white/5"}`}
+                    className={
+                      "rounded px-2 py-0.5 " +
+                      (filterMode === "advanced" ? "bg-indigo-500 text-white" : "bg-white/5")
+                    }
                     aria-pressed={filterMode === "advanced"}
                   >
-                    Advanced
+                    {tr("components.sections.section_editor_drawer.advanced")}
                   </button>
                 </div>
                 {filterMode === "easy" ? (
@@ -562,10 +600,12 @@ export default function SectionEditorDrawer(props: SectionEditorDrawerProps) {
 
         <SheetFooter>
           <Button variant="outline" onClick={() => props.onOpenChange(false)}>
-            Cancel
+            {tr("common.actions.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saveDisabled || isSubmitting}>
-            {isEdit ? "Save" : "Add Section"}
+            {isEdit
+              ? tr("common.actions.save")
+              : tr("components.sections.section_editor_drawer.add_section")}
           </Button>
         </SheetFooter>
       </SheetContent>

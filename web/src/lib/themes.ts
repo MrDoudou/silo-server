@@ -1,3 +1,4 @@
+import { tr } from "@/i18n/translate";
 export const THEME_IDS = [
   "midnight-cinema",
   "cinema-light",
@@ -28,52 +29,72 @@ export interface ThemeDefinition {
 export const THEMES: Record<ThemeId, ThemeDefinition> = {
   "midnight-cinema": {
     id: "midnight-cinema",
-    label: "Cinema Dark",
+    get label() {
+      return tr("lib.themes.cinema_dark");
+    },
     fontFamily: "Outfit",
     appearance: "dark",
     previewAccent: "#e8e8ec",
     previewBg: "#141417",
-    description: "Monochromatic cinema — content is the color",
+    get description() {
+      return tr("lib.themes.monochromatic_cinema_content_is_the_color");
+    },
     curated: true,
   },
   "cinema-light": {
     id: "cinema-light",
-    label: "Cinema Light",
+    get label() {
+      return tr("lib.themes.cinema_light");
+    },
     fontFamily: "Outfit",
     appearance: "light",
     previewAccent: "#1a1a1e",
     previewBg: "#f4f4f6",
-    description: "Light monochromatic cinema — content is the color",
+    get description() {
+      return tr("lib.themes.light_monochromatic_cinema_content_is_the_color");
+    },
     curated: true,
   },
   "cobalt-studio": {
     id: "cobalt-studio",
-    label: "Cobalt",
+    get label() {
+      return tr("lib.themes.cobalt");
+    },
     fontFamily: "Outfit",
     appearance: "dark",
     previewAccent: "#78aefc",
     previewBg: "#101722",
-    description: "Cool blue graphite with crisp contrast",
+    get description() {
+      return tr("lib.themes.cool_blue_graphite_with_crisp_contrast");
+    },
     curated: true,
   },
   "oxblood-noir": {
     id: "oxblood-noir",
-    label: "Oxblood",
+    get label() {
+      return tr("lib.themes.oxblood");
+    },
     fontFamily: "Outfit",
     appearance: "dark",
     previewAccent: "#d16a78",
     previewBg: "#171113",
-    description: "Deep red-black with restrained luxury warmth",
+    get description() {
+      return tr("lib.themes.deep_red_black_with_restrained_luxury_warmth");
+    },
     curated: true,
   },
   "evergreen-studio": {
     id: "evergreen-studio",
-    label: "Evergreen",
+    get label() {
+      return tr("lib.themes.evergreen");
+    },
     fontFamily: "Outfit",
     appearance: "dark",
     previewAccent: "#5bc39d",
     previewBg: "#101715",
-    description: "Refined evergreen accents on dense graphite",
+    get description() {
+      return tr("lib.themes.refined_evergreen_accents_on_dense_graphite");
+    },
     curated: true,
   },
 };

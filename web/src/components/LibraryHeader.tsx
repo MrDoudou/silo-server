@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Tabs as TabsPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 import { isAudiobookLibraryType } from "@/pages/libraryPageSearchParams";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type LibraryTab = "recommended" | "library" | "collections";
 
@@ -20,16 +22,16 @@ interface LibraryHeaderProps {
 const DEFAULT_TABS: readonly LibraryTab[] = ["recommended", "library", "collections"];
 
 const TAB_LABELS: Record<LibraryTab, string> = {
-  recommended: "Recommended",
-  library: "Library",
-  collections: "Collections",
+  recommended: "components.library_header.recommended",
+  library: "components.library_header.library",
+  collections: "components.library_header.collections",
 };
 
 // Audiobook libraries open on a resume-first deck rather than a discovery
 // feed, so "Recommended" would mislabel what the tab actually shows.
 const AUDIOBOOK_TAB_LABELS: Record<LibraryTab, string> = {
   ...TAB_LABELS,
-  recommended: "Home",
+  recommended: "components.library_header.home",
 };
 
 /** Scroll distance (in px) at which an overlay header switches to glass. */
@@ -41,6 +43,7 @@ export default function LibraryHeader({
   overlay = false,
   availableTabs = DEFAULT_TABS,
 }: LibraryHeaderProps) {
+  useUILanguage();
   const tabLabels = isAudiobookLibraryType(libraryType) ? AUDIOBOOK_TAB_LABELS : TAB_LABELS;
   const [pastThreshold, setPastThreshold] = useState(false);
 
@@ -66,15 +69,18 @@ export default function LibraryHeader({
           tab pills or truncate to "LIBRAR…". */}
       <div className="hidden min-w-0 items-center gap-4 sm:flex">
         <p className="hero-eyebrow truncate">
-          <span>Library</span>
+          <span>{tr("components.library_header.library")}</span>
           <span className="hero-eyebrow-divider">/</span>
           <span className="hero-eyebrow-strong">{libraryName}</span>
         </p>
       </div>
-      <TabsPrimitive.List className="marquee-tab-bar" aria-label="Library view">
+      <TabsPrimitive.List
+        className="marquee-tab-bar"
+        aria-label={tr("components.library_header.library_view")}
+      >
         {availableTabs.map((tab) => (
           <TabsPrimitive.Trigger key={tab} value={tab} className="marquee-tab-trigger">
-            {tabLabels[tab]}
+            {tr(tabLabels[tab])}
           </TabsPrimitive.Trigger>
         ))}
       </TabsPrimitive.List>

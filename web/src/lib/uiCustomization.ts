@@ -1,3 +1,4 @@
+import { tr } from "@/i18n/translate";
 export type PosterSize = "compact" | "standard" | "large";
 export type CardCaption = "title_metadata" | "title" | "artwork";
 
@@ -59,26 +60,42 @@ export const DEFAULT_CARD_PRESENTATION: CardPresentation = {
 export const CARD_PRESENTATION_PRESETS = [
   {
     id: "balanced",
-    label: "Balanced",
-    description: "Standard posters with titles and metadata.",
+    get label() {
+      return tr("lib.ui_customization.balanced");
+    },
+    get description() {
+      return tr("lib.ui_customization.standard_posters_with_titles_and_metadata");
+    },
     value: DEFAULT_CARD_PRESENTATION,
   },
   {
     id: "compact",
-    label: "Compact",
-    description: "More posters on screen with titles only.",
+    get label() {
+      return tr("lib.ui_customization.compact");
+    },
+    get description() {
+      return tr("lib.ui_customization.more_posters_on_screen_with_titles_only");
+    },
     value: { poster_size: "compact", caption: "title" },
   },
   {
     id: "cinema",
-    label: "Cinema",
-    description: "Large posters with titles only.",
+    get label() {
+      return tr("lib.ui_customization.cinema");
+    },
+    get description() {
+      return tr("lib.ui_customization.large_posters_with_titles_only");
+    },
     value: { poster_size: "large", caption: "title" },
   },
   {
     id: "artwork",
-    label: "Artwork only",
-    description: "Large artwork without caption rows.",
+    get label() {
+      return tr("lib.ui_customization.artwork_only");
+    },
+    get description() {
+      return tr("lib.ui_customization.large_artwork_without_caption_rows");
+    },
     value: { poster_size: "large", caption: "artwork" },
   },
 ] as const satisfies ReadonlyArray<{

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import type { BrowseItem, HistoryRemovalTargetRequest, RemoveHistoryRequest } from "@/api/types";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { historyKeys } from "./keys";
 import { invalidateMediaSurfaceQueries } from "./mediaSurfaceRefresh";
 import { bumpHomeRefreshSignal } from "@/pages/homeSurfaceRefresh";
@@ -23,16 +23,19 @@ export function useRemoveHistory() {
         body: JSON.stringify({ targets } satisfies RemoveHistoryRequest),
       }),
     onSuccess: async (_data, targets) => {
-      toast.success(
-        targets.length === 1
-          ? "Removed watch data"
-          : `Removed watch data for ${targets.length} items`,
-      );
+      toast.success("feedback.queries.history.reported_message", {
+        values: {
+          message:
+            targets.length === 1
+              ? "Removed watch data"
+              : `Removed watch data for ${targets.length} items`,
+        },
+      });
       await invalidateMediaSurfaceQueries(queryClient);
       bumpHomeRefreshSignal(queryClient);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to remove history");
+      toast.error("errors.queries.history.failed_to_remove_history", { error: err });
     },
   });
 }

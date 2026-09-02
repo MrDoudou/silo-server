@@ -56,6 +56,8 @@ import {
 } from "./userCollectionsShared";
 import { toAdminCollectionBuilderValue, toAdminCollectionRequest } from "./adminCollectionsShared";
 import type { CatalogSearchState } from "./catalogSearchParams";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type WizardStep = 1 | 2;
 
@@ -78,6 +80,7 @@ export type SmartCollectionWizardProps = UserModeProps | AdminModeProps;
 const PAGE_LIMIT = 60;
 
 export default function SmartCollectionWizard(wizard: SmartCollectionWizardProps) {
+  useUILanguage();
   const isEdit = wizard.collection !== null;
   const adminLibraryId = wizard.mode === "admin" ? wizard.initialLibraryId : null;
 
@@ -113,7 +116,11 @@ export default function SmartCollectionWizard(wizard: SmartCollectionWizardProps
     setStep(1);
   }, [initialDraft]);
 
-  useDocumentTitle(isEdit ? `Edit ${draft.title || "Collection"}` : "New Collection");
+  useDocumentTitle(
+    isEdit
+      ? tr("pages.smart_collection_wizard.edit_value", { value: draft.title || "Collection" })
+      : tr("pages.smart_collection_wizard.new_collection"),
+  );
 
   const handleQueryDefinitionChange = useCallback((next: QueryDefinition) => {
     setDraft((current) => ({ ...current, query_definition: withSmartCollectionLimit(next) }));
@@ -189,16 +196,23 @@ function WizardHeader({
   step: WizardStep;
   isEdit: boolean;
 }) {
+  useUILanguage();
   return (
     <div className="mt-10 flex flex-wrap items-end justify-between gap-4 sm:mt-12">
       <div>
         <h1 className="page-title text-[clamp(1.75rem,3vw,2.5rem)]">{title}</h1>
         <p className="page-subtitle mt-1 text-sm">
           {step === 1
-            ? "Tune the filters until the cards below show the collection you want."
+            ? tr(
+                "pages.smart_collection_wizard.tune_the_filters_until_the_cards_below_show_the_collection",
+              )
             : isEdit
-              ? "Update naming, artwork, and sharing for this collection."
-              : "Give your new collection a name, artwork, and sharing rules."}
+              ? tr(
+                  "pages.smart_collection_wizard.update_naming_artwork_and_sharing_for_this_collection",
+                )
+              : tr(
+                  "pages.smart_collection_wizard.give_your_new_collection_a_name_artwork_and_sharing_rules",
+                )}
         </p>
       </div>
       <StepIndicator step={step} />
@@ -207,11 +221,22 @@ function WizardHeader({
 }
 
 function StepIndicator({ step }: { step: WizardStep }) {
+  useUILanguage();
   return (
     <ol className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
-      <StepBadge index={1} label="Filters" active={step === 1} done={step > 1} />
+      <StepBadge
+        index={1}
+        label={tr("pages.smart_collection_wizard.filters")}
+        active={step === 1}
+        done={step > 1}
+      />
       <span aria-hidden="true" className="bg-border h-px w-6" />
-      <StepBadge index={2} label="Details" active={step === 2} done={false} />
+      <StepBadge
+        index={2}
+        label={tr("pages.smart_collection_wizard.details")}
+        active={step === 2}
+        done={false}
+      />
     </ol>
   );
 }
@@ -227,6 +252,7 @@ function StepBadge({
   active: boolean;
   done: boolean;
 }) {
+  useUILanguage();
   return (
     <li className="flex items-center gap-2">
       <span
@@ -258,6 +284,7 @@ function Step1FiltersAndPreview({
   adminLibraries: Library[];
   onContinue: () => void;
 }) {
+  useUILanguage();
   const queryDefinition = useMemo(
     () => normalizeQueryDefinition(draft.query_definition),
     [draft.query_definition],
@@ -333,9 +360,13 @@ function Step1FiltersAndPreview({
 
       {totalItems === 0 && !isLoading ? (
         <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed py-16 text-center">
-          <p className="text-sm font-medium">No titles match these filters yet.</p>
+          <p className="text-sm font-medium">
+            {tr("pages.smart_collection_wizard.no_titles_match_these_filters_yet")}
+          </p>
           <p className="text-xs">
-            Loosen the filters above to see what your collection would include.
+            {tr(
+              "pages.smart_collection_wizard.loosen_the_filters_above_to_see_what_your_collection_would",
+            )}
           </p>
         </div>
       ) : (
@@ -352,17 +383,19 @@ function Step1FiltersAndPreview({
       <div className="bg-background/95 supports-[backdrop-filter]:bg-background/70 fixed right-4 bottom-4 z-40 flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-xl backdrop-blur sm:right-6 lg:right-10 xl:right-12">
         <span className="text-muted-foreground hidden text-xs sm:inline">
           {adminMissingLibrary
-            ? "Pick at least one library to continue"
+            ? tr("pages.smart_collection_wizard.pick_at_least_one_library_to_continue")
             : totalItems > 0
-              ? `${itemCountLabel} match these filters`
-              : "Choose filters to preview matching titles"}
+              ? tr("pages.smart_collection_wizard.item_count_label_match_these_filters", {
+                  itemCountLabel: itemCountLabel,
+                })
+              : tr("pages.smart_collection_wizard.choose_filters_to_preview_matching_titles")}
         </span>
         <Button
           type="button"
           onClick={onContinue}
           disabled={adminMissingLibrary || (!isLoading && totalItems === 0)}
         >
-          Next: Details
+          {tr("pages.smart_collection_wizard.next_details")}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -390,6 +423,7 @@ function Step2UserMetadata({
   onPosterSourceUrlChange,
   onBack,
 }: Step2BaseProps & { wizard: UserModeProps }) {
+  useUILanguage();
   const { profile } = useCurrentProfile();
   const { data: profiles = [] } = useProfiles();
   const createMutation = useCreateCollection();
@@ -426,16 +460,18 @@ function Step2UserMetadata({
         <div className="space-y-5">
           <Field
             id="collection-name"
-            label="Name"
+            label={tr("pages.smart_collection_wizard.name")}
             required
             value={draft.title}
             disabled={readOnly}
             onChange={(value) => onDraftChange({ ...draft, title: value })}
-            placeholder="e.g. Saturday Night Movies"
+            placeholder={tr("pages.smart_collection_wizard.e_g_saturday_night_movies")}
           />
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold">Sharing</h2>
+            <h2 className="text-base font-semibold">
+              {tr("pages.smart_collection_wizard.sharing")}
+            </h2>
             <CollectionAccessEditor
               value={draft.access}
               onChange={(access) => onDraftChange({ ...draft, access })}
@@ -446,8 +482,10 @@ function Step2UserMetadata({
           </section>
 
           <ToggleRow
-            title="Show in my library Collections tab"
-            description="Pin this collection to your library's Collections tab alongside the admin shelves. Only you see it — personal collections are private to your user."
+            title={tr("pages.smart_collection_wizard.show_in_my_library_collections_tab")}
+            description={tr(
+              "pages.smart_collection_wizard.pin_this_collection_to_your_library_s_collections_tab_alongside",
+            )}
             checked={draft.include_in_server_collections}
             disabled={readOnly}
             onCheckedChange={(checked) =>
@@ -457,9 +495,9 @@ function Step2UserMetadata({
         </div>
 
         <div className="space-y-3">
-          <h2 className="text-base font-semibold">Poster</h2>
+          <h2 className="text-base font-semibold">{tr("pages.smart_collection_wizard.poster")}</h2>
           <ImageUploadField
-            label="Poster"
+            label={tr("pages.smart_collection_wizard.poster")}
             currentUrl={collection?.poster_url}
             file={posterFile}
             onFileChange={onPosterFileChange}
@@ -506,6 +544,7 @@ function Step2AdminMetadata({
   onBackdropSourceUrlChange,
   onBack,
 }: Step2AdminMetadataProps) {
+  useUILanguage();
   const createMutation = useCreateAdminCollection();
   const updateMutation = useUpdateAdminCollection();
   const deleteImage = useDeleteCollectionImage();
@@ -540,28 +579,32 @@ function Step2AdminMetadata({
         <div className="space-y-5">
           <Field
             id="admin-collection-title"
-            label="Title"
+            label={tr("pages.smart_collection_wizard.title")}
             required
             value={draft.title}
             onChange={(value) => onDraftChange({ ...draft, title: value })}
-            placeholder="e.g. Critically Acclaimed"
+            placeholder={tr("pages.smart_collection_wizard.e_g_critically_acclaimed")}
           />
 
           <div className="space-y-2">
-            <Label htmlFor="admin-collection-description">Description</Label>
+            <Label htmlFor="admin-collection-description">
+              {tr("pages.smart_collection_wizard.description")}
+            </Label>
             <textarea
               id="admin-collection-description"
               rows={3}
               value={draft.description}
               onChange={(event) => onDraftChange({ ...draft, description: event.target.value })}
               className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[88px] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px]"
-              placeholder="Optional context shown alongside the collection."
+              placeholder={tr(
+                "pages.smart_collection_wizard.optional_context_shown_alongside_the_collection",
+              )}
             />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Visibility</Label>
+              <Label>{tr("pages.smart_collection_wizard.visibility")}</Label>
               <Select
                 value={draft.visibility}
                 onValueChange={(value) =>
@@ -572,15 +615,19 @@ function Step2AdminMetadata({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="visible">Visible</SelectItem>
-                  <SelectItem value="hidden">Hidden</SelectItem>
+                  <SelectItem value="visible">
+                    {tr("pages.smart_collection_wizard.visible")}
+                  </SelectItem>
+                  <SelectItem value="hidden">
+                    {tr("pages.smart_collection_wizard.hidden")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <ToggleRow
-              title="Featured"
-              description="Surface near the top of the library."
+              title={tr("pages.smart_collection_wizard.featured")}
+              description={tr("pages.smart_collection_wizard.surface_near_the_top_of_the_library")}
               checked={draft.featured}
               onCheckedChange={(checked) => onDraftChange({ ...draft, featured: checked })}
             />
@@ -588,14 +635,16 @@ function Step2AdminMetadata({
 
           {!hasLibrary ? (
             <p className="text-destructive text-xs">
-              Pick at least one library in the Filters step before saving.
+              {tr(
+                "pages.smart_collection_wizard.pick_at_least_one_library_in_the_filters_step_before",
+              )}
             </p>
           ) : null}
         </div>
 
         <div className="space-y-4">
           <ImageUploadField
-            label="Poster"
+            label={tr("pages.smart_collection_wizard.poster")}
             currentUrl={collection?.poster_url}
             file={posterFile}
             onFileChange={onPosterFileChange}
@@ -613,7 +662,7 @@ function Step2AdminMetadata({
             }
           />
           <ImageUploadField
-            label="Backdrop"
+            label={tr("pages.smart_collection_wizard.backdrop")}
             currentUrl={collection?.backdrop_url}
             file={backdropFile}
             onFileChange={onBackdropFileChange}
@@ -652,6 +701,7 @@ function Step2Shell({
   onBack: () => void;
   onSubmit: () => void;
 }) {
+  useUILanguage();
   return (
     <form
       className="space-y-6 pb-24"
@@ -662,7 +712,7 @@ function Step2Shell({
     >
       <Button type="button" variant="ghost" size="sm" className="w-fit px-0" onClick={onBack}>
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Filters
+        {tr("pages.smart_collection_wizard.back_to_filters")}
       </Button>
       {children}
     </form>
@@ -680,14 +730,15 @@ function SaveBar({
   isPending: boolean;
   saveLabel: string;
 }) {
+  useUILanguage();
   return (
     <div className="bg-background/95 supports-[backdrop-filter]:bg-background/70 fixed right-4 bottom-4 z-40 flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-xl backdrop-blur sm:right-6 lg:right-10 xl:right-12">
       <Button type="button" variant="outline" size="sm" onClick={onBack} disabled={isPending}>
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back
+        {tr("common.actions.back")}
       </Button>
       <Button type="submit" disabled={!canSave || isPending}>
-        {isPending ? "Saving…" : saveLabel}
+        {isPending ? tr("pages.smart_collection_wizard.saving") : saveLabel}
       </Button>
     </div>
   );
@@ -710,6 +761,7 @@ function Field({
   placeholder?: string;
   disabled?: boolean;
 }) {
+  useUILanguage();
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -738,6 +790,7 @@ function ToggleRow({
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
 }) {
+  useUILanguage();
   return (
     <div className="border-border flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
       <div className="pr-2">

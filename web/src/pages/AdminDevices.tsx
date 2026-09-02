@@ -42,6 +42,9 @@ import { SETTING_KEYS } from "@/lib/settingsContract";
 import { SEARCH_SHORTCUT_LABEL } from "@/lib/keyboardShortcut";
 import { AdminSubtitleAppearanceDialog } from "@/components/admin/AdminSubtitleAppearanceDialog";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 // ─────────────────────────────────────────────────────────────────────
 // types & constants
@@ -197,6 +200,8 @@ function deviceKeyHints(device: AdminDeviceSummary): string {
 // ─────────────────────────────────────────────────────────────────────
 
 export default function AdminDevices() {
+  useUILanguage();
+  useUILanguage();
   const { userId: userIdParam, deviceId: deviceIdParam } = useParams<{
     userId?: string;
     deviceId?: string;
@@ -353,14 +358,17 @@ export default function AdminDevices() {
       {/* page header */}
       <div className="page-header items-end gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Devices</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_devices.devices")}
+          </h1>
           <p className="page-subtitle max-w-2xl text-sm sm:text-base">
-            Inspect, tune, and reset per-profile playback overrides across the fleet. Filter by
-            user, platform, or override pattern. Press{" "}
+            {tr(
+              "pages.admin_devices.inspect_tune_and_reset_per_profile_playback_overrides_across_the",
+            )}{" "}
             <kbd className="bg-surface/70 border-border/70 text-foreground/80 inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10.5px]">
               {SEARCH_SHORTCUT_LABEL}
             </kbd>{" "}
-            to jump to another admin page.
+            {tr("pages.admin_devices.to_jump_to_another_admin_page")}
           </p>
         </div>
 
@@ -368,7 +376,7 @@ export default function AdminDevices() {
           <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             className="bg-background/60 h-9 pr-9 pl-9 text-[13px]"
-            placeholder="Search devices, users, IDs, profiles…"
+            placeholder={tr("pages.admin_devices.search_devices_users_ids_profiles")}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -377,7 +385,7 @@ export default function AdminDevices() {
               type="button"
               onClick={() => setSearch("")}
               className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 transition-colors"
-              aria-label="Clear search"
+              aria-label={tr("pages.admin_devices.clear_search")}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -434,9 +442,14 @@ export default function AdminDevices() {
             <span>
               {filteredDevices.length}
               {filteredDevices.length !== devices.length && (
-                <span className="text-muted-foreground/60"> of {devices.length}</span>
+                <span className="text-muted-foreground/60">
+                  {" "}
+                  {tr("pages.admin_devices.of")} {devices.length}
+                </span>
               )}{" "}
-              {filteredDevices.length === 1 ? "device" : "devices"}
+              {filteredDevices.length === 1
+                ? tr("pages.admin_devices.device")
+                : tr("pages.admin_devices.devices_728190e7")}
             </span>
             {hasAnyFilter && (
               <button
@@ -444,7 +457,7 @@ export default function AdminDevices() {
                 onClick={clearAllFilters}
                 className="hover:text-foreground transition-colors"
               >
-                clear all
+                {tr("pages.admin_devices.clear_all")}
               </button>
             )}
           </div>
@@ -519,6 +532,8 @@ function FleetPulse({
   groupBy: GroupBy;
   onGroupByChange: (v: GroupBy) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   // sorted override counts for the histogram
   const sortedCounts = useMemo(
     () => [...devices].map((d) => d.override_count ?? 0).sort((a, b) => b - a),
@@ -529,37 +544,41 @@ function FleetPulse({
   return (
     <div className="surface-panel-subtle text-muted-foreground flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl px-4 py-3 text-[12px]">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <Stat label="users" value={totalUsers} />
+        <Stat label={tr("pages.admin_devices.users")} value={totalUsers} />
         <Dot />
-        <Stat label="devices" value={totalDevices} />
+        <Stat label={tr("pages.admin_devices.devices_728190e7")} value={totalDevices} />
         <Dot />
-        <Stat label="profiles" value={totalProfiles} />
+        <Stat label={tr("pages.admin_devices.profiles")} value={totalProfiles} />
         <Dot />
-        <Stat label="overrides" value={totalOverrides} />
+        <Stat label={tr("pages.admin_devices.overrides")} value={totalOverrides} />
         {anomalyCount > 0 && (
           <>
             <Dot />
-            <Stat label="anomalies" value={anomalyCount} tone="destructive" />
+            <Stat
+              label={tr("pages.admin_devices.anomalies")}
+              value={anomalyCount}
+              tone="destructive"
+            />
           </>
         )}
       </div>
 
       <div className="text-muted-foreground/80 flex items-center gap-2 font-mono text-[10px] tracking-[0.06em] uppercase">
-        <span className="hidden md:inline">density</span>
+        <span className="hidden md:inline">{tr("pages.admin_devices.density")}</span>
         <Histogram counts={sortedCounts} max={maxCount} />
       </div>
 
       <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
         <span className="text-muted-foreground/70 text-[10px] tracking-[0.08em] uppercase">
-          group by
+          {tr("pages.admin_devices.group_by")}
         </span>
         <SegmentedControl
           value={groupBy}
           onChange={onGroupByChange}
           options={[
-            { value: "user", label: "User" },
-            { value: "platform", label: "Platform" },
-            { value: "activity", label: "Activity" },
+            { value: "user", label: tr("pages.admin_devices.user") },
+            { value: "platform", label: tr("pages.admin_devices.platform") },
+            { value: "activity", label: tr("pages.admin_devices.activity") },
           ]}
         />
       </div>
@@ -578,6 +597,8 @@ function DeviceScopeControl({
   devicesWithOverrides: number;
   onChange: (overridesOnly: boolean) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="border-border/70 bg-background/40 inline-flex overflow-hidden rounded-md border">
       <button
@@ -591,7 +612,7 @@ function DeviceScopeControl({
             : "text-muted-foreground hover:bg-surface-hover/40 hover:text-foreground",
         )}
       >
-        <span>All Devices</span>
+        <span>{tr("pages.admin_devices.all_devices")}</span>
         <span className="font-mono text-[11.5px] tabular-nums opacity-70">{totalDevices}</span>
       </button>
       <button
@@ -605,7 +626,7 @@ function DeviceScopeControl({
             : "text-muted-foreground hover:bg-surface-hover/40 hover:text-foreground",
         )}
       >
-        <span>Devices with Overrides</span>
+        <span>{tr("pages.admin_devices.devices_with_overrides")}</span>
         <span className="font-mono text-[11.5px] tabular-nums opacity-70">
           {devicesWithOverrides}
         </span>
@@ -629,6 +650,8 @@ function SettingsScopeControl({
   lockToAllSettings: boolean;
   onChange: (showAllSettings: boolean) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const canShowOverrides = !disabled && !lockToAllSettings;
 
   return (
@@ -639,9 +662,9 @@ function SettingsScopeControl({
       )}
       title={
         disabled
-          ? "This device does not have a registered profile yet"
+          ? tr("pages.admin_devices.this_device_does_not_have_a_registered_profile_yet")
           : lockToAllSettings
-            ? "This device has no overrides yet, so every device setting is shown"
+            ? tr("pages.admin_devices.this_device_has_no_overrides_yet_so_every_device_setting")
             : undefined
       }
     >
@@ -659,7 +682,7 @@ function SettingsScopeControl({
             : "text-muted-foreground hover:bg-surface-hover/40 hover:text-foreground",
         )}
       >
-        <span>All Settings</span>
+        <span>{tr("pages.admin_devices.all_settings")}</span>
         <span className="font-mono text-[10.5px] tabular-nums opacity-70">{totalSettings}</span>
       </button>
       <button
@@ -676,7 +699,7 @@ function SettingsScopeControl({
             : "text-muted-foreground hover:bg-surface-hover/40 hover:text-foreground",
         )}
       >
-        <span>Overrides</span>
+        <span>{tr("pages.admin_devices.overrides_8df71d5f")}</span>
         <span className="font-mono text-[10.5px] tabular-nums opacity-70">{overrideCount}</span>
       </button>
     </div>
@@ -684,6 +707,8 @@ function SettingsScopeControl({
 }
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: "destructive" }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <span className="inline-flex items-baseline gap-1.5">
       <span
@@ -706,6 +731,8 @@ function Dot() {
 }
 
 function Histogram({ counts, max }: { counts: number[]; max: number }) {
+  useUILanguage();
+  useUILanguage();
   // 28 bars feels right for the "fleet at a glance" — if there are more
   // devices we sample, fewer we just render what we have.
   const SLOTS = 28;
@@ -750,6 +777,8 @@ function SegmentedControl<T extends string>({
   onChange: (v: T) => void;
   options: { value: T; label: string }[];
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="border-border/70 bg-background/40 inline-flex overflow-hidden rounded-md border">
       {options.map((opt, i) => {
@@ -810,6 +839,8 @@ function FilterRail({
   hasAnyFilter: boolean;
   onClearAll: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const togglePlatform = (k: PlatformKind) => {
     const next = new Set(platforms);
     if (next.has(k)) next.delete(k);
@@ -835,7 +866,7 @@ function FilterRail({
   return (
     <aside className="surface-panel hidden h-fit flex-col gap-5 overflow-hidden rounded-xl border-0 px-3 py-4 text-[12.5px] lg:flex">
       <FilterGroup
-        label="Saved views"
+        label={tr("pages.admin_devices.saved_views")}
         action={
           hasAnyFilter ? (
             <button
@@ -843,14 +874,14 @@ function FilterRail({
               onClick={onClearAll}
               className="text-muted-foreground hover:text-foreground italic transition-colors"
             >
-              clear
+              {tr("pages.admin_devices.clear")}
             </button>
           ) : null
         }
       >
         <SavedViewRow
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
-          label="Anomalies"
+          label={tr("pages.admin_devices.anomalies_4b2e6f56")}
           count={savedViewCounts.anomalies}
           active={activeView === "anomalies"}
           tone="destructive"
@@ -858,28 +889,28 @@ function FilterRail({
         />
         <SavedViewRow
           icon={<Clock className="h-3.5 w-3.5" />}
-          label="Updated < 7d"
+          label={tr("pages.admin_devices.updated_7d")}
           count={savedViewCounts.recent}
           active={activeView === "recent"}
           onClick={() => onViewChange(activeView === "recent" ? null : "recent")}
         />
         <SavedViewRow
           icon={<Sparkles className="h-3.5 w-3.5" />}
-          label="HDR-capable"
+          label={tr("pages.admin_devices.hdr_capable")}
           count={savedViewCounts.hdr}
           active={activeView === "hdr"}
           onClick={() => onViewChange(activeView === "hdr" ? null : "hdr")}
         />
         <SavedViewRow
           icon={<Subtitles className="h-3.5 w-3.5" />}
-          label="Heavy customizers"
+          label={tr("pages.admin_devices.heavy_customizers")}
           count={savedViewCounts.subtitle}
           active={activeView === "subtitle"}
           onClick={() => onViewChange(activeView === "subtitle" ? null : "subtitle")}
         />
         <SavedViewRow
           icon={<Activity className="h-3.5 w-3.5" />}
-          label="Dormant 30d"
+          label={tr("pages.admin_devices.dormant_30d")}
           count={savedViewCounts.dormant}
           active={activeView === "dormant"}
           onClick={() => onViewChange(activeView === "dormant" ? null : "dormant")}
@@ -887,7 +918,7 @@ function FilterRail({
       </FilterGroup>
 
       {availablePlatforms.length > 1 && (
-        <FilterGroup label="Platform">
+        <FilterGroup label={tr("pages.admin_devices.platform")}>
           {availablePlatforms.map((k) => (
             <FacetCheckbox
               key={k}
@@ -900,11 +931,11 @@ function FilterRail({
         </FilterGroup>
       )}
 
-      <FilterGroup label="Override count">
+      <FilterGroup label={tr("pages.admin_devices.override_count")}>
         {OVERRIDE_RANGES.map((b) => (
           <FacetCheckbox
             key={b}
-            label={b === "none" ? "none" : b}
+            label={b === "none" ? tr("pages.admin_devices.none") : b}
             count={overrideRangeCounts.get(b) ?? 0}
             checked={overrideRange.has(b)}
             onToggle={() => toggleRange(b)}
@@ -912,7 +943,7 @@ function FilterRail({
         ))}
       </FilterGroup>
 
-      <FilterGroup label="Last seen">
+      <FilterGroup label={tr("pages.admin_devices.last_seen")}>
         {RECENCY_BUCKETS.map((b) => (
           <FacetCheckbox
             key={b}
@@ -936,6 +967,8 @@ function FilterGroup({
   action?: ReactNode;
   children: ReactNode;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div>
       <div className="text-muted-foreground/70 mb-2 flex items-center justify-between px-1 text-[10px] font-semibold tracking-[0.12em] uppercase">
@@ -962,6 +995,8 @@ function SavedViewRow({
   tone?: "destructive";
   onClick: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <button
       type="button"
@@ -1009,6 +1044,8 @@ function FacetCheckbox({
   checked: boolean;
   onToggle: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <label
       className={cn(
@@ -1060,7 +1097,11 @@ function buildGroups(devices: AdminDeviceSummary[], groupBy: GroupBy): DeviceGro
     if (groupBy === "user") {
       return {
         key: `u:${d.user_id}`,
-        label: d.username || d.email || `User ${d.user_id}`,
+        get label() {
+          return (
+            d.username || d.email || tr("pages.admin_devices.user_user_id", { userId: d.user_id })
+          );
+        },
         href: `/admin/users/${d.user_id}`,
       };
     }
@@ -1141,6 +1182,8 @@ function DeviceGroup({
   currentProfileId: string | null;
   forceOpen: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   const groupAnomalies = group.devices.filter((d) => anomalies.has(d.device_id)).length;
   const containsActive = group.devices.some(
     (d) => d.user_id === currentUserId && d.device_id === currentDeviceId,
@@ -1167,7 +1210,7 @@ function DeviceGroup({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          aria-controls={`device-group-${group.key}`}
+          aria-controls={"device-group-" + group.key}
           className="text-foreground hover:text-foreground/80 group flex min-w-0 flex-1 items-center gap-1.5 text-left transition-colors"
         >
           <ChevronRight
@@ -1184,7 +1227,7 @@ function DeviceGroup({
               to={group.href}
               onClick={(e) => e.stopPropagation()}
               className="text-muted-foreground/70 hover:text-foreground inline-flex items-center transition-colors"
-              aria-label={`Open ${group.label}`}
+              aria-label={tr("pages.admin_devices.open_label", { label: group.label })}
             >
               <ArrowUpRight className="h-3 w-3" />
             </Link>
@@ -1196,12 +1239,15 @@ function DeviceGroup({
             </span>
           )}
           <span className="text-muted-foreground/70 font-mono text-[10.5px] tabular-nums">
-            {group.meta.devices}d · {group.meta.profiles}p · {group.meta.overrides}k
+            {group.meta.devices}
+            {tr("pages.admin_devices.d")} {group.meta.profiles}
+            {tr("pages.admin_devices.p")} {group.meta.overrides}
+            {tr("pages.admin_devices.k")}
           </span>
         </div>
       </header>
       {open && (
-        <ul id={`device-group-${group.key}`} className="space-y-0.5 px-1.5 pb-1.5">
+        <ul id={"device-group-" + group.key} className="space-y-0.5 px-1.5 pb-1.5">
           {group.devices.map((device) => (
             <li key={`${device.user_id}:${device.device_id}`}>
               <DeviceRow
@@ -1229,6 +1275,8 @@ function DeviceRow({
   active: boolean;
   activeProfileId: string | null;
 }) {
+  useUILanguage();
+  useUILanguage();
   const kind = classifyPlatform(device.device_platform);
   const profileSuffix = activeProfileId ? `?profile=${encodeURIComponent(activeProfileId)}` : "";
   const href = `/admin/devices/${device.user_id}/${encodeURIComponent(device.device_id)}${profileSuffix}`;
@@ -1253,13 +1301,15 @@ function DeviceRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="text-foreground truncate text-[13px] font-medium">
-            {device.device_name || "Unnamed device"}
+            {device.device_name || tr("pages.admin_devices.unnamed_device")}
           </span>
           {isAnomaly && (
             <span
               className="bg-destructive/90 ring-destructive/20 h-1.5 w-1.5 shrink-0 rounded-full ring-2"
-              title="Anomaly: override pattern diverges from platform peers, or device is dormant"
-              aria-label="anomaly"
+              title={tr(
+                "pages.admin_devices.anomaly_override_pattern_diverges_from_platform_peers_or_device_is",
+              )}
+              aria-label={tr("pages.admin_devices.anomaly")}
             />
           )}
         </div>
@@ -1283,6 +1333,8 @@ function DeviceRow({
 }
 
 function OverrideGauge({ count, active }: { count: number; active: boolean }) {
+  useUILanguage();
+  useUILanguage();
   const SLOTS = 5;
   // Map count to slots: 0→0, 1-2→1-2, 3→3, 4-5→4, 6+→5 (full)
   const filled = count === 0 ? 0 : count >= 6 ? 5 : Math.min(count, 5);
@@ -1320,19 +1372,23 @@ function OverrideGauge({ count, active }: { count: number; active: boolean }) {
 // ─────────────────────────────────────────────────────────────────────
 
 function EmptyFleet({ hasDevices, onClear }: { hasDevices: boolean; onClear: () => void }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="flex flex-col items-center gap-3 px-4 py-14 text-center">
       <p className="text-foreground text-sm font-medium">
-        {hasDevices ? "No devices match your filters" : "No devices seen yet"}
+        {hasDevices
+          ? tr("pages.admin_devices.no_devices_match_your_filters")
+          : tr("pages.admin_devices.no_devices_seen_yet")}
       </p>
       <p className="text-muted-foreground max-w-xs text-[12.5px] leading-relaxed">
         {hasDevices
-          ? "Try a different search term or clear a few filters."
-          : "Devices appear here after a client connects with a stable device id."}
+          ? tr("pages.admin_devices.try_a_different_search_term_or_clear_a_few_filters")
+          : tr("pages.admin_devices.devices_appear_here_after_a_client_connects_with_a_stable")}
       </p>
       {hasDevices && (
         <Button variant="outline" size="sm" onClick={onClear}>
-          Clear filters
+          {tr("pages.admin_devices.clear_filters")}
         </Button>
       )}
     </div>
@@ -1340,12 +1396,15 @@ function EmptyFleet({ hasDevices, onClear }: { hasDevices: boolean; onClear: () 
 }
 
 function EmptyDetail() {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="flex min-h-[420px] flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-      <h2 className="text-foreground text-base font-medium">Select a device</h2>
+      <h2 className="text-foreground text-base font-medium">
+        {tr("pages.admin_devices.select_a_device")}
+      </h2>
       <p className="text-muted-foreground max-w-sm text-[13px] leading-relaxed">
-        Pick a device from the list to inspect its per-profile overrides, tune controls, or reset
-        individual keys.
+        {tr("pages.admin_devices.pick_a_device_from_the_list_to_inspect_its_per")}
       </p>
     </div>
   );
@@ -1369,6 +1428,8 @@ function DeviceDetailPanel({
   anomaly: DeviceAnomalyReason | null;
   defaultShowAllSettings: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   const isAnomaly = anomaly !== null;
   // The detail endpoint supplies registration metadata — device name, owner,
   // which profiles have ever used it — which is not a setting and has no
@@ -1451,9 +1512,11 @@ function DeviceDetailPanel({
   if (!data) {
     return (
       <div className="flex min-h-[320px] flex-col items-center justify-center gap-1 text-center">
-        <div className="text-foreground text-sm font-medium">Device not found</div>
+        <div className="text-foreground text-sm font-medium">
+          {tr("pages.admin_devices.device_not_found")}
+        </div>
         <div className="text-muted-foreground max-w-xs text-xs">
-          The device may have been removed, or its overrides may have been cleared.
+          {tr("pages.admin_devices.the_device_may_have_been_removed_or_its_overrides_may")}
         </div>
       </div>
     );
@@ -1479,9 +1542,11 @@ function DeviceDetailPanel({
         onOpenChange={(open) => {
           if (!open) setSettingToReset(null);
         }}
-        title="Reset this override?"
-        description="The override will be removed and the device will fall back to the profile default."
-        confirmLabel="Reset override"
+        title={tr("pages.admin_devices.reset_this_override")}
+        description={tr(
+          "pages.admin_devices.the_override_will_be_removed_and_the_device_will_fall",
+        )}
+        confirmLabel={tr("pages.admin_devices.reset_override")}
         variant="destructive"
         onConfirm={() => {
           if (settingToReset) {
@@ -1501,9 +1566,15 @@ function DeviceDetailPanel({
         onOpenChange={(open) => {
           if (!open) setProfileToReset(null);
         }}
-        title={profileToReset ? `Reset overrides for ${profileToReset.name}?` : "Reset profile"}
-        description="Every override for this profile on this device will be cleared."
-        confirmLabel="Reset all"
+        title={
+          profileToReset
+            ? tr("pages.admin_devices.reset_overrides_for_name", { name: profileToReset.name })
+            : tr("pages.admin_devices.reset_profile")
+        }
+        description={tr(
+          "pages.admin_devices.every_override_for_this_profile_on_this_device_will_be",
+        )}
+        confirmLabel={tr("pages.admin_devices.reset_all")}
         variant="destructive"
         onConfirm={() => {
           if (profileToReset) {
@@ -1570,13 +1641,12 @@ function DeviceDetailPanel({
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-mono text-sm">
-              {jsonEditor?.setting.key ?? "JSON"}
+              {jsonEditor?.setting.key ?? tr("pages.admin_devices.json")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-muted-foreground text-[12.5px]">
-              Edit the raw value. Invalid JSON is saved as-is and may cause clients to fall back to
-              defaults.
+              {tr("pages.admin_devices.edit_the_raw_value_invalid_json_is_saved_as_is")}
             </p>
             <textarea
               spellCheck={false}
@@ -1586,7 +1656,7 @@ function DeviceDetailPanel({
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={closeJsonEditor}>
-                Cancel
+                {tr("common.actions.cancel")}
               </Button>
               <Button
                 size="sm"
@@ -1607,7 +1677,7 @@ function DeviceDetailPanel({
                   );
                 }}
               >
-                Save override
+                {tr("pages.admin_devices.save_override")}
               </Button>
             </div>
           </div>
@@ -1620,12 +1690,12 @@ function DeviceDetailPanel({
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-foreground text-lg leading-tight font-semibold sm:text-xl">
-                {data.device_name || "Unnamed device"}
+                {data.device_name || tr("pages.admin_devices.unnamed_device")}
               </h2>
               {isAnomaly && (
                 <span className="text-destructive border-destructive/30 bg-destructive/10 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] tracking-[0.04em] uppercase">
                   <AlertTriangle className="h-3 w-3" />
-                  anomaly
+                  {tr("pages.admin_devices.anomaly")}
                 </span>
               )}
             </div>
@@ -1635,14 +1705,16 @@ function DeviceDetailPanel({
               <span>{platformLabel(data.device_platform)}</span>
               <span className="text-muted-foreground/40">·</span>
               <Link
-                to={`/admin/users/${data.user_id}`}
+                to={"/admin/users/" + data.user_id}
                 className="text-foreground/85 hover:text-foreground inline-flex items-center gap-0.5 font-medium transition-colors"
               >
                 {data.username}
                 <ArrowUpRight className="h-3 w-3" />
               </Link>
               <span className="text-muted-foreground/40">·</span>
-              <span>updated {formatRelative(data.last_updated)}</span>
+              <span>
+                {tr("pages.admin_devices.updated")} {formatRelative(data.last_updated)}
+              </span>
             </div>
           </div>
         </div>
@@ -1657,8 +1729,8 @@ function DeviceDetailPanel({
             onChange={setShowAllSettings}
           />
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/admin/users/${data.user_id}`}>
-              Open user
+            <Link to={"/admin/users/" + data.user_id}>
+              {tr("pages.admin_devices.open_user")}
               <ArrowUpRight className="h-3 w-3" />
             </Link>
           </Button>
@@ -1668,13 +1740,20 @@ function DeviceDetailPanel({
       {/* instrument readout */}
       <div className="border-border/60 grid grid-cols-2 gap-x-6 gap-y-3 border-b px-5 py-4 sm:grid-cols-4 sm:px-6">
         <ReadoutCell
-          label="Overrides"
+          label={tr("pages.admin_devices.overrides_8df71d5f")}
           value={String(totalOverrides)}
-          sub={`across ${profileTabs.length} ${profileTabs.length === 1 ? "profile" : "profiles"}`}
+          sub={tr("pages.admin_devices.across_count_unit", {
+            count: profileTabs.length,
+            unit: tr(
+              profileTabs.length === 1
+                ? "pages.admin_devices.profile"
+                : "pages.admin_devices.profiles",
+            ),
+          })}
           tone="primary"
         />
         <ReadoutCell
-          label="Profiles touched"
+          label={tr("pages.admin_devices.profiles_touched")}
           value={
             profileTabs
               .slice(0, 2)
@@ -1683,23 +1762,25 @@ function DeviceDetailPanel({
           }
           sub={
             profileTabs.length > 2
-              ? `+ ${profileTabs.length - 2} more`
+              ? tr("pages.admin_devices.count_more", { count: profileTabs.length - 2 })
               : profileTabs.map((p) => `${p.settings.length}`).join(" / ")
           }
         />
         <ReadoutCell
-          label="Status"
+          label={tr("pages.admin_devices.status")}
           value={isAnomaly ? "Anomaly" : "Normal"}
           sub={
             anomaly
-              ? anomaly.summary
-              : `aligned with ${platformKindLabel(kind).toLowerCase()} fleet`
+              ? tr.remote({ message: anomaly.summary })
+              : tr("pages.admin_devices.aligned_with_platform_fleet", {
+                  platform: platformKindLabel(kind).toLocaleLowerCase(),
+                })
           }
-          subTitle={anomaly?.detail}
+          subTitle={anomaly?.detail ? tr.remote({ message: anomaly.detail }) : undefined}
           tone={isAnomaly ? "destructive" : undefined}
         />
         <ReadoutCell
-          label="Last update"
+          label={tr("pages.admin_devices.last_update")}
           value={formatRelative(lastUpdate || data.last_updated)}
           sub={lastUpdate ? lastUpdate.split("T")[0] : "—"}
         />
@@ -1715,9 +1796,11 @@ function DeviceDetailPanel({
         {profileTabs.length === 0 ? (
           <div className="px-5 py-5 sm:px-6">
             <div className="border-border/60 rounded-md border border-dashed px-6 py-12 text-center">
-              <p className="text-foreground text-sm font-medium">No profiles registered</p>
+              <p className="text-foreground text-sm font-medium">
+                {tr("pages.admin_devices.no_profiles_registered")}
+              </p>
               <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-xs leading-relaxed">
-                The device exists, but it does not have enough profile context to create overrides.
+                {tr("pages.admin_devices.the_device_exists_but_it_does_not_have_enough_profile")}
               </p>
             </div>
           </div>
@@ -1779,6 +1862,8 @@ function ReadoutCell({
   subTitle?: string;
   tone?: "primary" | "destructive";
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="min-w-0">
       <div className="text-muted-foreground/70 text-[10px] font-semibold tracking-[0.12em] uppercase">

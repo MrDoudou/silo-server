@@ -19,6 +19,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { CatalogFiltersResponse } from "@/api/types";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /** Default secondary filter values for "Clear All". */
 const EMPTY_SECONDARY_FILTERS: Partial<GuidedFormState> = {
@@ -91,6 +93,7 @@ export default function CatalogFilterSheet({
   libraryType,
   catalogState,
 }: CatalogFilterSheetProps) {
+  useUILanguage();
   // Portal container inside the Sheet's DOM so that react-remove-scroll
   // (activated by the Dialog/Sheet) does not block scroll events inside
   // dropdown listboxes opened by filter controls.
@@ -112,8 +115,10 @@ export default function CatalogFilterSheet({
           <SheetHeader className="border-b pb-3">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <SheetTitle>Filters</SheetTitle>
-                <SheetDescription>Refine your catalog results</SheetDescription>
+                <SheetTitle>{tr("components.catalog.catalog_filter_sheet.filters")}</SheetTitle>
+                <SheetDescription>
+                  {tr("components.catalog.catalog_filter_sheet.refine_your_catalog_results")}
+                </SheetDescription>
               </div>
               <div className="flex items-center gap-1">
                 <Button
@@ -122,7 +127,7 @@ export default function CatalogFilterSheet({
                   size="xs"
                   onClick={() => onEditorModeChange("guided")}
                 >
-                  Guided
+                  {tr("components.catalog.catalog_filter_sheet.guided")}
                 </Button>
                 <Button
                   type="button"
@@ -130,7 +135,7 @@ export default function CatalogFilterSheet({
                   size="xs"
                   onClick={() => onEditorModeChange("advanced")}
                 >
-                  Advanced
+                  {tr("components.catalog.catalog_filter_sheet.advanced")}
                 </Button>
               </div>
             </div>
@@ -176,11 +181,11 @@ export default function CatalogFilterSheet({
               size="sm"
               onClick={() => onUpdate(EMPTY_SECONDARY_FILTERS)}
             >
-              Clear All
+              {tr("components.catalog.catalog_filter_sheet.clear_all")}
             </Button>
             <SheetClose asChild>
               <Button type="button" size="sm">
-                Done
+                {tr("common.actions.done")}
               </Button>
             </SheetClose>
           </SheetFooter>

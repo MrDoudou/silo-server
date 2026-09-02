@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 import { MAX_CSS_SIZE } from "@/lib/themeExport";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface RawCssEditorProps {
   value: string;
@@ -7,6 +9,7 @@ interface RawCssEditorProps {
 }
 
 export function RawCssEditor({ value, onChange }: RawCssEditorProps) {
+  useUILanguage();
   const bytes = new TextEncoder().encode(value).length;
   const pct = Math.min(100, (bytes / MAX_CSS_SIZE) * 100);
   const isNearLimit = pct > 90;
@@ -16,10 +19,13 @@ export function RawCssEditor({ value, onChange }: RawCssEditorProps) {
     <div className="space-y-3">
       <div className="space-y-1">
         <p className="text-muted-foreground text-[13px] leading-relaxed">
-          Write custom CSS that is injected after all theme variables. Target any selector — your
-          overrides apply on top of the active theme. Use{" "}
-          <code className="bg-muted rounded px-1 py-0.5 text-xs">:root</code> to override CSS custom
-          properties directly.
+          {tr(
+            "components.theme.raw_css_editor.write_custom_css_that_is_injected_after_all_theme_variables",
+          )}{" "}
+          <code className="bg-muted rounded px-1 py-0.5 text-xs">
+            {tr("components.theme.raw_css_editor.root")}
+          </code>{" "}
+          {tr("components.theme.raw_css_editor.to_override_css_custom_properties_directly")}
         </p>
       </div>
 
@@ -31,7 +37,9 @@ export function RawCssEditor({ value, onChange }: RawCssEditorProps) {
             onChange(next);
           }
         }}
-        placeholder={`/* Example: override the primary color */\n:root {\n  --primary: #ff6b6b;\n}\n\n/* Example: custom scrollbar */\n::-webkit-scrollbar {\n  width: 8px;\n}`}
+        placeholder={tr(
+          "components.theme.raw_css_editor.example_override_the_primary_color_root_primary_ff6b6b_example_custom",
+        )}
         spellCheck={false}
         className={cn(
           "border-border bg-background text-foreground placeholder:text-muted-foreground/50 min-h-[240px] w-full resize-y rounded-xl border p-3 font-mono text-[13px] leading-relaxed focus:ring-2 focus:outline-none",
@@ -41,7 +49,9 @@ export function RawCssEditor({ value, onChange }: RawCssEditorProps) {
 
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-[11px]">
-          Preview updates as you type. Saved automatically after you pause.
+          {tr(
+            "components.theme.raw_css_editor.preview_updates_as_you_type_saved_automatically_after_you_pause",
+          )}
         </p>
         <span
           className={cn(
@@ -53,7 +63,8 @@ export function RawCssEditor({ value, onChange }: RawCssEditorProps) {
                 : "text-muted-foreground",
           )}
         >
-          {(bytes / 1024).toFixed(1)} / {MAX_CSS_SIZE / 1024} KB
+          {(bytes / 1024).toFixed(1)} / {MAX_CSS_SIZE / 1024}{" "}
+          {tr("components.theme.raw_css_editor.kb")}
         </span>
       </div>
     </div>

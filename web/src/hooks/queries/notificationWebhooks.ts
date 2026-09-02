@@ -8,7 +8,7 @@ import type {
   WebPushSubscriptionView,
 } from "@/api/types";
 import { notificationKeys } from "./keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 export function useNotificationCapability() {
   return useQuery({
@@ -55,7 +55,9 @@ export function useUpdateNotificationWebhook() {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.webhooks() });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to update webhook");
+      toast.error("errors.queries.notification_webhooks.failed_to_update_webhook", {
+        error: error,
+      });
     },
   });
 }
@@ -65,11 +67,11 @@ export function useDeleteNotificationWebhook() {
   return useMutation({
     mutationFn: (id: string) => api(`/notifications/webhooks/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Webhook deleted");
+      toast.success("feedback.queries.notification_webhooks.webhook_deleted");
       void queryClient.invalidateQueries({ queryKey: notificationKeys.webhooks() });
     },
     onError: () => {
-      toast.error("Failed to delete webhook");
+      toast.error("errors.queries.notification_webhooks.failed_to_delete_webhook");
     },
   });
 }
@@ -90,7 +92,9 @@ export function useRotateNotificationWebhookSecret() {
         method: "POST",
       }),
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to rotate signing secret");
+      toast.error("errors.queries.notification_webhooks.failed_to_rotate_signing_secret", {
+        error: error,
+      });
     },
   });
 }
@@ -115,7 +119,7 @@ export function useDeleteWebPushSubscription() {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.webPushSubscriptions() });
     },
     onError: () => {
-      toast.error("Failed to remove push subscription");
+      toast.error("errors.queries.notification_webhooks.failed_to_remove_push_subscription");
     },
   });
 }

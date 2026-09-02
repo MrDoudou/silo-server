@@ -20,6 +20,7 @@ import {
 import { invalidateAdminCollectionQueries } from "@/hooks/queries/collectionSurfaceRefresh";
 import { sectionKeys } from "@/hooks/queries/keys";
 import { useEventChannel } from "@/components/realtimeEventsContext";
+
 import { GroupsBoard } from "@/components/collections/admin/GroupsBoard";
 import { GroupEditDialog } from "@/components/collections/admin/GroupEditDialog";
 import { Button } from "@/components/ui/button";
@@ -48,8 +49,11 @@ import { CollectionTemplateGallery } from "@/components/CollectionTemplateGaller
 import { BulkSelectionCheckbox } from "@/components/BulkSelectionCheckbox";
 import { updateCheckboxSelection } from "@/lib/checkboxSelection";
 import { buildAdminCollectionEditorPath, collectionsInAdminScope } from "./adminCollectionsShared";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function AdminCollections() {
+  useUILanguage();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -200,9 +204,14 @@ export default function AdminCollections() {
         onOpenChange={(open) => {
           if (!open) setConfirmDeleteCollection(null);
         }}
-        title="Delete collection"
-        description={`Delete collection "${confirmDeleteCollection?.title}"? This action cannot be undone.`}
-        confirmLabel="Delete"
+        title={tr("pages.admin_collections.delete_collection")}
+        description={tr(
+          "pages.admin_collections.delete_collection_title_this_action_cannot_be_undone",
+          {
+            title: confirmDeleteCollection?.title,
+          },
+        )}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         onConfirm={() => {
           if (confirmDeleteCollection) {
@@ -218,9 +227,9 @@ export default function AdminCollections() {
       <ConfirmDialog
         open={confirmDeleteSelected}
         onOpenChange={setConfirmDeleteSelected}
-        title="Delete selected collections"
+        title={tr("pages.admin_collections.delete_selected_collections")}
         description={deleteSelectedDescription}
-        confirmLabel="Delete selected"
+        confirmLabel={tr("pages.admin_collections.delete_selected")}
         variant="destructive"
         onConfirm={handleDeleteSelected}
       />
@@ -228,18 +237,22 @@ export default function AdminCollections() {
       <ConfirmDialog
         open={confirmDeleteAll}
         onOpenChange={setConfirmDeleteAll}
-        title="Delete all collections"
+        title={tr("pages.admin_collections.delete_all_collections")}
         description={deleteAllDescription}
-        confirmLabel="Delete all"
+        confirmLabel={tr("pages.admin_collections.delete_all")}
         variant="destructive"
         onConfirm={handleDeleteAll}
       />
 
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Collections</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_collections.collections")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Curate library shelves and sync them from MDBList or TMDB trending.
+            {tr(
+              "pages.admin_collections.curate_library_shelves_and_sync_them_from_mdblist_or_tmdb",
+            )}
           </p>
         </div>
 
@@ -253,17 +266,19 @@ export default function AdminCollections() {
           />
           {!isAllLibraries ? (
             <Button size="sm" variant="outline" onClick={() => setEditingGroup({ mode: "create" })}>
-              <Plus className="mr-1 h-4 w-4" /> New Group
+              <Plus className="mr-1 h-4 w-4" /> {tr("pages.admin_collections.new_group")}
             </Button>
           ) : null}
           <Button size="sm" variant="outline" onClick={() => setGalleryOpen(true)}>
-            <Sparkles className="mr-1 h-4 w-4" /> Browse Templates
+            <Sparkles className="mr-1 h-4 w-4" /> {tr("pages.admin_collections.browse_templates")}
           </Button>
           {selectedCollections.length > 0 ? (
             <>
-              <Badge variant="secondary">{selectedCollections.length} selected</Badge>
+              <Badge variant="secondary">
+                {selectedCollections.length} {tr("pages.admin_collections.selected")}
+              </Badge>
               <Button size="sm" variant="ghost" onClick={clearCollectionSelection}>
-                Clear
+                {tr("pages.admin_collections.clear")}
               </Button>
               <Button
                 size="sm"
@@ -271,7 +286,8 @@ export default function AdminCollections() {
                 disabled={deleteCollections.isPending || activeApplyJob}
                 onClick={() => setConfirmDeleteSelected(true)}
               >
-                <Trash2 data-icon="inline-start" /> Delete Selected
+                <Trash2 data-icon="inline-start" />{" "}
+                {tr("pages.admin_collections.delete_selected_76bf56ab")}
               </Button>
             </>
           ) : null}
@@ -287,14 +303,18 @@ export default function AdminCollections() {
               ) : (
                 <Trash2 className="mr-1 h-4 w-4" />
               )}
-              {deleteCollections.isPending ? `${deleteProgressLabel}…` : "Delete All"}
+              {deleteCollections.isPending
+                ? tr("pages.admin_collections.delete_progress_label", {
+                    deleteProgressLabel: deleteProgressLabel,
+                  })
+                : tr("pages.admin_collections.delete_all_97f32d67")}
             </Button>
           ) : null}
           <Button
             size="sm"
             onClick={() => navigate(buildAdminCollectionEditorPath("new", selectedLibraryId))}
           >
-            <Plus className="mr-1 h-4 w-4" /> Add Collection
+            <Plus className="mr-1 h-4 w-4" /> {tr("pages.admin_collections.add_collection")}
           </Button>
         </div>
       </div>
@@ -365,21 +385,26 @@ export default function AdminCollections() {
       {showScopedEmpty && (
         <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-16 text-center">
           <div className="space-y-1">
-            <p className="text-sm font-medium">No collections yet</p>
+            <p className="text-sm font-medium">
+              {tr("pages.admin_collections.no_collections_yet")}
+            </p>
             <p className="text-muted-foreground max-w-sm text-xs">
-              Create collections for this library, or sync them from MDBList or TMDB trending.
+              {tr(
+                "pages.admin_collections.create_collections_for_this_library_or_sync_them_from_mdblist",
+              )}
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setGalleryOpen(true)}>
-              <Sparkles className="mr-1 h-4 w-4" /> Start from a template
+              <Sparkles className="mr-1 h-4 w-4" />{" "}
+              {tr("pages.admin_collections.start_from_a_template")}
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate(buildAdminCollectionEditorPath("new", selectedLibraryId))}
             >
-              <Plus className="mr-1 h-4 w-4" /> Create from scratch
+              <Plus className="mr-1 h-4 w-4" /> {tr("pages.admin_collections.create_from_scratch")}
             </Button>
           </div>
         </div>
@@ -422,6 +447,7 @@ export default function AdminCollections() {
 }
 
 function CollectionApplyJobBanner({ job }: { job: AdminJob | null }) {
+  useUILanguage();
   if (!job || job.job_type !== "template_bundle_apply") {
     return null;
   }
@@ -438,8 +464,14 @@ function CollectionApplyJobBanner({ job }: { job: AdminJob | null }) {
         <div className="flex items-start gap-3">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="min-w-0 space-y-1">
-            <p className="text-sm font-medium">Collection defaults apply failed</p>
-            <p className="text-xs">{job.error_message || job.message || "The job failed."}</p>
+            <p className="text-sm font-medium">
+              {tr("pages.admin_collections.collection_defaults_apply_failed")}
+            </p>
+            <p className="text-xs">
+              {job.error_message || job.message
+                ? tr.remote({ message: job.error_message || job.message || "" })
+                : tr("pages.admin_collections.the_job_failed")}
+            </p>
           </div>
         </div>
       </div>
@@ -452,7 +484,9 @@ function CollectionApplyJobBanner({ job }: { job: AdminJob | null }) {
         <div className="flex items-start gap-3">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
           <div className="min-w-0 space-y-1">
-            <p className="text-sm font-medium">Collection defaults applied</p>
+            <p className="text-sm font-medium">
+              {tr("pages.admin_collections.collection_defaults_applied")}
+            </p>
             <p className="text-muted-foreground text-xs">{templateBundleApplySummary(job)}</p>
           </div>
         </div>
@@ -466,8 +500,14 @@ function CollectionApplyJobBanner({ job }: { job: AdminJob | null }) {
         <Loader2 className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0 animate-spin" />
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium">Applying collection defaults</p>
-            <p className="text-muted-foreground text-xs">{job.message || "Working..."}</p>
+            <p className="text-sm font-medium">
+              {tr("pages.admin_collections.applying_collection_defaults")}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {job.message
+                ? tr.remote({ message: job.message })
+                : tr("pages.admin_collections.working")}
+            </p>
           </div>
           <div className="progress-bar">
             <div className="progress-fill animate-pulse" style={{ width: "40%" }} />
@@ -526,16 +566,20 @@ function AdminCollectionsLibrarySelect({
   totalCount: number;
   onChange: (libraryId: number | null) => void;
 }) {
+  useUILanguage();
   return (
     <Select
       value={value ? String(value) : "all"}
       onValueChange={(next) => onChange(next === "all" ? null : Number(next))}
     >
       <SelectTrigger className="w-full sm:w-[240px]">
-        <SelectValue placeholder="Choose library" />
+        <SelectValue placeholder={tr("pages.admin_collections.choose_library")} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">All libraries ({totalCount})</SelectItem>
+        <SelectItem value="all">
+          {tr("pages.admin_collections.all_libraries")}
+          {totalCount})
+        </SelectItem>
         {libraries.map((library) => (
           <SelectItem key={library.id} value={String(library.id)}>
             {library.name} ({counts.get(library.id) ?? 0})
@@ -571,6 +615,7 @@ function AllLibraryCollectionsOverview({
   onCreate: () => void;
   onOpenTemplates: () => void;
 }) {
+  useUILanguage();
   const sections = useMemo(
     () => buildAllLibrarySections(libraries, collections),
     [libraries, collections],
@@ -625,18 +670,20 @@ function AllLibraryCollectionsOverview({
       <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-16 text-center">
         <LibraryIcon className="text-muted-foreground h-9 w-9" />
         <div className="space-y-1">
-          <p className="text-sm font-medium">No collections yet</p>
+          <p className="text-sm font-medium">{tr("pages.admin_collections.no_collections_yet")}</p>
           <p className="text-muted-foreground max-w-sm text-xs">
-            Create collections to curate library shelves, or sync them from MDBList or TMDB
-            trending.
+            {tr(
+              "pages.admin_collections.create_collections_to_curate_library_shelves_or_sync_them_from",
+            )}
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button variant="outline" size="sm" onClick={onOpenTemplates}>
-            <Sparkles className="mr-1 h-4 w-4" /> Start from a template
+            <Sparkles className="mr-1 h-4 w-4" />{" "}
+            {tr("pages.admin_collections.start_from_a_template")}
           </Button>
           <Button variant="ghost" size="sm" onClick={onCreate}>
-            <Plus className="mr-1 h-4 w-4" /> Create from scratch
+            <Plus className="mr-1 h-4 w-4" /> {tr("pages.admin_collections.create_from_scratch")}
           </Button>
         </div>
       </div>
@@ -650,7 +697,8 @@ function AllLibraryCollectionsOverview({
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
             <h2 className="text-base font-semibold">{section.library.name}</h2>
             <Badge variant="outline">
-              {section.collections.length} collection{section.collections.length === 1 ? "" : "s"}
+              {section.collections.length} {tr("pages.admin_collections.collection")}
+              {section.collections.length === 1 ? "" : tr("pages.admin_collections.s")}
             </Badge>
           </div>
           <div className="divide-y">
@@ -701,6 +749,7 @@ function AllLibraryCollectionRow({
   onDelete: () => void;
   onSync: () => void;
 }) {
+  useUILanguage();
   const syncable = collection.collection_type !== "manual";
   const collectionLibraries = collectionLibraryIDs(collection)
     .map((id) => libraries.find((library) => library.id === id)?.name ?? `Library ${id}`)
@@ -711,7 +760,10 @@ function AllLibraryCollectionRow({
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <BulkSelectionCheckbox
-        label={`Select ${collection.title} in ${rowLibraryName}`}
+        label={tr("pages.admin_collections.select_title_in_row_library_name", {
+          title: collection.title,
+          rowLibraryName: rowLibraryName,
+        })}
         selected={selected}
         onSelectionChange={onSelectionChange}
       />
@@ -723,11 +775,17 @@ function AllLibraryCollectionRow({
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-sm font-medium">{collection.title}</p>
-          {collection.featured ? <Badge variant="secondary">Featured</Badge> : null}
-          {collection.visibility === "hidden" ? <Badge variant="outline">Hidden</Badge> : null}
+          {collection.featured ? (
+            <Badge variant="secondary">{tr("pages.admin_collections.featured")}</Badge>
+          ) : null}
+          {collection.visibility === "hidden" ? (
+            <Badge variant="outline">{tr("pages.admin_collections.hidden")}</Badge>
+          ) : null}
         </div>
         <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
-          <span>{collection.item_count} items</span>
+          <span>
+            {collection.item_count} {tr("pages.admin_collections.items")}
+          </span>
           <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
             {collection.collection_type}
           </Badge>
@@ -740,7 +798,7 @@ function AllLibraryCollectionRow({
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            aria-label={`Sync ${collection.title}`}
+            aria-label={tr("pages.admin_collections.sync_title", { title: collection.title })}
             disabled={isSyncing}
             onClick={onSync}
           >
@@ -751,7 +809,7 @@ function AllLibraryCollectionRow({
           variant="ghost"
           size="icon"
           className="h-8 w-8"
-          aria-label={`Edit ${collection.title}`}
+          aria-label={tr("pages.admin_collections.edit_title", { title: collection.title })}
           onClick={onEdit}
         >
           <Pencil className="h-3.5 w-3.5" />
@@ -760,13 +818,15 @@ function AllLibraryCollectionRow({
           variant="ghost"
           size="icon"
           className="text-destructive hover:bg-destructive/10 hover:text-destructive h-8 w-8"
-          aria-label={`Delete ${collection.title}`}
+          aria-label={tr("pages.admin_collections.delete_title", { title: collection.title })}
           onClick={onDelete}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <span className="sr-only">Shown under library {libraryId}</span>
+      <span className="sr-only">
+        {tr("pages.admin_collections.shown_under_library")} {libraryId}
+      </span>
     </div>
   );
 }

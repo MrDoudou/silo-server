@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import type { AdminAPIKey, AdminCreateAPIKeyRequest } from "@/api/types";
 import { adminKeys } from "../keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 const ADMIN_STALE_TIME = 30_000;
 
@@ -26,7 +26,7 @@ export function useAdminCreateApiKey() {
       queryClient.invalidateQueries({ queryKey: adminKeys.apiKeys() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to create API key");
+      toast.error("errors.queries.admin.api_keys.failed_to_create_api_key", { error: err });
     },
   });
 }
@@ -36,11 +36,11 @@ export function useAdminDeleteApiKey() {
   return useMutation({
     mutationFn: (id: number) => api(`/admin/api-keys/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("API key revoked");
+      toast.success("feedback.queries.admin.api_keys.api_key_revoked");
       queryClient.invalidateQueries({ queryKey: adminKeys.apiKeys() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to revoke API key");
+      toast.error("errors.queries.admin.api_keys.failed_to_revoke_api_key", { error: err });
     },
   });
 }
@@ -57,7 +57,7 @@ export function useAdminUpdateApiKeyTier() {
       queryClient.invalidateQueries({ queryKey: adminKeys.apiKeys() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update tier");
+      toast.error("errors.queries.admin.api_keys.failed_to_update_tier", { error: err });
     },
   });
 }

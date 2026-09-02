@@ -9,6 +9,9 @@ import type {
 } from "@/api/types";
 import { SubtitleUploadForm } from "@/components/subtitles/SubtitleUploadForm";
 import { LANGUAGES } from "../utils/languageNames";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 interface SubtitleSearchModalProps {
   mediaFileId: number;
@@ -43,6 +46,7 @@ export function SubtitleSearchModal({
   onClose,
   onSubtitleDownloaded,
 }: SubtitleSearchModalProps) {
+  useUILanguage();
   const [selectedLang, setSelectedLang] = useState("en");
   const [results, setResults] = useState<SubtitleResult[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -132,7 +136,7 @@ export function SubtitleSearchModal({
       setResults(response.results ?? []);
       setWarnings(response.warnings ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Search failed");
+      setError(tr.error("errors.player.components.subtitle_search_modal.search_failed", err));
     } finally {
       setSearching(false);
     }
@@ -211,7 +215,7 @@ export function SubtitleSearchModal({
         onSubtitleDownloaded();
         handleClose();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Download failed");
+        setError(tr.error("errors.player.components.subtitle_search_modal.download_failed", err));
       } finally {
         setDownloading(null);
       }
@@ -227,7 +231,7 @@ export function SubtitleSearchModal({
       onClick={handleClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Add Subtitles"
+      aria-label={tr("player.components.subtitle_search_modal.add_subtitles")}
       onKeyDown={handleFocusTrap}
     >
       <div
@@ -237,12 +241,14 @@ export function SubtitleSearchModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h2 className="text-sm font-semibold">Add Subtitles</h2>
+          <h2 className="text-sm font-semibold">
+            {tr("player.components.subtitle_search_modal.add_subtitles")}
+          </h2>
           <button
             type="button"
             className="rounded text-white/60 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
             onClick={handleClose}
-            aria-label="Close"
+            aria-label={tr("common.actions.close")}
           >
             ✕
           </button>
@@ -259,14 +265,16 @@ export function SubtitleSearchModal({
         />
 
         <div className="border-b border-white/10 px-4 py-2">
-          <p className="text-xs font-medium text-white/60">Search online</p>
+          <p className="text-xs font-medium text-white/60">
+            {tr("player.components.subtitle_search_modal.search_online")}
+          </p>
         </div>
 
         {/* Search controls */}
         <div className="flex gap-2 px-4 py-3">
           <select
             ref={searchInputRef}
-            aria-label="Language"
+            aria-label={tr("player.components.subtitle_search_modal.language")}
             className="flex-1 rounded bg-neutral-800 px-2 py-1.5 text-sm text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
             value={selectedLang}
             onChange={(e) => setSelectedLang(e.target.value)}
@@ -283,7 +291,9 @@ export function SubtitleSearchModal({
             onClick={handleSearch}
             disabled={searching}
           >
-            {searching ? "Searching\u2026" : "Search"}
+            {searching
+              ? tr("player.components.subtitle_search_modal.searching")
+              : tr("common.actions.search")}
           </button>
         </div>
 
@@ -312,7 +322,7 @@ export function SubtitleSearchModal({
         <div className="max-h-[60vh] overflow-y-auto px-4 pb-4">
           {results.length === 0 && !searching && !error && (
             <p className="py-6 text-center text-xs text-white/40">
-              Select a language and press Search.
+              {tr("player.components.subtitle_search_modal.select_a_language_and_press_search")}
             </p>
           )}
 
@@ -347,7 +357,7 @@ export function SubtitleSearchModal({
                 {/* HI badge */}
                 {result.hearing_impaired && (
                   <span className="shrink-0 rounded bg-white/10 px-1 py-0.5 text-[10px] text-white/60">
-                    HI
+                    {tr("player.components.subtitle_search_modal.hi")}
                   </span>
                 )}
 
@@ -370,7 +380,10 @@ export function SubtitleSearchModal({
 
                 {/* Download spinner */}
                 {isDownloading && (
-                  <span className="shrink-0 text-xs text-white/60" aria-label="Downloading">
+                  <span
+                    className="shrink-0 text-xs text-white/60"
+                    aria-label={tr("player.components.subtitle_search_modal.downloading")}
+                  >
                     ⟳
                   </span>
                 )}

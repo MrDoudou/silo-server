@@ -29,8 +29,11 @@ import MediaUserActionBar from "./components/MediaUserActionBar";
 import { SeasonCarouselSkeleton, RecommendationGridSkeleton } from "./components/SectionSkeletons";
 import { getSeasonDisplayTitle, resolveSeriesPrimaryAction } from "./itemDetailLayout";
 import { canCurateMetadata as canCurateMetadataForUser } from "@/lib/permissions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function SeriesContent({ item }: { item: ItemDetail & { type: "series" } }) {
+  useUILanguage();
   const { translating: overviewTranslating, onTranslate: onTranslateOverview } =
     useOnViewTranslation(item);
   const navigate = useNavigate();
@@ -173,9 +176,11 @@ export default function SeriesContent({ item }: { item: ItemDetail & { type: "se
         ) : singleSeason ? (
           <section>
             <div className="mb-5 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold tracking-tight">Episodes</h2>
+              <h2 className="text-xl font-semibold tracking-tight">
+                {tr("pages.item_detail.series_content.episodes")}
+              </h2>
               <span className="text-muted-foreground text-sm">
-                {singleSeason.episode_count} total
+                {singleSeason.episode_count} {tr("pages.item_detail.series_content.total")}
               </span>
             </div>
             <SeasonEpisodeGrid
@@ -193,7 +198,9 @@ export default function SeriesContent({ item }: { item: ItemDetail & { type: "se
 
         {item.cast && item.cast.length > 0 && (
           <div>
-            <h2 className="mb-5 text-xl font-semibold tracking-tight">Cast</h2>
+            <h2 className="mb-5 text-xl font-semibold tracking-tight">
+              {tr("pages.item_detail.series_content.cast")}
+            </h2>
             <CastCarousel cast={item.cast} />
           </div>
         )}
@@ -219,7 +226,7 @@ export default function SeriesContent({ item }: { item: ItemDetail & { type: "se
       )}
       {canCurateMetadata && (
         <SplitItemDialog
-          key={`split-${item.content_id}`}
+          key={"split-" + item.content_id}
           item={item}
           open={splitOpen}
           onOpenChange={setSplitOpen}

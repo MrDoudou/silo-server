@@ -71,6 +71,8 @@ import {
   saveEbookReaderConfigKeepalive,
   type EbookReaderAnnotation,
 } from "@/reader/ebookReaderApi";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export const EBOOK_READER_SETTINGS_STORAGE_KEY = "silo.ebook.reader.settings";
 
@@ -81,17 +83,41 @@ type TocEntry = TOCItem & {
 };
 
 const READER_FONT_OPTIONS = [
-  { label: "Book default", value: READER_FONT_STACKS.inherit },
-  { label: "System serif", value: READER_FONT_STACKS.serif },
-  { label: "System sans", value: READER_FONT_STACKS.sans },
-  { label: "Monospace", value: READER_FONT_STACKS.mono },
+  {
+    get label() {
+      return tr("pages.ebook_reader.book_default");
+    },
+    value: READER_FONT_STACKS.inherit,
+  },
+  {
+    get label() {
+      return tr("pages.ebook_reader.system_serif");
+    },
+    value: READER_FONT_STACKS.serif,
+  },
+  {
+    get label() {
+      return tr("pages.ebook_reader.system_sans");
+    },
+    value: READER_FONT_STACKS.sans,
+  },
+  {
+    get label() {
+      return tr("pages.ebook_reader.monospace");
+    },
+    value: READER_FONT_STACKS.mono,
+  },
 ] as const;
 
 const READER_PROFILES = [
   {
     id: "comfortable",
-    label: "Comfortable",
-    description: "Serif, roomier lines",
+    get label() {
+      return tr("pages.ebook_reader.comfortable");
+    },
+    get description() {
+      return tr("pages.ebook_reader.serif_roomier_lines");
+    },
     settings: {
       fontFamily: READER_FONT_STACKS.serif,
       fontSize: 112,
@@ -101,8 +127,12 @@ const READER_PROFILES = [
   },
   {
     id: "accessible",
-    label: "Accessible",
-    description: "Larger sans text",
+    get label() {
+      return tr("pages.ebook_reader.accessible");
+    },
+    get description() {
+      return tr("pages.ebook_reader.larger_sans_text");
+    },
     settings: {
       fontFamily: READER_FONT_STACKS.sans,
       fontSize: 126,
@@ -112,8 +142,12 @@ const READER_PROFILES = [
   },
   {
     id: "compact",
-    label: "Compact",
-    description: "More words per page",
+    get label() {
+      return tr("pages.ebook_reader.compact");
+    },
+    get description() {
+      return tr("pages.ebook_reader.more_words_per_page");
+    },
     settings: {
       fontFamily: READER_FONT_STACKS.inherit,
       fontSize: 96,
@@ -196,6 +230,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export default function EbookReader() {
+  useUILanguage();
   const { contentId = "" } = useParams<{ contentId: string }>();
   // Swapping the open file re-renders the reader in place, so it stays on the
   // plain navigate; only leaving the reader is a page transition.
@@ -547,7 +582,9 @@ export default function EbookReader() {
     return (
       <div className="page-shell py-10">
         <PageBack />
-        <div className="text-muted-foreground mt-10 text-sm">Ebook not found.</div>
+        <div className="text-muted-foreground mt-10 text-sm">
+          {tr("pages.ebook_reader.ebook_not_found")}
+        </div>
       </div>
     );
   }
@@ -591,7 +628,9 @@ export default function EbookReader() {
     return (
       <div className="page-shell py-10">
         <PageBack />
-        <div className="text-muted-foreground mt-10 text-sm">No ebook files found.</div>
+        <div className="text-muted-foreground mt-10 text-sm">
+          {tr("pages.ebook_reader.no_ebook_files_found")}
+        </div>
       </div>
     );
   }
@@ -600,7 +639,7 @@ export default function EbookReader() {
     <div className="bg-background min-h-screen">
       <header className="border-border/70 bg-background/95 sticky top-0 z-20 border-b backdrop-blur">
         <div className="flex h-14 items-center gap-3 px-4">
-          <Button asChild variant="ghost" size="icon" aria-label="Back">
+          <Button asChild variant="ghost" size="icon" aria-label={tr("common.actions.back")}>
             <Link
               to={backHref}
               onClick={(event) => {
@@ -641,7 +680,7 @@ export default function EbookReader() {
               variant="ghost"
               size="sm"
               className="hidden gap-1 sm:inline-flex"
-              title={`Next: ${nextChapter.label}`}
+              title={tr("pages.ebook_reader.next_label", { label: nextChapter.label })}
             >
               <Link to={nextChapterHref} replace>
                 <span className="text-muted-foreground max-w-36 truncate text-xs">
@@ -658,7 +697,7 @@ export default function EbookReader() {
           )}
           {isReaderSupportedFile(selectedFile) && readerFiles.length > 1 && (
             <select
-              aria-label="Reader file"
+              aria-label={tr("pages.ebook_reader.reader_file")}
               value={selectedFile.file_id}
               onChange={(event) => handleFileChange(event.target.value)}
               className="border-border bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 hidden h-8 max-w-44 rounded-md border px-2 text-xs outline-none focus-visible:ring-[3px] sm:block"
@@ -675,19 +714,19 @@ export default function EbookReader() {
               <Button
                 variant="secondary"
                 size="sm"
-                aria-label="Highlight selection"
-                title="Highlight selection"
+                aria-label={tr("pages.ebook_reader.highlight_selection")}
+                title={tr("pages.ebook_reader.highlight_selection")}
                 onClick={() => void handleCreateHighlight()}
               >
                 <Highlighter className="size-4" />
-                Highlight
+                {tr("pages.ebook_reader.highlight")}
               </Button>
             )}
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Add bookmark"
-              title="Add bookmark"
+              aria-label={tr("pages.ebook_reader.add_bookmark")}
+              title={tr("pages.ebook_reader.add_bookmark")}
               onClick={() => void handleCreateBookmark()}
             >
               <Bookmark className="size-4" />
@@ -696,8 +735,8 @@ export default function EbookReader() {
               <Button
                 variant={readerSettings.readingRuler ? "secondary" : "ghost"}
                 size="icon-sm"
-                aria-label="Toggle reading ruler"
-                title="Reading ruler"
+                aria-label={tr("pages.ebook_reader.toggle_reading_ruler")}
+                title={tr("pages.ebook_reader.reading_ruler")}
                 onClick={() => updateReaderSettings({ readingRuler: !readerSettings.readingRuler })}
               >
                 <Ruler className="size-4" />
@@ -706,8 +745,16 @@ export default function EbookReader() {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={panelOpen ? "Close reader panel" : "Open reader panel"}
-              title={panelOpen ? "Close reader panel" : "Open reader panel"}
+              aria-label={
+                panelOpen
+                  ? tr("pages.ebook_reader.close_reader_panel")
+                  : tr("pages.ebook_reader.open_reader_panel")
+              }
+              title={
+                panelOpen
+                  ? tr("pages.ebook_reader.close_reader_panel")
+                  : tr("pages.ebook_reader.open_reader_panel")
+              }
               onClick={() => setPanelOpen((open) => !open)}
             >
               {panelOpen ? (
@@ -719,8 +766,8 @@ export default function EbookReader() {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Previous page"
-              title="Previous page"
+              aria-label={tr("pages.ebook_reader.previous_page")}
+              title={tr("pages.ebook_reader.previous_page")}
               onClick={() => readerRef.current?.prev()}
             >
               <ChevronLeft className="size-5" />
@@ -728,8 +775,8 @@ export default function EbookReader() {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Next page"
-              title="Next page"
+              aria-label={tr("pages.ebook_reader.next_page")}
+              title={tr("pages.ebook_reader.next_page")}
               onClick={() => readerRef.current?.next()}
             >
               <ChevronRight className="size-5" />
@@ -739,7 +786,7 @@ export default function EbookReader() {
             <Button asChild variant="outline" size="sm">
               <a href={loadedFile.objectUrl} download={loadedFile.filename}>
                 <Download className="size-4" />
-                File
+                {tr("pages.ebook_reader.file")}
               </a>
             </Button>
           )}
@@ -747,7 +794,7 @@ export default function EbookReader() {
         <div className="border-border/60 flex h-10 items-center gap-3 border-t px-4">
           <BookOpen className="text-muted-foreground size-4 shrink-0" />
           <input
-            aria-label="Reading progress"
+            aria-label={tr("pages.ebook_reader.reading_progress")}
             type="range"
             min="0"
             max="100"
@@ -757,7 +804,7 @@ export default function EbookReader() {
             className="accent-primary h-2 min-w-0 flex-1"
           />
           <div className="text-muted-foreground w-11 text-right text-xs tabular-nums">
-            {progressLabel ?? "0%"}
+            {progressLabel ?? tr("pages.ebook_reader.value_0")}
           </div>
         </div>
       </header>
@@ -795,13 +842,13 @@ export default function EbookReader() {
                 <button
                   type="button"
                   role="slider"
-                  aria-label="Reading ruler position"
+                  aria-label={tr("pages.ebook_reader.reading_ruler_position")}
                   aria-orientation="vertical"
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={Math.round(effectiveRulerTop)}
                   aria-valuetext={`${Math.round(effectiveRulerTop)}%`}
-                  title="Drag to reposition the reading ruler"
+                  title={tr("pages.ebook_reader.drag_to_reposition_the_reading_ruler")}
                   className="focus-visible:ring-ring/50 pointer-events-auto absolute top-1/2 right-2 flex h-11 w-6 -translate-y-1/2 cursor-ns-resize touch-none items-center justify-center rounded-md border border-yellow-500/60 bg-yellow-400/90 text-yellow-950 shadow-sm transition-colors select-none hover:bg-yellow-300 focus-visible:ring-[3px] focus-visible:outline-none"
                   onPointerDown={handleRulerPointerDown}
                   onPointerMove={handleRulerPointerMove}
@@ -819,7 +866,9 @@ export default function EbookReader() {
             <div className="max-w-md text-center">
               <Library className="text-muted-foreground mx-auto mb-4 size-10" />
               <h1 className="text-lg font-semibold">{item.title}</h1>
-              <p className="text-muted-foreground mt-2 text-sm">Unsupported ebook format.</p>
+              <p className="text-muted-foreground mt-2 text-sm">
+                {tr("pages.ebook_reader.unsupported_ebook_format")}
+              </p>
             </div>
           </div>
         )}
@@ -829,20 +878,25 @@ export default function EbookReader() {
               {[
                 {
                   id: "toc" as const,
-                  label: "Contents",
+                  label: tr("pages.ebook_reader.contents"),
                   icon: ListTree,
                   aria: "Table of contents",
                 },
-                { id: "search" as const, label: "Search", icon: Search, aria: "Search book" },
+                {
+                  id: "search" as const,
+                  label: tr("common.actions.search"),
+                  icon: Search,
+                  aria: "Search book",
+                },
                 {
                   id: "notes" as const,
-                  label: "Notes",
+                  label: tr("pages.ebook_reader.notes"),
                   icon: StickyNote,
                   aria: "Annotations and bookmarks",
                 },
                 {
                   id: "settings" as const,
-                  label: "Settings",
+                  label: tr("pages.ebook_reader.settings"),
                   icon: Settings,
                   aria: "Reader settings",
                 },
@@ -875,7 +929,7 @@ export default function EbookReader() {
                 <div className="space-y-1">
                   {tocEntries.length === 0 ? (
                     <div className="text-muted-foreground px-2 py-8 text-center text-sm">
-                      No contents found.
+                      {tr("pages.ebook_reader.no_contents_found")}
                     </div>
                   ) : (
                     tocEntries.map((entry) => (
@@ -904,14 +958,14 @@ export default function EbookReader() {
                     }}
                   >
                     <input
-                      aria-label="Search text"
+                      aria-label={tr("pages.ebook_reader.search_text")}
                       value={searchText}
                       onChange={(event) => setSearchText(event.target.value)}
                       className="border-border bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 min-w-0 flex-1 rounded-md border px-3 text-sm outline-none focus-visible:ring-[3px]"
                     />
                     <Button
-                      aria-label="Run search"
-                      title="Run search"
+                      aria-label={tr("pages.ebook_reader.run_search")}
+                      title={tr("pages.ebook_reader.run_search")}
                       size="icon"
                       disabled={searching}
                     >
@@ -949,7 +1003,7 @@ export default function EbookReader() {
                 <div className="space-y-2">
                   {annotations.length === 0 ? (
                     <div className="text-muted-foreground px-2 py-8 text-center text-sm">
-                      No annotations yet.
+                      {tr("pages.ebook_reader.no_annotations_yet")}
                     </div>
                   ) : (
                     annotations.map((annotation) => (
@@ -976,8 +1030,8 @@ export default function EbookReader() {
                           <Button
                             variant="ghost"
                             size="icon-xs"
-                            aria-label="Delete annotation"
-                            title="Delete annotation"
+                            aria-label={tr("pages.ebook_reader.delete_annotation")}
+                            title={tr("pages.ebook_reader.delete_annotation")}
                             onClick={() => void handleDeleteAnnotation(annotation.id)}
                           >
                             <Trash2 className="size-3" />
@@ -994,18 +1048,18 @@ export default function EbookReader() {
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-label="Reset reader settings"
+                    aria-label={tr("pages.ebook_reader.reset_reader_settings")}
                     onClick={resetReaderSettings}
                     className="w-full justify-center"
                   >
                     <RotateCcw className="size-4" />
-                    Reset
+                    {tr("common.actions.reset")}
                   </Button>
                   <div className="space-y-3">
                     {!isComicFormat && (
                       <div className="border-border space-y-2 border-b pb-3">
                         <div className="text-muted-foreground text-xs font-medium">
-                          Reading profile
+                          {tr("pages.ebook_reader.reading_profile")}
                         </div>
                         <div className="grid gap-2">
                           {READER_PROFILES.map((profile) => {
@@ -1037,22 +1091,26 @@ export default function EbookReader() {
                       <>
                         <div className="flex items-center gap-2 text-sm font-medium">
                           <Volume2 className="size-4" />
-                          Read aloud
+                          {tr("pages.ebook_reader.read_aloud")}
                         </div>
                         <div className="flex gap-2">
                           <Button
                             variant="secondary"
                             size="sm"
-                            aria-label="Speak text"
+                            aria-label={tr("pages.ebook_reader.speak_text")}
                             onClick={handleSpeak}
                           >
                             <Play className="size-4" />
-                            Speak
+                            {tr("pages.ebook_reader.speak")}
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            aria-label={tts.state === "paused" ? "Resume speech" : "Pause speech"}
+                            aria-label={
+                              tts.state === "paused"
+                                ? tr("pages.ebook_reader.resume_speech")
+                                : tr("pages.ebook_reader.pause_speech")
+                            }
                             onClick={tts.state === "paused" ? tts.resume : tts.pause}
                           >
                             <Pause className="size-4" />
@@ -1060,14 +1118,14 @@ export default function EbookReader() {
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            aria-label="Stop speech"
+                            aria-label={tr("pages.ebook_reader.stop_speech")}
                             onClick={tts.stop}
                           >
                             <Square className="size-4" />
                           </Button>
                         </div>
                         <ReaderRange
-                          label="Speech rate"
+                          label={tr("pages.ebook_reader.speech_rate")}
                           value={ttsRate}
                           min={0.5}
                           max={2}
@@ -1075,14 +1133,16 @@ export default function EbookReader() {
                           onChange={setTtsRate}
                         />
                         <label className="block space-y-1 text-sm">
-                          <span className="text-muted-foreground text-xs font-medium">Voice</span>
+                          <span className="text-muted-foreground text-xs font-medium">
+                            {tr("pages.ebook_reader.voice")}
+                          </span>
                           <select
-                            aria-label="Voice"
+                            aria-label={tr("pages.ebook_reader.voice")}
                             value={ttsVoiceURI}
                             onChange={(event) => setTtsVoiceURI(event.target.value)}
                             className="border-border bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 text-sm outline-none focus-visible:ring-[3px]"
                           >
-                            <option value="">Default</option>
+                            <option value="">{tr("pages.ebook_reader.default")}</option>
                             {tts.voices.map((voice) => (
                               <option key={voice.voiceURI} value={voice.voiceURI}>
                                 {voice.name}
@@ -1095,9 +1155,9 @@ export default function EbookReader() {
                   </div>
                   <div className="border-border space-y-2 border-t pt-3">
                     <label className="flex items-center justify-between gap-3 text-sm">
-                      <span>Keep screen awake</span>
+                      <span>{tr("pages.ebook_reader.keep_screen_awake")}</span>
                       <input
-                        aria-label="Keep screen awake"
+                        aria-label={tr("pages.ebook_reader.keep_screen_awake")}
                         type="checkbox"
                         checked={wakeLockEnabled}
                         onChange={(event) => setWakeLockEnabled(event.target.checked)}
@@ -1106,12 +1166,14 @@ export default function EbookReader() {
                   </div>
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <Type className="size-4" />
-                    Typography
+                    {tr("pages.ebook_reader.typography")}
                   </div>
                   <label className="block space-y-1 text-sm">
-                    <span className="text-muted-foreground text-xs font-medium">Theme</span>
+                    <span className="text-muted-foreground text-xs font-medium">
+                      {tr("pages.ebook_reader.theme")}
+                    </span>
                     <select
-                      aria-label="Theme"
+                      aria-label={tr("pages.ebook_reader.theme")}
                       value={readerSettings.theme}
                       onChange={(event) =>
                         updateReaderSettings({
@@ -1120,16 +1182,18 @@ export default function EbookReader() {
                       }
                       className="border-border bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 text-sm outline-none focus-visible:ring-[3px]"
                     >
-                      <option value="light">Light</option>
-                      <option value="sepia">Sepia</option>
-                      <option value="dark">Dark</option>
+                      <option value="light">{tr("pages.ebook_reader.light")}</option>
+                      <option value="sepia">{tr("pages.ebook_reader.sepia")}</option>
+                      <option value="dark">{tr("pages.ebook_reader.dark")}</option>
                     </select>
                   </label>
                   {!isComicFormat && (
                     <label className="block space-y-1 text-sm">
-                      <span className="text-muted-foreground text-xs font-medium">Font</span>
+                      <span className="text-muted-foreground text-xs font-medium">
+                        {tr("pages.ebook_reader.font")}
+                      </span>
                       <select
-                        aria-label="Font family"
+                        aria-label={tr("pages.ebook_reader.font_family")}
                         value={readerSettings.fontFamily}
                         onChange={(event) =>
                           updateReaderSettings({ fontFamily: event.target.value })
@@ -1143,13 +1207,17 @@ export default function EbookReader() {
                         ))}
                         {!READER_FONT_OPTIONS.some(
                           (option) => option.value === readerSettings.fontFamily,
-                        ) && <option value={readerSettings.fontFamily}>Custom</option>}
+                        ) && (
+                          <option value={readerSettings.fontFamily}>
+                            {tr("pages.ebook_reader.custom")}
+                          </option>
+                        )}
                       </select>
                     </label>
                   )}
                   {!isComicFormat && (
                     <ReaderRange
-                      label="Font size"
+                      label={tr("pages.ebook_reader.font_size")}
                       value={readerSettings.fontSize}
                       min={80}
                       max={180}
@@ -1159,7 +1227,7 @@ export default function EbookReader() {
                     />
                   )}
                   <ReaderRange
-                    label="Brightness"
+                    label={tr("pages.ebook_reader.brightness")}
                     value={readerSettings.fontBrightness}
                     min={70}
                     max={125}
@@ -1169,7 +1237,7 @@ export default function EbookReader() {
                   />
                   {!isComicFormat && (
                     <ReaderRange
-                      label="Line height"
+                      label={tr("pages.ebook_reader.line_height")}
                       value={readerSettings.lineHeight}
                       min={1.1}
                       max={2.4}
@@ -1178,7 +1246,7 @@ export default function EbookReader() {
                     />
                   )}
                   <ReaderRange
-                    label="Margin"
+                    label={tr("pages.ebook_reader.margin")}
                     value={readerSettings.margin}
                     min={0}
                     max={64}
@@ -1188,7 +1256,7 @@ export default function EbookReader() {
                   />
                   {!isComicFormat && readerSettings.flow !== "scrolled" && (
                     <ReaderRange
-                      label="Width"
+                      label={tr("pages.ebook_reader.width")}
                       value={readerSettings.maxWidth}
                       min={42}
                       max={96}
@@ -1200,9 +1268,9 @@ export default function EbookReader() {
                   <div className="border-border space-y-2 border-t pt-3">
                     {!isComicFormat && (
                       <label className="flex items-center justify-between gap-3 text-sm">
-                        <span>Hyphenation</span>
+                        <span>{tr("pages.ebook_reader.hyphenation")}</span>
                         <input
-                          aria-label="Hyphenation"
+                          aria-label={tr("pages.ebook_reader.hyphenation")}
                           type="checkbox"
                           checked={readerSettings.hyphenation}
                           onChange={(event) =>
@@ -1212,9 +1280,9 @@ export default function EbookReader() {
                       </label>
                     )}
                     <label className="flex items-center justify-between gap-3 text-sm">
-                      <span>Right to left</span>
+                      <span>{tr("pages.ebook_reader.right_to_left")}</span>
                       <input
-                        aria-label="Right to left"
+                        aria-label={tr("pages.ebook_reader.right_to_left")}
                         type="checkbox"
                         checked={readerSettings.rtl}
                         onChange={(event) => updateReaderSettings({ rtl: event.target.checked })}
@@ -1222,9 +1290,9 @@ export default function EbookReader() {
                     </label>
                     {!isComicFormat && (
                       <label className="flex items-center justify-between gap-3 text-sm">
-                        <span>Reading ruler</span>
+                        <span>{tr("pages.ebook_reader.reading_ruler")}</span>
                         <input
-                          aria-label="Reading ruler"
+                          aria-label={tr("pages.ebook_reader.reading_ruler")}
                           type="checkbox"
                           checked={readerSettings.readingRuler}
                           onChange={(event) =>
@@ -1235,7 +1303,7 @@ export default function EbookReader() {
                     )}
                     {readerSettings.readingRuler && (
                       <ReaderRange
-                        label="Ruler position"
+                        label={tr("pages.ebook_reader.ruler_position")}
                         value={readerSettings.readingRulerTop}
                         min={0}
                         max={100}
@@ -1248,10 +1316,10 @@ export default function EbookReader() {
                   {!isComicFormat && (
                     <label className="block space-y-1 text-sm">
                       <span className="text-muted-foreground text-xs font-medium">
-                        Writing mode
+                        {tr("pages.ebook_reader.writing_mode")}
                       </span>
                       <select
-                        aria-label="Writing mode"
+                        aria-label={tr("pages.ebook_reader.writing_mode")}
                         value={readerSettings.writingMode}
                         onChange={(event) =>
                           updateReaderSettings({
@@ -1260,17 +1328,19 @@ export default function EbookReader() {
                         }
                         className="border-border bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 text-sm outline-none focus-visible:ring-[3px]"
                       >
-                        <option value="auto">Auto</option>
-                        <option value="horizontal-tb">Horizontal</option>
-                        <option value="vertical-rl">Vertical</option>
+                        <option value="auto">{tr("pages.ebook_reader.auto")}</option>
+                        <option value="horizontal-tb">{tr("pages.ebook_reader.horizontal")}</option>
+                        <option value="vertical-rl">{tr("pages.ebook_reader.vertical")}</option>
                       </select>
                     </label>
                   )}
                   {readerSettings.flow !== "scrolled" && (
                     <label className="block space-y-1 text-sm">
-                      <span className="text-muted-foreground text-xs font-medium">Spread</span>
+                      <span className="text-muted-foreground text-xs font-medium">
+                        {tr("pages.ebook_reader.spread")}
+                      </span>
                       <select
-                        aria-label="Spread"
+                        aria-label={tr("pages.ebook_reader.spread")}
                         value={readerSettings.spread}
                         onChange={(event) =>
                           updateReaderSettings({
@@ -1279,23 +1349,25 @@ export default function EbookReader() {
                         }
                         className="border-border bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 text-sm outline-none focus-visible:ring-[3px]"
                       >
-                        <option value="auto">Auto</option>
-                        <option value="none">Single page</option>
+                        <option value="auto">{tr("pages.ebook_reader.auto")}</option>
+                        <option value="none">{tr("pages.ebook_reader.single_page")}</option>
                       </select>
                     </label>
                   )}
                   <label className="block space-y-1 text-sm">
-                    <span className="text-muted-foreground text-xs font-medium">Flow</span>
+                    <span className="text-muted-foreground text-xs font-medium">
+                      {tr("pages.ebook_reader.flow")}
+                    </span>
                     <select
-                      aria-label="Flow"
+                      aria-label={tr("pages.ebook_reader.flow")}
                       value={readerSettings.flow}
                       onChange={(event) =>
                         updateReaderSettings({ flow: event.target.value as ReaderSettings["flow"] })
                       }
                       className="border-border bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 text-sm outline-none focus-visible:ring-[3px]"
                     >
-                      <option value="paginated">Paginated</option>
-                      <option value="scrolled">Scrolled</option>
+                      <option value="paginated">{tr("pages.ebook_reader.paginated")}</option>
+                      <option value="scrolled">{tr("pages.ebook_reader.scrolled")}</option>
                     </select>
                   </label>
                 </div>
@@ -1312,7 +1384,7 @@ export default function EbookReader() {
             className="h-11 gap-2 rounded-full px-6 text-[15px] font-bold shadow-lg"
           >
             <Link to={nextChapterHref} replace>
-              Next: {nextChapter.label}
+              {tr("pages.ebook_reader.next")} {nextChapter.label}
               <ChevronRight className="size-[18px]" />
             </Link>
           </Button>
@@ -1333,6 +1405,7 @@ type ReaderRangeProps = {
 };
 
 function ReaderRange({ label, value, min, max, step, suffix = "", onChange }: ReaderRangeProps) {
+  useUILanguage();
   return (
     <label className="block space-y-1 text-sm">
       <span

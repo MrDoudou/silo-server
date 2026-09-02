@@ -1,3 +1,4 @@
+import { tr } from "@/i18n/translate";
 export type QuerySortOrder = "asc" | "desc";
 export type QuerySortRelevanceScope =
   | "movie"
@@ -73,28 +74,36 @@ const ALL_MEDIA_SCOPES: ApplicableMediaScope[] = [...ALL_VIDEO_SCOPES, "audioboo
 export const QUERY_SORT_OPTIONS: QuerySortOption[] = [
   {
     value: "title",
-    label: "Title",
+    get label() {
+      return tr("lib.query_sort_options.title");
+    },
     defaultOrder: "asc",
     personalized: false,
     applicableMediaScopes: [...ALL_MEDIA_SCOPES, "manga"],
   },
   {
     value: "added_at",
-    label: "Date Added",
+    get label() {
+      return tr("lib.query_sort_options.date_added");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: [...ALL_MEDIA_SCOPES, "manga"],
   },
   {
     value: "release_date",
-    label: "Release Date",
+    get label() {
+      return tr("lib.query_sort_options.release_date");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: [...ALL_MEDIA_SCOPES, "manga"],
   },
   {
     value: "last_air_date",
-    label: "Latest Episode Air Date",
+    get label() {
+      return tr("lib.query_sort_options.latest_episode_air_date");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: ["series", "episode"],
@@ -102,91 +111,117 @@ export const QUERY_SORT_OPTIONS: QuerySortOption[] = [
   },
   {
     value: "latest_episode_added",
-    label: "Latest Episode Added",
+    get label() {
+      return tr("lib.query_sort_options.latest_episode_added");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: ["series"],
   },
   {
     value: "year",
-    label: "Year",
+    get label() {
+      return tr("lib.query_sort_options.year");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: [...ALL_MEDIA_SCOPES, "manga"],
   },
   {
     value: "content_rating",
-    label: "Content Rating",
+    get label() {
+      return tr("lib.query_sort_options.content_rating");
+    },
     defaultOrder: "asc",
     personalized: false,
     applicableMediaScopes: ALL_VIDEO_SCOPES,
   },
   {
     value: "runtime",
-    label: "Duration",
+    get label() {
+      return tr("lib.query_sort_options.duration");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: ALL_MEDIA_SCOPES,
   },
   {
     value: "rating_imdb",
-    label: "IMDb Rating",
+    get label() {
+      return tr("lib.query_sort_options.imdb_rating");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: ALL_VIDEO_SCOPES,
   },
   {
     value: "rating_tmdb",
-    label: "TMDB Rating",
+    get label() {
+      return tr("lib.query_sort_options.tmdb_rating");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: ALL_VIDEO_SCOPES,
   },
   {
     value: "rating_rt_critic",
-    label: "RT Critic Rating",
+    get label() {
+      return tr("lib.query_sort_options.rt_critic_rating");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: ALL_VIDEO_SCOPES,
   },
   {
     value: "rating_rt_audience",
-    label: "RT Audience Rating",
+    get label() {
+      return tr("lib.query_sort_options.rt_audience_rating");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: ALL_VIDEO_SCOPES,
   },
   {
     value: "resolution",
-    label: "Resolution",
+    get label() {
+      return tr("lib.query_sort_options.resolution");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: ALL_VIDEO_SCOPES,
   },
   {
     value: "bitrate",
-    label: "Bitrate",
+    get label() {
+      return tr("lib.query_sort_options.bitrate");
+    },
     defaultOrder: "desc",
     personalized: false,
     applicableMediaScopes: ALL_MEDIA_SCOPES,
   },
   {
     value: "progress",
-    label: "Progress",
+    get label() {
+      return tr("lib.query_sort_options.progress");
+    },
     defaultOrder: "desc",
     personalized: true,
     applicableMediaScopes: [...ALL_MEDIA_SCOPES, "manga"],
   },
   {
     value: "date_viewed",
-    label: "Date Viewed",
+    get label() {
+      return tr("lib.query_sort_options.date_viewed");
+    },
     defaultOrder: "desc",
     personalized: true,
     applicableMediaScopes: [...ALL_MEDIA_SCOPES, "manga"],
   },
   {
     value: "plays",
-    label: "Plays",
+    get label() {
+      return tr("lib.query_sort_options.plays");
+    },
     defaultOrder: "desc",
     personalized: true,
     applicableMediaScopes: [...ALL_MEDIA_SCOPES, "manga"],
@@ -196,21 +231,27 @@ export const QUERY_SORT_OPTIONS: QuerySortOption[] = [
   // ebook_series joins on the backend.
   {
     value: "author",
-    label: "Author",
+    get label() {
+      return tr("lib.query_sort_options.author");
+    },
     defaultOrder: "asc",
     personalized: false,
     applicableMediaScopes: ["audiobook", "ebook", "manga"],
   },
   {
     value: "narrator",
-    label: "Narrator",
+    get label() {
+      return tr("lib.query_sort_options.narrator");
+    },
     defaultOrder: "asc",
     personalized: false,
     applicableMediaScopes: ["audiobook"],
   },
   {
     value: "series",
-    label: "Series",
+    get label() {
+      return tr("lib.query_sort_options.series");
+    },
     defaultOrder: "asc",
     personalized: false,
     applicableMediaScopes: ["audiobook", "ebook"],
@@ -220,8 +261,8 @@ export const QUERY_SORT_OPTIONS: QuerySortOption[] = [
 const QUERY_SORT_OPTION_MAP = new Map(QUERY_SORT_OPTIONS.map((option) => [option.value, option]));
 
 const EBOOK_SORT_LABELS: Partial<Record<QuerySortField, string>> = {
-  date_viewed: "Date Read",
-  plays: "Reads",
+  date_viewed: "lib.query_sort_options.date_read",
+  plays: "lib.query_sort_options.reads",
 };
 
 function normalizeQuerySortOptionsConfig(
@@ -262,7 +303,7 @@ export function getQuerySortOptions(input: QuerySortOptionsInput = false): Query
       relevanceScope === "ebook" || relevanceScope === "manga"
         ? EBOOK_SORT_LABELS[option.value]
         : undefined;
-    return ebookLabel ? { ...option, label: ebookLabel } : option;
+    return ebookLabel ? { ...option, label: tr(ebookLabel) } : option;
   });
 }
 

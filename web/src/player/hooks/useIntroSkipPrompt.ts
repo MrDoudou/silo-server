@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { IntroSkipMode, PlayerTimeRange } from "../types";
 
+import { tr } from "@/i18n/translate";
+
 export const INTRO_PROMPT_SECONDS = 5;
 export const PLAYBACK_PAUSE_GRACE_MS = 1_500;
 
@@ -39,7 +41,7 @@ function promptStillActive(
 
 export interface IntroSkipPrompt {
   kind: "skip" | "undo";
-  label: "Skip Intro" | "Watch Intro";
+  label: string;
   /** Confirmation shown above the action for the `always` undo; absent for the `ask` offer. */
   caption?: "Intro skipped";
   durationMs: number;
@@ -337,7 +339,13 @@ export function useIntroSkipPrompt({
   const prompt: IntroSkipPrompt | null = activePrompt
     ? {
         kind: activePrompt.kind,
-        label: activePrompt.kind === "skip" ? "Skip Intro" : "Watch Intro",
+        get label() {
+          return tr(
+            activePrompt.kind === "skip"
+              ? "player.hooks.use_intro_skip_prompt.skip_intro"
+              : "player.hooks.use_intro_skip_prompt.watch_intro",
+          );
+        },
         caption: activePrompt.kind === "skip" ? undefined : "Intro skipped",
         durationMs: INTRO_PROMPT_MS,
         deadlineMs: activePrompt.deadlineMs,

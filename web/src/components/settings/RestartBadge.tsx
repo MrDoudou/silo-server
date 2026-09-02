@@ -1,6 +1,8 @@
 import { RotateCw } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const RESTART_TITLE = "Takes effect after a server restart";
 
@@ -10,6 +12,7 @@ const RESTART_TITLE = "Takes effect after a server restart";
  * the fact never has to be hand-copied into a field hint.
  */
 export function RestartBadge({ className }: { className?: string }) {
+  useUILanguage();
   return (
     <span
       title={RESTART_TITLE}
@@ -22,7 +25,7 @@ export function RestartBadge({ className }: { className?: string }) {
       )}
     >
       <RotateCw className="size-2.5" aria-hidden="true" />
-      Restart
+      {tr("components.settings.restart_badge.restart")}
     </span>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import type { PluginInstallation } from "@/api/types";
 import {
@@ -32,6 +32,8 @@ import { useRestartKeys, type RestartKeyMatcher } from "@/hooks/useRestartKeys";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 
 import { FieldGroup } from "./FieldGroup";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * App credentials only. A viewer's own Trakt or Simkl account is linked from
@@ -54,13 +56,17 @@ interface WatchProvider {
 const PROVIDERS: WatchProvider[] = [
   {
     key: "trakt",
-    title: "Trakt",
+    get title() {
+      return tr("pages.admin_settings.watch_sync_settings.trakt");
+    },
     monogram: "TR",
     monogramClass: "bg-red-500/20 text-red-700 dark:text-red-300",
   },
   {
     key: "simkl",
-    title: "Simkl",
+    get title() {
+      return tr("pages.admin_settings.watch_sync_settings.simkl");
+    },
     monogram: "SK",
     monogramClass: "bg-amber-500/20 text-amber-700 dark:text-amber-300",
   },
@@ -113,8 +119,14 @@ function pluginWatchProviders(installations: PluginInstallation[]): PluginWatchP
 
 function credentialKeys(providerKey: string) {
   return [
-    { key: `watchsync.${providerKey}.client_id`, label: "Client ID" },
-    { key: `watchsync.${providerKey}.client_secret`, label: "Client secret" },
+    {
+      key: `watchsync.${providerKey}.client_id`,
+      label: tr("pages.admin_settings.watch_sync_settings.client_id"),
+    },
+    {
+      key: `watchsync.${providerKey}.client_secret`,
+      label: tr("pages.admin_settings.watch_sync_settings.client_secret"),
+    },
   ];
 }
 
@@ -133,6 +145,7 @@ function WatchProviderTile({
   onExpand: () => void;
   onCollapse: () => void;
 }) {
+  useUILanguage();
   const updateSettings = useUpdateServerSettings();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [needsRestart, setNeedsRestart] = useState(false);
@@ -155,14 +168,18 @@ function WatchProviderTile({
       if (draftOf(field.key).trim() !== "") updates[field.key] = draftOf(field.key);
     }
     if (Object.keys(updates).length === 0) {
-      toast.info(`Nothing to save for ${title}.`);
+      toast.info("feedback.admin_settings.watch_sync_settings.nothing_to_save_for_provider", {
+        values: { provider: title },
+      });
       return;
     }
     try {
       const result = await updateSettings.mutateAsync(updates);
       setDrafts({});
       setNeedsRestart((current) => current || result.restart_required);
-      toast.success(`${title} credentials saved`);
+      toast.success("feedback.admin_settings.watch_sync_settings.provider_credentials_saved", {
+        values: { provider: title },
+      });
     } catch {
       // The mutation surfaces the API error.
     }
@@ -175,7 +192,9 @@ function WatchProviderTile({
       );
       setDrafts({});
       setNeedsRestart((current) => current || result.restart_required);
-      toast.success(`${title} credentials cleared`);
+      toast.success("feedback.admin_settings.watch_sync_settings.provider_credentials_cleared", {
+        values: { provider: title },
+      });
     } catch {
       // The mutation surfaces the API error.
     }
@@ -184,21 +203,32 @@ function WatchProviderTile({
   return (
     <ProviderTile
       name={title}
-      tagline="Watch history sync"
+      tagline={tr("pages.admin_settings.watch_sync_settings.watch_history_sync")}
       monogram={provider.monogram}
       monogramClass={provider.monogramClass}
       state={expanded ? "editing" : allConfigured ? "connected" : "not_connected"}
-      statePill={!expanded && !allConfigured && anyConfigured ? "Partly set up" : undefined}
+      statePill={
+        !expanded && !allConfigured && anyConfigured
+          ? tr("pages.admin_settings.watch_sync_settings.partly_set_up")
+          : undefined
+      }
       badge={restartRequired ? <RestartBadge /> : undefined}
       busy={updateSettings.isPending}
       expanded={expanded}
       primaryAction={{
-        label: anyConfigured ? "Manage" : "Connect",
+        get label() {
+          return tr(
+            anyConfigured
+              ? "pages.admin_settings.watch_sync_settings.manage"
+              : "pages.admin_settings.watch_sync_settings.connect",
+          );
+        },
         onClick: onExpand,
       }}
     >
       <p className="text-muted-foreground mb-1 text-xs">
-        Viewers link their own {title} account from profile settings.
+        {tr("pages.admin_settings.watch_sync_settings.viewers_link_their_own")} {title}{" "}
+        {tr("pages.admin_settings.watch_sync_settings.account_from_profile_settings")}
       </p>
       {fields.map((field) => (
         <SecretField
@@ -222,34 +252,45 @@ function WatchProviderTile({
           onClick={() => void save()}
           disabled={updateSettings.isPending}
         >
-          {updateSettings.isPending ? "Saving..." : "Save"}
+          {updateSettings.isPending
+            ? tr("pages.admin_settings.watch_sync_settings.saving")
+            : tr("common.actions.save")}
         </Button>
         {anyConfigured ? (
           <Button type="button" size="sm" variant="outline" onClick={() => setConfirmClear(true)}>
-            Clear credentials
+            {tr("pages.admin_settings.watch_sync_settings.clear_credentials")}
           </Button>
         ) : null}
         <Button type="button" size="sm" variant="outline" onClick={onCollapse}>
-          Close
+          {tr("common.actions.close")}
         </Button>
       </div>
       {needsRestart && (
         <div className="border-warning/30 bg-warning/10 text-warning mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs">
-          <span>Restart the server to pick up the new {title} credentials.</span>
+          <span>
+            {tr("pages.admin_settings.watch_sync_settings.restart_the_server_to_pick_up_the_new")}{" "}
+            {title} {tr("pages.admin_settings.watch_sync_settings.credentials")}
+          </span>
           <RestartServerButton />
         </div>
       )}
       <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear {title} credentials?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {tr("pages.admin_settings.watch_sync_settings.clear")} {title}{" "}
+              {tr("pages.admin_settings.watch_sync_settings.credentials_f8df471a")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Viewers can no longer connect a {title} account, and existing connections stop
-              syncing.
+              {tr("pages.admin_settings.watch_sync_settings.viewers_can_no_longer_connect_a")}{" "}
+              {title}{" "}
+              {tr(
+                "pages.admin_settings.watch_sync_settings.account_and_existing_connections_stop_syncing",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
@@ -257,7 +298,7 @@ function WatchProviderTile({
                 setConfirmClear(false);
               }}
             >
-              Clear
+              {tr("pages.admin_settings.watch_sync_settings.clear")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -267,6 +308,7 @@ function WatchProviderTile({
 }
 
 export default function WatchSyncSettings() {
+  useUILanguage();
   const form = useSettingsForm({ keys: KEYS });
   const restartKeys = useRestartKeys();
   const navigate = useNavigate();
@@ -278,20 +320,26 @@ export default function WatchSyncSettings() {
 
   if (form.isLoading) {
     return (
-      <div className="max-w-5xl space-y-6" role="status" aria-label="Loading watch sync">
+      <div
+        className="max-w-5xl space-y-6"
+        role="status"
+        aria-label={tr("pages.admin_settings.watch_sync_settings.loading_watch_sync")}
+      >
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-40 w-full" />
-        <span className="sr-only">Loading watch sync</span>
+        <span className="sr-only">
+          {tr("pages.admin_settings.watch_sync_settings.loading_watch_sync")}
+        </span>
       </div>
     );
   }
 
   return (
     <div className="flex h-full max-w-5xl flex-col gap-7">
-      <SettingsPageHeader title="Watch Providers" />
+      <SettingsPageHeader title={tr("pages.admin_settings.watch_sync_settings.watch_providers")} />
 
-      <FieldGroup label="Watch providers">
+      <FieldGroup label={tr("pages.admin_settings.watch_sync_settings.watch_providers_6f193951")}>
         <div className="py-3.5">
           <ProviderTileGrid>
             {PROVIDERS.map((provider) => (
@@ -307,17 +355,21 @@ export default function WatchSyncSettings() {
             ))}
             {pluginProviders.map((provider) => (
               <ProviderTile
-                key={`plugin-${provider.installationId}-${provider.capabilityId}`}
+                key={"plugin-" + provider.installationId + "-" + provider.capabilityId}
                 name={provider.name}
-                tagline="Watch provider plugin"
+                tagline={tr("pages.admin_settings.watch_sync_settings.watch_provider_plugin")}
                 monogram={providerMonogram(provider.name)}
                 monogramClass="bg-violet-500/20 text-violet-700 dark:text-violet-300"
                 state={provider.enabled && provider.configReady ? "connected" : "not_connected"}
                 statePill={
-                  !provider.enabled ? "Disabled" : provider.configReady ? "Enabled" : "Needs setup"
+                  !provider.enabled
+                    ? tr("pages.admin_settings.watch_sync_settings.disabled")
+                    : provider.configReady
+                      ? tr("pages.admin_settings.watch_sync_settings.enabled")
+                      : tr("pages.admin_settings.watch_sync_settings.needs_setup")
                 }
                 primaryAction={{
-                  label: "Configure",
+                  label: tr("pages.admin_settings.watch_sync_settings.configure"),
                   onClick: () =>
                     navigate(
                       `/admin/plugins?installed_q=${encodeURIComponent(provider.pluginId)}&configure=${encodeURIComponent(provider.pluginId)}`,
@@ -327,14 +379,18 @@ export default function WatchSyncSettings() {
             ))}
           </ProviderTileGrid>
           <p className="text-muted-foreground mt-3 text-xs">
-            Watch providers are pluggable. More install from the{" "}
+            {tr(
+              "pages.admin_settings.watch_sync_settings.watch_providers_are_pluggable_more_install_from_the",
+            )}{" "}
             <Link
               to="/admin/plugins?tab=catalog"
               className="hover:text-foreground font-medium underline underline-offset-2 transition-colors"
             >
-              plugin catalog
+              {tr("pages.admin_settings.watch_sync_settings.plugin_catalog")}
             </Link>
-            ; a plugin provider's credentials live on its plugin page.
+            {tr(
+              "pages.admin_settings.watch_sync_settings.a_plugin_provider_s_credentials_live_on_its_plugin_page",
+            )}
           </p>
         </div>
       </FieldGroup>

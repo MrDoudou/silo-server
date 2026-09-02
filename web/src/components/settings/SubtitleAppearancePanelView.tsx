@@ -11,6 +11,8 @@ import {
   computeSubtitleStyles,
   type SubtitleAppearance,
 } from "@/lib/subtitleAppearance";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface SubtitleAppearancePanelViewProps {
   /** Whether the panel is rendered. Mounting the portal is gated on this. */
@@ -57,6 +59,7 @@ export function SubtitleAppearancePanelView({
   eyebrow = "Captions",
   status = "Changes saved automatically",
 }: SubtitleAppearancePanelViewProps) {
+  useUILanguage();
   const previewStyles = useMemo(() => computeSubtitleStyles(value), [value]);
 
   // Close on Escape.
@@ -77,7 +80,7 @@ export function SubtitleAppearancePanelView({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Subtitle appearance"
+      aria-label={tr("components.settings.subtitle_appearance_panel_view.subtitle_appearance")}
       className="player-subtitle-panel fixed inset-0 z-[70] flex items-center justify-center p-4"
       onClick={onClose}
     >
@@ -96,13 +99,13 @@ export function SubtitleAppearancePanelView({
               {eyebrow}
             </div>
             <div className="text-[17px] font-semibold tracking-tight text-white">
-              Subtitle appearance
+              {tr("components.settings.subtitle_appearance_panel_view.subtitle_appearance")}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={tr("common.actions.close")}
             className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
           >
             <X className="h-[18px] w-[18px]" />
@@ -127,13 +130,13 @@ export function SubtitleAppearancePanelView({
               className="inline-block rounded px-3 py-1 leading-snug"
               style={{ ...previewStyles.cueStyle, whiteSpace: "pre-line" }}
             >
-              The quick brown fox
+              {tr("components.settings.subtitle_appearance_panel_view.the_quick_brown_fox")}
             </span>
             <span
               className="inline-block rounded px-3 py-1 leading-snug"
               style={{ ...previewStyles.cueStyle, whiteSpace: "pre-line" }}
             >
-              jumps over the lazy dog.
+              {tr("components.settings.subtitle_appearance_panel_view.jumps_over_the_lazy_dog")}
             </span>
           </div>
         </div>
@@ -141,33 +144,33 @@ export function SubtitleAppearancePanelView({
         {/* Scrollable body */}
         <div className="overlay-scroll max-h-[52vh] space-y-6 overflow-y-auto px-5 py-5">
           {/* Text */}
-          <Section label="Text">
-            <Row label="Size">
+          <Section label={tr("components.settings.subtitle_appearance_panel_view.text_c3328c39")}>
+            <Row label={tr("components.settings.subtitle_appearance_panel_view.size")}>
               <PillGroup
                 options={FONT_SIZE_OPTIONS}
                 value={value.fontSize}
                 onChange={(v) => onChange({ fontSize: v })}
               />
             </Row>
-            <Row label="Font">
+            <Row label={tr("components.settings.subtitle_appearance_panel_view.font")}>
               <PillGroup
                 options={FONT_FAMILY_OPTIONS}
                 value={value.fontFamily}
                 onChange={(v) => onChange({ fontFamily: v })}
               />
             </Row>
-            <Row label="Color">
+            <Row label={tr("components.settings.subtitle_appearance_panel_view.color")}>
               <ColorSwatchRow
                 colors={FONT_COLOR_PALETTE}
                 value={value.fontColor}
                 onChange={(v) => onChange({ fontColor: v })}
               />
             </Row>
-            <Row label="Outline">
+            <Row label={tr("components.settings.subtitle_appearance_panel_view.outline")}>
               <ToggleSwitch
                 checked={value.textOutline}
                 onChange={(v) => onChange({ textOutline: v })}
-                label="Text outline"
+                label={tr("components.settings.subtitle_appearance_panel_view.text_outline")}
               />
             </Row>
           </Section>
@@ -175,8 +178,8 @@ export function SubtitleAppearancePanelView({
           <Divider />
 
           {/* Background */}
-          <Section label="Background">
-            <Row label="Style">
+          <Section label={tr("components.settings.subtitle_appearance_panel_view.background")}>
+            <Row label={tr("components.settings.subtitle_appearance_panel_view.style")}>
               <PillGroup
                 options={BACKGROUND_STYLE_OPTIONS}
                 value={value.backgroundStyle}
@@ -185,13 +188,13 @@ export function SubtitleAppearancePanelView({
             </Row>
             {value.backgroundStyle === "box" && (
               <>
-                <Row label="Opacity">
+                <Row label={tr("components.settings.subtitle_appearance_panel_view.opacity")}>
                   <OpacitySlider
                     value={value.backgroundOpacity}
                     onChange={(v) => onChange({ backgroundOpacity: v })}
                   />
                 </Row>
-                <Row label="Color">
+                <Row label={tr("components.settings.subtitle_appearance_panel_view.color")}>
                   <ColorSwatchRow
                     colors={BG_COLOR_PALETTE}
                     value={value.backgroundColor}
@@ -205,8 +208,8 @@ export function SubtitleAppearancePanelView({
           <Divider />
 
           {/* Position */}
-          <Section label="Position">
-            <Row label="Vertical">
+          <Section label={tr("components.settings.subtitle_appearance_panel_view.position")}>
+            <Row label={tr("components.settings.subtitle_appearance_panel_view.vertical")}>
               <PillGroup
                 options={POSITION_OPTIONS}
                 value={value.position}
@@ -245,6 +248,7 @@ export function SubtitleAppearancePanelView({
    ───────────────────────────────────────────────────────────────────── */
 
 function Section({ label, children }: { label: string; children: ReactNode }) {
+  useUILanguage();
   return (
     <section className="space-y-3">
       <div className="text-[10.5px] font-semibold tracking-[0.2em] text-white/45 uppercase">
@@ -256,6 +260,7 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
+  useUILanguage();
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
       <div className="text-[13px] text-white/80 sm:w-24 sm:shrink-0">{label}</div>
@@ -282,6 +287,7 @@ function PillGroup<T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  useUILanguage();
   return (
     <div role="radiogroup" className="flex flex-wrap gap-1.5">
       {options.map((option) => {
@@ -293,11 +299,12 @@ function PillGroup<T extends string>({
             role="radio"
             aria-checked={active}
             onClick={() => onChange(option.value)}
-            className={`inline-flex items-center rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-              active
+            className={
+              "inline-flex items-center rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+              (active
                 ? "bg-white text-black"
-                : "bg-white/[0.06] text-white/75 hover:bg-white/10 hover:text-white"
-            }`}
+                : "bg-white/[0.06] text-white/75 hover:bg-white/10 hover:text-white")
+            }
           >
             {option.label}
           </button>
@@ -316,6 +323,7 @@ function ColorSwatchRow({
   value: string;
   onChange: (hex: string) => void;
 }) {
+  useUILanguage();
   return (
     <div role="radiogroup" className="flex flex-wrap gap-2">
       {colors.map((color) => {
@@ -329,9 +337,10 @@ function ColorSwatchRow({
             aria-label={color.label}
             title={color.label}
             onClick={() => onChange(color.hex)}
-            className={`relative h-7 w-7 rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-              active ? "scale-110" : "hover:scale-105"
-            }`}
+            className={
+              "relative h-7 w-7 rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+              (active ? "scale-110" : "hover:scale-105")
+            }
             style={{
               backgroundColor: color.hex,
               boxShadow: active
@@ -346,6 +355,7 @@ function ColorSwatchRow({
 }
 
 function OpacitySlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  useUILanguage();
   const pct = Math.max(0, Math.min(100, value));
   return (
     <div className="flex items-center gap-3">
@@ -360,7 +370,7 @@ function OpacitySlider({ value, onChange }: { value: number; onChange: (v: numbe
         style={{
           background: `linear-gradient(to right, rgb(255 255 255 / 0.85) 0%, rgb(255 255 255 / 0.85) ${pct}%, rgb(255 255 255 / 0.12) ${pct}%, rgb(255 255 255 / 0.12) 100%)`,
         }}
-        aria-label="Background opacity"
+        aria-label={tr("components.settings.subtitle_appearance_panel_view.background_opacity")}
       />
       <div className="w-10 text-right font-mono text-[11px] text-white/60 tabular-nums">{pct}%</div>
     </div>
@@ -376,6 +386,7 @@ function ToggleSwitch({
   onChange: (v: boolean) => void;
   label: string;
 }) {
+  useUILanguage();
   return (
     <button
       type="button"
@@ -383,14 +394,16 @@ function ToggleSwitch({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-        checked ? "bg-white" : "bg-white/15"
-      }`}
+      className={
+        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+        (checked ? "bg-white" : "bg-white/15")
+      }
     >
       <span
-        className={`inline-block h-5 w-5 transform rounded-full shadow-md transition-transform ${
-          checked ? "translate-x-[22px] bg-black" : "translate-x-[2px] bg-white"
-        }`}
+        className={
+          "inline-block h-5 w-5 transform rounded-full shadow-md transition-transform " +
+          (checked ? "translate-x-[22px] bg-black" : "translate-x-[2px] bg-white")
+        }
       />
     </button>
   );

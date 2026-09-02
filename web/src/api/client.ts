@@ -279,6 +279,9 @@ export class ApiClientError extends Error {
    * non-JSON or empty bodies.
    */
   public body?: unknown;
+  public readonly params: NonNullable<ApiError["params"]>;
+  public readonly pluginId?: string;
+  public readonly translationKey?: string;
 
   constructor(
     public status: number,
@@ -288,45 +291,99 @@ export class ApiClientError extends Error {
   ) {
     super(message);
     this.name = "ApiClientError";
+    this.params = details?.params ?? {};
+    this.pluginId = details?.plugin_id;
+    this.translationKey = details?.translation_key;
   }
 }
 
-function fallbackApiErrorMessage(res: Response): string {
-  const statusText = res.statusText.trim();
-  if (statusText) {
-    return statusText;
-  }
+interface ApiErrorFallback {
+  message: string;
+  params?: ApiError["params"];
+  translationKey: string;
+}
+
+function fallbackApiError(res: Response): ApiErrorFallback {
   if (res.status === 401) {
-    return "Authentication required.";
+    return {
+      message: "Authentication required.",
+      translationKey: "errors.api_client.authentication_required",
+    };
   }
   if (res.status === 403) {
-    return "You do not have permission to perform this action.";
+    return {
+      message: "You do not have permission to perform this action.",
+      translationKey: "errors.api_client.permission_denied",
+    };
   }
   if (res.status === 404) {
-    return "Requested resource was not found.";
+    return {
+      message: "Requested resource was not found.",
+      translationKey: "errors.api_client.resource_not_found",
+    };
   }
   if (res.status >= 500) {
-    return "Request failed. Please try again.";
+    return {
+      message: "Request failed. Please try again.",
+      translationKey: "errors.api_client.server_error",
+    };
   }
   if (res.status > 0) {
-    return `Request failed (${res.status}).`;
+    return {
+      message: `Request failed (${res.status}).`,
+      params: { status: res.status },
+      translationKey: "errors.api_client.request_failed_with_status",
+    };
   }
-  return "Request failed.";
+  return {
+    message: "Request failed.",
+    translationKey: "errors.api_client.request_failed",
+  };
+}
+
+function normalizeApiErrorParams(value: unknown): ApiError["params"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+  const params: NonNullable<ApiError["params"]> = {};
+  for (const [key, candidate] of Object.entries(value)) {
+    if (
+      candidate === null ||
+      typeof candidate === "string" ||
+      typeof candidate === "boolean" ||
+      (typeof candidate === "number" && Number.isFinite(candidate))
+    ) {
+      params[key] = candidate;
+    }
+  }
+  return Object.keys(params).length > 0 ? params : undefined;
 }
 
 function normalizeApiError(apiErr: Partial<ApiError> | null, res: Response): ApiError {
   const payload = apiErr && typeof apiErr === "object" ? apiErr : {};
+  const fallback = fallbackApiError(res);
+  const hasServerMessage = typeof payload.message === "string" && Boolean(payload.message.trim());
   const code =
     typeof payload.error === "string" && payload.error.trim() ? payload.error : "unknown";
-  const message =
-    typeof payload.message === "string" && payload.message.trim()
-      ? payload.message.trim()
-      : fallbackApiErrorMessage(res);
+  const message = hasServerMessage ? payload.message!.trim() : fallback.message;
+  const pluginId =
+    typeof payload.plugin_id === "string" && payload.plugin_id.trim()
+      ? payload.plugin_id.trim()
+      : undefined;
+  const translationKey =
+    typeof payload.translation_key === "string" && payload.translation_key.trim()
+      ? payload.translation_key.trim()
+      : hasServerMessage
+        ? undefined
+        : fallback.translationKey;
+  const params = normalizeApiErrorParams(payload.params) ?? fallback.params;
 
   return {
     ...payload,
     error: code,
     message,
+    params,
+    plugin_id: pluginId,
+    translation_key: translationKey,
   };
 }
 
@@ -626,6 +683,12 @@ export async function apiBlob(path: string, options: RequestInit = {}): Promise<
       res.status,
       "response_too_large",
       `This file is too large to open in the browser (${sizeMiB} MiB, limit ${limitMiB} MiB). Download it instead.`,
+      {
+        error: "response_too_large",
+        message: `This file is too large to open in the browser (${sizeMiB} MiB, limit ${limitMiB} MiB). Download it instead.`,
+        params: { limit_mib: limitMiB, size_mib: sizeMiB },
+        translation_key: "errors.api_client.response_too_large",
+      },
     );
   }
 

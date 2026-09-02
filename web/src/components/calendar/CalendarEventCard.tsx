@@ -9,8 +9,11 @@ import {
 } from "@/lib/upcomingEventPresentation";
 import type { CalendarEvent } from "@/hooks/queries/calendar";
 import { useUICustomization } from "@/hooks/useUICustomization";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function CalendarEventCard({ event }: { event: CalendarEvent }) {
+  useUILanguage();
   const [loaded, setLoaded] = useState(false);
   const thumbhashUrl = event.poster_thumbhash ? decodeThumbhash(event.poster_thumbhash) : "";
   const watched = event.watched === true;
@@ -30,7 +33,9 @@ export default function CalendarEventCard({ event }: { event: CalendarEvent }) {
     <div className="media-card group/card">
       <ViewTransitionLink to={href} className="block overflow-hidden rounded-xl">
         <div
-          className={`media-card-image relative aspect-[2/3] ${watched ? "opacity-60 grayscale" : ""}`}
+          className={
+            "media-card-image relative aspect-[2/3] " + (watched ? "opacity-60 grayscale" : "")
+          }
           style={
             thumbhashUrl
               ? {
@@ -45,13 +50,18 @@ export default function CalendarEventCard({ event }: { event: CalendarEvent }) {
             <img
               src={event.poster_url}
               alt={event.title}
-              className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+              className={
+                "h-full w-full object-cover transition-opacity duration-300 " +
+                (loaded ? "opacity-100" : "opacity-0")
+              }
               loading="lazy"
               onLoad={() => setLoaded(true)}
             />
           ) : (
             <div className="text-muted-foreground flex h-full w-full flex-col items-center justify-center gap-1 p-3 text-center text-sm">
-              <span className="line-clamp-3 font-medium">{event.title || "No Poster"}</span>
+              <span className="line-clamp-3 font-medium">
+                {event.title || tr("components.calendar.calendar_event_card.no_poster")}
+              </span>
             </div>
           )}
           <div className="from-background/70 pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t to-transparent opacity-90" />
@@ -60,7 +70,10 @@ export default function CalendarEventCard({ event }: { event: CalendarEvent }) {
               {event.badges.map((badge) => (
                 <span
                   key={badge}
-                  className={`rounded-full border px-2 py-0.5 text-[10px] leading-none font-semibold tracking-wide uppercase backdrop-blur-sm ${upcomingBadgeClass(badge)}`}
+                  className={
+                    "rounded-full border px-2 py-0.5 text-[10px] leading-none font-semibold tracking-wide uppercase backdrop-blur-sm " +
+                    upcomingBadgeClass(badge)
+                  }
                 >
                   {upcomingBadgeLabel(badge)}
                 </span>
@@ -71,7 +84,7 @@ export default function CalendarEventCard({ event }: { event: CalendarEvent }) {
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <span
                 className="bg-background/70 text-foreground flex h-8 w-8 items-center justify-center rounded-full text-base backdrop-blur-sm"
-                aria-label="Watched"
+                aria-label={tr("components.calendar.calendar_event_card.watched")}
               >
                 ✓
               </span>
@@ -82,7 +95,10 @@ export default function CalendarEventCard({ event }: { event: CalendarEvent }) {
       {showCaption ? (
         <ViewTransitionLink to={href} className="block px-1 pt-3">
           <div
-            className={`truncate text-[14px] font-semibold tracking-tight ${watched ? "text-muted-foreground" : ""}`}
+            className={
+              "truncate text-[14px] font-semibold tracking-tight " +
+              (watched ? "text-muted-foreground" : "")
+            }
           >
             {event.title}
           </div>

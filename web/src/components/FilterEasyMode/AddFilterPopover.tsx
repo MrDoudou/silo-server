@@ -1,28 +1,110 @@
 import { useState } from "react";
 import type { FilterChipModel } from "@/lib/filterEasyMode";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const FIELDS = [
-  { value: "", label: "Field…" },
-  { value: "genre", label: "Genre" },
-  { value: "year", label: "Year" },
-  { value: "rating_imdb", label: "Rating (IMDb)" },
-  { value: "director", label: "Director" },
-  { value: "studio", label: "Studio" },
-  { value: "cast", label: "Cast" },
-  { value: "library", label: "Library" },
-  { value: "watched", label: "Has been watched" },
-  { value: "language", label: "Language" },
-  { value: "runtime", label: "Runtime (min)" },
-  { value: "keyword", label: "Keyword" },
+  {
+    value: "",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.field");
+    },
+  },
+  {
+    value: "genre",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.genre");
+    },
+  },
+  {
+    value: "year",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.year");
+    },
+  },
+  {
+    value: "rating_imdb",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.rating_imdb");
+    },
+  },
+  {
+    value: "director",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.director");
+    },
+  },
+  {
+    value: "studio",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.studio");
+    },
+  },
+  {
+    value: "cast",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.cast");
+    },
+  },
+  {
+    value: "library",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.library");
+    },
+  },
+  {
+    value: "watched",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.has_been_watched");
+    },
+  },
+  {
+    value: "language",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.language");
+    },
+  },
+  {
+    value: "runtime",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.runtime_min");
+    },
+  },
+  {
+    value: "keyword",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.keyword");
+    },
+  },
 ];
 
 const OPS = [
-  { value: "is", label: "is" },
-  { value: "is_not", label: "is not" },
+  {
+    value: "is",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.is");
+    },
+  },
+  {
+    value: "is_not",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.is_not");
+    },
+  },
   { value: "gte", label: "≥" },
   { value: "lte", label: "≤" },
-  { value: "between", label: "between" },
-  { value: "contains", label: "contains" },
+  {
+    value: "between",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.between");
+    },
+  },
+  {
+    value: "contains",
+    get label() {
+      return tr("components.filter_easy_mode.add_filter_popover.contains");
+    },
+  },
 ];
 
 interface Props {
@@ -32,6 +114,7 @@ interface Props {
 }
 
 export default function AddFilterPopover({ open, onAdd, onCancel }: Props) {
+  useUILanguage();
   const [field, setField] = useState("");
   const [op, setOp] = useState("contains");
   const [value, setValue] = useState("");
@@ -40,7 +123,7 @@ export default function AddFilterPopover({ open, onAdd, onCancel }: Props) {
     <div className="rounded-lg border border-indigo-500/40 bg-zinc-900 p-3 shadow-lg" role="dialog">
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col text-[11px] text-white/70">
-          Field
+          {tr("components.filter_easy_mode.add_filter_popover.field_c326a466")}
           <select
             value={field}
             onChange={(e) => setField(e.target.value)}
@@ -54,7 +137,7 @@ export default function AddFilterPopover({ open, onAdd, onCancel }: Props) {
           </select>
         </label>
         <label className="flex flex-col text-[11px] text-white/70">
-          Operator
+          {tr("components.filter_easy_mode.add_filter_popover.operator")}
           <select
             value={op}
             onChange={(e) => setOp(e.target.value)}
@@ -68,11 +151,11 @@ export default function AddFilterPopover({ open, onAdd, onCancel }: Props) {
           </select>
         </label>
         <label className="flex flex-col text-[11px] text-white/70">
-          Value
+          {tr("components.filter_easy_mode.add_filter_popover.value")}
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="value"
+            placeholder={tr("components.filter_easy_mode.add_filter_popover.value_f32b67c7")}
             className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-white"
           />
         </label>
@@ -83,7 +166,7 @@ export default function AddFilterPopover({ open, onAdd, onCancel }: Props) {
           onClick={onCancel}
           className="rounded border border-white/15 px-2 py-1 text-xs text-white/70"
         >
-          Cancel
+          {tr("common.actions.cancel")}
         </button>
         <button
           type="button"
@@ -96,7 +179,7 @@ export default function AddFilterPopover({ open, onAdd, onCancel }: Props) {
           }}
           className="rounded bg-indigo-600 px-2 py-1 text-xs text-white"
         >
-          Add
+          {tr("common.actions.add")}
         </button>
       </div>
     </div>

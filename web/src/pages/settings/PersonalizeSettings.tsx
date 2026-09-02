@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useFavorites } from "@/hooks/queries/favorites";
 import { useOnboardingFlow } from "@/hooks/queries/onboarding";
 import { TourHost } from "@/components/onboarding/TourHost";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Re-entry point for the taste-seeding flow. Always links to /taste-seed —
@@ -12,6 +14,7 @@ import { TourHost } from "@/components/onboarding/TourHost";
  * users can both add new picks and review their existing ones from here.
  */
 export default function PersonalizeSettings() {
+  useUILanguage();
   const { data: favorites } = useFavorites();
   const favoriteCount = favorites?.length ?? 0;
   const [replaying, setReplaying] = useState(false);
@@ -21,9 +24,13 @@ export default function PersonalizeSettings() {
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <h2 className="text-foreground text-xl font-semibold tracking-tight">Personalize</h2>
+        <h2 className="text-foreground text-xl font-semibold tracking-tight">
+          {tr("pages.settings.personalize_settings.personalize")}
+        </h2>
         <p className="text-muted-foreground text-sm">
-          Pick titles you love so your home, recommendations, and "For You" rows reflect your taste.
+          {tr(
+            "pages.settings.personalize_settings.pick_titles_you_love_so_your_home_recommendations_and_for",
+          )}
         </p>
       </header>
 
@@ -34,15 +41,18 @@ export default function PersonalizeSettings() {
           </div>
           <div className="min-w-0 flex-1 space-y-3">
             <div>
-              <h3 className="text-base font-semibold">Refine your taste profile</h3>
+              <h3 className="text-base font-semibold">
+                {tr("pages.settings.personalize_settings.refine_your_taste_profile")}
+              </h3>
               <p className="text-muted-foreground mt-1 text-sm">
-                Browse popular titles and pick the ones you love. Already-favorited titles will be
-                marked, so you can add to (or trim) your picks any time.
+                {tr(
+                  "pages.settings.personalize_settings.browse_popular_titles_and_pick_the_ones_you_love_already",
+                )}
               </p>
             </div>
             <Button asChild>
               <Link to="/taste-seed?from=settings">
-                Open the picker
+                {tr("pages.settings.personalize_settings.open_the_picker")}
                 <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>
@@ -57,14 +67,17 @@ export default function PersonalizeSettings() {
           </div>
           <div className="min-w-0 flex-1 space-y-3">
             <div>
-              <h3 className="text-base font-semibold">Replay the feature tour</h3>
+              <h3 className="text-base font-semibold">
+                {tr("pages.settings.personalize_settings.replay_the_feature_tour")}
+              </h3>
               <p className="text-muted-foreground mt-1 text-sm">
-                A two-minute walkthrough of what this server can do — watch together, requests,
-                watchlists, and the playback settings worth knowing about.
+                {tr(
+                  "pages.settings.personalize_settings.a_two_minute_walkthrough_of_what_this_server_can_do",
+                )}
               </p>
             </div>
             <Button variant="outline" onClick={() => setReplaying(true)}>
-              Start the tour
+              {tr("pages.settings.personalize_settings.start_the_tour")}
             </Button>
           </div>
         </div>
@@ -78,10 +91,17 @@ export default function PersonalizeSettings() {
         <Heart className="h-4 w-4" />
         <span>
           {favoriteCount === 0
-            ? "You haven't favorited anything yet."
+            ? tr("pages.settings.personalize_settings.you_haven_t_favorited_anything_yet")
             : favoriteCount === 1
-              ? "1 favorite is shaping your recommendations."
-              : `${favoriteCount} favorites are shaping your recommendations.`}
+              ? tr(
+                  "pages.settings.personalize_settings.value_1_favorite_is_shaping_your_recommendations",
+                )
+              : tr(
+                  "pages.settings.personalize_settings.favorite_count_favorites_are_shaping_your_recommendations",
+                  {
+                    favoriteCount: favoriteCount,
+                  },
+                )}
         </span>
       </div>
     </div>

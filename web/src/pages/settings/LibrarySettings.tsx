@@ -50,7 +50,7 @@ import {
   SUBTITLE_MODE_OPTIONS,
 } from "./libraryPlaybackPreferences";
 import { namedLanguageOptionsFor, type SettingOption } from "@/lib/languageOptions";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { ChevronDown, ChevronRight, Eye, EyeOff, GripVertical, RotateCcw } from "lucide-react";
 import {
   DndContext,
@@ -70,6 +70,8 @@ import {
 } from "@dnd-kit/sortable";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function sortLibrariesByOrder(libraries: UserLibrary[], ids: number[]) {
   const selected = new Set(ids);
@@ -96,6 +98,7 @@ async function clearIgnoringUnset(clear: ReturnType<typeof useClearSettingValue>
 }
 
 function RememberLibraryPageStateSetting() {
+  useUILanguage();
   const { data: effective } = useEffectiveSettings({
     keys: [SETTING_KEYS.UI_REMEMBER_LIBRARY_PAGE_STATE],
   });
@@ -120,16 +123,18 @@ function RememberLibraryPageStateSetting() {
           identity: DEVICE_SCOPE,
         });
       }
-      toast.success("Library page preference saved");
+      toast.success("feedback.settings.library_settings.library_page_preference_saved");
     } catch {
-      toast.error("Failed to save library page preference");
+      toast.error("errors.settings.library_settings.failed_to_save_library_page_preference");
     }
   }
 
   return (
     <SettingRow
-      label="Remember library pages"
-      description="Return each library to the last tab, sort, and filters used on this profile and device."
+      label={tr("pages.settings.library_settings.remember_library_pages")}
+      description={tr(
+        "pages.settings.library_settings.return_each_library_to_the_last_tab_sort_and_filters",
+      )}
       control={(id) => (
         <Switch
           id={id}
@@ -157,6 +162,7 @@ function PlaybackField({
   onChange: (value: string) => void;
   children: ReactNode;
 }) {
+  useUILanguage();
   const controlId = useId();
 
   return (
@@ -193,6 +199,7 @@ function LanguageField({
   onChange: (value: string) => void;
   children: ReactNode;
 }) {
+  useUILanguage();
   const controlId = useId();
 
   return (
@@ -216,6 +223,7 @@ function LanguageField({
 }
 
 function SortableLibraryCard({ id, children }: { id: number; children: React.ReactNode }) {
+  useUILanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
@@ -230,7 +238,7 @@ function SortableLibraryCard({ id, children }: { id: number; children: React.Rea
     <div ref={setNodeRef} style={style} className="flex gap-2">
       <button
         type="button"
-        aria-label="Drag to reorder"
+        aria-label={tr("pages.settings.library_settings.drag_to_reorder")}
         className="hover:bg-surface-hover mt-4 cursor-grab touch-none self-start rounded-md p-1 transition-colors"
         {...attributes}
         {...listeners}
@@ -261,6 +269,7 @@ function LibraryCard({
   };
   onToggleVisibility: (checked: boolean) => void;
 }) {
+  useUILanguage();
   const controlId = useId();
   // Resolved with this library in context, so each key reports whether the
   // answer came from the library's own row or from a wider scope.
@@ -336,7 +345,7 @@ function LibraryCard({
       }
     } catch {
       setEditorState(rollbackState);
-      toast.error("Failed to update playback defaults");
+      toast.error("errors.settings.library_settings.failed_to_update_playback_defaults");
     }
   }
 
@@ -369,7 +378,7 @@ function LibraryCard({
             </Badge>
             {hasOverride && (
               <Badge variant="secondary" className="shrink-0 text-[11px]">
-                Custom
+                {tr("pages.settings.library_settings.custom")}
               </Badge>
             )}
           </div>
@@ -389,11 +398,15 @@ function LibraryCard({
             ) : (
               <ChevronRight className="size-3.5" />
             )}
-            <span>{expanded ? "Hide playback overrides" : "Edit playback overrides"}</span>
+            <span>
+              {expanded
+                ? tr("pages.settings.library_settings.hide_playback_overrides")
+                : tr("pages.settings.library_settings.edit_playback_overrides")}
+            </span>
           </Button>
           <div className="surface-panel-subtle flex items-center justify-between rounded-[1rem] px-3 py-2 sm:min-w-[180px]">
             <Label htmlFor={controlId} className="text-xs font-medium">
-              Visible in navigation
+              {tr("pages.settings.library_settings.visible_in_navigation")}
             </Label>
             <Switch
               id={controlId}
@@ -408,12 +421,13 @@ function LibraryCard({
       {expanded && (
         <div className="border-border/50 bg-muted/20 border-t px-4 py-4 sm:px-5">
           <p className="text-muted-foreground mb-3 text-xs">
-            Override your profile&apos;s playback defaults for this library. Changes save
-            automatically.
+            {tr(
+              "pages.settings.library_settings.override_your_profile_s_playback_defaults_for_this_library_changes",
+            )}
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <LanguageField
-              label="Spoken language"
+              label={tr("pages.settings.library_settings.spoken_language")}
               value={editorState.audioLanguage}
               options={audioLanguageOptions}
               disabled={playbackPending}
@@ -426,7 +440,7 @@ function LibraryCard({
             </LanguageField>
 
             <LanguageField
-              label="Subtitle language"
+              label={tr("pages.settings.library_settings.subtitle_language")}
               value={editorState.subtitleLanguage}
               options={subtitleLanguageOptions}
               disabled={playbackPending}
@@ -436,11 +450,13 @@ function LibraryCard({
               <SelectItem value={INHERIT_VALUE}>
                 {buildInheritedSubtitleLanguageLabel(profileDefaults.subtitleLanguage ?? "")}
               </SelectItem>
-              <SelectItem value={NONE_VALUE}>None</SelectItem>
+              <SelectItem value={NONE_VALUE}>
+                {tr("pages.settings.library_settings.none")}
+              </SelectItem>
             </LanguageField>
 
             <PlaybackField
-              label="Subtitle behavior"
+              label={tr("pages.settings.library_settings.subtitle_behavior")}
               value={editorState.subtitleMode}
               disabled={playbackPending}
               hint={getProfileDefaultSubtitleModeHint(profileDefaults.subtitleMode)}
@@ -457,7 +473,7 @@ function LibraryCard({
             </PlaybackField>
 
             <PlaybackField
-              label="Forced subtitles"
+              label={tr("pages.settings.library_settings.forced_subtitles")}
               value={editorState.showForcedSubtitles}
               disabled={playbackPending}
               hint={getProfileDefaultForcedSubtitlesHint(profileDefaults.showForcedSubtitles)}
@@ -466,8 +482,8 @@ function LibraryCard({
               <SelectItem value={INHERIT_VALUE}>
                 {buildInheritedShowForcedSubtitlesLabel(profileDefaults.showForcedSubtitles)}
               </SelectItem>
-              <SelectItem value="on">On</SelectItem>
-              <SelectItem value="off">Off</SelectItem>
+              <SelectItem value="on">{tr("pages.settings.library_settings.on")}</SelectItem>
+              <SelectItem value="off">{tr("pages.settings.library_settings.off")}</SelectItem>
             </PlaybackField>
           </div>
 
@@ -482,7 +498,7 @@ function LibraryCard({
                 onClick={handleReset}
               >
                 <RotateCcw className="size-3" />
-                Reset to profile defaults
+                {tr("pages.settings.library_settings.reset_to_profile_defaults")}
               </Button>
             </div>
           )}
@@ -493,6 +509,7 @@ function LibraryCard({
 }
 
 export default function LibrarySettings() {
+  useUILanguage();
   const { data: libraries, isLoading: librariesLoading } = useAvailableUserLibraries();
   const {
     disabledLibraryIDs: savedDisabledLibraryIDs,
@@ -546,7 +563,7 @@ export default function LibrarySettings() {
       {
         onError: () => {
           setDisabledLibraryIDs(rollbackIDs);
-          toast.error("Failed to update library visibility");
+          toast.error("errors.settings.library_settings.failed_to_update_library_visibility");
         },
       },
     );
@@ -598,7 +615,7 @@ export default function LibrarySettings() {
       {
         onError: () => {
           setOrderedLibraries(prev);
-          toast.error("Failed to update library order");
+          toast.error("errors.settings.library_settings.failed_to_update_library_order");
         },
       },
     );
@@ -611,19 +628,29 @@ export default function LibrarySettings() {
   const activeLibrary = activeId != null ? orderedLibraries.find((l) => l.id === activeId) : null;
 
   if (librariesLoading || libraryPrefsLoading || profileLoading || playbackPrefsLoading) {
-    return <div className="text-muted-foreground pt-4">Loading libraries...</div>;
+    return (
+      <div className="text-muted-foreground pt-4">
+        {tr("pages.settings.library_settings.loading_libraries")}
+      </div>
+    );
   }
 
   if (!libraries || libraries.length === 0) {
     return (
       <div className="text-muted-foreground pt-4">
-        No libraries are available for this account right now.
+        {tr(
+          "pages.settings.library_settings.no_libraries_are_available_for_this_account_right_now",
+        )}
       </div>
     );
   }
 
   if (!currentProfile) {
-    return <div className="text-muted-foreground pt-4">Choose a profile to manage libraries.</div>;
+    return (
+      <div className="text-muted-foreground pt-4">
+        {tr("pages.settings.library_settings.choose_a_profile_to_manage_libraries")}
+      </div>
+    );
   }
 
   const displayLibraries = orderedLibraries.length > 0 ? orderedLibraries : libraries;
@@ -650,24 +677,30 @@ export default function LibrarySettings() {
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Libraries</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.settings.library_settings.libraries")}
+        </h2>
         <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-          Toggle which libraries appear in your navigation and customize playback defaults per
-          library.
+          {tr(
+            "pages.settings.library_settings.toggle_which_libraries_appear_in_your_navigation_and_customize_playback",
+          )}
         </p>
       </div>
 
       <SettingsGroup
-        title="Browsing"
-        description="These preferences apply to this profile on the current device."
+        title={tr("pages.settings.library_settings.browsing")}
+        description={tr(
+          "pages.settings.library_settings.these_preferences_apply_to_this_profile_on_the_current_device",
+        )}
       >
         <RememberLibraryPageStateSetting />
       </SettingsGroup>
 
       <div className="surface-panel-subtle flex flex-col gap-4 rounded-[1.4rem] p-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-sm leading-relaxed">
-          <span className="text-foreground font-medium">{visibleCount}</span> of {libraries.length}{" "}
-          libraries visible for this profile.
+          <span className="text-foreground font-medium">{visibleCount}</span>{" "}
+          {tr("pages.settings.library_settings.of")} {libraries.length}{" "}
+          {tr("pages.settings.library_settings.libraries_visible_for_this_profile")}
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
@@ -678,7 +711,7 @@ export default function LibrarySettings() {
             disabled={setSetting.isPending || visibleCount === libraries.length}
           >
             <Eye className="size-3.5" />
-            Show all
+            {tr("pages.settings.library_settings.show_all")}
           </Button>
           <Button
             size="sm"
@@ -688,7 +721,7 @@ export default function LibrarySettings() {
             disabled={setSetting.isPending || visibleCount === 0}
           >
             <EyeOff className="size-3.5" />
-            Hide all
+            {tr("pages.settings.library_settings.hide_all")}
           </Button>
         </div>
       </div>

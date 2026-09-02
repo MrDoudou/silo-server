@@ -19,6 +19,8 @@ import {
   playbackQualityValueFromPreset,
   type PlaybackQualityPreset,
 } from "@/lib/playback-quality";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Per-user policy overrides. null = inherit the access group's value; a
 // concrete value is an explicit override in either direction.
@@ -156,6 +158,7 @@ function BooleanPolicyRow({
   onValueChange: (value: boolean | null) => void;
   effectiveValue?: boolean;
 }) {
+  useUILanguage();
   const id = useId();
   const selectValue = value === null ? INHERIT : value ? "allowed" : "blocked";
   return (
@@ -177,8 +180,8 @@ function BooleanPolicyRow({
               effectiveValue === undefined ? undefined : effectiveValue ? "Allowed" : "Not allowed",
             )}
           </SelectItem>
-          <SelectItem value="allowed">Allowed</SelectItem>
-          <SelectItem value="blocked">Not allowed</SelectItem>
+          <SelectItem value="allowed">{tr("components.user_policy_fields.allowed")}</SelectItem>
+          <SelectItem value="blocked">{tr("components.user_policy_fields.not_allowed")}</SelectItem>
         </SelectContent>
       </Select>
     </div>
@@ -203,6 +206,7 @@ function LimitPolicyField({
   onValueChange: (value: number | null) => void;
   effectiveValue?: number;
 }) {
+  useUILanguage();
   const id = useId();
   const overrideId = `${id}-override`;
   // Override is tracked locally because "overriding, but nothing typed yet" has
@@ -241,7 +245,7 @@ function LimitPolicyField({
         <Label htmlFor={id}>{label}</Label>
         <div className="flex items-center gap-2">
           <Label htmlFor={overrideId} className="text-muted-foreground text-xs">
-            Override
+            {tr("components.user_policy_fields.override")}
           </Label>
           <Switch id={overrideId} checked={overridden} onCheckedChange={handleOverrideChange} />
         </div>
@@ -259,8 +263,10 @@ function LimitPolicyField({
           />
           <p className="text-muted-foreground text-xs">
             {draftValue === null
-              ? "Enter a whole number, or turn Override off to inherit."
-              : "0 = unlimited"}
+              ? tr(
+                  "components.user_policy_fields.enter_a_whole_number_or_turn_override_off_to_inherit",
+                )
+              : tr("components.user_policy_fields.value_0_unlimited")}
           </p>
         </>
       ) : (
@@ -285,6 +291,7 @@ export function PolicyAccessFields({
   effective,
   libraries,
 }: PolicyContext & { libraries: Library[] }) {
+  useUILanguage();
   return (
     <>
       <LibraryAccessSelector
@@ -302,13 +309,13 @@ export function PolicyAccessFields({
       />
       <div className="grid gap-2 sm:grid-cols-2">
         <BooleanPolicyRow
-          label="Downloads"
+          label={tr("components.user_policy_fields.downloads")}
           value={state.downloadAllowed}
           onValueChange={(downloadAllowed) => onChange({ ...state, downloadAllowed })}
           effectiveValue={effective?.download_allowed}
         />
         <BooleanPolicyRow
-          label="Download Transcodes"
+          label={tr("components.user_policy_fields.download_transcodes")}
           value={state.downloadTranscodeAllowed}
           onValueChange={(downloadTranscodeAllowed) =>
             onChange({ ...state, downloadTranscodeAllowed })
@@ -317,8 +324,10 @@ export function PolicyAccessFields({
         />
       </div>
       <BooleanPolicyRow
-        label="Media Requests"
-        description="Request new movies and series when requests are enabled."
+        label={tr("components.user_policy_fields.media_requests")}
+        description={tr(
+          "components.user_policy_fields.request_new_movies_and_series_when_requests_are_enabled",
+        )}
         value={state.requestsAllowed}
         onValueChange={(requestsAllowed) => onChange({ ...state, requestsAllowed })}
         effectiveValue={effective?.requests_allowed}
@@ -329,6 +338,7 @@ export function PolicyAccessFields({
 
 // Limits-tab policy fields: stream/transcode ceilings and the quality gate.
 export function PolicyLimitFields({ state, onChange, effective }: PolicyContext) {
+  useUILanguage();
   const qualityId = useId();
   const qualityValue: PlaybackQualityPreset | typeof INHERIT =
     state.maxPlaybackQuality === null
@@ -338,13 +348,13 @@ export function PolicyLimitFields({ state, onChange, effective }: PolicyContext)
     <>
       <div className="grid gap-3 sm:grid-cols-2">
         <LimitPolicyField
-          label="Max Streams"
+          label={tr("components.user_policy_fields.max_streams")}
           value={state.maxStreams}
           onValueChange={(maxStreams) => onChange({ ...state, maxStreams })}
           effectiveValue={effective?.max_streams}
         />
         <LimitPolicyField
-          label="Max Transcodes"
+          label={tr("components.user_policy_fields.max_transcodes")}
           value={state.maxTranscodes}
           onValueChange={(maxTranscodes) => onChange({ ...state, maxTranscodes })}
           effectiveValue={effective?.max_transcodes}
@@ -352,21 +362,23 @@ export function PolicyLimitFields({ state, onChange, effective }: PolicyContext)
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <BooleanPolicyRow
-          label="Video Transcoding"
+          label={tr("components.user_policy_fields.video_transcoding")}
           value={state.transcodeAllowed}
           onValueChange={(transcodeAllowed) => onChange({ ...state, transcodeAllowed })}
           effectiveValue={effective?.transcode_allowed}
         />
         <BooleanPolicyRow
-          label="Audio Transcoding"
-          description="Audio conversion without video encoding."
+          label={tr("components.user_policy_fields.audio_transcoding")}
+          description={tr("components.user_policy_fields.audio_conversion_without_video_encoding")}
           value={state.audioTranscodeAllowed}
           onValueChange={(audioTranscodeAllowed) => onChange({ ...state, audioTranscodeAllowed })}
           effectiveValue={effective?.audio_transcode_allowed}
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor={qualityId}>Max Playback Quality</Label>
+        <Label htmlFor={qualityId}>
+          {tr("components.user_policy_fields.max_playback_quality")}
+        </Label>
         <Select
           value={qualityValue}
           onValueChange={(value) =>
@@ -399,7 +411,7 @@ export function PolicyLimitFields({ state, onChange, effective }: PolicyContext)
         </Select>
         <p className="text-muted-foreground text-xs">
           {qualityValue === INHERIT
-            ? "Uses the access group's quality ceiling."
+            ? tr("components.user_policy_fields.uses_the_access_group_s_quality_ceiling")
             : PLAYBACK_QUALITY_OPTIONS.find((option) => option.value === qualityValue)?.description}
         </p>
       </div>

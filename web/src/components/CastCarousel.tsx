@@ -6,6 +6,8 @@ import { useCarouselEmbla } from "@/hooks/useCarouselEmbla";
 import { buildPersonCatalogHref } from "@/pages/catalogSearchParams";
 import { getInitials } from "@/lib/text";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CastCarouselProps {
   cast: CastMember[];
@@ -19,6 +21,7 @@ interface CastCarouselProps {
 }
 
 function CastCarousel({ cast, limit = 20, fullBleed = false }: CastCarouselProps) {
+  useUILanguage();
   const { emblaRef, canScrollPrev, canScrollNext, scrollPrev, scrollNext } = useCarouselEmbla();
   const visible = useMemo(
     () =>
@@ -41,7 +44,7 @@ function CastCarousel({ cast, limit = 20, fullBleed = false }: CastCarouselProps
             "from-background/90 absolute top-0 bottom-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-r to-transparent opacity-0 transition-opacity duration-200 group-hover/carousel:opacity-100 focus-visible:opacity-100",
             fullBleed ? "left-4 sm:left-6 lg:left-10 xl:left-12" : "left-0",
           )}
-          aria-label="Scroll left"
+          aria-label={tr("components.cast_carousel.scroll_left")}
         >
           <ChevronLeft className="text-foreground h-6 w-6" />
         </button>
@@ -80,7 +83,7 @@ function CastCarousel({ cast, limit = 20, fullBleed = false }: CastCarouselProps
             "from-background/90 absolute top-0 bottom-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-l to-transparent opacity-0 transition-opacity duration-200 group-hover/carousel:opacity-100 focus-visible:opacity-100",
             fullBleed ? "right-4 sm:right-6 lg:right-10 xl:right-12" : "right-0",
           )}
-          aria-label="Scroll right"
+          aria-label={tr("components.cast_carousel.scroll_right")}
         >
           <ChevronRight className="text-foreground h-6 w-6" />
         </button>
@@ -92,6 +95,7 @@ function CastCarousel({ cast, limit = 20, fullBleed = false }: CastCarouselProps
 export default memo(CastCarousel);
 
 function CastCard({ member, href }: { member: CastMember; href: string | null }) {
+  useUILanguage();
   const inner = (
     <>
       <div className="media-card-image mb-2.5 aspect-[2/3] overflow-hidden rounded-lg">

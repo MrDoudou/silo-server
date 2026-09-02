@@ -1,6 +1,8 @@
 import type { ConnectionCheckResponse } from "@/api/types";
 import { Button } from "@/components/ui/button";
 
+import { tr } from "@/i18n/translate";
+
 type Props = {
   onClick: () => void | Promise<void>;
   result: ConnectionCheckResponse | null;
@@ -18,6 +20,8 @@ export function ConnectionCheckAction({
   label = "Check Connection",
   pendingLabel = "Checking...",
 }: Props) {
+  const resultMessage = result ? tr.remote(result) : undefined;
+
   return (
     // py matches SettingFieldRow so the action reads as one more row in the
     // group instead of hugging the hairline under the last field.
@@ -38,9 +42,9 @@ export function ConnectionCheckAction({
         <span
           role="status"
           aria-live="polite"
-          className={`text-sm ${result.success ? "text-green-600" : "text-red-600"}`}
+          className={"text-sm " + (result.success ? "text-green-600" : "text-red-600")}
         >
-          {result.message}
+          {resultMessage}
         </span>
       ) : null}
     </div>

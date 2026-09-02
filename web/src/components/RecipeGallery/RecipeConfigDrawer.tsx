@@ -2,6 +2,8 @@ import { useState } from "react";
 import BulkApplyDialog from "./BulkApplyDialog";
 import RecipeParamFields from "./RecipeParamFields";
 import type { RecipeDefinition, GalleryPreset } from "@/lib/recipes";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface AddPayload {
   section_type: string;
@@ -38,6 +40,7 @@ export default function RecipeConfigDrawer({
   showBulkApply = true,
   showEnabled = true,
 }: Props) {
+  useUILanguage();
   const [title, setTitle] = useState(preset.display_name);
   const [params, setParams] = useState<Record<string, unknown>>({ ...preset.default_params });
   const [limit, setLimit] = useState<number>(20);
@@ -93,7 +96,7 @@ export default function RecipeConfigDrawer({
           onClick={onBackToGallery ?? onCancel}
           className="text-xs text-white/60"
         >
-          ← Back to gallery
+          {tr("components.recipe_gallery.recipe_config_drawer.back_to_gallery")}
         </button>
       </div>
 
@@ -103,7 +106,7 @@ export default function RecipeConfigDrawer({
 
       <div className="mt-4">
         <label htmlFor="rcd-title" className="mb-1 block text-xs text-white/70">
-          Title
+          {tr("components.recipe_gallery.recipe_config_drawer.title")}
         </label>
         <input
           id="rcd-title"
@@ -119,16 +122,24 @@ export default function RecipeConfigDrawer({
 
       {collectionMissing ? (
         <p className="mt-2 text-xs text-amber-300">
-          Choose a synced collection before adding this section.
+          {tr(
+            "components.recipe_gallery.recipe_config_drawer.choose_a_synced_collection_before_adding_this_section",
+          )}
         </p>
       ) : null}
 
       {curatedListEmpty ? (
-        <p className="mt-2 text-xs text-amber-300">Add at least one title to the curated list.</p>
+        <p className="mt-2 text-xs text-amber-300">
+          {tr(
+            "components.recipe_gallery.recipe_config_drawer.add_at_least_one_title_to_the_curated_list",
+          )}
+        </p>
       ) : null}
 
       <div className="mt-4">
-        <label className="mb-1 block text-xs text-white/70">Item limit</label>
+        <label className="mb-1 block text-xs text-white/70">
+          {tr("components.recipe_gallery.recipe_config_drawer.item_limit")}
+        </label>
         <input
           type="number"
           min={1}
@@ -140,13 +151,13 @@ export default function RecipeConfigDrawer({
       </div>
 
       <label className="mt-3 flex items-center justify-between text-sm">
-        <span>Show as featured hero</span>
+        <span>{tr("components.recipe_gallery.recipe_config_drawer.show_as_featured_hero")}</span>
         <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
       </label>
 
       {showBulkApply ? (
         <label className="mt-2 flex items-center justify-between text-sm">
-          <span>Apply to all libraries</span>
+          <span>{tr("components.recipe_gallery.recipe_config_drawer.apply_to_all_libraries")}</span>
           <input
             type="checkbox"
             checked={applyAll}
@@ -157,7 +168,7 @@ export default function RecipeConfigDrawer({
 
       {showEnabled ? (
         <label className="mt-2 flex items-center justify-between text-sm">
-          <span>Enabled</span>
+          <span>{tr("components.recipe_gallery.recipe_config_drawer.enabled")}</span>
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
         </label>
       ) : null}
@@ -168,7 +179,7 @@ export default function RecipeConfigDrawer({
           onClick={onCancel}
           className="rounded border border-white/15 px-3 py-1 text-sm"
         >
-          Cancel
+          {tr("common.actions.cancel")}
         </button>
         <button
           type="button"
@@ -176,7 +187,7 @@ export default function RecipeConfigDrawer({
           disabled={collectionMissing || curatedListEmpty}
           className="rounded bg-indigo-600 px-3 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Add section
+          {tr("components.recipe_gallery.recipe_config_drawer.add_section")}
         </button>
       </div>
 

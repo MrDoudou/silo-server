@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { buildAreaPath, buildLinePath, chartSeriesColor, niceTicks } from "./chartMath";
 import { ChartLegend, ChartTooltip, ChartTooltipRow } from "./chartChrome";
 import { useMeasuredSize } from "./useMeasuredSize";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface LineChartPoint {
   /** Sample timestamp in epoch milliseconds. */
@@ -100,6 +102,7 @@ export function LineChart({
   ariaLabel,
   className,
 }: LineChartProps) {
+  useUILanguage();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const color = chartSeriesColor(seriesIndex);
   const { ref: plotRef, size: plotSize } = useMeasuredSize<HTMLDivElement>();
@@ -251,7 +254,7 @@ export function LineChart({
             role="img"
             aria-label={ariaLabel}
             className="absolute inset-0 h-full w-full overflow-visible"
-            viewBox={`0 0 ${viewWidth} ${viewHeight}`}
+            viewBox={"0 0 " + viewWidth + " " + viewHeight}
             preserveAspectRatio="none"
           >
             {geometry.ticks.map((tick) => {
@@ -348,7 +351,12 @@ export function LineChart({
             className="focus-visible:ring-ring absolute inset-0 cursor-crosshair rounded-sm focus-visible:ring-2 focus-visible:outline-none"
             tabIndex={0}
             role="application"
-            aria-label={`${ariaLabel} — use arrow keys to inspect samples`}
+            aria-label={tr(
+              "components.admin.dashboard.charts.line_chart.aria_label_use_arrow_keys_to_inspect_samples",
+              {
+                ariaLabel: ariaLabel,
+              },
+            )}
             onPointerMove={handlePointerMove}
             onPointerLeave={() => setActiveIndex(null)}
             onBlur={() => setActiveIndex(null)}

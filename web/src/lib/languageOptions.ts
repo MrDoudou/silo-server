@@ -6,6 +6,8 @@ import {
 } from "@/lib/settingsContract";
 import { getLanguageName, languageIdentity } from "@/lib/languageNames";
 
+import { tr } from "@/i18n/translate";
+
 /** One choice in a settings dropdown. */
 export interface SettingOption {
   value: string;
@@ -86,5 +88,13 @@ export function languageOptionsFor(
   const named = namedLanguageOptionsFor(key, currentValue, runtimeValues, revision);
   const definition = SETTING_DEFINITIONS[key];
   if (!definition.nullable) return named;
-  return [{ value: "", label: definition.unsetLabel ?? "Unset" }, ...named];
+  return [
+    {
+      value: "",
+      get label() {
+        return tr(definition.unsetLabel ?? "lib.language_options.unset");
+      },
+    },
+    ...named,
+  ];
 }

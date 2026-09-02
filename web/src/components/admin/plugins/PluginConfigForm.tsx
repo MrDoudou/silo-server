@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { adminFormForConfigSchema, humanizeConfigKey } from "./configSchemaAdminForm";
 import { SchemaForm } from "./SchemaForm";
 import { buildSchemaValues } from "./schemaFormUtils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type PluginConfigValue = Record<string, unknown>;
 
@@ -76,6 +78,7 @@ export function PluginConfigForm({
   isSaving = false,
   isTesting = false,
 }: Props) {
+  useUILanguage();
   const inferredDescriptor = useMemo(() => adminFormForConfigSchema(schema), [schema]);
   const fields = inferredDescriptor?.fields ?? EMPTY_FIELDS;
   const supported = inferredDescriptor != null;
@@ -87,7 +90,12 @@ export function PluginConfigForm({
       ...base,
       fields: base.fields.map((field) =>
         configured.has(field.key) && (field.secret || field.control === "PASSWORD")
-          ? { ...field, placeholder: "Saved secret — leave blank to keep" }
+          ? {
+              ...field,
+              placeholder: tr(
+                "components.admin.plugins.plugin_config_form.saved_secret_leave_blank_to_keep",
+              ),
+            }
           : field,
       ),
     };
@@ -131,7 +139,7 @@ export function PluginConfigForm({
     } catch (error) {
       setTestResult({
         success: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error("errors.plugins.connection_check_failed", error),
       });
     }
   }
@@ -141,7 +149,9 @@ export function PluginConfigForm({
       <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
         <Label>{schema.title || schema.key}</Label>
         <p className="text-muted-foreground text-sm">
-          This plugin uses a configuration schema shape that the admin form does not support yet.
+          {tr(
+            "components.admin.plugins.plugin_config_form.this_plugin_uses_a_configuration_schema_shape_that_the_admin",
+          )}
         </p>
       </div>
     );
@@ -172,8 +182,11 @@ export function PluginConfigForm({
             return (
               <div key={key} className="flex items-center justify-between gap-3 text-xs">
                 <span className={clearing ? "text-destructive" : "text-muted-foreground"}>
-                  {field?.label || humanizeConfigKey(key)}: {clearing ? "will be cleared" : "saved"}
-                  {required ? " (required)" : ""}
+                  {field?.label || humanizeConfigKey(key)}:{" "}
+                  {clearing
+                    ? tr("components.admin.plugins.plugin_config_form.will_be_cleared")
+                    : tr("components.admin.plugins.plugin_config_form.saved")}
+                  {required ? tr("components.admin.plugins.plugin_config_form.required") : ""}
                 </span>
                 {!required ? (
                   <Button
@@ -189,7 +202,9 @@ export function PluginConfigForm({
                       })
                     }
                   >
-                    {clearing ? "Keep saved secret" : "Clear saved secret"}
+                    {clearing
+                      ? tr("components.admin.plugins.plugin_config_form.keep_saved_secret")
+                      : tr("components.admin.plugins.plugin_config_form.clear_saved_secret")}
                   </Button>
                 ) : null}
               </div>
@@ -215,7 +230,8 @@ export function PluginConfigForm({
             onSave(schema.key, buildSchemaValues(descriptor, values), Array.from(clearSecrets))
           }
         >
-          {schema.admin_form?.submit_label || "Save config"}
+          {schema.admin_form?.submit_label ||
+            tr("components.admin.plugins.plugin_config_form.save_config")}
         </Button>
       </div>
     </fieldset>

@@ -13,6 +13,8 @@ import { FieldGroup } from "./FieldGroup";
 import { SaveBar } from "./SaveBar";
 import { SettingField } from "./SettingField";
 import { effectiveDownloadArtifactDir } from "./settingsPathDefaults";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Decimal GB, matching how drives and object stores are sold and reported.
 const BYTES_PER_GB = 1_000_000_000;
@@ -46,6 +48,7 @@ const ADVANCED_KEYS = [...PER_USER_ADVANCED_KEYS, ...GLOBAL_ADVANCED_KEYS];
 const KEYS = [...ESSENTIAL_KEYS, ...ADVANCED_KEYS];
 
 export default function DownloadsSettings() {
+  useUILanguage();
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
   const restartKeys = useRestartKeys();
 
@@ -63,31 +66,44 @@ export default function DownloadsSettings() {
 
   if (form.isLoading)
     return (
-      <div className="space-y-6" role="status" aria-label="Loading settings">
+      <div
+        className="space-y-6"
+        role="status"
+        aria-label={tr("pages.admin_settings.downloads_settings.loading_settings")}
+      >
         <Skeleton className="h-8 w-40" />
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-        <span className="sr-only">Loading settings</span>
+        <span className="sr-only">
+          {tr("pages.admin_settings.downloads_settings.loading_settings")}
+        </span>
       </div>
     );
 
   return (
     <div className="flex h-full flex-col">
-      <SettingsPageHeader title="Downloads" className="mb-8" />
+      <SettingsPageHeader
+        title={tr("pages.admin_settings.downloads_settings.downloads")}
+        className="mb-8"
+      />
 
       <div className="flex-1 space-y-5">
-        <FieldGroup label="Downloads" restartAll={allRestart(KEYS)} dirty={anyDirty(KEYS)}>
+        <FieldGroup
+          label={tr("pages.admin_settings.downloads_settings.downloads")}
+          restartAll={allRestart(KEYS)}
+          dirty={anyDirty(KEYS)}
+        >
           <SettingField
-            label="Allow downloads"
+            label={tr("pages.admin_settings.downloads_settings.allow_downloads")}
             type="toggle"
             value={form.getValue("download.enabled")}
             onChange={(v) => form.setValue("download.enabled", v)}
             restartRequired={restartKeys.has("download.enabled")}
           />
           <LimitField
-            label="Per-user bandwidth"
+            label={tr("pages.admin_settings.downloads_settings.per_user_bandwidth")}
             unit="Mbps"
             value={form.getValue("download.user_bandwidth_mbps")}
             onChange={(v) => form.setValue("download.user_bandwidth_mbps", v)}
@@ -99,59 +115,79 @@ export default function DownloadsSettings() {
             count={ADVANCED_KEYS.length}
             forceOpen={anyDirty(ADVANCED_KEYS)}
           >
-            <SettingsSubheading>Per user</SettingsSubheading>
+            <SettingsSubheading>
+              {tr("pages.admin_settings.downloads_settings.per_user")}
+            </SettingsSubheading>
             <LimitField
-              label="Downloads at once per user"
-              hint="Counted per user, alongside the per-user bandwidth cap above."
+              label={tr("pages.admin_settings.downloads_settings.downloads_at_once_per_user")}
+              hint={tr(
+                "pages.admin_settings.downloads_settings.counted_per_user_alongside_the_per_user_bandwidth_cap_above",
+              )}
               value={form.getValue("download.max_concurrent_per_user")}
               onChange={(v) => form.setValue("download.max_concurrent_per_user", v)}
               restartRequired={restartKeys.has("download.max_concurrent_per_user")}
             />
             <LimitField
-              label="Downloads per period"
-              hint="How many each user may start in the period below."
+              label={tr("pages.admin_settings.downloads_settings.downloads_per_period")}
+              hint={tr(
+                "pages.admin_settings.downloads_settings.how_many_each_user_may_start_in_the_period_below",
+              )}
               value={form.getValue("download.max_per_period")}
               onChange={(v) => form.setValue("download.max_per_period", v)}
               restartRequired={restartKeys.has("download.max_per_period")}
             />
             <SettingField
-              label="Period length"
+              label={tr("pages.admin_settings.downloads_settings.period_length")}
               type="duration"
-              description="Rolling window each user's count is measured over, e.g. 24h or 168h."
+              description={tr(
+                "pages.admin_settings.downloads_settings.rolling_window_each_user_s_count_is_measured_over_e",
+              )}
               value={form.getValue("download.period_duration")}
               onChange={(v) => form.setValue("download.period_duration", v)}
               restartRequired={restartKeys.has("download.period_duration")}
             />
 
-            <SettingsSubheading>Whole server</SettingsSubheading>
+            <SettingsSubheading>
+              {tr("pages.admin_settings.downloads_settings.whole_server")}
+            </SettingsSubheading>
             <LimitField
-              label="Server bandwidth"
+              label={tr("pages.admin_settings.downloads_settings.server_bandwidth")}
               unit="Mbps"
-              hint="All downloads on this server combined."
+              hint={tr(
+                "pages.admin_settings.downloads_settings.all_downloads_on_this_server_combined",
+              )}
               value={form.getValue("download.server_bandwidth_mbps")}
               onChange={(v) => form.setValue("download.server_bandwidth_mbps", v)}
               restartRequired={restartKeys.has("download.server_bandwidth_mbps")}
             />
             <SettingField
-              label="Prepare device-friendly copies"
+              label={tr("pages.admin_settings.downloads_settings.prepare_device_friendly_copies")}
               type="toggle"
-              description="Converts a file the device cannot play before download."
+              description={tr(
+                "pages.admin_settings.downloads_settings.converts_a_file_the_device_cannot_play_before_download",
+              )}
               value={form.getValue("download.transcode_enabled")}
               onChange={(v) => form.setValue("download.transcode_enabled", v)}
               restartRequired={restartKeys.has("download.transcode_enabled")}
             />
             <SettingField
-              label="Prepare locally when workers are unavailable"
+              label={tr(
+                "pages.admin_settings.downloads_settings.prepare_locally_when_workers_are_unavailable",
+              )}
               type="toggle"
-              description="This is separate from live playback routing."
+              description={tr(
+                "pages.admin_settings.downloads_settings.this_is_separate_from_live_playback_routing",
+              )}
               value={form.getValue("download.local_transcode_fallback") || "true"}
               onChange={(v) => form.setValue("download.local_transcode_fallback", v)}
               restartRequired={restartKeys.has("download.local_transcode_fallback")}
             />
             <PathSettingField
-              label="Prepared file directory"
+              label={tr("pages.admin_settings.downloads_settings.prepared_file_directory")}
               defaultValue={derivedArtifactDir}
-              description="Leave blank for a silo-download-artifacts folder beside the transcode directory."
+              description={tr(
+                "pages.admin_settings.downloads_settings.leave_blank_for_a_silo_download_artifacts_folder_beside_the",
+              )}
               value={form.getValue("download.artifact_dir")}
               onChange={(v) => form.setValue("download.artifact_dir", v)}
               restartRequired={restartKeys.has("download.artifact_dir")}
@@ -159,9 +195,11 @@ export default function DownloadsSettings() {
             {/* Not a LimitField: the server reads 0 as "use the built-in
                 worker count" (2), not as unlimited. */}
             <SettingField
-              label="Files prepared at once"
+              label={tr("pages.admin_settings.downloads_settings.files_prepared_at_once")}
               type="number"
-              description="0 uses the built-in default of 2."
+              description={tr(
+                "pages.admin_settings.downloads_settings.value_0_uses_the_built_in_default_of_2",
+              )}
               value={form.getValue("download.max_concurrent_prepares")}
               onChange={(v) => form.setValue("download.max_concurrent_prepares", v)}
               restartRequired={restartKeys.has("download.max_concurrent_prepares")}
@@ -170,10 +208,12 @@ export default function DownloadsSettings() {
                 because nobody sizes a disk budget in bytes. Unlimited stays
                 the default and still writes the 0 sentinel. */}
             <LimitField
-              label="Prepared file storage budget"
+              label={tr("pages.admin_settings.downloads_settings.prepared_file_storage_budget")}
               unit="GB"
               scale={BYTES_PER_GB}
-              hint="Least recently used files are deleted first."
+              hint={tr(
+                "pages.admin_settings.downloads_settings.least_recently_used_files_are_deleted_first",
+              )}
               value={form.getValue("download.artifact_max_bytes")}
               onChange={(v) => form.setValue("download.artifact_max_bytes", v)}
               restartRequired={restartKeys.has("download.artifact_max_bytes")}

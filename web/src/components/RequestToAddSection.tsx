@@ -12,6 +12,8 @@ import {
 } from "@/lib/mediaRequests";
 import { cn } from "@/lib/utils";
 import RequestPosterCard from "./RequestPosterCard";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function cardKey(item: Pick<RequestMediaResult, "media_type" | "tmdb_id">): string {
   return `${item.media_type}-${item.tmdb_id}`;
@@ -94,10 +96,11 @@ function HeaderCopy({
   libraryResultsKnown: boolean;
   count: number;
 }) {
+  useUILanguage();
   if (libraryHadHits) {
     return (
       <div className="text-muted-foreground flex items-center gap-2 px-3 pt-2 pb-1 text-[10px] font-medium tracking-[0.1em] uppercase">
-        <span>Request to Add</span>
+        <span>{tr("components.request_to_add_section.request_to_add")}</span>
         <span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[10px]">
           {count}
         </span>
@@ -106,12 +109,16 @@ function HeaderCopy({
   }
 
   if (!libraryResultsKnown) {
-    return <div className="px-3 pt-3 pb-1 text-[12px] text-amber-300/85">Discovery matches:</div>;
+    return (
+      <div className="px-3 pt-3 pb-1 text-[12px] text-amber-300/85">
+        {tr("components.request_to_add_section.discovery_matches")}
+      </div>
+    );
   }
 
   return (
     <div className="px-3 pt-3 pb-1 text-[12px] text-amber-300/85">
-      Not in your library, but you can request:
+      {tr("components.request_to_add_section.not_in_your_library_but_you_can_request")}
     </div>
   );
 }
@@ -125,6 +132,7 @@ function DialogVariant({
   libraryHadHits: boolean;
   libraryResultsKnown: boolean;
 }) {
+  useUILanguage();
   return (
     <div className="border-t border-white/5 pt-1">
       <HeaderCopy
@@ -144,6 +152,7 @@ function DialogVariant({
 }
 
 function DialogRow({ item }: { item: RequestMediaResult }) {
+  useUILanguage();
   const poster = tmdbImageURL(item.poster_path);
   const Icon = item.media_type === "series" ? Tv : Film;
   const requestable = item.request.requestable;
@@ -151,7 +160,7 @@ function DialogRow({ item }: { item: RequestMediaResult }) {
 
   return (
     <Link
-      to={`/requests/${item.media_type}/${item.tmdb_id}`}
+      to={"/requests/" + item.media_type + "/" + item.tmdb_id}
       className="hover:bg-muted/80 flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors"
     >
       <div
@@ -171,18 +180,20 @@ function DialogRow({ item }: { item: RequestMediaResult }) {
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{item.title}</div>
         <div className="text-muted-foreground text-xs">
-          {item.year ? `${item.year} · ` : ""}
-          {item.media_type === "series" ? "Series" : "Movie"}
+          {item.year ? tr("components.request_to_add_section.year", { year: item.year }) : ""}
+          {item.media_type === "series"
+            ? tr("components.request_to_add_section.series")
+            : tr("components.request_to_add_section.movie")}
         </div>
       </div>
       {requestable ? (
         <span className="rounded-full border border-amber-400/30 bg-amber-400/15 px-2 py-0.5 text-[9px] font-semibold tracking-[0.5px] text-amber-300 uppercase">
-          Request
+          {tr("components.request_to_add_section.request")}
         </span>
       ) : (
         <span
           className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-medium tracking-[0.5px] text-white/60 uppercase"
-          title={unavailableLabel ?? "Blocked"}
+          title={unavailableLabel ?? tr("components.request_to_add_section.blocked")}
         >
           {unavailableLabel}
         </span>
@@ -200,6 +211,7 @@ function GridVariant({
   libraryHadHits: boolean;
   libraryResultsKnown: boolean;
 }) {
+  useUILanguage();
   const count = items.length;
   const createRequest = useCreateMediaRequest();
   // Track each in-flight card key independently; the shared `useMutation`
@@ -245,22 +257,27 @@ function GridVariant({
             <Sparkles className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden />
             <span className="text-[10px] font-semibold tracking-[0.24em] uppercase">
               {libraryHadHits
-                ? "Discover · Outside your library"
+                ? tr("components.request_to_add_section.discover_outside_your_library")
                 : libraryResultsKnown
-                  ? "Outside your library"
-                  : "Discovery"}
+                  ? tr("components.request_to_add_section.outside_your_library")
+                  : tr("components.request_to_add_section.discovery")}
             </span>
           </div>
           <h2 className="font-display text-foreground text-[clamp(1.25rem,1.6vw,1.55rem)] leading-tight font-semibold tracking-tight">
             {libraryHadHits
-              ? "Request to Add"
+              ? tr("components.request_to_add_section.request_to_add")
               : libraryResultsKnown
-                ? "Not in your library, but you can request"
-                : "More search matches"}
+                ? tr(
+                    "components.request_to_add_section.not_in_your_library_but_you_can_request_29f71166",
+                  )
+                : tr("components.request_to_add_section.more_search_matches")}
           </h2>
         </div>
         <span className="inline-flex items-center gap-1.5 self-end rounded-full border border-amber-400/15 bg-amber-400/[0.06] px-2.5 py-1 text-[11px] font-medium tracking-wide text-amber-100/75 tabular-nums">
-          {count} {count === 1 ? "result" : "results"}
+          {count}{" "}
+          {count === 1
+            ? tr("components.request_to_add_section.result")
+            : tr("components.request_to_add_section.results")}
         </span>
       </header>
 

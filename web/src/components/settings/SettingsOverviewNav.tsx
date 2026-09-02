@@ -3,6 +3,8 @@ import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router";
 
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface SettingsOverviewNavItem {
   id: string;
@@ -34,14 +36,17 @@ export function SettingsOverviewNav({
   idPrefix,
   variant = "grouped-list",
 }: SettingsOverviewNavProps) {
+  useUILanguage();
   const isDirectory = variant === "directory";
 
   if (groups.length === 0) {
     return (
       <div className="surface-panel-subtle rounded-2xl px-5 py-8 text-center">
-        <p className="font-medium">No matching settings</p>
+        <p className="font-medium">
+          {tr("components.settings.settings_overview_nav.no_matching_settings")}
+        </p>
         <p className="text-muted-foreground mt-1 text-sm">
-          Try a category, feature, or setting name.
+          {tr("components.settings.settings_overview_nav.try_a_category_feature_or_setting_name")}
         </p>
       </div>
     );

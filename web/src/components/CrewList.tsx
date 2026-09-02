@@ -1,6 +1,8 @@
 import ViewTransitionLink from "@/components/ViewTransitionLink";
 import type { CrewMember } from "@/api/types";
 import { buildPersonCatalogHref } from "@/pages/catalogSearchParams";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CrewListProps {
   crew: CrewMember[];
@@ -15,6 +17,7 @@ interface CrewEntry {
 const DISPLAY_JOBS = ["Director", "Writer", "Producer"] as const;
 
 export default function CrewList({ crew }: CrewListProps) {
+  useUILanguage();
   if (crew.length === 0) return null;
 
   const grouped = new Map<string, CrewEntry[]>();
@@ -39,7 +42,7 @@ export default function CrewList({ crew }: CrewListProps) {
 
   return (
     <div>
-      <h2 className="mb-4 text-xl font-semibold">Crew</h2>
+      <h2 className="mb-4 text-xl font-semibold">{tr("components.crew_list.crew")}</h2>
       <dl className="glass-subtle grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 rounded-xl px-5 py-4 text-sm">
         {entries.map(({ job, people }) => (
           <div key={job} className="contents">

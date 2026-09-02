@@ -52,6 +52,8 @@ import { parseWatchHref } from "@/pages/watchRouteHelpers";
 import VersionDropdown from "./VersionDropdown";
 import AudioTracksPopover from "./AudioTracksPopover";
 import SubtitlesPopover from "./SubtitlesPopover";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Keep hover feedback on the compositor. Repainting these controls while the detail backdrop is
 // animating can stall the main thread on image-heavy movie and series pages.
@@ -74,7 +76,10 @@ function DetailOverflowMenuItem({
       {...props}
       type="button"
       role="menuitem"
-      className={`focus:bg-accent focus:text-accent-foreground hover:bg-accent hover:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 ${className ?? ""}`}
+      className={
+        "focus:bg-accent focus:text-accent-foreground hover:bg-accent hover:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 " +
+        (className ?? "")
+      }
       onClick={() => {
         closeMenu();
         onAction?.();
@@ -190,6 +195,7 @@ export default function ActionBar({
   showForcedSubtitles,
   profileLanguage,
 }: ActionBarProps) {
+  useUILanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const playbackController = useWatchPlaybackController();
@@ -480,7 +486,10 @@ export default function ActionBar({
           showPlayChoiceDialog ? (
             <Button
               onClick={openPlayChoiceDialog}
-              className={`${responsivePlayActionClass} relative h-11 cursor-pointer gap-2.5 overflow-hidden rounded-full px-8 text-[15px] font-bold tracking-wide shadow-md`}
+              className={
+                responsivePlayActionClass +
+                " relative h-11 cursor-pointer gap-2.5 overflow-hidden rounded-full px-8 text-[15px] font-bold tracking-wide shadow-md"
+              }
             >
               <Play className="size-[18px] fill-current" />
               {displayedPlayLabel}
@@ -489,7 +498,10 @@ export default function ActionBar({
           ) : selectedVersion ? (
             <Button
               onClick={() => handleSelectedVersionPlay(false)}
-              className={`${responsivePlayActionClass} relative h-11 cursor-pointer gap-2.5 overflow-hidden rounded-full px-8 text-[15px] font-bold tracking-wide shadow-md`}
+              className={
+                responsivePlayActionClass +
+                " relative h-11 cursor-pointer gap-2.5 overflow-hidden rounded-full px-8 text-[15px] font-bold tracking-wide shadow-md"
+              }
             >
               <Play className="size-[18px] fill-current" />
               {displayedPlayLabel}
@@ -498,7 +510,10 @@ export default function ActionBar({
           ) : (
             <Button
               onClick={() => startPlaybackFromHref(playHref)}
-              className={`${responsivePlayActionClass} relative h-11 cursor-pointer gap-2.5 overflow-hidden rounded-full px-8 text-[15px] font-bold tracking-wide shadow-md`}
+              className={
+                responsivePlayActionClass +
+                " relative h-11 cursor-pointer gap-2.5 overflow-hidden rounded-full px-8 text-[15px] font-bold tracking-wide shadow-md"
+              }
             >
               <Play className="size-[18px] fill-current" />
               {displayedPlayLabel}
@@ -525,7 +540,10 @@ export default function ActionBar({
             variant="glass"
             onClick={onToggleWatched}
             disabled={isUpdatingWatched}
-            className={`${responsivePrimaryActionClass} h-11 min-w-[161px] rounded-full px-5 text-[14px] font-semibold enabled:cursor-pointer`}
+            className={
+              responsivePrimaryActionClass +
+              " h-11 min-w-[161px] rounded-full px-5 text-[14px] font-semibold enabled:cursor-pointer"
+            }
           >
             <Check className="size-[18px]" />
             {watchedLabel}
@@ -538,12 +556,22 @@ export default function ActionBar({
             variant="glass"
             size="icon-lg"
             onClick={onToggleFavorite}
-            title={isFavorite ? "Unfavorite" : "Favorite"}
-            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-            className={`${staticGlassActionClass} size-11 cursor-pointer rounded-full`}
+            title={
+              isFavorite
+                ? tr("pages.item_detail.components.action_bar.unfavorite")
+                : tr("pages.item_detail.components.action_bar.favorite")
+            }
+            aria-label={
+              isFavorite
+                ? tr("pages.item_detail.components.action_bar.remove_from_favorites")
+                : tr("pages.item_detail.components.action_bar.add_to_favorites")
+            }
+            className={staticGlassActionClass + " size-11 cursor-pointer rounded-full"}
           >
             <Heart
-              className={`size-[18px] transition-colors ${isFavorite ? "fill-current text-red-400" : ""}`}
+              className={
+                "size-[18px] transition-colors " + (isFavorite ? "fill-current text-red-400" : "")
+              }
             />
           </Button>
         )}
@@ -557,12 +585,12 @@ export default function ActionBar({
             ref={overflowTriggerRef}
             variant="glass"
             size="icon-lg"
-            title="More"
-            aria-label="More actions"
+            title={tr("pages.item_detail.components.action_bar.more")}
+            aria-label={tr("pages.item_detail.components.action_bar.more_actions")}
             aria-haspopup="menu"
             aria-expanded={overflowOpen}
             aria-controls={overflowOpen ? overflowMenuId : undefined}
-            className={`${staticGlassActionClass} size-11 cursor-pointer rounded-full`}
+            className={staticGlassActionClass + " size-11 cursor-pointer rounded-full"}
             onClick={toggleOverflowMenu}
           >
             <MoreVertical className="size-[18px]" />
@@ -589,13 +617,15 @@ export default function ActionBar({
                   onAction={handleRestartPlayback}
                 >
                   <RotateCcw className="size-4" />
-                  Play from Beginning
+                  {tr("pages.item_detail.components.action_bar.play_from_beginning")}
                 </DetailOverflowMenuItem>
               )}
               {onToggleWatchlist && (
                 <DetailOverflowMenuItem closeMenu={closeOverflowMenu} onAction={onToggleWatchlist}>
                   {inWatchlist ? <Check className="size-4" /> : <Plus className="size-4" />}
-                  {inWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
+                  {inWatchlist
+                    ? tr("pages.item_detail.components.action_bar.remove_from_watchlist")
+                    : tr("pages.item_detail.components.action_bar.add_to_watchlist")}
                 </DetailOverflowMenuItem>
               )}
               {contentId && (
@@ -604,19 +634,19 @@ export default function ActionBar({
                   onAction={() => setAddToCollectionOpen(true)}
                 >
                   <FolderPlus className="size-4" />
-                  Add to Collection
+                  {tr("pages.item_detail.components.action_bar.add_to_collection")}
                 </DetailOverflowMenuItem>
               )}
               {onDownload && (
                 <DetailOverflowMenuItem closeMenu={closeOverflowMenu} onAction={onDownload}>
                   <Download className="size-4" />
-                  Download
+                  {tr("common.actions.download")}
                 </DetailOverflowMenuItem>
               )}
               {onSearchSubtitles && (
                 <DetailOverflowMenuItem closeMenu={closeOverflowMenu} onAction={onSearchSubtitles}>
                   <Captions className="size-4" />
-                  Search Subtitles
+                  {tr("pages.item_detail.components.action_bar.search_subtitles")}
                 </DetailOverflowMenuItem>
               )}
               {(hasAdminActions || hasMetadataActions) && (
@@ -630,7 +660,7 @@ export default function ActionBar({
                       onAction={onShowMediaInfo}
                     >
                       <Info className="size-4" />
-                      Media Info
+                      {tr("pages.item_detail.components.action_bar.media_info")}
                     </DetailOverflowMenuItem>
                   )}
                   {isAdmin && contentId && (
@@ -641,7 +671,7 @@ export default function ActionBar({
                       }
                     >
                       <MediaActionIcon action="viewPlayHistory" />
-                      View Play History
+                      {tr("pages.item_detail.components.action_bar.view_play_history")}
                     </DetailOverflowMenuItem>
                   )}
                   {canCurateMetadata && onRefresh && (
@@ -653,7 +683,7 @@ export default function ActionBar({
                       }}
                     >
                       <MediaActionIcon action="refreshMetadata" isPending={isRefreshing} />
-                      Refresh Metadata
+                      {tr("pages.item_detail.components.action_bar.refresh_metadata")}
                     </DetailOverflowMenuItem>
                   )}
                   {isAdmin && onRedetectIntro && (
@@ -662,14 +692,16 @@ export default function ActionBar({
                       disabled={isRedetectingIntro}
                       onAction={onRedetectIntro}
                     >
-                      <RefreshCw className={`size-4 ${isRedetectingIntro ? "animate-spin" : ""}`} />
-                      Re-detect Intro Markers
+                      <RefreshCw
+                        className={"size-4 " + (isRedetectingIntro ? "animate-spin" : "")}
+                      />
+                      {tr("pages.item_detail.components.action_bar.re_detect_intro_markers")}
                     </DetailOverflowMenuItem>
                   )}
                   {canCurateMetadata && onEditMetadata && (
                     <DetailOverflowMenuItem closeMenu={closeOverflowMenu} onAction={onEditMetadata}>
                       <MediaActionIcon action="editMetadata" />
-                      Edit Metadata
+                      {tr("pages.item_detail.components.action_bar.edit_metadata")}
                     </DetailOverflowMenuItem>
                   )}
                   {showMarkerEditor && (
@@ -678,19 +710,19 @@ export default function ActionBar({
                       onAction={() => setMarkerEditorOpen(true)}
                     >
                       <Tags className="size-4" />
-                      Edit Markers
+                      {tr("pages.item_detail.components.action_bar.edit_markers")}
                     </DetailOverflowMenuItem>
                   )}
                   {canCurateMetadata && onMatchItem && (
                     <DetailOverflowMenuItem closeMenu={closeOverflowMenu} onAction={onMatchItem}>
                       <MediaActionIcon action="matchItem" />
-                      Match Item
+                      {tr("pages.item_detail.components.action_bar.match_item")}
                     </DetailOverflowMenuItem>
                   )}
                   {canCurateMetadata && onSplitItem && (
                     <DetailOverflowMenuItem closeMenu={closeOverflowMenu} onAction={onSplitItem}>
                       <Scissors className="size-4" />
-                      Split Versions
+                      {tr("pages.item_detail.components.action_bar.split_versions")}
                     </DetailOverflowMenuItem>
                   )}
                 </>
@@ -702,7 +734,9 @@ export default function ActionBar({
           <Dialog open={playChoiceOpen} onOpenChange={setPlayChoiceOpen}>
             <DialogContent className="max-w-xs gap-3 p-5">
               <DialogHeader className="gap-1.5">
-                <DialogTitle className="text-base">Resume Playback?</DialogTitle>
+                <DialogTitle className="text-base">
+                  {tr("pages.item_detail.components.action_bar.resume_playback")}
+                </DialogTitle>
                 <DialogDescription className="text-xs">{dialogDescription}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-2">
@@ -711,7 +745,7 @@ export default function ActionBar({
                   className="h-9 justify-start gap-2.5 px-3 text-sm"
                 >
                   <Play className="size-3.5 fill-current" />
-                  Resume at {formattedResumeTime}
+                  {tr("pages.item_detail.components.action_bar.resume_at")} {formattedResumeTime}
                 </Button>
                 <Button
                   variant="outline"
@@ -719,7 +753,7 @@ export default function ActionBar({
                   className="h-9 justify-start gap-2.5 px-3 text-sm"
                 >
                   <RotateCcw className="size-3.5" />
-                  Play from Beginning
+                  {tr("pages.item_detail.components.action_bar.play_from_beginning")}
                 </Button>
               </div>
             </DialogContent>

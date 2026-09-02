@@ -649,4 +649,40 @@ describe("api", () => {
     ).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("preserves safe translation parameters and plugin identity on API errors", async () => {
+    Object.defineProperty(globalThis, "sessionStorage", {
+      value: {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
+        clear: () => {},
+      },
+      configurable: true,
+    });
+
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: "connection_refused",
+            message: "Could not connect",
+            params: { attempts: 3, retryable: true, ignored: { nested: true } },
+            plugin_id: " silo.sonarr ",
+          }),
+          {
+            status: 502,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api("/test")).rejects.toMatchObject({
+      code: "connection_refused",
+      message: "Could not connect",
+      params: { attempts: 3, retryable: true },
+      pluginId: "silo.sonarr",
+    });
+  });
 });

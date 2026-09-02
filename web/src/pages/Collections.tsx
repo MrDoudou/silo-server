@@ -50,6 +50,8 @@ import {
   buildUserCollectionCatalogHref,
   buildUserCollectionEditorPath,
 } from "./userCollectionsShared";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type ImportedCollectionType = Extract<UserCollectionType, "mdblist" | "tmdb" | "trakt">;
 const SYNCABLE_TYPES = new Set<ImportedCollectionType>(["mdblist", "tmdb", "trakt"]);
@@ -63,6 +65,7 @@ export default function Collections() {
 }
 
 function CollectionList() {
+  useUILanguage();
   const { data, isLoading } = useCollections();
   const { data: groupsData } = useCollectionGroups();
   const collections = useMemo(() => data ?? [], [data]);
@@ -79,7 +82,7 @@ function CollectionList() {
   const deleteGroupMutation = useDeleteCollectionGroup();
   const reorderGroupsMutation = useReorderCollectionGroups();
 
-  useDocumentTitle("Collections");
+  useDocumentTitle(tr("pages.collections.collections"));
 
   if (isLoading)
     return (
@@ -99,9 +102,11 @@ function CollectionList() {
         onOpenChange={(open) => {
           if (!open) setConfirmDeleteCollection(null);
         }}
-        title="Delete collection"
-        description={`Delete collection "${confirmDeleteCollection?.name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
+        title={tr("pages.collections.delete_collection")}
+        description={tr("pages.collections.delete_collection_name_this_action_cannot_be_undone", {
+          name: confirmDeleteCollection?.name,
+        })}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         onConfirm={() => {
           if (confirmDeleteCollection) deleteMutation.mutate(confirmDeleteCollection.id);
@@ -113,44 +118,47 @@ function CollectionList() {
 
       <div className="page-header">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,5vw,3.25rem)]">Collections</h1>
+          <h1 className="page-title text-[clamp(2rem,5vw,3.25rem)]">
+            {tr("pages.collections.collections")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Build personal or shared shelves around moods, series arcs, or anything else worth
-            grouping.
+            {tr("pages.collections.build_personal_or_shared_shelves_around_moods_series_arcs_or")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => setGalleryOpen(true)}>
-            <Sparkles className="mr-1 h-4 w-4" /> Browse Templates
+            <Sparkles className="mr-1 h-4 w-4" /> {tr("pages.collections.browse_templates")}
           </Button>
           <Button size="sm" onClick={() => navigate(buildUserCollectionEditorPath("new"))}>
-            <Plus className="mr-1 h-4 w-4" /> New Collection
+            <Plus className="mr-1 h-4 w-4" /> {tr("pages.collections.new_collection")}
           </Button>
         </div>
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your collections</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.collections.your_collections")}
+        </h2>
         {collections.length === 0 ? (
           <div className="surface-panel flex flex-col items-center justify-center gap-3 rounded-[2rem] py-16 text-center">
             <Library className="text-muted-foreground/50 h-10 w-10" />
             <div className="space-y-1">
-              <p className="text-sm font-medium">No collections yet</p>
+              <p className="text-sm font-medium">{tr("pages.collections.no_collections_yet")}</p>
               <p className="text-muted-foreground max-w-sm text-xs">
-                Start from a curated TMDB, Trakt, or MDBList template — or build your own from
-                scratch.
+                {tr("pages.collections.start_from_a_curated_tmdb_trakt_or_mdblist_template_or")}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setGalleryOpen(true)}>
-                <Sparkles className="mr-1 h-4 w-4" /> Start from a template
+                <Sparkles className="mr-1 h-4 w-4" />{" "}
+                {tr("pages.collections.start_from_a_template")}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate(buildUserCollectionEditorPath("new"))}
               >
-                <Plus className="mr-1 h-4 w-4" /> Create from scratch
+                <Plus className="mr-1 h-4 w-4" /> {tr("pages.collections.create_from_scratch")}
               </Button>
             </div>
           </div>
@@ -198,6 +206,7 @@ function CollectionList() {
 // title (and the "Explore all" action when the library has more) links into
 // that library's full Collections tab.
 function ServerCollectionsSection() {
+  useUILanguage();
   const { data, isLoading } = useServerCollections();
   const { cardPresentation } = useUICustomization();
   const posterWidthClasses = carouselCardWidthClasses(cardPresentation.poster_size);
@@ -209,9 +218,11 @@ function ServerCollectionsSection() {
     return (
       <section className="space-y-6">
         <div className="space-y-1">
-          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Server collections</h2>
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {tr("pages.collections.server_collections")}
+          </h2>
           <p className="text-muted-foreground text-sm">
-            Curated shelves from across every library on this server.
+            {tr("pages.collections.curated_shelves_from_across_every_library_on_this_server")}
           </p>
         </div>
         <div className="space-y-8">
@@ -238,9 +249,11 @@ function ServerCollectionsSection() {
   return (
     <section className="space-y-6">
       <div className="space-y-1">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Server collections</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.collections.server_collections")}
+        </h2>
         <p className="text-muted-foreground text-sm">
-          Curated shelves from across every library on this server.
+          {tr("pages.collections.curated_shelves_from_across_every_library_on_this_server")}
         </p>
       </div>
       <div className="space-y-8">
@@ -258,6 +271,7 @@ function ServerCollectionsSection() {
 // section sits inside the Collections page's `page-shell`, which already
 // supplies horizontal padding — the row title and cards align to that column.
 function ServerLibraryRow({ library }: { library: ServerCollectionsLibrary }) {
+  useUILanguage();
   const navigate = useNavigate();
   const { cardPresentation } = useUICustomization();
   const posterWidthClasses = carouselCardWidthClasses(cardPresentation.poster_size);
@@ -298,6 +312,7 @@ function SortableCollectionCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  useUILanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useGroupedCollectionCard(collection.id);
   const style: React.CSSProperties = {
@@ -316,7 +331,7 @@ function SortableCollectionCard({
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            aria-label={`Drag ${collection.name}`}
+            aria-label={tr("pages.collections.drag_name", { name: collection.name })}
             className="hover:bg-surface-hover relative z-10 -ml-1 cursor-grab touch-none rounded-md p-1 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100"
             {...attributes}
             {...listeners}
@@ -341,21 +356,21 @@ function SortableCollectionCard({
               variant="ghost"
               size="icon"
               className="h-9 w-9"
-              aria-label="Sync collection"
+              aria-label={tr("pages.collections.sync_collection")}
               disabled={isSyncing}
               onClick={(event) => {
                 event.stopPropagation();
                 onSync();
               }}
             >
-              <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
+              <RefreshCw className={"h-3 w-3 " + (isSyncing ? "animate-spin" : "")} />
             </Button>
           ) : null}
           <Button
             variant="ghost"
             size="icon"
             className="h-9 w-9"
-            aria-label="Edit collection"
+            aria-label={tr("pages.collections.edit_collection")}
             onClick={(event) => {
               event.stopPropagation();
               onEdit();
@@ -367,7 +382,7 @@ function SortableCollectionCard({
             variant="ghost"
             size="icon"
             className="h-9 w-9"
-            aria-label="Delete collection"
+            aria-label={tr("pages.collections.delete_collection")}
             onClick={(event) => {
               event.stopPropagation();
               onDelete();
@@ -382,11 +397,11 @@ function SortableCollectionCard({
 }
 
 const TYPE_LABELS: Record<UserCollectionType, string> = {
-  manual: "manual",
-  smart: "smart",
-  mdblist: "MDBList",
-  tmdb: "TMDB",
-  trakt: "Trakt",
+  manual: "pages.collections.manual",
+  smart: "pages.collections.smart",
+  mdblist: "pages.collections.mdblist",
+  tmdb: "pages.collections.tmdb",
+  trakt: "pages.collections.trakt",
 };
 
 const TYPE_ICONS: Record<UserCollectionType, typeof Film> = {
@@ -403,13 +418,24 @@ const SYNC_STATUS_BADGES: Partial<
     { variant: "outline" | "destructive"; label: string }
   >
 > = {
-  warning: { variant: "outline", label: "Sync warning" },
-  failed: { variant: "destructive", label: "Sync failed" },
+  warning: {
+    variant: "outline",
+    get label() {
+      return tr("pages.collections.sync_warning");
+    },
+  },
+  failed: {
+    variant: "destructive",
+    get label() {
+      return tr("pages.collections.sync_failed");
+    },
+  },
 };
 
 function CollectionBadges({ collection }: { collection: Collection }) {
+  useUILanguage();
   const TypeIcon = TYPE_ICONS[collection.collection_type] ?? Film;
-  const typeLabel = TYPE_LABELS[collection.collection_type] ?? collection.collection_type;
+  const typeLabel = tr(TYPE_LABELS[collection.collection_type] ?? collection.collection_type);
   const statusBadge = collection.last_sync_status
     ? SYNC_STATUS_BADGES[collection.last_sync_status]
     : undefined;
@@ -420,7 +446,9 @@ function CollectionBadges({ collection }: { collection: Collection }) {
         <TypeIcon className="mr-1 h-3 w-3" />
         {typeLabel}
       </Badge>
-      {collection.is_shared ? <Badge variant="outline">Shared</Badge> : null}
+      {collection.is_shared ? (
+        <Badge variant="outline">{tr("pages.collections.shared")}</Badge>
+      ) : null}
       {collection.sync_schedule ? (
         <Badge variant="outline">
           <Calendar className="mr-1 h-3 w-3" />

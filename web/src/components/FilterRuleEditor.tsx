@@ -20,6 +20,8 @@ import {
   normalizeQuerySortForScope,
   type QuerySortRelevanceScope,
 } from "@/lib/querySortOptions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type FilterRuleMediaScope =
   | "all"
@@ -53,7 +55,7 @@ export function getFilterRuleFieldOptions(
     }
     switch (option.value) {
       case "watched":
-        return { ...option, label: "Read" };
+        return { ...option, label: tr("components.filter_rule_editor.read") };
       default:
         return option;
     }
@@ -68,6 +70,7 @@ export default function FilterRuleEditor({
   sortRelevanceScope,
   mediaScope = "all",
 }: FilterRuleEditorProps) {
+  useUILanguage();
   const config = value || { match: "all", groups: [] };
   const sortOptions = getCollectionSortOptions(allowPersonalizedSorts, sortRelevanceScope);
   const selectedSort = normalizeQuerySortForScope(
@@ -173,7 +176,7 @@ export default function FilterRuleEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Match</span>
+        <span className="text-muted-foreground">{tr("components.filter_rule_editor.match")}</span>
         <Select
           value={config.match}
           onValueChange={(v) => updateConfig({ match: v as "all" | "any" })}
@@ -182,18 +185,22 @@ export default function FilterRuleEditor({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">ALL</SelectItem>
-            <SelectItem value="any">ANY</SelectItem>
+            <SelectItem value="all">{tr("components.filter_rule_editor.all")}</SelectItem>
+            <SelectItem value="any">{tr("components.filter_rule_editor.any")}</SelectItem>
           </SelectContent>
         </Select>
-        <span className="text-muted-foreground">of the following groups</span>
+        <span className="text-muted-foreground">
+          {tr("components.filter_rule_editor.of_the_following_groups")}
+        </span>
       </div>
 
       {config.groups.map((group, groupIdx) => (
         <div key={groupIdx} className="border-border space-y-2 rounded-lg border p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Match</span>
+              <span className="text-muted-foreground">
+                {tr("components.filter_rule_editor.match")}
+              </span>
               <Select
                 value={group.match}
                 onValueChange={(v) => updateGroup(groupIdx, { match: v as "all" | "any" })}
@@ -202,11 +209,13 @@ export default function FilterRuleEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">ALL</SelectItem>
-                  <SelectItem value="any">ANY</SelectItem>
+                  <SelectItem value="all">{tr("components.filter_rule_editor.all")}</SelectItem>
+                  <SelectItem value="any">{tr("components.filter_rule_editor.any")}</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-muted-foreground">rules</span>
+              <span className="text-muted-foreground">
+                {tr("components.filter_rule_editor.rules")}
+              </span>
             </div>
             <Button
               type="button"
@@ -294,7 +303,11 @@ export default function FilterRuleEditor({
                             updateRule(groupIdx, ruleIdx, { value: nextValue });
                           }}
                           className="h-8 flex-1 text-xs"
-                          placeholder={index === 0 ? "From" : "To"}
+                          placeholder={
+                            index === 0
+                              ? tr("components.filter_rule_editor.from")
+                              : tr("components.filter_rule_editor.to")
+                          }
                         />
                       );
                     })}
@@ -308,8 +321,12 @@ export default function FilterRuleEditor({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="true">True</SelectItem>
-                      <SelectItem value="false">False</SelectItem>
+                      <SelectItem value="true">
+                        {tr("components.filter_rule_editor.true")}
+                      </SelectItem>
+                      <SelectItem value="false">
+                        {tr("components.filter_rule_editor.false")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 ) : fieldDef?.inputType === "select" ? (
@@ -318,7 +335,7 @@ export default function FilterRuleEditor({
                     onValueChange={(v) => updateRule(groupIdx, ruleIdx, { value: v })}
                   >
                     <SelectTrigger className="h-8 flex-1 text-xs">
-                      <SelectValue placeholder="Select..." />
+                      <SelectValue placeholder={tr("components.filter_rule_editor.select")} />
                     </SelectTrigger>
                     <SelectContent>
                       {fieldDef.selectOptions?.map((opt) => (
@@ -346,7 +363,11 @@ export default function FilterRuleEditor({
                       })
                     }
                     className="h-8 flex-1 text-xs"
-                    placeholder={rule.field === "added_at" ? "e.g. 30d, 2w" : "Value..."}
+                    placeholder={
+                      rule.field === "added_at"
+                        ? tr("components.filter_rule_editor.e_g_30d_2w")
+                        : tr("components.filter_rule_editor.value")
+                    }
                   />
                 )}
 
@@ -370,18 +391,20 @@ export default function FilterRuleEditor({
             className="h-7 text-xs"
             onClick={() => addRule(groupIdx)}
           >
-            <Plus className="mr-1 h-3 w-3" /> Add Rule
+            <Plus className="mr-1 h-3 w-3" /> {tr("components.filter_rule_editor.add_rule")}
           </Button>
         </div>
       ))}
 
       <Button type="button" variant="outline" size="sm" onClick={addGroup}>
-        <Plus className="mr-1 h-3.5 w-3.5" /> Add Group
+        <Plus className="mr-1 h-3.5 w-3.5" /> {tr("components.filter_rule_editor.add_group")}
       </Button>
 
       {/* Sort controls */}
       <div className="border-border flex items-center gap-2 border-t pt-2">
-        <span className="text-muted-foreground text-sm">Sort by</span>
+        <span className="text-muted-foreground text-sm">
+          {tr("components.filter_rule_editor.sort_by")}
+        </span>
         <Select
           value={selectedSort.field}
           onValueChange={(v) => updateConfig({ sort: v, order: getDefaultQuerySortOrder(v) })}
@@ -402,8 +425,8 @@ export default function FilterRuleEditor({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="desc">Descending</SelectItem>
-            <SelectItem value="asc">Ascending</SelectItem>
+            <SelectItem value="desc">{tr("components.filter_rule_editor.descending")}</SelectItem>
+            <SelectItem value="asc">{tr("components.filter_rule_editor.ascending")}</SelectItem>
           </SelectContent>
         </Select>
       </div>

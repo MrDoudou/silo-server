@@ -33,6 +33,8 @@ import {
   parseCatalogSearchParams,
 } from "./catalogSearchParams";
 import type { CatalogSearchState } from "./catalogSearchParams";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const REQUEST_SEARCH_DEBOUNCE_MS = 100;
 const INTERACTIVE_SEARCH_GC_TIME_MS = 30_000;
@@ -53,6 +55,7 @@ function defaultCatalogSubtitle(source: string): string {
 }
 
 export default function Catalog() {
+  useUILanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const state = useMemo(() => parseCatalogSearchParams(searchParams), [searchParams]);
   const emptySearchTitle =
@@ -66,9 +69,9 @@ export default function Catalog() {
         <div className="text-muted-foreground mb-6">
           <Search className="h-10 w-10" strokeWidth={1.5} />
         </div>
-        <h1 className="page-title mb-4">Search</h1>
+        <h1 className="page-title mb-4">{tr("common.actions.search")}</h1>
         <p className="page-subtitle mb-8 max-w-xl text-sm sm:text-base">
-          Find films, series, performances, and rediscover things you forgot you saved.
+          {tr("pages.catalog.find_films_series_performances_and_rediscover_things_you_forgot_you")}
         </p>
         <SearchBar autoFocus prominent />
       </section>
@@ -89,6 +92,7 @@ function CatalogResults({
   setSearchParams: (nextInit: URLSearchParams) => void;
   state: ReturnType<typeof parseCatalogSearchParams>;
 }) {
+  useUILanguage();
   const limit = 60;
   const searchKey = searchParams.toString();
   const [visibleRangeState, setVisibleRangeState] = useState<{
@@ -368,21 +372,24 @@ function CatalogResults({
       {isHistorySource && (
         <section className="surface-panel flex flex-col gap-3 rounded-2xl border-0 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-semibold">Watch History</p>
+            <p className="text-sm font-semibold">{tr("pages.catalog.watch_history")}</p>
             <p className="text-muted-foreground text-xs sm:text-sm">
-              Removing items clears watch history, watched status, and resume progress for this
-              profile.
+              {tr(
+                "pages.catalog.removing_items_clears_watch_history_watched_status_and_resume_progress",
+              )}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {!selectionMode ? (
               <Button variant="outline" size="sm" onClick={() => setSelectionMode(true)}>
                 <CheckSquare className="size-4" />
-                Select
+                {tr("pages.catalog.select")}
               </Button>
             ) : (
               <>
-                <span className="text-muted-foreground text-sm">{selectedIds.size} selected</span>
+                <span className="text-muted-foreground text-sm">
+                  {selectedIds.size} {tr("pages.catalog.selected")}
+                </span>
                 <Button
                   variant="outline"
                   size="sm"
@@ -390,10 +397,10 @@ function CatalogResults({
                     setSelectedIds(new Set(loadedHistoryItems.map((item) => item.content_id)))
                   }
                 >
-                  Select Loaded
+                  {tr("pages.catalog.select_loaded")}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
-                  Clear
+                  {tr("pages.catalog.clear")}
                 </Button>
                 <Button
                   variant="destructive"
@@ -402,7 +409,7 @@ function CatalogResults({
                   onClick={() => setRemoveConfirmOpen(true)}
                 >
                   <Trash2 className="size-4" />
-                  Remove Selected
+                  {tr("pages.catalog.remove_selected")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -413,7 +420,7 @@ function CatalogResults({
                   }}
                 >
                   <X className="size-4" />
-                  Done
+                  {tr("common.actions.done")}
                 </Button>
               </>
             )}
@@ -428,17 +435,17 @@ function CatalogResults({
         >
           <p className="font-medium">
             {isQuerySource
-              ? "Search stopped before it could finish."
-              : "Catalog stopped before it could finish."}
+              ? tr("pages.catalog.search_stopped_before_it_could_finish")
+              : tr("pages.catalog.catalog_stopped_before_it_could_finish")}
           </p>
           <p className="text-muted-foreground max-w-md text-sm">
             {isQuerySource
-              ? "The server ended the lookup so it could not keep using CPU in the background. Try a more specific title or retry once."
-              : "The server could not load every requested result. Retry the catalog once."}
+              ? tr("pages.catalog.the_server_ended_the_lookup_so_it_could_not_keep")
+              : tr("pages.catalog.the_server_could_not_load_every_requested_result_retry_the")}
           </p>
           <Button variant="outline" size="sm" onClick={() => void catalogQuery.refetch()}>
             <RefreshCw className="size-4" />
-            {isQuerySource ? "Retry search" : "Retry catalog"}
+            {isQuerySource ? tr("pages.catalog.retry_search") : tr("pages.catalog.retry_catalog")}
           </Button>
         </div>
       ) : tmdbMayRescueLibrary ? null : (
@@ -469,7 +476,7 @@ function CatalogResults({
         onOpenChange={setRemoveConfirmOpen}
         title={historyRemovalDialogTitle(selectedHistoryTargets)}
         description={historyRemovalDialogDescription(selectedHistoryTargets)}
-        confirmLabel="Remove"
+        confirmLabel={tr("common.actions.remove")}
         variant="destructive"
         isPending={removeHistory.isPending}
         onConfirm={() => {

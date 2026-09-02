@@ -13,6 +13,8 @@ import { useAuth, getBootstrapProfile } from "@/hooks/useAuth";
 import { useAvailableUserLibraries } from "@/hooks/queries/libraries";
 import { useProfiles } from "@/hooks/queries/profiles";
 import { isHouseholdSetupDone, setHouseholdSetupDone } from "@/lib/onboarding";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * The "Who's watching?" onboarding step, shown once right after an invite is
@@ -21,6 +23,7 @@ import { isHouseholdSetupDone, setHouseholdSetupDone } from "@/lib/onboarding";
  * now" is a first-class exit that creates nothing.
  */
 export default function HouseholdSetup() {
+  useUILanguage();
   const { user, loading, selectProfile } = useAuth();
   const { data: profiles = [], isLoading: profilesLoading, avatarUploadEnabled } = useProfiles();
   const { data: libraries = [] } = useAvailableUserLibraries();
@@ -28,7 +31,7 @@ export default function HouseholdSetup() {
   const [editing, setEditing] = useState<Profile | null>(null);
   const navigate = useNavigate();
 
-  useDocumentTitle("Who's watching?");
+  useDocumentTitle(tr("pages.household_setup.who_s_watching"));
 
   if (loading) {
     return (
@@ -71,11 +74,12 @@ export default function HouseholdSetup() {
       <div className="relative z-10 w-full max-w-2xl px-4">
         <div className="mb-10 text-center">
           <h1 className="text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl">
-            Who&apos;s watching?
+            {tr("pages.household_setup.who_s_watching")}
           </h1>
           <p className="text-muted-foreground mx-auto mt-3 max-w-md text-sm leading-6">
-            Everyone gets their own history, watchlist, and recommendations. Add the whole household
-            now or later — this is your account either way.
+            {tr(
+              "pages.household_setup.everyone_gets_their_own_history_watchlist_and_recommendations_add_the",
+            )}
           </p>
         </div>
 
@@ -91,7 +95,7 @@ export default function HouseholdSetup() {
                 type="button"
                 onClick={() => openEditor(p)}
                 className="group flex w-24 flex-col items-center gap-2 text-center"
-                title="Edit profile"
+                title={tr("pages.household_setup.edit_profile")}
               >
                 <div className="relative">
                   <Avatar className="border-border group-hover:border-primary size-20 rounded-2xl border transition-colors">
@@ -105,7 +109,9 @@ export default function HouseholdSetup() {
                       variant="outline"
                       className="bg-background absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0 font-mono text-[9px] tracking-wider uppercase"
                     >
-                      {p.is_child ? "Kids" : "PIN"}
+                      {p.is_child
+                        ? tr("pages.household_setup.kids")
+                        : tr("pages.household_setup.pin")}
                     </Badge>
                   )}
                 </div>
@@ -120,17 +126,21 @@ export default function HouseholdSetup() {
               <div className="border-border group-hover:border-primary text-muted-foreground grid size-20 place-items-center rounded-2xl border border-dashed transition-colors">
                 <Plus className="size-7" />
               </div>
-              <span className="text-muted-foreground mt-1 text-sm font-medium">Add profile</span>
+              <span className="text-muted-foreground mt-1 text-sm font-medium">
+                {tr("pages.household_setup.add_profile")}
+              </span>
             </button>
           </div>
         )}
 
         <div className="mt-12 flex justify-center gap-3">
           <Button variant="ghost" onClick={finish}>
-            {profiles.length > 1 ? "Skip for now" : "Just me for now"}
+            {profiles.length > 1
+              ? tr("pages.household_setup.skip_for_now")
+              : tr("pages.household_setup.just_me_for_now")}
           </Button>
           <Button onClick={finish} disabled={profilesLoading}>
-            Continue
+            {tr("common.actions.continue")}
           </Button>
         </div>
       </div>

@@ -19,6 +19,8 @@ import { bitrateSelectChoices } from "@/lib/bitrateOptions";
 import { namedLanguageOptionsFor } from "@/lib/languageOptions";
 import { controlKindFor, optionsFor } from "@/lib/settingsDisplay";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const EMPTY_SELECT_VALUE = "__empty__";
 
@@ -55,6 +57,7 @@ export function DeviceSettingGroups({
   onReset,
   onOpenPanel,
 }: DeviceSettingGroupsProps) {
+  useUILanguage();
   const storedHere = new Set(
     (Object.keys(settings) as SettingKey[]).filter(
       (key) => settings[key]?.scope === "profile_device",
@@ -104,6 +107,7 @@ function DeviceSettingRow({
   onReset,
   onOpenPanel,
 }: DeviceSettingRowProps) {
+  useUILanguage();
   const definition = SETTING_DEFINITIONS[settingKey];
   if (!definition) return null;
 
@@ -131,13 +135,13 @@ function DeviceSettingRow({
           <span className="text-sm font-medium">{definition.label}</span>
           {changedHere ? (
             <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-px text-[10px] font-semibold tracking-[0.04em] text-amber-300 uppercase">
-              Changed here
+              {tr("components.settings.device_setting_groups.changed_here")}
             </span>
           ) : null}
           {constrained ? (
             <span className="border-info/30 bg-info/10 text-info inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-semibold tracking-[0.04em] uppercase">
               <Lock className="h-2.5 w-2.5" />
-              Household limit
+              {tr("components.settings.device_setting_groups.household_limit")}
             </span>
           ) : null}
         </div>
@@ -170,7 +174,8 @@ function DeviceSettingRow({
             )}
           >
             <RotateCcw className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
-            Use {ownerLabel} setting
+            {tr("components.settings.device_setting_groups.use")} {ownerLabel}{" "}
+            {tr("components.settings.device_setting_groups.setting")}
           </button>
         ) : null}
         <DeviceSettingControl
@@ -225,6 +230,7 @@ function DeviceSettingControl({
   onChange,
   onOpenPanel,
 }: DeviceSettingControlProps) {
+  useUILanguage();
   const definition = SETTING_DEFINITIONS[settingKey];
   const control = controlKindFor(definition);
 
@@ -236,7 +242,7 @@ function DeviceSettingControl({
         onClick={() => onOpenPanel?.(settingKey)}
         className="order-1 min-h-11 w-full sm:order-none sm:h-8 sm:min-h-0 sm:w-auto sm:px-3 sm:text-sm"
       >
-        Change how they look
+        {tr("components.settings.device_setting_groups.change_how_they_look")}
       </Button>
     );
   }
@@ -294,7 +300,9 @@ function DeviceSettingControl({
           onValueChange={(next) => onChange(settingKey, next === EMPTY_SELECT_VALUE ? null : next)}
         >
           {definition.nullable && (
-            <SelectItem value={EMPTY_SELECT_VALUE}>{definition.unsetLabel ?? "Unset"}</SelectItem>
+            <SelectItem value={EMPTY_SELECT_VALUE}>
+              {definition.unsetLabel ?? tr("components.settings.device_setting_groups.unset")}
+            </SelectItem>
           )}
         </LanguageSelect>
       </div>

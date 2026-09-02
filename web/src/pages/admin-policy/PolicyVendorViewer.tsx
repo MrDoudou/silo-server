@@ -12,17 +12,20 @@ import { usePolicyVendor } from "@/hooks/queries/admin/policy";
 
 import { policyDomainMeta } from "./policyPresentation";
 import { groupVendorModules, parseRankLadder, type LadderTier } from "./vendorBaseline";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const DOMAIN_ORDER = ["scope", "permission", "action"] as const;
 
 function ModuleSourceAccordion({ module }: { module: PolicyVendorModule }) {
+  useUILanguage();
   return (
     <Accordion type="single" collapsible>
       <AccordionItem value="source" className="border-0">
         <AccordionTrigger className="text-muted-foreground py-2 text-xs font-medium hover:no-underline [&>svg]:hidden">
           <span className="inline-flex items-center gap-1">
             <ChevronRight aria-hidden className="size-3.5 transition-transform" />
-            View Rego source
+            {tr("pages.admin_policy.policy_vendor_viewer.view_rego_source")}
             <span className="font-mono font-normal">({module.path})</span>
           </span>
         </AccordionTrigger>
@@ -35,6 +38,7 @@ function ModuleSourceAccordion({ module }: { module: PolicyVendorModule }) {
 }
 
 function Ladder({ tiers, caption }: { tiers: LadderTier[]; caption: string }) {
+  useUILanguage();
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-1.5" role="list" aria-label={caption}>
@@ -61,6 +65,7 @@ interface LadderCardProps {
 }
 
 function LadderCard({ title, caption, module }: LadderCardProps) {
+  useUILanguage();
   const tiers = parseRankLadder(module.source);
   return (
     <section className="surface-panel-subtle rounded-2xl p-5">
@@ -70,7 +75,9 @@ function LadderCard({ title, caption, module }: LadderCardProps) {
           <Ladder tiers={tiers} caption={caption} />
         ) : (
           <p className="text-muted-foreground text-xs">
-            The tier table could not be summarized — see the source below.
+            {tr(
+              "pages.admin_policy.policy_vendor_viewer.the_tier_table_could_not_be_summarized_see_the_source",
+            )}
           </p>
         )}
       </div>
@@ -82,16 +89,21 @@ function LadderCard({ title, caption, module }: LadderCardProps) {
 }
 
 export function PolicyVendorViewer() {
+  useUILanguage();
   const { data: modules, isLoading, error } = usePolicyVendor();
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">Loading vendor policy modules...</p>;
+    return (
+      <p className="text-muted-foreground text-sm">
+        {tr("pages.admin_policy.policy_vendor_viewer.loading_vendor_policy_modules")}
+      </p>
+    );
   }
 
   if (error) {
     return (
       <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border px-3 py-2 text-sm">
-        Failed to load vendor policy modules.
+        {tr("pages.admin_policy.policy_vendor_viewer.failed_to_load_vendor_policy_modules")}
       </div>
     );
   }
@@ -99,7 +111,7 @@ export function PolicyVendorViewer() {
   if (!modules?.length) {
     return (
       <div className="surface-panel-subtle text-muted-foreground rounded-2xl p-6 text-sm">
-        No vendor policy modules are available.
+        {tr("pages.admin_policy.policy_vendor_viewer.no_vendor_policy_modules_are_available")}
       </div>
     );
   }
@@ -109,9 +121,9 @@ export function PolicyVendorViewer() {
   return (
     <div className="space-y-5">
       <p className="text-muted-foreground max-w-prose text-sm">
-        These rules ship with each Silo release and always apply — upgrading Silo updates them
-        without touching your overrides. Summaries below; the Rego source under each card is the
-        authoritative version.
+        {tr(
+          "pages.admin_policy.policy_vendor_viewer.these_rules_ship_with_each_silo_release_and_always_apply",
+        )}
       </p>
 
       {DOMAIN_ORDER.map((domain) => {
@@ -154,14 +166,14 @@ export function PolicyVendorViewer() {
       <div className="grid gap-5 lg:grid-cols-2">
         {grouped.ratings && (
           <LadderCard
-            title="Content-rating tiers"
+            title={tr("pages.admin_policy.policy_vendor_viewer.content_rating_tiers")}
             caption="A ceiling admits its own tier and everything before it. Unrated ceilings admit everything; unknown ratings are hidden once a ceiling is set."
             module={grouped.ratings}
           />
         )}
         {grouped.quality && (
           <LadderCard
-            title="Playback-quality tiers"
+            title={tr("pages.admin_policy.policy_vendor_viewer.playback_quality_tiers")}
             caption="File resolutions are ranked left to right; a ceiling admits files at or below it. Ceiling presets normalize to 1080p or 4K."
             module={grouped.quality}
           />

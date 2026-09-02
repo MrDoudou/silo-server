@@ -71,7 +71,7 @@ describe("SearchStatusPanel", () => {
     renderPanel();
 
     expect(
-      screen.getByText("Couldn't load search status: search status unavailable"),
+      screen.getByText("Couldn't load search status: The request failed. Please try again."),
     ).toBeInTheDocument();
     // The maintenance tasks are exactly what an admin wants when the index is
     // unhealthy enough for the status endpoint to fail, so they stay reachable.

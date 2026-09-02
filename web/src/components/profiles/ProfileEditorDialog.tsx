@@ -46,6 +46,8 @@ import {
   type ProfileDraft,
 } from "@/lib/profile-management";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ProfileEditorDialogProps {
   open: boolean;
@@ -82,6 +84,7 @@ export function ProfileEditorDialog({
   onOpenChange,
   onSaveSuccess,
 }: ProfileEditorDialogProps) {
+  useUILanguage();
   const mode = profile ? "edit" : "create";
   const sortedLibraries = useMemo(
     () => [...libraries].sort((left, right) => left.sort_order - right.sort_order),
@@ -92,9 +95,15 @@ export function ProfileEditorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{mode === "edit" ? "Edit profile" : "New profile"}</DialogTitle>
+          <DialogTitle>
+            {mode === "edit"
+              ? tr("components.profiles.profile_editor_dialog.edit_profile")
+              : tr("components.profiles.profile_editor_dialog.new_profile")}
+          </DialogTitle>
           <DialogDescription>
-            Set the avatar, name, PIN, and access rules for this profile.
+            {tr(
+              "components.profiles.profile_editor_dialog.set_the_avatar_name_pin_and_access_rules_for_this",
+            )}
           </DialogDescription>
         </DialogHeader>
         {open ? (
@@ -134,6 +143,7 @@ function ProfileEditorForm({
     },
   ) => void;
 }) {
+  useUILanguage();
   const createMutation = useCreateProfile();
   const updateMutation = useUpdateProfile();
   const uploadAvatarMutation = useUploadProfileAvatar();
@@ -312,37 +322,46 @@ function ProfileEditorForm({
     <form onSubmit={(event) => void handleSubmit(event)} className="space-y-5">
       <section className="border-border space-y-4 rounded-md border p-4">
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold">Profile</h3>
-          <p className="text-muted-foreground text-sm">Choose an avatar and basic details.</p>
+          <h3 className="text-sm font-semibold">
+            {tr("components.profiles.profile_editor_dialog.profile")}
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            {tr("components.profiles.profile_editor_dialog.choose_an_avatar_and_basic_details")}
+          </p>
         </div>
 
         <div className="flex flex-col gap-4 lg:flex-row">
           <div className="flex flex-col items-center gap-3 rounded-xl border px-5 py-4 lg:w-52">
             <Avatar className="ring-border h-24 w-24 ring-2">
               {previewImage ? (
-                <AvatarImage src={previewImage} alt={draft.name || "Profile avatar"} />
+                <AvatarImage
+                  src={previewImage}
+                  alt={draft.name || tr("components.profiles.profile_editor_dialog.profile_avatar")}
+                />
               ) : null}
               <AvatarFallback className="bg-surface text-primary text-3xl font-bold">
                 {(draft.name || profile?.name || "?").charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="text-center">
-              <div className="text-sm font-medium">{draft.name.trim() || "Preview"}</div>
+              <div className="text-sm font-medium">
+                {draft.name.trim() || tr("components.profiles.profile_editor_dialog.preview")}
+              </div>
               <div className="text-muted-foreground text-xs">
                 {avatarFile
-                  ? "Custom upload selected"
+                  ? tr("components.profiles.profile_editor_dialog.custom_upload_selected")
                   : selectedPreset
                     ? selectedPreset.label
                     : existingUploadedAvatarURL
-                      ? "Custom upload"
-                      : "Initials fallback"}
+                      ? tr("components.profiles.profile_editor_dialog.custom_upload")
+                      : tr("components.profiles.profile_editor_dialog.initials_fallback")}
               </div>
             </div>
           </div>
 
           <div className="flex-1 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor={nameId}>Name</Label>
+              <Label htmlFor={nameId}>{tr("components.profiles.profile_editor_dialog.name")}</Label>
               <Input
                 id={nameId}
                 value={draft.name}
@@ -358,17 +377,21 @@ function ProfileEditorForm({
             <div className="space-y-2">
               <Label htmlFor={pinId}>
                 {draft.clearPin
-                  ? "PIN will be removed"
+                  ? tr("components.profiles.profile_editor_dialog.pin_will_be_removed")
                   : profile?.has_pin
-                    ? "New PIN"
-                    : "PIN (optional)"}
+                    ? tr("components.profiles.profile_editor_dialog.new_pin")
+                    : tr("components.profiles.profile_editor_dialog.pin_optional")}
               </Label>
               <Input
                 id={pinId}
                 type="password"
                 inputMode="numeric"
                 maxLength={4}
-                placeholder={draft.clearPin ? "PIN will be removed on save" : "4 digits"}
+                placeholder={
+                  draft.clearPin
+                    ? tr("components.profiles.profile_editor_dialog.pin_will_be_removed_on_save")
+                    : tr("components.profiles.profile_editor_dialog.value_4_digits")
+                }
                 value={draft.clearPin ? "" : draft.pin}
                 disabled={draft.clearPin}
                 onChange={(event) => {
@@ -392,7 +415,9 @@ function ProfileEditorForm({
                     setErrors((current) => ({ ...current, pin: undefined }));
                   }}
                 >
-                  {draft.clearPin ? "Keep existing PIN" : "Remove PIN"}
+                  {draft.clearPin
+                    ? tr("components.profiles.profile_editor_dialog.keep_existing_pin")
+                    : tr("components.profiles.profile_editor_dialog.remove_pin")}
                 </Button>
               ) : null}
               {errors.pin ? <p className="text-destructive text-sm">{errors.pin}</p> : null}
@@ -402,10 +427,11 @@ function ProfileEditorForm({
 
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label>Preset avatars</Label>
+            <Label>{tr("components.profiles.profile_editor_dialog.preset_avatars")}</Label>
             <p className="text-muted-foreground text-xs">
-              Pick a DiceBear style, shuffle fun options, or leave it blank to keep initials. A
-              custom upload overrides presets.
+              {tr(
+                "components.profiles.profile_editor_dialog.pick_a_dice_bear_style_shuffle_fun_options_or_leave",
+              )}
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -435,8 +461,9 @@ function ProfileEditorForm({
           </div>
           <div className="flex items-center justify-between gap-3">
             <p className="text-muted-foreground text-xs">
-              {PROFILE_AVATAR_STYLES.find((style) => style.id === activePresetStyle)?.summary}.
-              Showing {visiblePresets.length} options right now.
+              {PROFILE_AVATAR_STYLES.find((style) => style.id === activePresetStyle)?.summary}
+              {tr("components.profiles.profile_editor_dialog.showing")} {visiblePresets.length}{" "}
+              {tr("components.profiles.profile_editor_dialog.options_right_now")}
             </p>
             <Button
               type="button"
@@ -445,7 +472,7 @@ function ProfileEditorForm({
               onClick={() => setPresetBatch((current) => current + 1)}
             >
               <RefreshCw className="h-4 w-4" />
-              More options
+              {tr("components.profiles.profile_editor_dialog.more_options")}
             </Button>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -481,7 +508,7 @@ function ProfileEditorForm({
 
         {avatarUploadEnabled ? (
           <ImageUploadField
-            label="Custom upload"
+            label={tr("components.profiles.profile_editor_dialog.custom_upload")}
             currentUrl={existingUploadedAvatarURL}
             file={avatarFile}
             onFileChange={(file) => {
@@ -503,9 +530,13 @@ function ProfileEditorForm({
           />
         ) : (
           <div className="rounded-md border border-dashed px-4 py-3 text-sm">
-            <p className="font-medium">Custom uploads are unavailable</p>
+            <p className="font-medium">
+              {tr("components.profiles.profile_editor_dialog.custom_uploads_are_unavailable")}
+            </p>
             <p className="text-muted-foreground mt-1 text-xs">
-              Configure private S3 avatar storage to enable uploaded profile avatars.
+              {tr(
+                "components.profiles.profile_editor_dialog.configure_private_s3_avatar_storage_to_enable_uploaded_profile_avatars",
+              )}
             </p>
           </div>
         )}
@@ -513,17 +544,25 @@ function ProfileEditorForm({
 
       <section className="border-border space-y-4 rounded-md border p-4">
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold">Access</h3>
+          <h3 className="text-sm font-semibold">
+            {tr("components.profiles.profile_editor_dialog.access")}
+          </h3>
           <p className="text-muted-foreground text-sm">
-            Content limits and library visibility for this profile.
+            {tr(
+              "components.profiles.profile_editor_dialog.content_limits_and_library_visibility_for_this_profile",
+            )}
           </p>
         </div>
 
         <div className="border-border flex items-center justify-between rounded-md border px-3 py-2">
           <div className="space-y-0.5">
-            <Label htmlFor="profile-is-child">Kids profile</Label>
+            <Label htmlFor="profile-is-child">
+              {tr("components.profiles.profile_editor_dialog.kids_profile")}
+            </Label>
             <p className="text-muted-foreground text-xs">
-              Seeds a safer default rating and library setup.
+              {tr(
+                "components.profiles.profile_editor_dialog.seeds_a_safer_default_rating_and_library_setup",
+              )}
             </p>
           </div>
           <Switch
@@ -535,7 +574,9 @@ function ProfileEditorForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor={contentRatingId}>Maximum content rating</Label>
+            <Label htmlFor={contentRatingId}>
+              {tr("components.profiles.profile_editor_dialog.maximum_content_rating")}
+            </Label>
             <Select
               value={selectedContentRatingValue}
               onValueChange={(value) => {
@@ -560,7 +601,9 @@ function ProfileEditorForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor={playbackQualityId}>Maximum playback quality</Label>
+            <Label htmlFor={playbackQualityId}>
+              {tr("components.profiles.profile_editor_dialog.maximum_playback_quality")}
+            </Label>
             <Select
               value={draft.maxPlaybackQuality}
               onValueChange={(value) =>
@@ -584,9 +627,13 @@ function ProfileEditorForm({
         <div className="border-border space-y-3 rounded-md border p-3">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
-              <Label htmlFor={restrictLibrariesId}>Restrict libraries</Label>
+              <Label htmlFor={restrictLibrariesId}>
+                {tr("components.profiles.profile_editor_dialog.restrict_libraries")}
+              </Label>
               <p className="text-muted-foreground text-xs">
-                Limit this profile to a specific set of libraries.
+                {tr(
+                  "components.profiles.profile_editor_dialog.limit_this_profile_to_a_specific_set_of_libraries",
+                )}
               </p>
             </div>
             <Switch
@@ -604,7 +651,9 @@ function ProfileEditorForm({
             <div className="space-y-2">
               <div className="grid gap-2">
                 {libraries.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No libraries available.</p>
+                  <p className="text-muted-foreground text-sm">
+                    {tr("components.profiles.profile_editor_dialog.no_libraries_available")}
+                  </p>
                 ) : (
                   libraries.map((library) => {
                     const checked = draft.allowedLibraryIDs.includes(library.id);
@@ -640,10 +689,12 @@ function ProfileEditorForm({
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-          Cancel
+          {tr("common.actions.cancel")}
         </Button>
         <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving..." : "Save profile"}
+          {isPending
+            ? tr("components.profiles.profile_editor_dialog.saving")
+            : tr("components.profiles.profile_editor_dialog.save_profile")}
         </Button>
       </DialogFooter>
     </form>

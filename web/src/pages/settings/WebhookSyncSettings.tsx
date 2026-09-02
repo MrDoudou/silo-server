@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useProfiles } from "@/hooks/queries/profiles";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
+
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import type {
   WebhookSyncConnection,
   WebhookSyncDiscoveredUser,
@@ -70,6 +71,8 @@ import {
   getPreferredPlexServerURL,
   type BrowserPlexServer,
 } from "@/lib/plexAuth";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const UNMAPPED_VALUE = "__unmapped__";
 
@@ -202,23 +205,24 @@ function eventMatchedItemLabel(event: WebhookSyncEventLog) {
 }
 
 const EVENT_ATTR_LABELS: Record<string, string> = {
-  event_kind: "Event kind",
-  action: "Action",
-  external_user_id: "External user ID",
-  external_user_name: "External user",
-  external_item_id: "External item ID",
-  media_kind: "Media kind",
-  matched_media_item_id: "Matched item ID",
-  matched_media_item_title: "Matched item",
-  profile_id: "Profile ID",
-  client_ip: "Client IP",
-  content_type: "Content type",
-  user_agent: "User agent",
-  path_pattern: "Path pattern",
+  event_kind: "pages.settings.webhook_sync_settings.event_kind",
+  action: "pages.settings.webhook_sync_settings.action",
+  external_user_id: "pages.settings.webhook_sync_settings.external_user_id",
+  external_user_name: "pages.settings.webhook_sync_settings.external_user",
+  external_item_id: "pages.settings.webhook_sync_settings.external_item_id",
+  media_kind: "pages.settings.webhook_sync_settings.media_kind",
+  matched_media_item_id: "pages.settings.webhook_sync_settings.matched_item_id",
+  matched_media_item_title: "pages.settings.webhook_sync_settings.matched_item",
+  profile_id: "pages.settings.webhook_sync_settings.profile_id",
+  client_ip: "pages.settings.webhook_sync_settings.client_ip",
+  content_type: "pages.settings.webhook_sync_settings.content_type",
+  user_agent: "pages.settings.webhook_sync_settings.user_agent",
+  path_pattern: "pages.settings.webhook_sync_settings.path_pattern",
 };
 
 function eventAttrLabel(key: string) {
-  return EVENT_ATTR_LABELS[key] ?? key.replace(/_/g, " ");
+  const knownLabel = EVENT_ATTR_LABELS[key];
+  return knownLabel ? tr(knownLabel) : key.replace(/_/g, " ");
 }
 
 type ProviderType = "plex" | "emby" | "jellyfin";
@@ -238,6 +242,7 @@ const EVENT_MATRIX_TONE: Record<EventMatrixTone, string> = {
 };
 
 function EventMatrix({ sections }: { sections: EventMatrixSection[] }) {
+  useUILanguage();
   return (
     <div className="border-border/50 divide-border/50 divide-y rounded-md border">
       {sections.map((section) => (
@@ -265,6 +270,7 @@ function EventMatrix({ sections }: { sections: EventMatrixSection[] }) {
 }
 
 export default function WebhookSyncSettings() {
+  useUILanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { profile } = useCurrentProfile();
@@ -402,7 +408,9 @@ export default function WebhookSyncSettings() {
 
     if (!returnedPlexPinId || !returnedPlexPinCode) {
       setPlexAuthError(
-        "Plex sign-in returned without the expected session details. Please try again.",
+        tr(
+          "pages.settings.webhook_sync_settings.plex_sign_in_returned_without_the_expected_session_details_please",
+        ),
       );
       void navigate("/settings/webhook-sync", { replace: true });
       return;
@@ -410,7 +418,11 @@ export default function WebhookSyncSettings() {
 
     const pinID = Number(returnedPlexPinId);
     if (!Number.isFinite(pinID) || pinID <= 0) {
-      setPlexAuthError("Plex sign-in returned an invalid PIN. Please try again.");
+      setPlexAuthError(
+        tr(
+          "pages.settings.webhook_sync_settings.plex_sign_in_returned_an_invalid_pin_please_try_again",
+        ),
+      );
       void navigate("/settings/webhook-sync", { replace: true });
       return;
     }
@@ -433,7 +445,9 @@ export default function WebhookSyncSettings() {
         }
         setPlexServers([]);
         setSelectedServerId("");
-        setPlexAuthError(error instanceof Error ? error.message : "Failed to finish Plex sign-in");
+        setPlexAuthError(
+          tr.error("errors.settings.webhook_sync_settings.failed_to_finish_plex_sign_in", error),
+        );
       } finally {
         if (!cancelled) {
           setPlexAuthPending(false);
@@ -471,9 +485,9 @@ export default function WebhookSyncSettings() {
   async function copyText(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("Copied to clipboard");
+      toast.success("feedback.settings.webhook_sync_settings.copied_to_clipboard");
     } catch {
-      toast.error("Failed to copy to clipboard");
+      toast.error("errors.settings.webhook_sync_settings.failed_to_copy_to_clipboard");
     }
   }
 
@@ -492,7 +506,9 @@ export default function WebhookSyncSettings() {
       window.location.assign(buildPlexAuthURL(pin.code, forwardURL.toString()));
     } catch (error) {
       setPlexAuthPending(false);
-      setPlexAuthError(error instanceof Error ? error.message : "Failed to start Plex sign-in");
+      setPlexAuthError(
+        tr.error("errors.settings.webhook_sync_settings.failed_to_start_plex_sign_in", error),
+      );
     }
   }
 
@@ -582,26 +598,40 @@ export default function WebhookSyncSettings() {
   return (
     <div className="space-y-6 pb-6">
       <div className="space-y-3">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Webhook Sync</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.settings.webhook_sync_settings.webhook_sync")}
+        </h2>
         <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-          Receive watched, stop, and progress events from Plex, Emby, and Jellyfin.
+          {tr(
+            "pages.settings.webhook_sync_settings.receive_watched_stop_and_progress_events_from_plex_emby_and",
+          )}
         </p>
       </div>
 
       <SettingsGroup
-        title="Add a connection"
-        description="Create a provider-specific webhook endpoint and choose the default Silo profile."
+        title={tr("pages.settings.webhook_sync_settings.add_a_connection")}
+        description={tr(
+          "pages.settings.webhook_sync_settings.create_a_provider_specific_webhook_endpoint_and_choose_the_default",
+        )}
       >
         <div className="flex flex-col gap-3">
-          <Label className="text-sm font-medium">Provider</Label>
+          <Label className="text-sm font-medium">
+            {tr("pages.settings.webhook_sync_settings.provider")}
+          </Label>
           <Select value={provider} onValueChange={(value) => setProvider(value as ProviderType)}>
             <SelectTrigger className="w-full sm:w-[260px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="plex">Plex</SelectItem>
-              <SelectItem value="emby">Emby</SelectItem>
-              <SelectItem value="jellyfin">Jellyfin</SelectItem>
+              <SelectItem value="plex">
+                {tr("pages.settings.webhook_sync_settings.plex")}
+              </SelectItem>
+              <SelectItem value="emby">
+                {tr("pages.settings.webhook_sync_settings.emby")}
+              </SelectItem>
+              <SelectItem value="jellyfin">
+                {tr("pages.settings.webhook_sync_settings.jellyfin")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -610,11 +640,18 @@ export default function WebhookSyncSettings() {
           <>
             <div className="border-border/50 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-0.5">
-                <Label className="text-sm font-medium">Plex account</Label>
+                <Label className="text-sm font-medium">
+                  {tr("pages.settings.webhook_sync_settings.plex_account")}
+                </Label>
                 <p className="text-muted-foreground text-[13px] leading-relaxed">
                   {hasSignedInToPlex
-                    ? `${plexServers.length} server${plexServers.length === 1 ? "" : "s"} available`
-                    : "Authorize via plex.tv to discover your servers"}
+                    ? tr("pages.settings.webhook_sync_settings.length_server_value_available", {
+                        length: plexServers.length,
+                        value: plexServers.length === 1 ? "" : "s",
+                      })
+                    : tr(
+                        "pages.settings.webhook_sync_settings.authorize_via_plex_tv_to_discover_your_servers",
+                      )}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -628,7 +665,9 @@ export default function WebhookSyncSettings() {
                   disabled={plexAuthPending}
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                  {hasSignedInToPlex ? "Re-authenticate" : "Sign in to Plex"}
+                  {hasSignedInToPlex
+                    ? tr("pages.settings.webhook_sync_settings.re_authenticate")
+                    : tr("pages.settings.webhook_sync_settings.sign_in_to_plex")}
                 </Button>
               </div>
             </div>
@@ -638,9 +677,13 @@ export default function WebhookSyncSettings() {
             {hasSignedInToPlex ? (
               <div className="border-border/50 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 space-y-0.5">
-                  <Label className="text-sm font-medium">Server</Label>
+                  <Label className="text-sm font-medium">
+                    {tr("pages.settings.webhook_sync_settings.server")}
+                  </Label>
                   <p className="text-muted-foreground text-[13px] leading-relaxed">
-                    The Plex Media Server that will send webhook events.
+                    {tr(
+                      "pages.settings.webhook_sync_settings.the_plex_media_server_that_will_send_webhook_events",
+                    )}
                   </p>
                 </div>
                 <Select
@@ -650,7 +693,9 @@ export default function WebhookSyncSettings() {
                   }}
                 >
                   <SelectTrigger className="w-full sm:w-[240px]">
-                    <SelectValue placeholder="Select a server" />
+                    <SelectValue
+                      placeholder={tr("pages.settings.webhook_sync_settings.select_a_server")}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {plexServers.map((server) => (
@@ -665,20 +710,30 @@ export default function WebhookSyncSettings() {
           </>
         ) : (
           <div className="border-border/50 flex flex-col gap-3 border-t pt-4">
-            <Label className="text-sm font-medium">Connection name</Label>
+            <Label className="text-sm font-medium">
+              {tr("pages.settings.webhook_sync_settings.connection_name")}
+            </Label>
             <Input
               value={manualServerName}
               onChange={(event) => setManualServerName(event.target.value)}
-              placeholder={provider === "emby" ? "My Emby Server" : "My Jellyfin Server"}
+              placeholder={
+                provider === "emby"
+                  ? tr("pages.settings.webhook_sync_settings.my_emby_server")
+                  : tr("pages.settings.webhook_sync_settings.my_jellyfin_server")
+              }
             />
           </div>
         )}
 
         <div className="border-border/50 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 space-y-0.5">
-            <Label className="text-sm font-medium">Default profile</Label>
+            <Label className="text-sm font-medium">
+              {tr("pages.settings.webhook_sync_settings.default_profile")}
+            </Label>
             <p className="text-muted-foreground text-[13px] leading-relaxed">
-              The signed-in external user is linked to this profile when the connection is created.
+              {tr(
+                "pages.settings.webhook_sync_settings.the_signed_in_external_user_is_linked_to_this_profile",
+              )}
             </p>
           </div>
           <Select
@@ -686,14 +741,20 @@ export default function WebhookSyncSettings() {
             onValueChange={(value) => setDefaultProfileId(value === UNMAPPED_VALUE ? "" : value)}
           >
             <SelectTrigger className="w-full sm:w-[240px]">
-              <SelectValue placeholder="Choose a profile" />
+              <SelectValue
+                placeholder={tr("pages.settings.webhook_sync_settings.choose_a_profile")}
+              />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={UNMAPPED_VALUE}>Choose a profile</SelectItem>
+              <SelectItem value={UNMAPPED_VALUE}>
+                {tr("pages.settings.webhook_sync_settings.choose_a_profile")}
+              </SelectItem>
               {profiles.map((candidate) => (
                 <SelectItem key={candidate.id} value={candidate.id}>
                   {candidate.name}
-                  {profile?.id === candidate.id ? " (current)" : ""}
+                  {profile?.id === candidate.id
+                    ? tr("pages.settings.webhook_sync_settings.current")
+                    : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -710,20 +771,22 @@ export default function WebhookSyncSettings() {
             ) : (
               <Plus className="h-4 w-4" />
             )}
-            Create connection
+            {tr("pages.settings.webhook_sync_settings.create_connection")}
           </Button>
         </div>
       </SettingsGroup>
 
       {/* ── Connected servers ── */}
       <SettingsGroup
-        title="Connected servers"
-        description="Manage webhook endpoints, provider setup instructions, and profile mappings."
+        title={tr("pages.settings.webhook_sync_settings.connected_servers")}
+        description={tr(
+          "pages.settings.webhook_sync_settings.manage_webhook_endpoints_provider_setup_instructions_and_profile_mappings",
+        )}
       >
         {connectionsQuery.isLoading ? (
           <div className="text-muted-foreground flex items-center gap-2 text-sm">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading connections...
+            {tr("pages.settings.webhook_sync_settings.loading_connections")}
           </div>
         ) : connectionsQuery.isError ? (
           <div className="flex items-start gap-2.5 rounded-md bg-red-500/10 px-3 py-2.5">
@@ -731,12 +794,14 @@ export default function WebhookSyncSettings() {
             <p className="text-sm leading-relaxed text-red-300">
               {connectionsQuery.error instanceof Error
                 ? connectionsQuery.error.message
-                : "Failed to load webhook connections"}
+                : tr("pages.settings.webhook_sync_settings.failed_to_load_webhook_connections")}
             </p>
           </div>
         ) : connections.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No webhook connections yet. Create one above to generate a provider-specific endpoint.
+            {tr(
+              "pages.settings.webhook_sync_settings.no_webhook_connections_yet_create_one_above_to_generate_a",
+            )}
           </p>
         ) : (
           <div className="space-y-2">
@@ -764,10 +829,17 @@ export default function WebhookSyncSettings() {
                         </span>
                       </span>
                       <p className="text-muted-foreground text-xs">
-                        {connection.user_count ?? 0} user
-                        {(connection.user_count ?? 0) === 1 ? "" : "s"}
+                        {connection.user_count ?? 0}{" "}
+                        {tr("pages.settings.webhook_sync_settings.user")}
+                        {(connection.user_count ?? 0) === 1
+                          ? ""
+                          : tr("pages.settings.webhook_sync_settings.s")}
                         {connection.last_webhook_received_at
-                          ? ` · last event ${relativeTime(connection.last_webhook_received_at) ?? formatTimestamp(connection.last_webhook_received_at)}`
+                          ? tr("pages.settings.webhook_sync_settings.last_event_value", {
+                              value:
+                                relativeTime(connection.last_webhook_received_at) ??
+                                formatTimestamp(connection.last_webhook_received_at),
+                            })
                           : ""}
                       </p>
                     </div>
@@ -790,7 +862,9 @@ export default function WebhookSyncSettings() {
         <>
           <SettingsGroup
             title={selectedConnection.server_name}
-            description={`${providerLabel(selectedConnection.provider)} webhook endpoint`}
+            description={tr("pages.settings.webhook_sync_settings.value_webhook_endpoint", {
+              value: providerLabel(selectedConnection.provider),
+            })}
           >
             {(() => {
               const health = connectionHealth(selectedConnection);
@@ -804,7 +878,8 @@ export default function WebhookSyncSettings() {
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
                       <div className="min-w-0 space-y-0.5">
                         <p className="text-sm font-medium text-red-300">
-                          Error {formatTimestamp(selectedConnection.last_webhook_error_at)}
+                          {tr("pages.settings.webhook_sync_settings.error")}{" "}
+                          {formatTimestamp(selectedConnection.last_webhook_error_at)}
                         </p>
                         <p className="text-[13px] leading-relaxed text-red-300/80">
                           {selectedConnection.last_webhook_error_message}
@@ -815,14 +890,18 @@ export default function WebhookSyncSettings() {
                     <div className="flex items-center gap-2 text-[13px]">
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                       <span className="text-muted-foreground">
-                        Ready to receive webhook traffic
+                        {tr(
+                          "pages.settings.webhook_sync_settings.ready_to_receive_webhook_traffic",
+                        )}
                       </span>
                     </div>
                   )}
 
                   {/* Webhook URL */}
                   <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">Webhook URL</Label>
+                    <Label className="text-muted-foreground text-xs">
+                      {tr("pages.settings.webhook_sync_settings.webhook_url")}
+                    </Label>
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <Input value={webhookURL} readOnly className="font-mono text-xs" />
                       <div className="flex gap-2">
@@ -833,7 +912,7 @@ export default function WebhookSyncSettings() {
                           disabled={!webhookURL}
                         >
                           <Copy className="h-3.5 w-3.5" />
-                          Copy
+                          {tr("common.actions.copy")}
                         </Button>
                         <Button
                           variant="outline"
@@ -850,7 +929,7 @@ export default function WebhookSyncSettings() {
                           disabled={rotateWebhookMutation.isPending}
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
-                          Rotate
+                          {tr("pages.settings.webhook_sync_settings.rotate")}
                         </Button>
                         <Button
                           variant="outline"
@@ -862,7 +941,7 @@ export default function WebhookSyncSettings() {
                           disabled={deleteConnectionMutation.isPending}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                          Delete
+                          {tr("common.actions.delete")}
                         </Button>
                       </div>
                     </div>
@@ -872,7 +951,9 @@ export default function WebhookSyncSettings() {
                   <div className="border-border/50 space-y-3 border-t pt-4">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-1.5">
-                        <Label className="text-muted-foreground text-xs">Connection name</Label>
+                        <Label className="text-muted-foreground text-xs">
+                          {tr("pages.settings.webhook_sync_settings.connection_name")}
+                        </Label>
                         <Input
                           value={currentConnectionServerName}
                           onChange={(event) =>
@@ -881,7 +962,9 @@ export default function WebhookSyncSettings() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-muted-foreground text-xs">Default profile</Label>
+                        <Label className="text-muted-foreground text-xs">
+                          {tr("pages.settings.webhook_sync_settings.default_profile")}
+                        </Label>
                         <Select
                           value={currentConnectionDefaultValue}
                           onValueChange={(value) =>
@@ -891,10 +974,16 @@ export default function WebhookSyncSettings() {
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Choose a profile" />
+                            <SelectValue
+                              placeholder={tr(
+                                "pages.settings.webhook_sync_settings.choose_a_profile",
+                              )}
+                            />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value={UNMAPPED_VALUE}>No default profile</SelectItem>
+                            <SelectItem value={UNMAPPED_VALUE}>
+                              {tr("pages.settings.webhook_sync_settings.no_default_profile")}
+                            </SelectItem>
                             {profiles.map((candidate) => (
                               <SelectItem key={candidate.id} value={candidate.id}>
                                 {candidate.name}
@@ -931,7 +1020,7 @@ export default function WebhookSyncSettings() {
                         {updateConnectionMutation.isPending ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : null}
-                        Save connection
+                        {tr("pages.settings.webhook_sync_settings.save_connection")}
                       </Button>
                     </div>
                   </div>
@@ -939,16 +1028,20 @@ export default function WebhookSyncSettings() {
                   {/* Profile mapping — part of connection config */}
                   <div className="border-border/50 space-y-3 border-t pt-4">
                     <div className="space-y-0.5">
-                      <Label className="text-sm font-medium">Profile mapping</Label>
+                      <Label className="text-sm font-medium">
+                        {tr("pages.settings.webhook_sync_settings.profile_mapping")}
+                      </Label>
                       <p className="text-muted-foreground text-[13px] leading-relaxed">
-                        Map each external user to a Silo profile. Unmapped users are ignored.
+                        {tr(
+                          "pages.settings.webhook_sync_settings.map_each_external_user_to_a_silo_profile_unmapped_users",
+                        )}
                       </p>
                     </div>
 
                     {mappingsQuery.isLoading ? (
                       <div className="text-muted-foreground flex items-center gap-2 text-sm">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Loading users...
+                        {tr("pages.settings.webhook_sync_settings.loading_users")}
                       </div>
                     ) : mappingsQuery.isError ? (
                       <div className="flex items-start gap-2.5 rounded-md bg-red-500/10 px-3 py-2.5">
@@ -956,7 +1049,9 @@ export default function WebhookSyncSettings() {
                         <p className="text-sm leading-relaxed text-red-300">
                           {mappingsQuery.error instanceof Error
                             ? mappingsQuery.error.message
-                            : "Failed to load profile mappings"}
+                            : tr(
+                                "pages.settings.webhook_sync_settings.failed_to_load_profile_mappings",
+                              )}
                         </p>
                       </div>
                     ) : mappingRows.length > 0 ? (
@@ -983,10 +1078,16 @@ export default function WebhookSyncSettings() {
                               }
                             >
                               <SelectTrigger className="w-full sm:w-[240px]">
-                                <SelectValue placeholder="Choose a profile" />
+                                <SelectValue
+                                  placeholder={tr(
+                                    "pages.settings.webhook_sync_settings.choose_a_profile",
+                                  )}
+                                />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value={UNMAPPED_VALUE}>Ignore this user</SelectItem>
+                                <SelectItem value={UNMAPPED_VALUE}>
+                                  {tr("pages.settings.webhook_sync_settings.ignore_this_user")}
+                                </SelectItem>
                                 {profiles.map((candidate) => (
                                   <SelectItem key={candidate.id} value={candidate.id}>
                                     {candidate.name}
@@ -1005,13 +1106,15 @@ export default function WebhookSyncSettings() {
                             {updateMappingsMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : null}
-                            Save mappings
+                            {tr("pages.settings.webhook_sync_settings.save_mappings")}
                           </Button>
                         </div>
                       </div>
                     ) : (
                       <p className="text-muted-foreground text-sm">
-                        No users discovered yet. Send a webhook event first, then map them here.
+                        {tr(
+                          "pages.settings.webhook_sync_settings.no_users_discovered_yet_send_a_webhook_event_first_then",
+                        )}
                       </p>
                     )}
                   </div>
@@ -1020,23 +1123,29 @@ export default function WebhookSyncSettings() {
                   <details className="border-border/50 border-t pt-4">
                     <summary className="text-muted-foreground flex cursor-pointer items-center gap-2 text-sm font-medium select-none">
                       <Server className="h-3.5 w-3.5" />
-                      Setup instructions
+                      {tr("pages.settings.webhook_sync_settings.setup_instructions")}
                     </summary>
                     <div className="mt-3">
                       {selectedConnection.provider === "plex" ? (
                         <ol className="text-muted-foreground list-decimal space-y-1.5 pl-5 text-sm leading-relaxed">
                           <li>
-                            In Plex, open{" "}
-                            <span className="text-foreground">Settings → Webhooks</span> (Plex Pass
-                            required).
+                            {tr("pages.settings.webhook_sync_settings.in_plex_open")}{" "}
+                            <span className="text-foreground">
+                              {tr("pages.settings.webhook_sync_settings.settings_webhooks")}
+                            </span>{" "}
+                            {tr("pages.settings.webhook_sync_settings.plex_pass_required")}
                           </li>
                           <li>
-                            Click <span className="text-foreground">Add Webhook</span> and paste the
-                            URL above.
+                            {tr("pages.settings.webhook_sync_settings.click")}{" "}
+                            <span className="text-foreground">
+                              {tr("pages.settings.webhook_sync_settings.add_webhook")}
+                            </span>{" "}
+                            {tr("pages.settings.webhook_sync_settings.and_paste_the_url_above")}
                           </li>
                           <li>
-                            Save. Plex sends events automatically — no per-event toggles to
-                            configure.
+                            {tr(
+                              "pages.settings.webhook_sync_settings.save_plex_sends_events_automatically_no_per_event_toggles_to",
+                            )}
                           </li>
                         </ol>
                       ) : null}
@@ -1044,22 +1153,44 @@ export default function WebhookSyncSettings() {
                         <div className="space-y-4 text-sm">
                           <ol className="text-muted-foreground list-decimal space-y-1.5 pl-5 leading-relaxed">
                             <li>
-                              In the Emby dashboard, open{" "}
-                              <span className="text-foreground">Notifications</span> and add a new{" "}
-                              <span className="text-foreground">Webhooks</span> notification.
+                              {tr(
+                                "pages.settings.webhook_sync_settings.in_the_emby_dashboard_open",
+                              )}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.notifications")}
+                              </span>{" "}
+                              {tr("pages.settings.webhook_sync_settings.and_add_a_new")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.webhooks")}
+                              </span>{" "}
+                              {tr("pages.settings.webhook_sync_settings.notification")}
                             </li>
                             <li>
-                              Paste the URL above into <span className="text-foreground">Url</span>,
-                              and set <span className="text-foreground">Request content type</span>{" "}
-                              to <span className="text-foreground">application/json</span>.
+                              {tr("pages.settings.webhook_sync_settings.paste_the_url_above_into")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.url")}
+                              </span>
+                              {tr("pages.settings.webhook_sync_settings.and_set")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.request_content_type")}
+                              </span>{" "}
+                              {tr("pages.settings.webhook_sync_settings.to")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.application_json")}
+                              </span>
+                              .
                             </li>
-                            <li>Enable the events listed below, then save.</li>
+                            <li>
+                              {tr(
+                                "pages.settings.webhook_sync_settings.enable_the_events_listed_below_then_save",
+                              )}
+                            </li>
                           </ol>
 
                           <EventMatrix
                             sections={[
                               {
-                                label: "Required",
+                                label: tr("pages.settings.webhook_sync_settings.required"),
                                 tone: "required",
                                 items: [
                                   {
@@ -1069,7 +1200,7 @@ export default function WebhookSyncSettings() {
                                 ],
                               },
                               {
-                                label: "Recommended",
+                                label: tr("pages.settings.webhook_sync_settings.recommended"),
                                 tone: "recommended",
                                 items: [
                                   {
@@ -1083,7 +1214,7 @@ export default function WebhookSyncSettings() {
                                 ],
                               },
                               {
-                                label: "Skip",
+                                label: tr("common.actions.skip"),
                                 tone: "skip",
                                 items: [
                                   {
@@ -1100,37 +1231,73 @@ export default function WebhookSyncSettings() {
                         <div className="space-y-4 text-sm">
                           <ol className="text-muted-foreground list-decimal space-y-1.5 pl-5 leading-relaxed">
                             <li>
-                              Install the official <span className="text-foreground">Webhook</span>{" "}
-                              plugin from{" "}
-                              <span className="text-foreground">Dashboard → Plugins → Catalog</span>{" "}
-                              and restart Jellyfin.
+                              {tr("pages.settings.webhook_sync_settings.install_the_official")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.webhook")}
+                              </span>{" "}
+                              {tr("pages.settings.webhook_sync_settings.plugin_from")}{" "}
+                              <span className="text-foreground">
+                                {tr(
+                                  "pages.settings.webhook_sync_settings.dashboard_plugins_catalog",
+                                )}
+                              </span>{" "}
+                              {tr("pages.settings.webhook_sync_settings.and_restart_jellyfin")}
                             </li>
                             <li>
-                              Open{" "}
-                              <span className="text-foreground">Dashboard → Plugins → Webhook</span>{" "}
-                              and add a <span className="text-foreground">Generic Destination</span>
+                              {tr("pages.settings.webhook_sync_settings.open")}{" "}
+                              <span className="text-foreground">
+                                {tr(
+                                  "pages.settings.webhook_sync_settings.dashboard_plugins_webhook",
+                                )}
+                              </span>{" "}
+                              {tr("pages.settings.webhook_sync_settings.and_add_a")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.generic_destination")}
+                              </span>
                               .
                             </li>
                             <li>
-                              Paste the URL above into{" "}
-                              <span className="text-foreground">Webhook Url</span>.
+                              {tr("pages.settings.webhook_sync_settings.paste_the_url_above_into")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.webhook_url_54038d3a")}
+                              </span>
+                              .
                             </li>
                             <li>
-                              Under <span className="text-foreground">Notification Type</span>,
-                              enable only <span className="text-foreground">Playback Stop</span>.
-                              Leave <span className="text-foreground">Playback Progress</span> and{" "}
-                              <span className="text-foreground">User Data Saved</span> off — Silo
-                              ignores them and they generate heavy traffic.
+                              {tr("pages.settings.webhook_sync_settings.under")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.notification_type")}
+                              </span>
+                              {tr("pages.settings.webhook_sync_settings.enable_only")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.playback_stop")}
+                              </span>
+                              {tr("pages.settings.webhook_sync_settings.leave")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.playback_progress")}
+                              </span>{" "}
+                              {tr("pages.settings.webhook_sync_settings.and")}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.user_data_saved")}
+                              </span>{" "}
+                              {tr(
+                                "pages.settings.webhook_sync_settings.off_silo_ignores_them_and_they_generate_heavy_traffic",
+                              )}
                             </li>
                             <li>
-                              Paste the template below into{" "}
-                              <span className="text-foreground">Template</span> and save.
+                              {tr(
+                                "pages.settings.webhook_sync_settings.paste_the_template_below_into",
+                              )}{" "}
+                              <span className="text-foreground">
+                                {tr("pages.settings.webhook_sync_settings.template")}
+                              </span>{" "}
+                              {tr("pages.settings.webhook_sync_settings.and_save")}
                             </li>
                           </ol>
 
                           <div className="space-y-1.5">
                             <Label className="text-muted-foreground text-xs">
-                              Webhook payload template
+                              {tr("pages.settings.webhook_sync_settings.webhook_payload_template")}
                             </Label>
                             <textarea
                               readOnly
@@ -1143,7 +1310,7 @@ export default function WebhookSyncSettings() {
                               onClick={() => void copyText(JELLYFIN_TEMPLATE)}
                             >
                               <Copy className="h-3.5 w-3.5" />
-                              Copy template
+                              {tr("pages.settings.webhook_sync_settings.copy_template")}
                             </Button>
                           </div>
                         </div>
@@ -1157,13 +1324,15 @@ export default function WebhookSyncSettings() {
 
           {/* Recent deliveries — table */}
           <SettingsGroup
-            title="Recent deliveries"
-            description="Latest webhook requests for this connection."
+            title={tr("pages.settings.webhook_sync_settings.recent_deliveries")}
+            description={tr(
+              "pages.settings.webhook_sync_settings.latest_webhook_requests_for_this_connection",
+            )}
           >
             {eventsQuery.isLoading ? (
               <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading deliveries...
+                {tr("pages.settings.webhook_sync_settings.loading_deliveries")}
               </div>
             ) : eventsQuery.isError ? (
               <div className="flex items-start gap-2.5 rounded-md bg-red-500/10 px-3 py-2.5">
@@ -1171,7 +1340,9 @@ export default function WebhookSyncSettings() {
                 <p className="text-sm leading-relaxed text-red-300">
                   {eventsQuery.error instanceof Error
                     ? eventsQuery.error.message
-                    : "Failed to load recent webhook deliveries"}
+                    : tr(
+                        "pages.settings.webhook_sync_settings.failed_to_load_recent_webhook_deliveries",
+                      )}
                 </p>
               </div>
             ) : (eventsQuery.data?.length ?? 0) > 0 ? (
@@ -1183,7 +1354,7 @@ export default function WebhookSyncSettings() {
                     <Input
                       value={eventSearch}
                       onChange={(e) => setEventSearch(e.target.value)}
-                      placeholder="Search events..."
+                      placeholder={tr("pages.settings.webhook_sync_settings.search_events")}
                       className="h-8 pl-8 text-xs"
                     />
                   </div>
@@ -1197,7 +1368,9 @@ export default function WebhookSyncSettings() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All outcomes</SelectItem>
+                      <SelectItem value="all">
+                        {tr("pages.settings.webhook_sync_settings.all_outcomes")}
+                      </SelectItem>
                       {(Object.keys(EVENT_OUTCOME_LABEL) as WebhookSyncEventLog["outcome"][]).map(
                         (key) => (
                           <SelectItem key={key} value={key}>
@@ -1214,11 +1387,21 @@ export default function WebhookSyncSettings() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Status</TableHead>
-                        <TableHead className="text-xs">Event</TableHead>
-                        <TableHead className="text-xs">Item</TableHead>
-                        <TableHead className="text-xs">User</TableHead>
-                        <TableHead className="text-right text-xs">Time</TableHead>
+                        <TableHead className="text-xs">
+                          {tr("pages.settings.webhook_sync_settings.status")}
+                        </TableHead>
+                        <TableHead className="text-xs">
+                          {tr("pages.settings.webhook_sync_settings.event")}
+                        </TableHead>
+                        <TableHead className="text-xs">
+                          {tr("pages.settings.webhook_sync_settings.item")}
+                        </TableHead>
+                        <TableHead className="text-xs">
+                          {tr("pages.settings.webhook_sync_settings.user_9f8a2389")}
+                        </TableHead>
+                        <TableHead className="text-right text-xs">
+                          {tr("pages.settings.webhook_sync_settings.time")}
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1246,7 +1429,9 @@ export default function WebhookSyncSettings() {
                           </TableCell>
                           <TableCell className="max-w-[200px] text-xs">
                             {eventMatchedItemLabel(event) ?? (
-                              <span className="text-muted-foreground">&mdash;</span>
+                              <span className="text-muted-foreground">
+                                {tr("pages.settings.webhook_sync_settings.mdash")}
+                              </span>
                             )}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-xs">
@@ -1261,7 +1446,9 @@ export default function WebhookSyncSettings() {
                   </Table>
                 ) : (
                   <p className="text-muted-foreground py-4 text-center text-sm">
-                    No deliveries match the current filters.
+                    {tr(
+                      "pages.settings.webhook_sync_settings.no_deliveries_match_the_current_filters",
+                    )}
                   </p>
                 )}
 
@@ -1269,7 +1456,10 @@ export default function WebhookSyncSettings() {
                 {filteredEvents.length > EVENTS_PER_PAGE ? (
                   <div className="border-border/40 flex items-center justify-between border-t px-1 pt-3">
                     <span className="text-muted-foreground text-xs tracking-tight tabular-nums">
-                      {eventRangeStart}&ndash;{eventRangeEnd} of {filteredEvents.length}
+                      {eventRangeStart}
+                      {tr("pages.settings.webhook_sync_settings.ndash")}
+                      {eventRangeEnd} {tr("pages.settings.webhook_sync_settings.of")}{" "}
+                      {filteredEvents.length}
                     </span>
                     <div className="flex items-center gap-0.5">
                       <Button
@@ -1278,7 +1468,7 @@ export default function WebhookSyncSettings() {
                         className="h-7 w-7"
                         disabled={eventPageClamped <= 0}
                         onClick={() => setEventPage(0)}
-                        title="First page"
+                        title={tr("pages.settings.webhook_sync_settings.first_page")}
                       >
                         <ChevronsLeft className="h-3.5 w-3.5" />
                       </Button>
@@ -1288,7 +1478,7 @@ export default function WebhookSyncSettings() {
                         className="h-7 w-7"
                         disabled={eventPageClamped <= 0}
                         onClick={() => setEventPage((p) => Math.max(0, p - 1))}
-                        title="Previous page"
+                        title={tr("pages.settings.webhook_sync_settings.previous_page")}
                       >
                         <ChevronLeft className="h-3.5 w-3.5" />
                       </Button>
@@ -1298,7 +1488,7 @@ export default function WebhookSyncSettings() {
                         className="h-7 w-7"
                         disabled={eventPageClamped >= eventTotalPages - 1}
                         onClick={() => setEventPage((p) => Math.min(eventTotalPages - 1, p + 1))}
-                        title="Next page"
+                        title={tr("pages.settings.webhook_sync_settings.next_page")}
                       >
                         <ChevronRight className="h-3.5 w-3.5" />
                       </Button>
@@ -1308,7 +1498,7 @@ export default function WebhookSyncSettings() {
                         className="h-7 w-7"
                         disabled={eventPageClamped >= eventTotalPages - 1}
                         onClick={() => setEventPage(eventTotalPages - 1)}
-                        title="Last page"
+                        title={tr("pages.settings.webhook_sync_settings.last_page")}
                       >
                         <ChevronsRight className="h-3.5 w-3.5" />
                       </Button>
@@ -1318,7 +1508,9 @@ export default function WebhookSyncSettings() {
               </>
             ) : (
               <p className="text-muted-foreground text-sm">
-                No deliveries yet. Send a test event from the provider to confirm the connection.
+                {tr(
+                  "pages.settings.webhook_sync_settings.no_deliveries_yet_send_a_test_event_from_the_provider",
+                )}
               </p>
             )}
           </SettingsGroup>
@@ -1332,7 +1524,8 @@ export default function WebhookSyncSettings() {
             <DialogHeader>
               <DialogTitle className="text-base">{selectedEvent.summary}</DialogTitle>
               <DialogDescription>
-                {formatTimestamp(selectedEvent.received_at)} · HTTP {selectedEvent.http_status}
+                {formatTimestamp(selectedEvent.received_at)}{" "}
+                {tr("pages.settings.webhook_sync_settings.http")} {selectedEvent.http_status}
               </DialogDescription>
             </DialogHeader>
 
@@ -1359,7 +1552,9 @@ export default function WebhookSyncSettings() {
               {/* Attributes */}
               {Object.keys(selectedEvent.attrs ?? {}).length > 0 ? (
                 <div className="space-y-1.5">
-                  <Label className="text-muted-foreground text-xs">Attributes</Label>
+                  <Label className="text-muted-foreground text-xs">
+                    {tr("pages.settings.webhook_sync_settings.attributes")}
+                  </Label>
                   <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
                     {Object.entries(selectedEvent.attrs ?? {})
                       .filter(([, v]) => v !== "" && v != null)
@@ -1379,7 +1574,9 @@ export default function WebhookSyncSettings() {
               {/* Body excerpt */}
               {selectedEvent.body_excerpt ? (
                 <div className="space-y-1.5">
-                  <Label className="text-muted-foreground text-xs">Body excerpt</Label>
+                  <Label className="text-muted-foreground text-xs">
+                    {tr("pages.settings.webhook_sync_settings.body_excerpt")}
+                  </Label>
                   <pre className="bg-background max-h-60 overflow-auto rounded-md border px-3 py-2 text-xs whitespace-pre-wrap">
                     {selectedEvent.body_excerpt}
                   </pre>
@@ -1389,7 +1586,7 @@ export default function WebhookSyncSettings() {
               {/* Request ID */}
               {selectedEvent.request_id ? (
                 <p className="text-muted-foreground text-xs">
-                  Request ID: {selectedEvent.request_id}
+                  {tr("pages.settings.webhook_sync_settings.request_id")} {selectedEvent.request_id}
                 </p>
               ) : null}
             </div>

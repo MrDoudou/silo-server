@@ -7,6 +7,8 @@ import type { SubtitleInventoryItemV3 } from "../protocol-v3";
 import type { PlayerSubtitleInfo, PlayerSubtitleTrackSignature } from "../types";
 import { derivePersistedSubtitleMode } from "./subtitleMode";
 
+import { tr } from "@/i18n/translate";
+
 /** One PUT the player issues to persist a subtitle choice. */
 export interface SubtitleChoiceRequest {
   path: string;
@@ -67,10 +69,15 @@ export function buildSubtitleChoiceRequests({
           index,
           language: inventoryTrack.language ?? "",
           codec: inventoryTrack.codec,
-          label:
-            inventoryTrack.label ??
-            inventoryTrack.language ??
-            `Track ${inventoryTrack.combined_index + 1}`,
+          get label() {
+            return (
+              inventoryTrack.label ??
+              inventoryTrack.language ??
+              tr("player.utils.subtitle_choice_persistence.track_track_number", {
+                trackNumber: inventoryTrack.combined_index + 1,
+              })
+            );
+          },
           source: subtitleSourceOf(inventoryTrack.source),
           forced: inventoryTrack.forced,
           hearing_impaired: inventoryTrack.hearing_impaired,

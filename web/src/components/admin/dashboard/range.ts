@@ -1,6 +1,8 @@
 import { formatDate, formatTime, preferredDateLocale } from "@/lib/datetime";
 import type { WidgetRange } from "./types";
 
+import { tr } from "@/i18n/translate";
+
 /**
  * How a `WidgetRange` turns into request parameters and into words.
  *
@@ -40,34 +42,34 @@ const RANGE_DAYS: Record<WidgetRange, number> = {
 
 /** Compact label for the segmented control. */
 const RANGE_LABELS: Record<WidgetRange, string> = {
-  hour: "1h",
-  day: "24h",
-  week: "7d",
-  month: "30d",
+  hour: "components.admin.dashboard.range.value_1h",
+  day: "components.admin.dashboard.range.value_24h",
+  week: "components.admin.dashboard.range.value_7d",
+  month: "components.admin.dashboard.range.value_30d",
 };
 
 /** Spoken form, for aria-labels and prose ("No plays in the last 7 days"). */
 const RANGE_PHRASES: Record<WidgetRange, string> = {
-  hour: "the last hour",
-  day: "the last 24 hours",
-  week: "the last 7 days",
-  month: "the last 30 days",
+  hour: "components.admin.dashboard.range.the_last_hour",
+  day: "components.admin.dashboard.range.the_last_24_hours",
+  week: "components.admin.dashboard.range.the_last_7_days",
+  month: "components.admin.dashboard.range.the_last_30_days",
 };
 
 /** Card-title suffix, e.g. "Egress · last 30 d". */
 const RANGE_TITLE_SUFFIXES: Record<WidgetRange, string> = {
-  hour: "last 1 h",
-  day: "last 24 h",
-  week: "last 7 d",
-  month: "last 30 d",
+  hour: "components.admin.dashboard.range.last_1_h",
+  day: "components.admin.dashboard.range.last_24_h",
+  week: "components.admin.dashboard.range.last_7_d",
+  month: "components.admin.dashboard.range.last_30_d",
 };
 
 /** Leading edge label on a time axis; the trailing one is always "now". */
 const RANGE_EDGE_LABELS: Record<WidgetRange, string> = {
-  hour: "1h ago",
-  day: "24h ago",
-  week: "7d ago",
-  month: "30d ago",
+  hour: "components.admin.dashboard.range.value_1h_ago",
+  day: "components.admin.dashboard.range.value_24h_ago",
+  week: "components.admin.dashboard.range.value_7d_ago",
+  month: "components.admin.dashboard.range.value_30d_ago",
 };
 
 export function rangeHours(range: WidgetRange): number {
@@ -79,21 +81,24 @@ export function rangeDays(range: WidgetRange): number {
 }
 
 export function rangeLabel(range: WidgetRange): string {
-  return RANGE_LABELS[range];
+  return tr(RANGE_LABELS[range]);
 }
 
 export function rangePhrase(range: WidgetRange): string {
-  return RANGE_PHRASES[range];
+  return tr(RANGE_PHRASES[range]);
 }
 
 /** "Playback activity · last 24 h" — one format for every ranged widget. */
-export function rangeTitle(title: string, range: WidgetRange): string {
-  return `${title} · ${RANGE_TITLE_SUFFIXES[range]}`;
+export function rangeTitle(titleKey: string, range: WidgetRange): string {
+  return tr("components.admin.dashboard.range.title_range", {
+    title: tr(titleKey),
+    range: tr(RANGE_TITLE_SUFFIXES[range]),
+  });
 }
 
 /** Axis edges: how far back the window starts, and where it ends. */
 export function rangeEdgeLabels(range: WidgetRange): { start: string; end: string } {
-  return { start: RANGE_EDGE_LABELS[range], end: "now" };
+  return { start: tr(RANGE_EDGE_LABELS[range]), end: tr("components.admin.dashboard.range.now") };
 }
 
 /**

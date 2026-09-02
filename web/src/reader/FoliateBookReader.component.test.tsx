@@ -371,7 +371,16 @@ describe("FoliateBookReader open flow", () => {
 
   it("surfaces a user-facing error when the ebook file fails to load", async () => {
     mocks.apiBlob.mockRejectedValue(
-      new Error("This file is too large to open in the browser (3072 MiB, limit 512 MiB)."),
+      Object.assign(
+        new Error("This file is too large to open in the browser (3072 MiB, limit 512 MiB)."),
+        {
+          name: "ApiClientError",
+          status: 413,
+          code: "response_too_large",
+          params: { size_mib: 3072, limit_mib: 512 },
+          translationKey: "errors.api_client.response_too_large",
+        },
+      ),
     );
 
     await act(async () => {

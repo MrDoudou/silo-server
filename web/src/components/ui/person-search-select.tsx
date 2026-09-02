@@ -6,6 +6,8 @@ import { usePersonSearch } from "@/hooks/queries/people";
 import { useDebounce } from "@/hooks/useDebounce";
 import { cn } from "@/lib/utils";
 import { PortalContainerContext } from "./portal-container-context";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface PersonSearchSelectProps {
   value: string;
@@ -20,6 +22,7 @@ export function PersonSearchSelect({
   placeholder = "Search people...",
   disabled = false,
 }: PersonSearchSelectProps) {
+  useUILanguage();
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [focusedIndex, setFocusedIndex] = React.useState(-1);
@@ -107,8 +110,8 @@ export function PersonSearchSelect({
                 setFocusedIndex(-1);
               }}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Search people..."
-              aria-label="Search people"
+              placeholder={tr("components.ui.person_search_select.search_people")}
+              aria-label={tr("components.ui.person_search_select.search_people_b565ea6b")}
               aria-controls={listboxId}
               aria-activedescendant={
                 focusedIndex >= 0 ? `${listboxId}-opt-${focusedIndex}` : undefined
@@ -124,15 +127,19 @@ export function PersonSearchSelect({
             className="max-h-60 overflow-y-auto overscroll-contain p-1"
           >
             {resultsQuery.isLoading ? (
-              <p className="text-muted-foreground py-4 text-center text-sm">Loading...</p>
+              <p className="text-muted-foreground py-4 text-center text-sm">
+                {tr("components.ui.person_search_select.loading")}
+              </p>
             ) : options.length === 0 ? (
               <p className="text-muted-foreground py-4 text-center text-sm">
-                {debouncedQuery ? "No people found" : "Start typing to search"}
+                {debouncedQuery
+                  ? tr("components.ui.person_search_select.no_people_found")
+                  : tr("components.ui.person_search_select.start_typing_to_search")}
               </p>
             ) : (
               <>
                 <button
-                  id={`${listboxId}-opt-0`}
+                  id={listboxId + "-opt-0"}
                   type="button"
                   role="option"
                   aria-selected={!value}
@@ -149,12 +156,14 @@ export function PersonSearchSelect({
                   <Check
                     className={cn("mr-2 h-4 w-4 shrink-0", value ? "opacity-0" : "opacity-100")}
                   />
-                  <span className="text-muted-foreground italic">Any</span>
+                  <span className="text-muted-foreground italic">
+                    {tr("components.ui.person_search_select.any")}
+                  </span>
                 </button>
 
                 {options.map((option, index) => (
                   <button
-                    id={`${listboxId}-opt-${index + 1}`}
+                    id={listboxId + "-opt-" + (index + 1)}
                     key={option}
                     type="button"
                     role="option"

@@ -11,6 +11,8 @@ import { useBuildInfo } from "@/hooks/queries/admin/system";
 import { cn } from "@/lib/utils";
 import { SectionError } from "../feedback";
 import { formatLatency, formatUptime } from "../format";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * One-line deployment health.
@@ -21,6 +23,7 @@ import { formatLatency, formatUptime } from "../format";
  * dashboard two answers that can disagree.
  */
 export function HealthStripWidget() {
+  useUILanguage();
   const statusQuery = useAdminServerStatus();
   const buildQuery = useBuildInfo();
   const nodesQuery = useAdminNodes();
@@ -48,7 +51,11 @@ export function HealthStripWidget() {
     return (
       <Card className="h-full justify-center py-3">
         <CardContent>
-          <SectionError message="Failed to load server health." />
+          <SectionError
+            message={tr(
+              "components.admin.dashboard.widgets.health_strip_widget.failed_to_load_server_health",
+            )}
+          />
         </CardContent>
       </Card>
     );
@@ -61,22 +68,38 @@ export function HealthStripWidget() {
       <CardContent className="grid min-h-0 flex-1 grid-cols-2 content-center gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <HealthCell
           icon={Tag}
-          label="Version"
+          label={tr("components.admin.dashboard.widgets.health_strip_widget.version")}
           value={buildNumber > 0 ? `${buildNumber} · ${versionDisplay}` : versionDisplay}
-          detail={buildQuery.data?.dirty ? "dirty build" : undefined}
+          detail={
+            buildQuery.data?.dirty
+              ? tr("components.admin.dashboard.widgets.health_strip_widget.dirty_build")
+              : undefined
+          }
         />
         <HealthCell
           icon={Clock}
-          label="Uptime"
+          label={tr("components.admin.dashboard.widgets.health_strip_widget.uptime")}
           value={formatUptime(status.started_at)}
-          detail={status.restart_required ? "restart required" : undefined}
+          detail={
+            status.restart_required
+              ? tr("components.admin.dashboard.widgets.health_strip_widget.restart_required")
+              : undefined
+          }
           tone={status.restart_required ? "warn" : undefined}
         />
-        <DependencyCell icon={Database} label="Postgres" component={health?.postgres} />
-        <DependencyCell icon={Zap} label="Redis" component={health?.redis} />
+        <DependencyCell
+          icon={Database}
+          label={tr("components.admin.dashboard.widgets.health_strip_widget.postgres")}
+          component={health?.postgres}
+        />
+        <DependencyCell
+          icon={Zap}
+          label={tr("components.admin.dashboard.widgets.health_strip_widget.redis")}
+          component={health?.redis}
+        />
         <HealthCell
           icon={Server}
-          label="Nodes"
+          label={tr("components.admin.dashboard.widgets.health_strip_widget.nodes")}
           value={
             !nodesReady
               ? "—"
@@ -87,19 +110,27 @@ export function HealthStripWidget() {
           detail={
             !nodesReady
               ? nodesQuery.isError
-                ? "unavailable"
+                ? tr("components.admin.dashboard.widgets.health_strip_widget.unavailable")
                 : undefined
               : enabledNodes.length === 0
-                ? "this server transcodes"
-                : "healthy"
+                ? tr(
+                    "components.admin.dashboard.widgets.health_strip_widget.this_server_transcodes",
+                  )
+                : tr("components.admin.dashboard.widgets.health_strip_widget.healthy")
           }
           tone={nodesReady && healthyNodes < enabledNodes.length ? "warn" : undefined}
         />
         <HealthCell
           icon={AlertTriangle}
-          label="Errors · 24h"
+          label={tr("components.admin.dashboard.widgets.health_strip_widget.errors_24h")}
           value={health ? health.errors_24h.toLocaleString() : "—"}
-          detail={health ? `${health.warnings_24h.toLocaleString()} warnings` : undefined}
+          detail={
+            health
+              ? tr("components.admin.dashboard.widgets.health_strip_widget.count_warnings", {
+                  count: health.warnings_24h.toLocaleString(),
+                })
+              : undefined
+          }
           tone={health && health.errors_24h > 0 ? "error" : undefined}
           to="/admin/logs"
         />
@@ -122,11 +153,19 @@ function DependencyCell({
   label: string;
   component: AdminHealthComponent | undefined;
 }) {
+  useUILanguage();
   if (!component) {
     return <HealthCell icon={icon} label={label} value="—" />;
   }
   if (!component.configured) {
-    return <HealthCell icon={icon} label={label} value="Not configured" detail="optional" />;
+    return (
+      <HealthCell
+        icon={icon}
+        label={label}
+        value="Not configured"
+        detail={tr("components.admin.dashboard.widgets.health_strip_widget.optional")}
+      />
+    );
   }
   if (!component.ok) {
     return <HealthCell icon={icon} label={label} value="Unreachable" tone="error" />;
@@ -156,6 +195,7 @@ function HealthCell({
   tone?: "warn" | "error";
   to?: string;
 }) {
+  useUILanguage();
   const body = (
     <>
       <div className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium">
@@ -182,6 +222,7 @@ function HealthCell({
 }
 
 function CellShell({ to, children }: { to?: string; children: ReactNode }) {
+  useUILanguage();
   const className = "bg-surface border-border min-w-0 rounded-lg border p-2.5";
   if (to) {
     return (

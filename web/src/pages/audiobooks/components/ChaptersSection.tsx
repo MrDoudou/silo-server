@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { ArrowUpDown, ChevronDown, Play } from "lucide-react";
 import type { AudiobookChapter, AudiobookFile } from "@/lib/audiobooks/types";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ChaptersSectionProps {
   files: AudiobookFile[];
@@ -29,7 +31,14 @@ function buildRows(files: AudiobookFile[]): Row[] {
           chapter: ch,
           absoluteStart: offset + ch.start_seconds,
           durationSeconds: Math.max(0, (ch.end_seconds ?? ch.start_seconds) - ch.start_seconds),
-          label: ch.title || `Chapter ${ch.index + 1}`,
+          get label() {
+            return (
+              ch.title ||
+              tr("pages.audiobooks.components.chapters_section.chapter_chapter_number", {
+                chapterNumber: ch.index + 1,
+              })
+            );
+          },
           positionIndex: positionIndex++,
         });
       }
@@ -54,6 +63,7 @@ function formatChapterStart(totalSeconds: number): string {
 }
 
 export function ChaptersSection({ files, currentPositionSeconds, onSelect }: ChaptersSectionProps) {
+  useUILanguage();
   const rows = useMemo(() => buildRows(files), [files]);
   const [sort, setSort] = useState<SortMode>("position");
   const [sortOpen, setSortOpen] = useState(false);
@@ -86,22 +96,24 @@ export function ChaptersSection({ files, currentPositionSeconds, onSelect }: Cha
           aria-expanded={expanded}
           className="hover:text-primary flex items-center gap-2 text-xl font-semibold tracking-tight transition-colors"
         >
-          <ChevronDown className={`h-5 w-5 transition-transform ${expanded ? "" : "-rotate-90"}`} />
-          Chapters
+          <ChevronDown
+            className={"h-5 w-5 transition-transform " + (expanded ? "" : "-rotate-90")}
+          />
+          {tr("pages.audiobooks.components.chapters_section.chapters")}
           <span className="text-muted-foreground text-sm font-normal">({rows.length})</span>
         </button>
         {expanded && (
           <div className="relative">
             <button
               type="button"
-              aria-label="Sort chapters"
+              aria-label={tr("pages.audiobooks.components.chapters_section.sort_chapters")}
               aria-haspopup="menu"
               aria-expanded={sortOpen}
               className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
               onClick={() => setSortOpen((v) => !v)}
             >
               <ArrowUpDown className="h-3.5 w-3.5" />
-              Sort
+              {tr("pages.audiobooks.components.chapters_section.sort")}
             </button>
             {sortOpen && (
               <div
@@ -120,7 +132,9 @@ export function ChaptersSection({ files, currentPositionSeconds, onSelect }: Cha
                       setSortOpen(false);
                     }}
                   >
-                    {mode === "position" ? "By position" : "Longest first"}
+                    {mode === "position"
+                      ? tr("pages.audiobooks.components.chapters_section.by_position")
+                      : tr("pages.audiobooks.components.chapters_section.longest_first")}
                   </button>
                 ))}
               </div>
@@ -139,9 +153,10 @@ export function ChaptersSection({ files, currentPositionSeconds, onSelect }: Cha
                   type="button"
                   onClick={() => onSelect(row.absoluteStart)}
                   data-current={isCurrent ? "true" : undefined}
-                  className={`hover:bg-muted/50 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
-                    isCurrent ? "bg-muted/50 border-primary border-l-2" : ""
-                  }`}
+                  className={
+                    "hover:bg-muted/50 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors " +
+                    (isCurrent ? "bg-muted/50 border-primary border-l-2" : "")
+                  }
                 >
                   <span className="text-muted-foreground w-8 shrink-0 text-right text-xs tabular-nums">
                     {row.positionIndex}
@@ -155,7 +170,8 @@ export function ChaptersSection({ files, currentPositionSeconds, onSelect }: Cha
                   </span>
                   {isCurrent && (
                     <span className="text-primary flex shrink-0 items-center gap-1 text-xs">
-                      <Play className="h-3 w-3 fill-current" /> listening
+                      <Play className="h-3 w-3 fill-current" />{" "}
+                      {tr("pages.audiobooks.components.chapters_section.listening")}
                     </span>
                   )}
                 </button>

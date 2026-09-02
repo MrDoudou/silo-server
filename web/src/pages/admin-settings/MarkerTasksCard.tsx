@@ -8,6 +8,8 @@ import { useEventChannel } from "@/components/realtimeEventsContext";
 import { Button } from "@/components/ui/button";
 import { useTasks, useRunTask } from "@/hooks/queries/admin/tasks";
 import { formatDateTime } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function numberFromResultData(data: Record<string, unknown> | undefined, key: string) {
   const value = data?.[key];
@@ -49,6 +51,7 @@ function TaskActionRow({
   onRun: () => void;
   pending: boolean;
 }) {
+  useUILanguage();
   const key = task?.key;
   const running = task?.state === "running" || task?.state === "cancelling";
 
@@ -62,13 +65,17 @@ function TaskActionRow({
         <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
           {task?.description ?? fallbackDescription}
         </p>
-        <p className="text-muted-foreground mt-1 text-xs">Last result: {formatTaskResult(task)}</p>
+        <p className="text-muted-foreground mt-1 text-xs">
+          {tr("pages.admin_settings.marker_tasks_card.last_result")} {formatTaskResult(task)}
+        </p>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {key && (
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/admin/tasks/${key}`}>History</Link>
+            <Link to={"/admin/tasks/" + key}>
+              {tr("pages.admin_settings.marker_tasks_card.history")}
+            </Link>
           </Button>
         )}
         <Button type="button" size="sm" onClick={onRun} disabled={!task || running || pending}>
@@ -77,7 +84,9 @@ function TaskActionRow({
           ) : (
             <Play className="h-3.5 w-3.5" />
           )}
-          {running ? "Running" : "Run now"}
+          {running
+            ? tr("pages.admin_settings.marker_tasks_card.running")
+            : tr("pages.admin_settings.marker_tasks_card.run_now")}
         </Button>
       </div>
     </div>

@@ -11,6 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CollectionRulesEditorProps {
   value: QueryDefinition;
@@ -35,6 +37,7 @@ export default function CollectionRulesEditor({
   sortRelevanceScope,
   readOnly = false,
 }: CollectionRulesEditorProps) {
+  useUILanguage();
   const filterConfig: FilterConfig = {
     match: value.match,
     groups: value.groups,
@@ -54,7 +57,7 @@ export default function CollectionRulesEditor({
         >
           {showMediaScopeSelector ? (
             <div className="space-y-2">
-              <Label>Media Scope</Label>
+              <Label>{tr("components.collections.collection_rules_editor.media_scope")}</Label>
               <Select
                 value={value.media_scope ?? "all"}
                 onValueChange={(next) => {
@@ -80,12 +83,24 @@ export default function CollectionRulesEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Media</SelectItem>
-                  <SelectItem value="movie">Movies</SelectItem>
-                  <SelectItem value="series">Series</SelectItem>
-                  <SelectItem value="episode">Episodes</SelectItem>
-                  <SelectItem value="audiobook">Audiobooks</SelectItem>
-                  <SelectItem value="ebook">Ebooks</SelectItem>
+                  <SelectItem value="all">
+                    {tr("components.collections.collection_rules_editor.all_media")}
+                  </SelectItem>
+                  <SelectItem value="movie">
+                    {tr("components.collections.collection_rules_editor.movies")}
+                  </SelectItem>
+                  <SelectItem value="series">
+                    {tr("components.collections.collection_rules_editor.series")}
+                  </SelectItem>
+                  <SelectItem value="episode">
+                    {tr("components.collections.collection_rules_editor.episodes")}
+                  </SelectItem>
+                  <SelectItem value="audiobook">
+                    {tr("components.collections.collection_rules_editor.audiobooks")}
+                  </SelectItem>
+                  <SelectItem value="ebook">
+                    {tr("components.collections.collection_rules_editor.ebooks")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -93,7 +108,7 @@ export default function CollectionRulesEditor({
 
           {allowLibrarySelection ? (
             <div className="space-y-2">
-              <Label>Libraries</Label>
+              <Label>{tr("components.collections.collection_rules_editor.libraries")}</Label>
               <LibraryMultiSelect
                 libraries={libraries}
                 value={value.library_ids}
@@ -105,7 +120,7 @@ export default function CollectionRulesEditor({
       ) : null}
 
       <div className="space-y-2">
-        <Label>Rule Groups</Label>
+        <Label>{tr("components.collections.collection_rules_editor.rule_groups")}</Label>
         <FilterRuleEditor
           value={filterConfig}
           allowPersonalizedFilters={allowPersonalizedFilters}

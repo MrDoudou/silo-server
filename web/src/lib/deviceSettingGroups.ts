@@ -1,6 +1,8 @@
 import { SETTING_DEFINITIONS, type SettingKey } from "@/lib/settingsContract";
 import { ALL_DEVICE_SETTING_KEYS } from "@/lib/settingsDisplay";
 
+import { tr } from "@/i18n/translate";
+
 /**
  * Device settings, grouped by what they affect rather than by manifest order.
  *
@@ -25,10 +27,38 @@ export interface DeviceSettingGroup {
 }
 
 const GROUP_META: Record<DeviceSettingGroupId, { title: string; description: string }> = {
-  picture: { title: "Picture", description: "How video looks on this device" },
-  sound: { title: "Sound", description: "Audio on this device" },
-  subtitles: { title: "Subtitles", description: "On this device" },
-  episodes: { title: "Episodes", description: "What happens between episodes" },
+  picture: {
+    get title() {
+      return tr("lib.device_setting_groups.picture");
+    },
+    get description() {
+      return tr("lib.device_setting_groups.how_video_looks_on_this_device");
+    },
+  },
+  sound: {
+    get title() {
+      return tr("lib.device_setting_groups.sound");
+    },
+    get description() {
+      return tr("lib.device_setting_groups.audio_on_this_device");
+    },
+  },
+  subtitles: {
+    get title() {
+      return tr("lib.device_setting_groups.subtitles");
+    },
+    get description() {
+      return tr("lib.device_setting_groups.on_this_device");
+    },
+  },
+  episodes: {
+    get title() {
+      return tr("lib.device_setting_groups.episodes");
+    },
+    get description() {
+      return tr("lib.device_setting_groups.what_happens_between_episodes");
+    },
+  },
 };
 
 const GROUP_ORDER: DeviceSettingGroupId[] = ["picture", "sound", "subtitles", "episodes"];

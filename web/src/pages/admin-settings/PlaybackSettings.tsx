@@ -23,6 +23,8 @@ import {
   parseHWDeviceList,
   toggleHWDevice,
 } from "./playbackSettings.utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Shown without a disclosure: the handful of controls a household admin
 // actually touches.
@@ -48,18 +50,63 @@ const TRANSCODING_ADVANCED_KEYS = [
 ];
 
 const executionOptions = [
-  { value: "prefer_worker", label: "Prefer any worker" },
-  { value: "prefer_transcode", label: "Prefer transcode node" },
-  { value: "worker_only", label: "Any worker only" },
-  { value: "prefer_api", label: "Prefer API server" },
-  { value: "api_only", label: "API server only" },
+  {
+    value: "prefer_worker",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.prefer_any_worker");
+    },
+  },
+  {
+    value: "prefer_transcode",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.prefer_transcode_node");
+    },
+  },
+  {
+    value: "worker_only",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.any_worker_only");
+    },
+  },
+  {
+    value: "prefer_api",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.prefer_api_server");
+    },
+  },
+  {
+    value: "api_only",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.api_server_only");
+    },
+  },
 ];
 
 const egressOptions = [
-  { value: "prefer_proxy", label: "Prefer proxy" },
-  { value: "proxy_only", label: "Proxy only" },
-  { value: "prefer_api", label: "Prefer API server" },
-  { value: "api_only", label: "API server only" },
+  {
+    value: "prefer_proxy",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.prefer_proxy");
+    },
+  },
+  {
+    value: "proxy_only",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.proxy_only");
+    },
+  },
+  {
+    value: "prefer_api",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.prefer_api_server");
+    },
+  },
+  {
+    value: "api_only",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.api_server_only");
+    },
+  },
 ];
 
 type ExecutionWorkload = "remux" | "video_transcode";
@@ -129,34 +176,59 @@ interface RoutingField {
 const ROUTING_FIELDS: readonly RoutingField[] = [
   {
     key: "playback.routing.direct_play_egress",
-    label: "Direct play egress",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.direct_play_egress");
+    },
     kind: "egress",
-    description: "Original bytes need no executor.",
+    get description() {
+      return tr("pages.admin_settings.playback_settings.original_bytes_need_no_executor");
+    },
   },
   {
     key: "playback.routing.remux_execution",
-    label: "Remux execution",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.remux_execution");
+    },
     kind: "execution",
-    description:
-      "A worker can be a proxy or transcode node. Prefer transcode node runs HLS or progressive remux there when supported; progressive output is relayed through the selected proxy.",
+    get description() {
+      return tr(
+        "pages.admin_settings.playback_settings.a_worker_can_be_a_proxy_or_transcode_node_prefer",
+      );
+    },
   },
-  { key: "playback.routing.remux_egress", label: "Remux egress", kind: "egress" },
+  {
+    key: "playback.routing.remux_egress",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.remux_egress");
+    },
+    kind: "egress",
+  },
   {
     key: "playback.routing.video_transcode_execution",
-    label: "Video transcode execution",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.video_transcode_execution");
+    },
     kind: "execution",
-    description: "Video transcode workers are transcode nodes; proxy nodes only provide egress.",
+    get description() {
+      return tr(
+        "pages.admin_settings.playback_settings.video_transcode_workers_are_transcode_nodes_proxy_nodes_only_provide",
+      );
+    },
   },
   {
     key: "playback.routing.video_transcode_egress",
-    label: "Video transcode egress",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.video_transcode_egress");
+    },
     kind: "egress",
   },
 ];
 
 const ROUTING_PRESETS = {
   standard: {
-    label: "Silo Defaults",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.silo_defaults");
+    },
     values: {
       "playback.routing.direct_play_egress": "prefer_proxy",
       "playback.routing.remux_execution": "prefer_transcode",
@@ -166,7 +238,9 @@ const ROUTING_PRESETS = {
     },
   },
   gpu: {
-    label: "GPU offload",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.gpu_offload");
+    },
     values: {
       "playback.routing.direct_play_egress": "prefer_api",
       "playback.routing.remux_execution": "prefer_api",
@@ -176,7 +250,9 @@ const ROUTING_PRESETS = {
     },
   },
   central: {
-    label: "Central egress",
+    get label() {
+      return tr("pages.admin_settings.playback_settings.central_egress");
+    },
     values: {
       "playback.routing.direct_play_egress": "api_only",
       "playback.routing.remux_execution": "prefer_worker",
@@ -204,6 +280,8 @@ const KEYS = [
 
 /** One line of the preferred-path summary: workload on the left, route on the right. */
 function PreferredPathRow({ label, route }: { label: string; route: string }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="flex justify-between gap-5">
       <span className="text-muted-foreground">{label}</span>
@@ -213,6 +291,8 @@ function PreferredPathRow({ label, route }: { label: string; route: string }) {
 }
 
 export default function PlaybackSettings() {
+  useUILanguage();
+  useUILanguage();
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
   const restartKeys = useRestartKeys();
   const hwAccel = form.getValue("playback.hw_accel");
@@ -286,12 +366,13 @@ export default function PlaybackSettings() {
             </SettingFieldStatus>
           ) : hwDetection.isLoading ? (
             <SettingFieldStatus key="detecting" tone="muted">
-              Detecting hardware…
+              {tr("pages.admin_settings.playback_settings.detecting_hardware")}
             </SettingFieldStatus>
           ) : null,
           isNvenc && selectedDevices.length > 1 ? (
             <SettingFieldStatus key="nvenc" tone="warn">
-              NVENC uses the first configured device ({selectedDevices[0]}).
+              {tr("pages.admin_settings.playback_settings.nvenc_uses_the_first_configured_device")}
+              {selectedDevices[0]}).
             </SettingFieldStatus>
           ) : null,
         ].filter(Boolean);
@@ -300,46 +381,59 @@ export default function PlaybackSettings() {
       <span className="flex flex-col items-start gap-1">{hwAccelLines}</span>
     ) : undefined;
 
-  if (form.isLoading) return <div>Loading...</div>;
+  if (form.isLoading) return <div>{tr("pages.admin_settings.playback_settings.loading")}</div>;
 
   return (
     <div className="flex h-full flex-col">
-      <SettingsPageHeader title="Playback" className="mb-8" />
+      <SettingsPageHeader
+        title={tr("pages.admin_settings.playback_settings.playback")}
+        className="mb-8"
+      />
 
       <div className="flex-1 space-y-5">
         <FieldGroup
-          label="Transcoding"
+          label={tr("pages.admin_settings.playback_settings.transcoding")}
           restartAll={allRestart([...TRANSCODING_ESSENTIAL_KEYS, ...TRANSCODING_ADVANCED_KEYS])}
         >
           <SettingField
-            label="Transcoding"
+            label={tr("pages.admin_settings.playback_settings.transcoding")}
             type="toggle"
-            description="Off serves only files clients can already play."
+            description={tr(
+              "pages.admin_settings.playback_settings.off_serves_only_files_clients_can_already_play",
+            )}
             value={form.getValue("playback.transcode_enabled")}
             onChange={(v) => form.setValue("playback.transcode_enabled", v)}
             restartRequired={restartKeys.has("playback.transcode_enabled")}
           />
           <SettingField
-            label="Hardware acceleration"
+            label={tr("pages.admin_settings.playback_settings.hardware_acceleration")}
             type="select"
             options={[
-              { value: "auto", label: "Auto" },
-              { value: "qsv", label: "Intel Quick Sync (QSV)" },
-              { value: "vaapi", label: "VA-API" },
-              { value: "nvenc", label: "NVIDIA NVENC" },
-              { value: "videotoolbox", label: "VideoToolbox (macOS)" },
-              { value: "none", label: "Software" },
+              { value: "auto", label: tr("pages.admin_settings.playback_settings.auto") },
+              {
+                value: "qsv",
+                label: tr("pages.admin_settings.playback_settings.intel_quick_sync_qsv"),
+              },
+              { value: "vaapi", label: tr("pages.admin_settings.playback_settings.va_api") },
+              { value: "nvenc", label: tr("pages.admin_settings.playback_settings.nvidia_nvenc") },
+              {
+                value: "videotoolbox",
+                label: tr("pages.admin_settings.playback_settings.video_toolbox_mac_os"),
+              },
+              { value: "none", label: tr("pages.admin_settings.playback_settings.software") },
             ]}
-            description="Auto picks the best device this server can see."
+            description={tr(
+              "pages.admin_settings.playback_settings.auto_picks_the_best_device_this_server_can_see",
+            )}
             status={hwAccelStatus}
             value={hwAccel}
             onChange={(v) => form.setValue("playback.hw_accel", v)}
             restartRequired={restartKeys.has("playback.hw_accel")}
           />
           <SettingField
-            label="Allow 4K transcoding"
+            label={tr("pages.admin_settings.playback_settings.allow_4_k_transcoding")}
             type="toggle"
-            description="Heavy load on most hardware."
+            description={tr("pages.admin_settings.playback_settings.heavy_load_on_most_hardware")}
             value={form.getValue("allow_4k_transcode")}
             onChange={(v) => form.setValue("allow_4k_transcode", v)}
             restartRequired={restartKeys.has("allow_4k_transcode")}
@@ -351,17 +445,23 @@ export default function PlaybackSettings() {
             forceOpen={anyDirty(TRANSCODING_ADVANCED_KEYS)}
           >
             <PathSettingField
-              label="FFmpeg path"
+              label={tr("pages.admin_settings.playback_settings.ffmpeg_path")}
               defaultValue={DEFAULT_FFMPEG_PATH}
-              description={`Leave blank to use the FFmpeg that ships with the server, at ${DEFAULT_FFMPEG_PATH}.`}
+              description={tr(
+                "pages.admin_settings.playback_settings.leave_blank_to_use_the_ffmpeg_that_ships_with_the",
+                { DEFAULT_FFMPEG_PATH: DEFAULT_FFMPEG_PATH },
+              )}
               value={form.getValue("playback.ffmpeg_path")}
               onChange={(v) => form.setValue("playback.ffmpeg_path", v)}
               restartRequired={restartKeys.has("playback.ffmpeg_path")}
             />
             <PathSettingField
-              label="Transcode directory"
+              label={tr("pages.admin_settings.playback_settings.transcode_directory")}
               defaultValue={DEFAULT_TRANSCODE_DIR}
-              description={`Use fast local storage with room to spare. Leave blank to use ${DEFAULT_TRANSCODE_DIR}.`}
+              description={tr(
+                "pages.admin_settings.playback_settings.use_fast_local_storage_with_room_to_spare_leave_blank",
+                { DEFAULT_TRANSCODE_DIR: DEFAULT_TRANSCODE_DIR },
+              )}
               value={form.getValue("playback.transcode_dir")}
               onChange={(v) => form.setValue("playback.transcode_dir", v)}
               restartRequired={restartKeys.has("playback.transcode_dir")}
@@ -377,17 +477,18 @@ export default function PlaybackSettings() {
                         : "Transcodes balance across the selected devices."
                   }
                 >
-                  GPU devices
+                  {tr("pages.admin_settings.playback_settings.gpu_devices")}
                 </SettingsSubheading>
                 {inventoriesDiverge && (
                   <p className="pb-2 text-xs text-amber-500">
-                    Nodes report different devices. Only paths on every node are safe to select —
-                    for the rest, set per-node overrides on the{" "}
+                    {tr(
+                      "pages.admin_settings.playback_settings.nodes_report_different_devices_only_paths_on_every_node_are",
+                    )}{" "}
                     <Link
                       to="/admin/nodes"
                       className="font-medium underline-offset-2 hover:underline"
                     >
-                      Nodes page
+                      {tr("pages.admin_settings.playback_settings.nodes_page")}
                     </Link>
                     .
                   </p>
@@ -408,7 +509,9 @@ export default function PlaybackSettings() {
                         <span className="block font-mono">{row.path}</span>
                         {row.missingOnNodes.length > 0 && (
                           <span className="mt-0.5 block text-amber-500">
-                            Not present on: {row.missingOnNodes.join(", ")}
+                            {tr("pages.admin_settings.playback_settings.not_present_on_nodes", {
+                              nodes: row.missingOnNodes.join(", "),
+                            })}
                           </span>
                         )}
                       </>
@@ -433,32 +536,38 @@ export default function PlaybackSettings() {
               </div>
             )}
             <SettingField
-              label="Enable Hardware HDR Tone Mapping"
+              label={tr("pages.admin_settings.playback_settings.enable_hardware_hdr_tone_mapping")}
               type="toggle"
-              hint="Allows validated local or remote GPU executors to convert HDR video to SDR when transcoding."
+              hint={tr(
+                "pages.admin_settings.playback_settings.allows_validated_local_or_remote_gpu_executors_to_convert_hdr",
+              )}
               value={form.getValue("playback.transcode_hardware_tone_map_enabled") || "false"}
               onChange={(v) => form.setValue("playback.transcode_hardware_tone_map_enabled", v)}
               restartRequired={restartKeys.has("playback.transcode_hardware_tone_map_enabled")}
             />
             <SettingField
-              label="Enable Software HDR Tone Mapping"
+              label={tr("pages.admin_settings.playback_settings.enable_software_hdr_tone_mapping")}
               type="toggle"
-              hint="Allows the CPU to convert HDR video to SDR when transcoding. This can be very CPU-intensive."
+              hint={tr(
+                "pages.admin_settings.playback_settings.allows_the_cpu_to_convert_hdr_video_to_sdr_when",
+              )}
               value={form.getValue("playback.transcode_software_tone_map_enabled") || "false"}
               onChange={(v) => form.setValue("playback.transcode_software_tone_map_enabled", v)}
               restartRequired={restartKeys.has("playback.transcode_software_tone_map_enabled")}
             />
             <SettingField
-              label="Throttle transcoding"
+              label={tr("pages.admin_settings.playback_settings.throttle_transcoding")}
               type="toggle"
-              description="Pause encoding once the client is far enough ahead."
+              description={tr(
+                "pages.admin_settings.playback_settings.pause_encoding_once_the_client_is_far_enough_ahead",
+              )}
               value={form.getValue("enable_transcode_throttle")}
               onChange={(v) => form.setValue("enable_transcode_throttle", v)}
               restartRequired={restartKeys.has("enable_transcode_throttle")}
             />
             {form.getValue("enable_transcode_throttle") === "true" && (
               <SettingField
-                label="Buffer ahead"
+                label={tr("pages.admin_settings.playback_settings.buffer_ahead")}
                 type="number"
                 unit="seconds"
                 value={form.getValue("transcode_throttle_seconds")}
@@ -467,30 +576,34 @@ export default function PlaybackSettings() {
               />
             )}
             <SettingField
-              label="Transcode back buffer"
+              label={tr("pages.admin_settings.playback_settings.transcode_back_buffer")}
               type="number"
               unit="seconds"
-              hint="Keeps this much already-downloaded media for instant backward seeking, then reclaims older transcode segments. Use 0 to disable cleanup; enabled values must be at least 120 seconds. Pair with transcode throttling to bound both behind- and ahead-of-client disk usage."
+              hint={tr(
+                "pages.admin_settings.playback_settings.keeps_this_much_already_downloaded_media_for_instant_backward_seeking",
+              )}
               value={form.getValue("playback.segment_retention_seconds")}
               onChange={(v) => form.setValue("playback.segment_retention_seconds", v)}
               restartRequired={restartKeys.has("playback.segment_retention_seconds")}
             />
             <SettingField
-              label="Chapter thumbnail workers"
+              label={tr("pages.admin_settings.playback_settings.chapter_thumbnail_workers")}
               type="number"
-              description="Parallel extraction jobs per library scan."
+              description={tr(
+                "pages.admin_settings.playback_settings.parallel_extraction_jobs_per_library_scan",
+              )}
               value={form.getValue("playback.chapter_thumbnail_workers")}
               onChange={(v) => form.setValue("playback.chapter_thumbnail_workers", v)}
               restartRequired={restartKeys.has("playback.chapter_thumbnail_workers")}
             />
             <SettingField
-              label="Generate chapter thumbnails on"
+              label={tr("pages.admin_settings.playback_settings.generate_chapter_thumbnails_on")}
               type="select"
               options={chapterThumbnailExecutionOptions(chapterExecution, transcodeNodeAvailable)}
               status={
                 transcodeNodeAvailable ? undefined : (
                   <SettingFieldStatus tone="warn">
-                    No transcode nodes are connected
+                    {tr("pages.admin_settings.playback_settings.no_transcode_nodes_are_connected")}
                   </SettingFieldStatus>
                 )
               }
@@ -499,21 +612,31 @@ export default function PlaybackSettings() {
               restartRequired={restartKeys.has("playback.chapter_thumbnail_execution")}
             />
             <SettingField
-              label="HDR handling"
+              label={tr("pages.admin_settings.playback_settings.hdr_handling")}
               type="select"
               options={[
-                { value: "best_effort", label: "Generate when possible" },
-                { value: "disabled", label: "Skip HDR and Dolby Vision" },
+                {
+                  value: "best_effort",
+                  label: tr("pages.admin_settings.playback_settings.generate_when_possible"),
+                },
+                {
+                  value: "disabled",
+                  label: tr("pages.admin_settings.playback_settings.skip_hdr_and_dolby_vision"),
+                },
               ]}
-              description="HDR frames need extra color conversion."
+              description={tr(
+                "pages.admin_settings.playback_settings.hdr_frames_need_extra_color_conversion",
+              )}
               value={form.getValue("playback.chapter_thumbnail_hdr_policy") || "best_effort"}
               onChange={(v) => form.setValue("playback.chapter_thumbnail_hdr_policy", v)}
               restartRequired={restartKeys.has("playback.chapter_thumbnail_hdr_policy")}
             />
             <SettingField
-              label="Software HDR tone mapping"
+              label={tr("pages.admin_settings.playback_settings.software_hdr_tone_mapping")}
               type="toggle"
-              description="Slow, but works without graphics hardware."
+              description={tr(
+                "pages.admin_settings.playback_settings.slow_but_works_without_graphics_hardware",
+              )}
               value={
                 form.getValue("playback.chapter_thumbnail_software_tone_map_enabled") || "false"
               }
@@ -528,10 +651,15 @@ export default function PlaybackSettings() {
           </AdvancedSection>
         </FieldGroup>
 
-        <FieldGroup label="Node routing" restartAll={allRestart(ROUTING_KEYS)}>
+        <FieldGroup
+          label={tr("pages.admin_settings.playback_settings.node_routing")}
+          restartAll={allRestart(ROUTING_KEYS)}
+        >
           <SettingFieldRow
-            label="Routing preset"
-            description="Presets update the five primitive policies below; Custom is not stored."
+            label={tr("pages.admin_settings.playback_settings.routing_preset")}
+            description={tr(
+              "pages.admin_settings.playback_settings.presets_update_the_five_primitive_policies_below_custom_is_not",
+            )}
           >
             <div className="flex flex-wrap justify-end gap-2">
               {Object.entries(ROUTING_PRESETS).map(([id, preset]) => (
@@ -546,7 +674,9 @@ export default function PlaybackSettings() {
                 </Button>
               ))}
               {!activeRoutingPreset && (
-                <span className="text-muted-foreground self-center text-xs">Custom</span>
+                <span className="text-muted-foreground self-center text-xs">
+                  {tr("pages.admin_settings.playback_settings.custom")}
+                </span>
               )}
             </div>
           </SettingFieldRow>
@@ -565,16 +695,18 @@ export default function PlaybackSettings() {
           ))}
 
           <SettingFieldRow
-            label="Preferred paths"
-            description="Arrows show soft fallback order; only modes never cross that boundary."
+            label={tr("pages.admin_settings.playback_settings.preferred_paths")}
+            description={tr(
+              "pages.admin_settings.playback_settings.arrows_show_soft_fallback_order_only_modes_never_cross_that",
+            )}
           >
             <div className="grid min-w-64 gap-1 text-xs">
               <PreferredPathRow
-                label="Direct play"
+                label={tr("pages.admin_settings.playback_settings.direct_play")}
                 route={egressPreview(routingValues["playback.routing.direct_play_egress"])}
               />
               <PreferredPathRow
-                label="Remux"
+                label={tr("pages.admin_settings.playback_settings.remux")}
                 route={routePreview(
                   routingValues["playback.routing.remux_execution"],
                   routingValues["playback.routing.remux_egress"],
@@ -582,7 +714,7 @@ export default function PlaybackSettings() {
                 )}
               />
               <PreferredPathRow
-                label="Video transcode"
+                label={tr("pages.admin_settings.playback_settings.video_transcode")}
                 route={routePreview(
                   routingValues["playback.routing.video_transcode_execution"],
                   routingValues["playback.routing.video_transcode_egress"],
@@ -594,21 +726,26 @@ export default function PlaybackSettings() {
 
           {strandedRoute && (
             <SettingFieldStatus tone="warn">
-              An “only” route currently has no healthy supporting node. Saving is allowed so nodes
-              can join later.
+              {tr(
+                "pages.admin_settings.playback_settings.an_only_route_currently_has_no_healthy_supporting_node_saving",
+              )}
             </SettingFieldStatus>
           )}
           {usesProxyOnlyEgress && (
             <SettingFieldStatus tone="warn">
-              Proxy-only egress requires every native client to support authorized media origins;
-              older clients may be unable to start that workload.
+              {tr(
+                "pages.admin_settings.playback_settings.proxy_only_egress_requires_every_native_client_to_support_authorized",
+              )}
             </SettingFieldStatus>
           )}
         </FieldGroup>
 
-        <FieldGroup label="Watch behavior" restartAll={allRestart(WATCH_KEYS)}>
+        <FieldGroup
+          label={tr("pages.admin_settings.playback_settings.watch_behavior")}
+          restartAll={allRestart(WATCH_KEYS)}
+        >
           <SettingField
-            label="Mark watched at"
+            label={tr("pages.admin_settings.playback_settings.mark_watched_at")}
             type="number"
             unit="%"
             value={form.getValue("playback.watched_threshold")}
@@ -616,10 +753,12 @@ export default function PlaybackSettings() {
             restartRequired={restartKeys.has("playback.watched_threshold")}
           />
           <SettingField
-            label="Show in Continue Watching after"
+            label={tr("pages.admin_settings.playback_settings.show_in_continue_watching_after")}
             type="number"
             unit="%"
-            description="Progress below this is ignored."
+            description={tr(
+              "pages.admin_settings.playback_settings.progress_below_this_is_ignored",
+            )}
             value={form.getValue("playback.min_resume_threshold")}
             onChange={(v) => form.setValue("playback.min_resume_threshold", v)}
             restartRequired={restartKeys.has("playback.min_resume_threshold")}

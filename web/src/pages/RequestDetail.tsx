@@ -23,8 +23,11 @@ import {
   tmdbImageURL,
 } from "@/lib/mediaRequests";
 import ViewTransitionLink from "@/components/ViewTransitionLink";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function RequestDetail() {
+  useUILanguage();
   const params = useParams<{ mediaType: string; tmdbId: string }>();
   const mediaType = (params.mediaType === "series" ? "series" : "movie") as "movie" | "series";
   const tmdbID = Number(params.tmdbId) || 0;
@@ -32,7 +35,7 @@ export default function RequestDetail() {
   const detail = useRequestMediaDetail(mediaType, tmdbID);
   const createRequest = useCreateMediaRequest();
 
-  useDocumentTitle(detail.data?.title ?? "Request");
+  useDocumentTitle(detail.data?.title ?? tr("pages.request_detail.request"));
 
   if (detail.isLoading) {
     return <RequestDetailSkeleton />;
@@ -43,10 +46,10 @@ export default function RequestDetail() {
       <div className="page-shell relative space-y-3 py-12 text-center">
         <PageBack to="/requests" />
         <p className="text-foreground mt-10 text-base font-semibold sm:mt-12">
-          Couldn't load this title.
+          {tr("pages.request_detail.couldn_t_load_this_title")}
         </p>
         <p className="text-muted-foreground text-sm">
-          The TMDB record may be temporarily unavailable.
+          {tr("pages.request_detail.the_tmdb_record_may_be_temporarily_unavailable")}
         </p>
       </div>
     );
@@ -86,7 +89,9 @@ export default function RequestDetail() {
         {item.cast && item.cast.length > 0 && (
           <section className="section-row">
             <div className="mb-5 px-4 sm:px-6 lg:px-10 xl:px-12">
-              <h2 className="text-foreground text-xl font-semibold tracking-tight">Cast</h2>
+              <h2 className="text-foreground text-xl font-semibold tracking-tight">
+                {tr("pages.request_detail.cast")}
+              </h2>
             </div>
             <CastCarousel cast={adaptRequestCast(item.cast)} fullBleed />
           </section>
@@ -116,14 +121,19 @@ function adaptRequestCast(cast: RequestMediaCastMember[]): CastMember[] {
 }
 
 function RequestContext({ mediaType }: { mediaType: "movie" | "series" }) {
+  useUILanguage();
   return (
     <span className="text-muted-foreground inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.22em] uppercase">
-      Request · {mediaType === "series" ? "Series" : "Movie"}
+      {tr("pages.request_detail.request_2827a9e0")}{" "}
+      {mediaType === "series"
+        ? tr("pages.request_detail.series")
+        : tr("pages.request_detail.movie")}
     </span>
   );
 }
 
 function MetaPills({ item }: { item: RequestMediaDetail }) {
+  useUILanguage();
   const pills: string[] = [];
   if (item.year) pills.push(String(item.year));
   if (item.content_rating) pills.push(item.content_rating);
@@ -155,28 +165,33 @@ function MetaPills({ item }: { item: RequestMediaDetail }) {
 }
 
 function RequestScoreRow({ item }: { item: RequestMediaDetail }) {
+  useUILanguage();
   if (!item.vote_average) return null;
   return (
     <div className="text-muted-foreground flex items-center gap-3 text-[13px]">
       <span className="inline-flex items-center gap-1.5">
         <Star className="h-3.5 w-3.5 fill-amber-300/90 text-amber-300/90" />
         <span className="text-foreground tabular-nums">{item.vote_average.toFixed(1)}</span>
-        <span className="opacity-60">TMDB</span>
+        <span className="opacity-60">{tr("pages.request_detail.tmdb")}</span>
       </span>
       {item.vote_count ? (
-        <span className="tabular-nums opacity-70">{formatVoteCount(item.vote_count)} votes</span>
+        <span className="tabular-nums opacity-70">
+          {formatVoteCount(item.vote_count)} {tr("pages.request_detail.votes")}
+        </span>
       ) : null}
     </div>
   );
 }
 
 function RequestCrewLine({ item }: { item: RequestMediaDetail }) {
+  useUILanguage();
   const parts: { label: string; value: string }[] = [];
-  if (item.director) parts.push({ label: "Director", value: item.director });
+  if (item.director)
+    parts.push({ label: tr("pages.request_detail.director"), value: item.director });
   if (item.creators && item.creators.length > 0)
-    parts.push({ label: "Created by", value: item.creators.join(", ") });
+    parts.push({ label: tr("pages.request_detail.created_by"), value: item.creators.join(", ") });
   if (item.networks && item.networks.length > 0)
-    parts.push({ label: "Network", value: item.networks.join(", ") });
+    parts.push({ label: tr("pages.request_detail.network"), value: item.networks.join(", ") });
 
   if (parts.length === 0) return null;
 
@@ -201,6 +216,7 @@ function RequestActions({
   isSubmitting: boolean;
   onRequest: () => void;
 }) {
+  useUILanguage();
   const requestable = item.request.requestable;
   const statusLabel = item.request.status ? formatRequestStatus(item.request.status) : null;
   const reasonLabel =
@@ -218,12 +234,15 @@ function RequestActions({
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Submitting
+              {tr("pages.request_detail.submitting")}
             </>
           ) : (
             <>
               <Plus className="h-4 w-4 stroke-[2.5]" />
-              Request {item.media_type === "series" ? "series" : "movie"}
+              {tr("pages.request_detail.request")}{" "}
+              {item.media_type === "series"
+                ? tr("pages.request_detail.series_8c45d090")
+                : tr("pages.request_detail.movie_94b19a10")}
             </>
           )}
         </Button>
@@ -232,7 +251,7 @@ function RequestActions({
           <StatusBlock
             tone="emerald"
             icon={<Check className="h-4 w-4 stroke-[2.5]" />}
-            label="Already in your library"
+            label={tr("pages.request_detail.already_in_your_library")}
           />
           {item.library_content_id ? (
             <Button
@@ -240,9 +259,9 @@ function RequestActions({
               variant="outline"
               className="border-border/60 h-11 rounded-full px-5 text-sm font-semibold"
             >
-              <ViewTransitionLink to={`/item/${encodeURIComponent(item.library_content_id)}`}>
+              <ViewTransitionLink to={"/item/" + encodeURIComponent(item.library_content_id)}>
                 <Library className="h-4 w-4" />
-                Open in library
+                {tr("pages.request_detail.open_in_library")}
               </ViewTransitionLink>
             </Button>
           ) : null}
@@ -257,27 +276,32 @@ function RequestActions({
         <StatusBlock
           tone="zinc"
           icon={<Clock className="h-4 w-4" />}
-          label={reasonLabel ?? "Unavailable"}
+          label={reasonLabel ?? tr("pages.request_detail.unavailable")}
         />
       )}
 
       {item.imdb_id ? (
         <a
-          href={`https://www.imdb.com/title/${item.imdb_id}`}
+          href={"https://www.imdb.com/title/" + item.imdb_id}
           target="_blank"
           rel="noreferrer"
           className="text-muted-foreground hover:text-foreground border-border/60 inline-flex items-center rounded-full border px-3 py-1.5 text-[12px] font-medium tracking-wide transition-colors"
         >
-          IMDb
+          {tr("pages.request_detail.imdb")}
         </a>
       ) : null}
       <a
-        href={`https://www.themoviedb.org/${item.media_type === "series" ? "tv" : "movie"}/${item.tmdb_id}`}
+        href={
+          "https://www.themoviedb.org/" +
+          (item.media_type === "series" ? "tv" : "movie") +
+          "/" +
+          item.tmdb_id
+        }
         target="_blank"
         rel="noreferrer"
         className="text-muted-foreground hover:text-foreground border-border/60 inline-flex items-center rounded-full border px-3 py-1.5 text-[12px] font-medium tracking-wide transition-colors"
       >
-        TMDB
+        {tr("pages.request_detail.tmdb")}
       </a>
     </div>
   );
@@ -299,6 +323,7 @@ function StatusBlock({
   icon: React.ReactNode;
   label: string;
 }) {
+  useUILanguage();
   return (
     <span
       className={cn(
@@ -338,8 +363,9 @@ function RecommendationsRow({
   isSubmitting: boolean;
   onRequest: (item: RequestMediaResult) => void;
 }) {
+  useUILanguage();
   return (
-    <MediaCarousel title="More Like This">
+    <MediaCarousel title={tr("pages.request_detail.more_like_this")}>
       {recommendations.map((item) => (
         <RequestPosterCard
           key={`${item.media_type}-${item.tmdb_id}`}
@@ -377,6 +403,7 @@ function formatVoteCount(count: number): string {
 }
 
 function RequestDetailSkeleton() {
+  useUILanguage();
   return (
     <div>
       <section className="border-border/10 relative isolate overflow-hidden border-b">

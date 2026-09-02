@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 
+import { tr } from "@/i18n/translate";
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface SubtitleAppearance {
@@ -31,30 +33,105 @@ export const DEFAULT_SUBTITLE_APPEARANCE: SubtitleAppearance = {
 // ─── Option Arrays ──────────────────────────────────────────────────────────
 
 export const FONT_SIZE_OPTIONS = [
-  { value: "small" as const, label: "Small" },
-  { value: "medium" as const, label: "Medium" },
-  { value: "large" as const, label: "Large" },
-  { value: "xlarge" as const, label: "X-Large" },
-  { value: "xxlarge" as const, label: "XX-Large" },
+  {
+    value: "small" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.small");
+    },
+  },
+  {
+    value: "medium" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.medium");
+    },
+  },
+  {
+    value: "large" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.large");
+    },
+  },
+  {
+    value: "xlarge" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.x_large");
+    },
+  },
+  {
+    value: "xxlarge" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.xx_large");
+    },
+  },
 ];
 
 export const FONT_FAMILY_OPTIONS = [
-  { value: "sans-serif" as const, label: "Sans-serif" },
-  { value: "serif" as const, label: "Serif" },
-  { value: "monospace" as const, label: "Monospace" },
+  {
+    value: "sans-serif" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.sans_serif");
+    },
+  },
+  {
+    value: "serif" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.serif");
+    },
+  },
+  {
+    value: "monospace" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.monospace");
+    },
+  },
 ];
 
 export const BACKGROUND_STYLE_OPTIONS = [
-  { value: "box" as const, label: "Box" },
-  { value: "shadow" as const, label: "Drop Shadow" },
-  { value: "outline" as const, label: "Outline" },
-  { value: "none" as const, label: "None" },
+  {
+    value: "box" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.box");
+    },
+  },
+  {
+    value: "shadow" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.drop_shadow");
+    },
+  },
+  {
+    value: "outline" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.outline");
+    },
+  },
+  {
+    value: "none" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.none");
+    },
+  },
 ];
 
 export const POSITION_OPTIONS = [
-  { value: "bottom" as const, label: "Bottom" },
-  { value: "lower-third" as const, label: "Lower Third" },
-  { value: "top" as const, label: "Top" },
+  {
+    value: "bottom" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.bottom");
+    },
+  },
+  {
+    value: "lower-third" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.lower_third");
+    },
+  },
+  {
+    value: "top" as const,
+    get label() {
+      return tr("lib.subtitle_appearance.top");
+    },
+  },
 ];
 
 // ─── Color Palettes ─────────────────────────────────────────────────────────
@@ -65,22 +142,87 @@ interface ColorSwatch {
 }
 
 export const FONT_COLOR_PALETTE: ColorSwatch[] = [
-  { hex: "#ffffff", label: "White" },
-  { hex: "#facc15", label: "Yellow" },
-  { hex: "#22c55e", label: "Green" },
-  { hex: "#06b6d4", label: "Cyan" },
-  { hex: "#d946ef", label: "Magenta" },
-  { hex: "#ef4444", label: "Red" },
-  { hex: "#3b82f6", label: "Blue" },
-  { hex: "#000000", label: "Black" },
+  {
+    hex: "#ffffff",
+    get label() {
+      return tr("lib.subtitle_appearance.white");
+    },
+  },
+  {
+    hex: "#facc15",
+    get label() {
+      return tr("lib.subtitle_appearance.yellow");
+    },
+  },
+  {
+    hex: "#22c55e",
+    get label() {
+      return tr("lib.subtitle_appearance.green");
+    },
+  },
+  {
+    hex: "#06b6d4",
+    get label() {
+      return tr("lib.subtitle_appearance.cyan");
+    },
+  },
+  {
+    hex: "#d946ef",
+    get label() {
+      return tr("lib.subtitle_appearance.magenta");
+    },
+  },
+  {
+    hex: "#ef4444",
+    get label() {
+      return tr("lib.subtitle_appearance.red");
+    },
+  },
+  {
+    hex: "#3b82f6",
+    get label() {
+      return tr("lib.subtitle_appearance.blue");
+    },
+  },
+  {
+    hex: "#000000",
+    get label() {
+      return tr("lib.subtitle_appearance.black");
+    },
+  },
 ];
 
 export const BG_COLOR_PALETTE: ColorSwatch[] = [
-  { hex: "#000000", label: "Black" },
-  { hex: "#374151", label: "Dark Gray" },
-  { hex: "#1e3a5f", label: "Navy" },
-  { hex: "#7f1d1d", label: "Dark Red" },
-  { hex: "#14532d", label: "Dark Green" },
+  {
+    hex: "#000000",
+    get label() {
+      return tr("lib.subtitle_appearance.black");
+    },
+  },
+  {
+    hex: "#374151",
+    get label() {
+      return tr("lib.subtitle_appearance.dark_gray");
+    },
+  },
+  {
+    hex: "#1e3a5f",
+    get label() {
+      return tr("lib.subtitle_appearance.navy");
+    },
+  },
+  {
+    hex: "#7f1d1d",
+    get label() {
+      return tr("lib.subtitle_appearance.dark_red");
+    },
+  },
+  {
+    hex: "#14532d",
+    get label() {
+      return tr("lib.subtitle_appearance.dark_green");
+    },
+  },
 ];
 
 // ─── Parser ─────────────────────────────────────────────────────────────────

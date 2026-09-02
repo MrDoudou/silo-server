@@ -15,6 +15,8 @@ import {
 import { PolicyEditorPanel } from "./PolicyEditorPanel";
 import { formatPolicyDate, messageFromError } from "./policyPageUtils";
 import { PolicyStatusPill, policyDocumentStatus, policyDomainMeta } from "./policyPresentation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface PolicyDocumentListProps {
   domains: readonly string[];
@@ -27,6 +29,7 @@ function parseDocumentID(value: string | null) {
 }
 
 export function PolicyDocumentList({ domains }: PolicyDocumentListProps) {
+  useUILanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const documents = usePolicyDocuments();
   const selectedDocumentId = parseDocumentID(searchParams.get("document"));
@@ -57,7 +60,7 @@ export function PolicyDocumentList({ domains }: PolicyDocumentListProps) {
           onClick={() => selectDocument(undefined)}
         >
           <ArrowLeft className="size-4" />
-          All overrides
+          {tr("pages.admin_policy.policy_document_list.all_overrides")}
         </Button>
         <PolicyEditorPanel documentId={selectedDocumentId} domains={domains} />
       </div>
@@ -67,7 +70,9 @@ export function PolicyDocumentList({ domains }: PolicyDocumentListProps) {
   return (
     <div className="space-y-5">
       {documents.isLoading && (
-        <p className="text-muted-foreground text-sm">Loading policy documents...</p>
+        <p className="text-muted-foreground text-sm">
+          {tr("pages.admin_policy.policy_document_list.loading_policy_documents")}
+        </p>
       )}
       {!documents.isLoading &&
         domains.map((domain) => (
@@ -89,6 +94,7 @@ interface PolicyDomainCardProps {
 }
 
 function PolicyDomainCard({ domain, documents, onSelect }: PolicyDomainCardProps) {
+  useUILanguage();
   const meta = policyDomainMeta(domain);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -100,7 +106,7 @@ function PolicyDomainCard({ domain, documents, onSelect }: PolicyDomainCardProps
     setError("");
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setError("Name is required.");
+      setError(tr("pages.admin_policy.policy_document_list.name_is_required"));
       return;
     }
     try {
@@ -137,7 +143,7 @@ function PolicyDomainCard({ domain, documents, onSelect }: PolicyDomainCardProps
         {!creating && (
           <Button type="button" variant="outline" size="sm" onClick={() => setCreating(true)}>
             <Plus className="size-4" />
-            New override
+            {tr("pages.admin_policy.policy_document_list.new_override")}
           </Button>
         )}
       </div>
@@ -151,14 +157,20 @@ function PolicyDomainCard({ domain, documents, onSelect }: PolicyDomainCardProps
               if (event.key === "Enter") void create();
             }}
             placeholder={
-              meta.example ? `e.g. ${meta.example.replace(/[“”]/g, "")}` : "Override name"
+              meta.example
+                ? tr("pages.admin_policy.policy_document_list.e_g_value", {
+                    value: meta.example.replace(/[“”]/g, ""),
+                  })
+                : tr("pages.admin_policy.policy_document_list.override_name")
             }
-            aria-label={`New ${meta.title} override name`}
+            aria-label={tr("pages.admin_policy.policy_document_list.new_title_override_name", {
+              title: meta.title,
+            })}
             className="max-w-sm"
             autoFocus
           />
           <Button type="button" size="sm" onClick={create} disabled={createDocument.isPending}>
-            Create
+            {tr("common.actions.create")}
           </Button>
           <Button
             type="button"
@@ -170,7 +182,7 @@ function PolicyDomainCard({ domain, documents, onSelect }: PolicyDomainCardProps
               setError("");
             }}
           >
-            Cancel
+            {tr("common.actions.cancel")}
           </Button>
         </div>
       )}
@@ -193,7 +205,8 @@ function PolicyDomainCard({ domain, documents, onSelect }: PolicyDomainCardProps
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{document.name}</span>
                 <PolicyStatusPill status={policyDocumentStatus(document)} />
                 <span className="text-muted-foreground hidden text-xs sm:block">
-                  Updated {formatPolicyDate(document.updated_at)}
+                  {tr("pages.admin_policy.policy_document_list.updated")}{" "}
+                  {formatPolicyDate(document.updated_at)}
                 </span>
                 <span
                   onClick={(event) => event.stopPropagation()}
@@ -205,7 +218,9 @@ function PolicyDomainCard({ domain, documents, onSelect }: PolicyDomainCardProps
                       void toggleDocument(document.id, checked);
                     }}
                     disabled={setEnabled.isPending}
-                    aria-label={`Set ${document.name} enabled`}
+                    aria-label={tr("pages.admin_policy.policy_document_list.set_name_enabled", {
+                      name: document.name,
+                    })}
                   />
                 </span>
               </div>
@@ -215,11 +230,12 @@ function PolicyDomainCard({ domain, documents, onSelect }: PolicyDomainCardProps
       ) : (
         !creating && (
           <p className="text-muted-foreground border-border mt-4 border-t pt-4 text-sm">
-            The Silo baseline applies unchanged.
+            {tr("pages.admin_policy.policy_document_list.the_silo_baseline_applies_unchanged")}
             {meta.example && (
               <span className="text-muted-foreground/80">
                 {" "}
-                Write an override like {meta.example}
+                {tr("pages.admin_policy.policy_document_list.write_an_override_like")}{" "}
+                {meta.example}
               </span>
             )}
           </p>

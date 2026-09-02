@@ -17,6 +17,8 @@ import WeekNavigator from "@/components/calendar/WeekNavigator";
 import DayGroup from "@/components/calendar/DayGroup";
 import { addWeeks, formatDayHeading, getWeekDays, getWeekStart } from "@/lib/calendarWeek";
 import { storage } from "@/utils/storage";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type CalendarFilter = "following" | "popular" | "trending" | "everything";
 
@@ -24,9 +26,24 @@ type CalendarFilter = "following" | "popular" | "trending" | "everything";
 // server has enough watch history. Re-add the entry here and in KNOWN_FILTERS to
 // surface it; the backend filter remains supported.
 const PRESET_OPTIONS: { value: CalendarFilter; label: string }[] = [
-  { value: "following", label: "Following" },
-  { value: "trending", label: "Trending" },
-  { value: "everything", label: "All" },
+  {
+    value: "following",
+    get label() {
+      return tr("pages.calendar.following");
+    },
+  },
+  {
+    value: "trending",
+    get label() {
+      return tr("pages.calendar.trending");
+    },
+  },
+  {
+    value: "everything",
+    get label() {
+      return tr("pages.calendar.all");
+    },
+  },
 ];
 
 const DEFAULT_PRESET: CalendarFilter = "following";
@@ -66,7 +83,8 @@ function parseCalendarParams(searchParams: URLSearchParams) {
 }
 
 export default function Calendar() {
-  useDocumentTitle("Calendar");
+  useUILanguage();
+  useDocumentTitle(tr("pages.calendar.calendar"));
   const [searchParams, setSearchParams] = useSearchParams();
   const { weekStart, filter, libraryId } = parseCalendarParams(searchParams);
   const libraries = useUserLibraries();
@@ -126,12 +144,14 @@ export default function Calendar() {
       {/* Same horizontal rhythm as Recommendations: one page gutter; MediaCarousel row padding aligns with it */}
       <div className="px-4 pt-4 pb-4 sm:px-6 sm:pt-6 lg:px-10 xl:px-12">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Calendar</h1>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            {tr("pages.calendar.calendar")}
+          </h1>
           <div className="flex flex-wrap items-center gap-2">
             {/* Preset pills (desktop) */}
             <div
               role="group"
-              aria-label="Calendar preset"
+              aria-label={tr("pages.calendar.calendar_preset")}
               className="surface-panel-subtle hidden items-center gap-0.5 rounded-full p-1 lg:flex"
             >
               {PRESET_OPTIONS.map((opt) => (
@@ -140,11 +160,12 @@ export default function Calendar() {
                   type="button"
                   aria-pressed={filter === opt.value}
                   onClick={() => setFilter(opt.value)}
-                  className={`rounded-full px-3 py-1 text-[12px] font-semibold transition-all duration-150 sm:px-4 sm:py-1.5 sm:text-[13px] ${
-                    filter === opt.value
+                  className={
+                    "rounded-full px-3 py-1 text-[12px] font-semibold transition-all duration-150 sm:px-4 sm:py-1.5 sm:text-[13px] " +
+                    (filter === opt.value
                       ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-                  }`}
+                      : "text-muted-foreground hover:bg-surface-hover hover:text-foreground")
+                  }
                 >
                   {opt.label}
                 </button>
@@ -155,7 +176,7 @@ export default function Calendar() {
             <div className="lg:hidden">
               <Select value={filter} onValueChange={setFilter}>
                 <SelectTrigger className="border-border/50 bg-surface/60 h-9 w-auto min-w-[130px] rounded-full text-[12px] font-semibold backdrop-blur-sm sm:text-[13px]">
-                  <SelectValue placeholder="Following" />
+                  <SelectValue placeholder={tr("pages.calendar.following")} />
                 </SelectTrigger>
                 <SelectContent>
                   {PRESET_OPTIONS.map((opt) => (
@@ -171,10 +192,10 @@ export default function Calendar() {
             {libraries.data && libraries.data.length > 1 && (
               <Select value={libraryId ? String(libraryId) : "all"} onValueChange={setLibrary}>
                 <SelectTrigger className="border-border/50 bg-surface/60 h-9 w-auto min-w-[120px] rounded-full text-[12px] font-semibold backdrop-blur-sm sm:min-w-[140px] sm:text-[13px]">
-                  <SelectValue placeholder="All Libraries" />
+                  <SelectValue placeholder={tr("pages.calendar.all_libraries")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Libraries</SelectItem>
+                  <SelectItem value="all">{tr("pages.calendar.all_libraries")}</SelectItem>
                   {libraries.data.map((lib) => (
                     <SelectItem key={lib.id} value={String(lib.id)}>
                       {lib.name}
@@ -210,7 +231,7 @@ export default function Calendar() {
             className="surface-panel-subtle text-muted-foreground rounded-2xl px-4 py-3 text-[13px]"
             role="status"
           >
-            Nothing scheduled for{" "}
+            {tr("pages.calendar.nothing_scheduled_for")}{" "}
             <span className="text-foreground font-semibold">
               {formatDayHeading(activeSelectedDay!)}
             </span>
@@ -237,12 +258,13 @@ export default function Calendar() {
 }
 
 function CalendarSkeleton() {
+  useUILanguage();
   return (
     <div className="space-y-6">
       {Array.from({ length: CALENDAR_SKELETON_DAY_ROWS }).map((_, i) => (
         <MediaCarousel
           key={i}
-          title="Loading..."
+          title={tr("pages.calendar.loading")}
           loading
           skeletonCount={CALENDAR_SKELETON_ITEMS_PER_ROW}
         >
@@ -260,16 +282,17 @@ function CalendarEmpty({
   filter: string;
   onSelectPreset: (f: string) => void;
 }) {
+  useUILanguage();
   const isEverything = filter === "everything" || filter === "all";
   return (
     <div className="surface-panel flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-[1.8rem] border-0 px-6 py-16 text-center">
       <CalendarDays className="text-muted-foreground h-10 w-10" strokeWidth={1.5} />
       <p className="text-muted-foreground text-sm">
         {filter === "following"
-          ? "Nothing upcoming from shows you follow this week."
+          ? tr("pages.calendar.nothing_upcoming_from_shows_you_follow_this_week")
           : isEverything
-            ? "Nothing scheduled this week."
-            : "No events this week for this view."}
+            ? tr("pages.calendar.nothing_scheduled_this_week")
+            : tr("pages.calendar.no_events_this_week_for_this_view")}
       </p>
       {!isEverything && (
         <div className="flex flex-wrap items-center justify-center gap-2">
@@ -279,7 +302,7 @@ function CalendarEmpty({
             className="text-primary text-sm"
             onClick={() => onSelectPreset("trending")}
           >
-            Trending
+            {tr("pages.calendar.trending")}
           </Button>
           <Button
             variant="link"
@@ -287,7 +310,7 @@ function CalendarEmpty({
             className="text-primary text-sm"
             onClick={() => onSelectPreset("everything")}
           >
-            Show everything
+            {tr("pages.calendar.show_everything")}
           </Button>
         </div>
       )}

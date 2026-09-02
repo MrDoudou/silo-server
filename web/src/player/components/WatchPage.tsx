@@ -14,7 +14,10 @@ import { fetchWatchDetail } from "@/hooks/queries/items";
 import { itemKeys } from "@/hooks/queries/keys";
 import { useWatchPlaybackController } from "@/playback/watchPlaybackContext";
 import { useWatchTogetherRoomConnection } from "../hooks/useWatchTogetherRoomConnection";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function patchChapterThumbnail(
   versions: PlayerFileVersion[],
@@ -100,6 +103,7 @@ export function WatchPage({
   watchTogetherRoomId,
   watchTogetherRoomToken,
 }: WatchPageProps) {
+  useUILanguage();
   const config = usePlayerConfig();
   const queryClient = useQueryClient();
   const playbackController = useWatchPlaybackController();
@@ -141,8 +145,13 @@ export function WatchPage({
     const key = `${session.playbackAttemptId}:${session.initialSubtitleError}`;
     if (initialSubtitleErrorKeyRef.current === key) return;
     initialSubtitleErrorKeyRef.current = key;
-    toast.error(session.initialSubtitleErrorTitle ?? "That subtitle track can't be used", {
-      description: session.initialSubtitleError,
+    toast.error("errors.player.components.watch_page.reported_message", {
+      values: {
+        message: session.initialSubtitleErrorTitle
+          ? tr.remote({ message: session.initialSubtitleErrorTitle })
+          : tr("player.playback_errors.that_subtitle_track_can_t_be_used"),
+      },
+      resolvedDescription: tr.remote({ message: session.initialSubtitleError }),
     });
   }, [session.initialSubtitleError, session.initialSubtitleErrorTitle, session.playbackAttemptId]);
 
@@ -400,7 +409,9 @@ export function WatchPage({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
           <div className="flex flex-col items-center gap-3">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-            <span className="text-sm text-white/60">Loading player...</span>
+            <span className="text-sm text-white/60">
+              {tr("player.components.watch_page.loading_player")}
+            </span>
           </div>
         </div>
       );
@@ -411,10 +422,10 @@ export function WatchPage({
         <div className="surface-panel-subtle flex max-w-md flex-col items-center gap-4 rounded-[1.8rem] px-8 py-8 text-center">
           <div className="space-y-2">
             <p className="text-base font-semibold text-white">
-              {session.errorTitle ?? "Playback unavailable"}
+              {session.errorTitle ?? tr("player.components.watch_page.playback_unavailable")}
             </p>
             <p className="text-sm text-white/60">
-              {session.error ?? "Silo could not start playback."}
+              {session.error ?? tr("player.components.watch_page.silo_could_not_start_playback")}
             </p>
           </div>
           <button
@@ -424,7 +435,7 @@ export function WatchPage({
             type="button"
             className="rounded-[0.95rem] bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
           >
-            Go Back
+            {tr("player.components.watch_page.go_back")}
           </button>
         </div>
       </div>

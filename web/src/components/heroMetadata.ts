@@ -1,5 +1,7 @@
 import type { SectionItem } from "@/api/types";
 
+import { tr } from "@/i18n/translate";
+
 function isPositiveFinite(value: number | undefined | null): value is number {
   return value != null && Number.isFinite(value) && value > 0;
 }
@@ -45,7 +47,12 @@ export function formatHeroMetadata(item: SectionItem): HeroMetadataEntry[] {
     if (isNonNegativeInteger(item.season_number) && isNonNegativeInteger(item.episode_number)) {
       entries.push({
         key: "episode-identity",
-        label: `S${item.season_number} · E${item.episode_number}`,
+        get label() {
+          return tr("components.hero_metadata.s_value1_e_value2", {
+            value1: item.season_number,
+            value2: item.episode_number,
+          });
+        },
       });
     }
     if (runtime) entries.push({ key: "runtime", label: runtime });
@@ -57,13 +64,14 @@ export function formatHeroMetadata(item: SectionItem): HeroMetadataEntry[] {
     entries.push({ key: "year", label: String(item.year) });
   }
   if (runtime) entries.push({ key: "runtime", label: runtime });
-  if (
-    item.rating_imdb != null &&
-    Number.isFinite(item.rating_imdb) &&
-    item.rating_imdb > 0 &&
-    item.rating_imdb <= 10
-  ) {
-    entries.push({ key: "imdb", label: `IMDb ${item.rating_imdb.toFixed(1)}` });
+  const imdbRating = item.rating_imdb;
+  if (imdbRating != null && Number.isFinite(imdbRating) && imdbRating > 0 && imdbRating <= 10) {
+    entries.push({
+      key: "imdb",
+      get label() {
+        return tr("components.hero_metadata.imdb_value1", { value1: imdbRating.toFixed(1) });
+      },
+    });
   }
 
   const genres = [...new Set((item.genres ?? []).map((genre) => genre.trim()).filter(Boolean))];

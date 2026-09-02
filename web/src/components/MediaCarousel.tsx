@@ -6,6 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCarouselEmbla } from "@/hooks/useCarouselEmbla";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { carouselIntrinsicHeight } from "@/lib/uiCustomization";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface MediaCarouselProps {
   title: string;
@@ -38,6 +40,7 @@ export default function MediaCarousel({
   headerActions,
   edgePadding = true,
 }: MediaCarouselProps) {
+  useUILanguage();
   const { emblaRef, canScrollPrev, canScrollNext, scrollPrev, scrollNext } = useCarouselEmbla();
   const { cardPresentation } = useUICustomization();
   // Page-edge padding is opt-out so the carousel can also be embedded in an
@@ -48,7 +51,7 @@ export default function MediaCarousel({
   const slideChildren = loading
     ? Array.from({ length: skeletonCount }).map((_, i) => (
         <div key={i} className="w-[130px] sm:w-[150px] lg:w-[178px]">
-          <Skeleton className={`w-full ${skeletonAspect} rounded-lg`} />
+          <Skeleton className={"w-full " + skeletonAspect + " rounded-lg"} />
           <Skeleton className="mt-2 h-4 w-3/4 rounded" />
           <Skeleton className="mt-1 h-3 w-1/2 rounded" />
         </div>
@@ -64,14 +67,14 @@ export default function MediaCarousel({
         } as CSSProperties
       }
     >
-      <div className={`mb-5 flex items-end justify-between gap-4${headerPadX}`}>
+      <div className={"mb-5 flex items-end justify-between gap-4" + headerPadX}>
         <div className="flex items-center gap-2">
           {titleHref ? (
             <Link to={titleHref} className="group/title hover:text-primary transition-colors">
               <h2 className="text-foreground text-xl font-semibold tracking-tight">
                 {title}
                 <span className="text-muted-foreground group-hover/title:text-primary ml-2 text-sm transition-colors">
-                  View
+                  {tr("components.media_carousel.view")}
                 </span>
               </h2>
             </Link>
@@ -85,7 +88,7 @@ export default function MediaCarousel({
             onClick={onViewAll}
             className="text-muted-foreground hover:text-primary text-[12px] font-semibold tracking-[0.16em] uppercase transition-all active:scale-[0.98]"
           >
-            Explore all
+            {tr("components.media_carousel.explore_all")}
           </button>
         )}
       </div>
@@ -102,7 +105,7 @@ export default function MediaCarousel({
             type="button"
             onClick={scrollPrev}
             className="from-background/80 absolute top-0 bottom-0 left-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-r to-transparent opacity-0 transition-opacity duration-(--duration-fast) group-hover/carousel:opacity-100 focus-visible:opacity-100"
-            aria-label="Scroll left"
+            aria-label={tr("components.media_carousel.scroll_left")}
           >
             <ChevronLeft className="text-foreground h-6 w-6" />
           </button>
@@ -110,9 +113,9 @@ export default function MediaCarousel({
 
         <div
           ref={emblaRef}
-          className={`embla__viewport -mt-1 overflow-hidden pt-1${viewportPadX}`}
+          className={"embla__viewport -mt-1 overflow-hidden pt-1" + viewportPadX}
           tabIndex={0}
-          aria-label="Media carousel"
+          aria-label={tr("components.media_carousel.media_carousel")}
           onKeyDown={(e) => {
             if (e.key === "ArrowLeft") {
               scrollPrev();
@@ -123,7 +126,7 @@ export default function MediaCarousel({
         >
           <ul
             role="list"
-            className={`embla__container flex cursor-grab list-none gap-4 lg:gap-5${containerPadX}`}
+            className={"embla__container flex cursor-grab list-none gap-4 lg:gap-5" + containerPadX}
           >
             {slideChildren.map((child, index) => (
               <li key={index} className="embla__slide shrink-0">
@@ -139,7 +142,7 @@ export default function MediaCarousel({
             type="button"
             onClick={scrollNext}
             className="from-background/80 absolute top-0 right-0 bottom-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-l to-transparent opacity-0 transition-opacity duration-(--duration-fast) group-hover/carousel:opacity-100 focus-visible:opacity-100"
-            aria-label="Scroll right"
+            aria-label={tr("components.media_carousel.scroll_right")}
           >
             <ChevronRight className="text-foreground h-6 w-6" />
           </button>

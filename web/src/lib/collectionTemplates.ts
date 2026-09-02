@@ -8,6 +8,8 @@ import type {
 } from "@/api/types";
 import { adminKeys } from "@/hooks/queries/keys";
 
+import { tr } from "@/i18n/translate";
+
 export type CollectionTemplateCategory =
   | "trending"
   | "popular"
@@ -228,13 +230,21 @@ export function libraryEligibilityForMediaKind(
   if (kind === "movie") {
     return {
       kinds: ["movies"],
-      hint: "Movie-only source — TV-only libraries are disabled. Mixed libraries always work.",
+      get hint() {
+        return tr(
+          "lib.collection_templates.movie_only_source_tv_only_libraries_are_disabled_mixed_libraries",
+        );
+      },
     };
   }
   if (kind === "tv") {
     return {
       kinds: ["series"],
-      hint: "TV-only source — movie-only libraries are disabled. Mixed libraries always work.",
+      get hint() {
+        return tr(
+          "lib.collection_templates.tv_only_source_movie_only_libraries_are_disabled_mixed_libraries",
+        );
+      },
     };
   }
   return {};

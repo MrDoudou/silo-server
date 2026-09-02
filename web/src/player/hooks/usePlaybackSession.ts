@@ -38,6 +38,8 @@ import type {
   ResumeHints,
 } from "../types";
 
+import { tr } from "@/i18n/translate";
+
 interface PlaybackSessionState {
   /**
    * The server's plan, verbatim. It is the single source of truth for the
@@ -148,7 +150,15 @@ function mapSubtitleInventory(
     burn_in_only: item.delivery === "burn_in_only",
     language: item.language ?? "",
     codec: item.codec,
-    label: item.label ?? item.language ?? `Track ${item.combined_index + 1}`,
+    get label() {
+      return (
+        item.label ??
+        item.language ??
+        tr("player.hooks.use_playback_session.track_track_number", {
+          trackNumber: item.combined_index + 1,
+        })
+      );
+    },
     source: subtitleSourceOf(item.source),
     forced: item.forced,
     hearing_impaired: item.hearing_impaired,
@@ -214,8 +224,12 @@ function describeDecisionWithoutPlan(decision: DecisionResponseV3): PlaybackSess
     return describePlanTerminal(decision.terminal);
   }
   return {
-    title: "Playback unavailable",
-    message: "This server is not accepting playback requests right now.",
+    title: tr("player.hooks.use_playback_session.playback_unavailable"),
+    get message() {
+      return tr(
+        "player.hooks.use_playback_session.this_server_is_not_accepting_playback_requests_right_now",
+      );
+    },
   };
 }
 
@@ -230,13 +244,13 @@ function describePlaybackSessionError(
 
   if (error instanceof Error && error.message.trim().length > 0) {
     return {
-      title: "Playback unavailable",
+      title: tr("player.hooks.use_playback_session.playback_unavailable"),
       message: error.message,
     };
   }
 
   return {
-    title: "Playback unavailable",
+    title: tr("player.hooks.use_playback_session.playback_unavailable"),
     message: fallbackMessage,
   };
 }
@@ -1219,7 +1233,10 @@ export function usePlaybackSession(
       return replan({
         operation: "failure_recovery",
         positionSeconds: currentPosition,
-        failure: { classification, message: "The server invalidated this plan." },
+        failure: {
+          classification,
+          message: "The server invalidated this plan.",
+        },
       });
     },
     [awaitAdoptionSettled, replan, reportEvent],

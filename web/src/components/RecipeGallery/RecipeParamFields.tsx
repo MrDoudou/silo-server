@@ -10,6 +10,8 @@ import { catalogKeys, itemKeys } from "@/hooks/queries/keys";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { BrowseItem } from "@/api/types";
 import type { RecipeDefinition } from "@/lib/recipes";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface RecipeParamFieldsProps {
   def: RecipeDefinition;
@@ -18,6 +20,7 @@ export interface RecipeParamFieldsProps {
 }
 
 export default function RecipeParamFields({ def, params, onChange }: RecipeParamFieldsProps) {
+  useUILanguage();
   if (def.type === "collection") {
     return <CollectionParamField params={params} onChange={onChange} />;
   }
@@ -39,9 +42,11 @@ export default function RecipeParamFields({ def, params, onChange }: RecipeParam
         params={params}
         onChange={onChange}
         paramKey="lookback_days"
-        label="Lookback window (days)"
-        placeholder="30"
-        hint="How far back a new season counts as “just arrived”."
+        label={tr("components.recipe_gallery.recipe_param_fields.lookback_window_days")}
+        placeholder={tr("components.recipe_gallery.recipe_param_fields.value_30")}
+        hint={tr(
+          "components.recipe_gallery.recipe_param_fields.how_far_back_a_new_season_counts_as_just_arrived",
+        )}
       />
     );
   }
@@ -51,9 +56,11 @@ export default function RecipeParamFields({ def, params, onChange }: RecipeParam
         params={params}
         onChange={onChange}
         paramKey="max_minutes"
-        label="Maximum runtime (minutes)"
-        placeholder="95"
-        hint="Movies at or under this runtime qualify."
+        label={tr("components.recipe_gallery.recipe_param_fields.maximum_runtime_minutes")}
+        placeholder={tr("components.recipe_gallery.recipe_param_fields.value_95")}
+        hint={tr(
+          "components.recipe_gallery.recipe_param_fields.movies_at_or_under_this_runtime_qualify",
+        )}
       />
     );
   }
@@ -63,9 +70,11 @@ export default function RecipeParamFields({ def, params, onChange }: RecipeParam
         params={params}
         onChange={onChange}
         paramKey="milestone_years"
-        label="Milestone (years)"
-        placeholder="5"
-        hint="Only anniversaries that are a multiple of this many years. Set 1 for every anniversary."
+        label={tr("components.recipe_gallery.recipe_param_fields.milestone_years")}
+        placeholder={tr("components.recipe_gallery.recipe_param_fields.value_5")}
+        hint={tr(
+          "components.recipe_gallery.recipe_param_fields.only_anniversaries_that_are_a_multiple_of_this_many_years",
+        )}
       />
     );
   }
@@ -81,16 +90,24 @@ export default function RecipeParamFields({ def, params, onChange }: RecipeParam
     return (
       <div className="space-y-3">
         <label className="block">
-          <span className="mb-1 block text-xs text-white/70">Subject type</span>
+          <span className="mb-1 block text-xs text-white/70">
+            {tr("components.recipe_gallery.recipe_param_fields.subject_type")}
+          </span>
           <select
             value={subjectType}
             onChange={(e) => onChange({ ...params, subject_type: e.target.value })}
             className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm"
           >
-            <option value="director">Director</option>
-            <option value="studio">Studio</option>
-            <option value="actor">Actor</option>
-            <option value="era">Era</option>
+            <option value="director">
+              {tr("components.recipe_gallery.recipe_param_fields.director")}
+            </option>
+            <option value="studio">
+              {tr("components.recipe_gallery.recipe_param_fields.studio")}
+            </option>
+            <option value="actor">
+              {tr("components.recipe_gallery.recipe_param_fields.actor")}
+            </option>
+            <option value="era">{tr("components.recipe_gallery.recipe_param_fields.era")}</option>
           </select>
         </label>
         <label className="flex items-center gap-2 text-sm">
@@ -99,29 +116,41 @@ export default function RecipeParamFields({ def, params, onChange }: RecipeParam
             checked={autoRotate}
             onChange={(e) => onChange({ ...params, auto_rotate: e.target.checked })}
           />
-          Auto-rotate
+          {tr("components.recipe_gallery.recipe_param_fields.auto_rotate")}
         </label>
         {autoRotate ? (
           <label className="block">
-            <span className="mb-1 block text-xs text-white/70">Rotation cadence</span>
+            <span className="mb-1 block text-xs text-white/70">
+              {tr("components.recipe_gallery.recipe_param_fields.rotation_cadence")}
+            </span>
             <select
               value={cadence}
               onChange={(e) => onChange({ ...params, rotation_cadence: e.target.value })}
               className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm"
             >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly (default)</option>
-              <option value="monthly">Monthly</option>
+              <option value="daily">
+                {tr("components.recipe_gallery.recipe_param_fields.daily")}
+              </option>
+              <option value="weekly">
+                {tr("components.recipe_gallery.recipe_param_fields.weekly_default")}
+              </option>
+              <option value="monthly">
+                {tr("components.recipe_gallery.recipe_param_fields.monthly")}
+              </option>
             </select>
           </label>
         ) : (
           <label className="block">
-            <span className="mb-1 block text-xs text-white/70">Subject</span>
+            <span className="mb-1 block text-xs text-white/70">
+              {tr("components.recipe_gallery.recipe_param_fields.subject")}
+            </span>
             <input
               value={subject}
               onChange={(e) => onChange({ ...params, subject: e.target.value })}
               className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm"
-              placeholder="e.g. Christopher Nolan"
+              placeholder={tr(
+                "components.recipe_gallery.recipe_param_fields.e_g_christopher_nolan",
+              )}
             />
           </label>
         )}
@@ -132,15 +161,21 @@ export default function RecipeParamFields({ def, params, onChange }: RecipeParam
     const anchor = (params.anchor_item_id as string) ?? "";
     return (
       <div>
-        <label className="mb-1 block text-xs text-white/70">Anchor item</label>
+        <label className="mb-1 block text-xs text-white/70">
+          {tr("components.recipe_gallery.recipe_param_fields.anchor_item")}
+        </label>
         <input
           className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm"
-          placeholder="Auto-pick latest watched (leave blank)"
+          placeholder={tr(
+            "components.recipe_gallery.recipe_param_fields.auto_pick_latest_watched_leave_blank",
+          )}
           value={anchor}
           onChange={(e) => onChange({ ...params, anchor_item_id: e.target.value })}
         />
         <div className="mt-1 text-[11px] text-white/50">
-          Leave blank to auto-pick the most recent watch.
+          {tr(
+            "components.recipe_gallery.recipe_param_fields.leave_blank_to_auto_pick_the_most_recent_watch",
+          )}
         </div>
       </div>
     );
@@ -149,15 +184,21 @@ export default function RecipeParamFields({ def, params, onChange }: RecipeParam
     const genre = (params.genre as string) ?? "";
     return (
       <div>
-        <label className="mb-1 block text-xs text-white/70">Genre (optional)</label>
+        <label className="mb-1 block text-xs text-white/70">
+          {tr("components.recipe_gallery.recipe_param_fields.genre_optional")}
+        </label>
         <input
           className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm"
-          placeholder="Auto-pick your strongest genre (leave blank)"
+          placeholder={tr(
+            "components.recipe_gallery.recipe_param_fields.auto_pick_your_strongest_genre_leave_blank",
+          )}
           value={genre}
           onChange={(e) => onChange({ ...params, genre: e.target.value })}
         />
         <div className="mt-1 text-[11px] text-white/50">
-          Leave blank to follow the profile&apos;s strongest taste automatically.
+          {tr(
+            "components.recipe_gallery.recipe_param_fields.leave_blank_to_follow_the_profile_s_strongest_taste_automatically",
+          )}
         </div>
       </div>
     );
@@ -173,20 +214,61 @@ interface ParamFieldProps {
 // Sort choices for watchlist/favorites sections. The empty value keeps the
 // list's stored order (provider sync order, then newest-added first).
 const PERSONAL_LIST_SORT_OPTIONS = [
-  { value: "", label: "List order (default)" },
-  { value: "added_at:desc", label: "Date added (newest first)" },
-  { value: "added_at:asc", label: "Date added (oldest first)" },
-  { value: "title:asc", label: "Title (A–Z)" },
-  { value: "title:desc", label: "Title (Z–A)" },
-  { value: "release_date:desc", label: "Release date (newest first)" },
-  { value: "release_date:asc", label: "Release date (oldest first)" },
-  { value: "rating_imdb:desc", label: "IMDb rating (highest first)" },
+  {
+    value: "",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.list_order_default");
+    },
+  },
+  {
+    value: "added_at:desc",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.date_added_newest_first");
+    },
+  },
+  {
+    value: "added_at:asc",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.date_added_oldest_first");
+    },
+  },
+  {
+    value: "title:asc",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.title_a_z");
+    },
+  },
+  {
+    value: "title:desc",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.title_z_a");
+    },
+  },
+  {
+    value: "release_date:desc",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.release_date_newest_first");
+    },
+  },
+  {
+    value: "release_date:asc",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.release_date_oldest_first");
+    },
+  },
+  {
+    value: "rating_imdb:desc",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.imdb_rating_highest_first");
+    },
+  },
 ];
 
 // PersonalListFilterFields edits the optional filter_type / filter_library_ids
 // filters and sort for watchlist and favorites sections, e.g. a "Movies
 // watchlist" rail sorted by release date.
 function PersonalListFilterFields({ params, onChange }: ParamFieldProps) {
+  useUILanguage();
   const { data: libraries } = useAvailableUserLibraries();
   const filterType = typeof params.filter_type === "string" ? params.filter_type : "";
   const libraryIds = Array.isArray(params.filter_library_ids)
@@ -204,7 +286,9 @@ function PersonalListFilterFields({ params, onChange }: ParamFieldProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <label className="block">
-        <span className="mb-1 block text-xs text-white/70">Media type</span>
+        <span className="mb-1 block text-xs text-white/70">
+          {tr("components.recipe_gallery.recipe_param_fields.media_type")}
+        </span>
         <select
           value={filterType || "all"}
           onChange={(e) =>
@@ -215,14 +299,24 @@ function PersonalListFilterFields({ params, onChange }: ParamFieldProps) {
           }
           className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm"
         >
-          <option value="all">All Media</option>
-          <option value="movie">Movies</option>
-          <option value="series">TV Shows</option>
-          <option value="audiobook">Audiobooks</option>
+          <option value="all">
+            {tr("components.recipe_gallery.recipe_param_fields.all_media")}
+          </option>
+          <option value="movie">
+            {tr("components.recipe_gallery.recipe_param_fields.movies")}
+          </option>
+          <option value="series">
+            {tr("components.recipe_gallery.recipe_param_fields.tv_shows")}
+          </option>
+          <option value="audiobook">
+            {tr("components.recipe_gallery.recipe_param_fields.audiobooks")}
+          </option>
         </select>
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs text-white/70">Libraries</span>
+        <span className="mb-1 block text-xs text-white/70">
+          {tr("components.recipe_gallery.recipe_param_fields.libraries")}
+        </span>
         <LibraryMultiSelect
           libraries={libraries ?? []}
           value={libraryIds}
@@ -232,7 +326,9 @@ function PersonalListFilterFields({ params, onChange }: ParamFieldProps) {
         />
       </label>
       <label className="block md:col-span-2">
-        <span className="mb-1 block text-xs text-white/70">Sort</span>
+        <span className="mb-1 block text-xs text-white/70">
+          {tr("components.recipe_gallery.recipe_param_fields.sort")}
+        </span>
         <select
           value={PERSONAL_LIST_SORT_OPTIONS.some((o) => o.value === sortValue) ? sortValue : ""}
           onChange={(e) => {
@@ -253,18 +349,25 @@ function PersonalListFilterFields({ params, onChange }: ParamFieldProps) {
 }
 
 function ContinueTypeParamField({ params, onChange }: ParamFieldProps) {
+  useUILanguage();
   const continueType = params.continue_type === "listening" ? "listening" : "watching";
 
   return (
     <label className="block">
-      <span className="mb-1 block text-xs text-white/70">Continue type</span>
+      <span className="mb-1 block text-xs text-white/70">
+        {tr("components.recipe_gallery.recipe_param_fields.continue_type")}
+      </span>
       <select
         value={continueType}
         onChange={(event) => onChange({ ...params, continue_type: event.target.value })}
         className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm"
       >
-        <option value="watching">Watching</option>
-        <option value="listening">Listening</option>
+        <option value="watching">
+          {tr("components.recipe_gallery.recipe_param_fields.watching")}
+        </option>
+        <option value="listening">
+          {tr("components.recipe_gallery.recipe_param_fields.listening")}
+        </option>
       </select>
     </label>
   );
@@ -273,32 +376,74 @@ function ContinueTypeParamField({ params, onChange }: ParamFieldProps) {
 // Order matches SeasonalThemeOrder in the backend. Higher entries take
 // priority when multiple enabled themes match the current date.
 const SEASONAL_THEMES: Array<{ key: string; label: string; window: string; icon: string }> = [
-  { key: "valentines", label: "Valentine's Day", window: "Feb 7–14", icon: "💝" },
-  { key: "st_patricks", label: "St. Patrick's Day", window: "Mar 15–17", icon: "🍀" },
-  { key: "thanksgiving", label: "Thanksgiving", window: "Nov 22–30", icon: "🦃" },
-  { key: "christmas", label: "Christmas", window: "Dec 1–31", icon: "🎄" },
-  { key: "halloween", label: "Halloween", window: "All October", icon: "🎃" },
+  {
+    key: "valentines",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.valentine_s_day");
+    },
+    window: "Feb 7–14",
+    icon: "💝",
+  },
+  {
+    key: "st_patricks",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.st_patrick_s_day");
+    },
+    window: "Mar 15–17",
+    icon: "🍀",
+  },
+  {
+    key: "thanksgiving",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.thanksgiving");
+    },
+    window: "Nov 22–30",
+    icon: "🦃",
+  },
+  {
+    key: "christmas",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.christmas");
+    },
+    window: "Dec 1–31",
+    icon: "🎄",
+  },
+  {
+    key: "halloween",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.halloween");
+    },
+    window: "All October",
+    icon: "🎃",
+  },
   {
     key: "saturday_morning",
-    label: "Saturday Morning Cartoons",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.saturday_morning_cartoons");
+    },
     window: "Saturday before 1pm",
     icon: "📺",
   },
   {
     key: "family_movie_night",
-    label: "Family Movie Night",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.family_movie_night");
+    },
     window: "Fri & Sat from 5pm",
     icon: "🍿",
   },
   {
     key: "summer_blockbuster",
-    label: "Summer Blockbusters",
+    get label() {
+      return tr("components.recipe_gallery.recipe_param_fields.summer_blockbusters");
+    },
     window: "June – August",
     icon: "🌴",
   },
 ];
 
 function SeasonalParamField({ params, onChange }: ParamFieldProps) {
+  useUILanguage();
   // Resolve the current enabled set, falling back to the legacy single-theme
   // shape when the section was saved before EnabledThemes existed.
   const rawEnabled = params.enabled_themes;
@@ -351,7 +496,9 @@ function SeasonalParamField({ params, onChange }: ParamFieldProps) {
 
   return (
     <div className="space-y-2">
-      <span className="block text-xs text-white/70">Holidays to celebrate</span>
+      <span className="block text-xs text-white/70">
+        {tr("components.recipe_gallery.recipe_param_fields.holidays_to_celebrate")}
+      </span>
       <div className="space-y-2 rounded border border-white/10 bg-white/5 px-3 py-2">
         {SEASONAL_THEMES.map((t) => {
           const isOn = enabled.has(t.key);
@@ -374,7 +521,12 @@ function SeasonalParamField({ params, onChange }: ParamFieldProps) {
                   type="text"
                   value={themeTitles[t.key] ?? ""}
                   onChange={(e) => setTitle(t.key, e.target.value)}
-                  placeholder={`Section title in season — defaults to "${t.label}"`}
+                  placeholder={tr(
+                    "components.recipe_gallery.recipe_param_fields.section_title_in_season_defaults_to_label",
+                    {
+                      label: t.label,
+                    },
+                  )}
                   className="ml-7 w-[calc(100%-1.75rem)] rounded border border-white/10 bg-white/5 px-2 py-1 text-xs"
                 />
               )}
@@ -383,9 +535,9 @@ function SeasonalParamField({ params, onChange }: ParamFieldProps) {
         })}
       </div>
       <p className="text-[11px] text-white/50">
-        The section auto-cycles: it shows whichever enabled holiday is currently in season, and
-        hides itself when none match. Per-holiday titles override the section name only while that
-        holiday is active.
+        {tr(
+          "components.recipe_gallery.recipe_param_fields.the_section_auto_cycles_it_shows_whichever_enabled_holiday_is",
+        )}
       </p>
     </div>
   );
@@ -406,6 +558,7 @@ function NumberParamField({
   placeholder: string;
   hint?: string;
 }) {
+  useUILanguage();
   const raw = params[paramKey];
   const value = typeof raw === "number" && Number.isFinite(raw) ? String(raw) : "";
   return (
@@ -447,6 +600,7 @@ function curatedItemLabel(title: string, year?: number): string {
 // items persisted before this drawer opened are hydrated from the item
 // detail endpoint, falling back to the raw id while loading.
 function CuratedItemsParamField({ params, onChange }: ParamFieldProps) {
+  useUILanguage();
   const [query, setQuery] = useState("");
   const [labels, setLabels] = useState<Record<string, string>>({});
   const debounced = useDebounce(query.trim(), CURATED_SEARCH_DEBOUNCE_MS);
@@ -520,20 +674,28 @@ function CuratedItemsParamField({ params, onChange }: ParamFieldProps) {
   return (
     <div className="space-y-3">
       <div>
-        <label className="mb-1 block text-xs text-white/70">Add titles</label>
+        <label className="mb-1 block text-xs text-white/70">
+          {tr("components.recipe_gallery.recipe_param_fields.add_titles")}
+        </label>
         <input
           className="w-full rounded border border-white/15 bg-white/5 px-3 py-2 text-sm"
-          placeholder="🔍 Search your catalog…"
+          placeholder={tr("components.recipe_gallery.recipe_param_fields.search_your_catalog")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           autoComplete="off"
         />
         {debounced.length === 0 ? null : results.isLoading ? (
-          <div className="mt-2 text-xs text-white/50">Searching…</div>
+          <div className="mt-2 text-xs text-white/50">
+            {tr("components.recipe_gallery.recipe_param_fields.searching")}
+          </div>
         ) : results.isError ? (
-          <div className="mt-2 text-xs text-amber-300">Search failed — try again.</div>
+          <div className="mt-2 text-xs text-amber-300">
+            {tr("components.recipe_gallery.recipe_param_fields.search_failed_try_again")}
+          </div>
         ) : found.length === 0 ? (
-          <div className="mt-2 text-xs text-white/50">No matches.</div>
+          <div className="mt-2 text-xs text-white/50">
+            {tr("components.recipe_gallery.recipe_param_fields.no_matches")}
+          </div>
         ) : (
           <ul className="mt-2 max-h-52 divide-y divide-white/10 overflow-y-auto rounded border border-white/10">
             {found.map((item) => {
@@ -543,7 +705,11 @@ function CuratedItemsParamField({ params, onChange }: ParamFieldProps) {
                   <span className="min-w-0 flex-1 truncate">
                     {item.title}
                     <span className="ml-1 text-xs text-white/40">
-                      {item.year ? `${item.year} · ` : ""}
+                      {item.year
+                        ? tr("components.recipe_gallery.recipe_param_fields.year", {
+                            year: item.year,
+                          })
+                        : ""}
                       {item.type}
                     </span>
                   </span>
@@ -553,7 +719,9 @@ function CuratedItemsParamField({ params, onChange }: ParamFieldProps) {
                     onClick={() => add(item)}
                     className="rounded border border-white/15 px-2 py-0.5 text-xs disabled:opacity-40"
                   >
-                    {already ? "Added" : "Add"}
+                    {already
+                      ? tr("components.recipe_gallery.recipe_param_fields.added")
+                      : tr("common.actions.add")}
                   </button>
                 </li>
               );
@@ -564,12 +732,18 @@ function CuratedItemsParamField({ params, onChange }: ParamFieldProps) {
 
       <div>
         <span className="mb-1 block text-xs text-white/70">
-          Curated list ({itemIDs.length} {itemIDs.length === 1 ? "title" : "titles"}, shown in this
-          order)
+          {tr("components.recipe_gallery.recipe_param_fields.curated_list")}
+          {itemIDs.length}{" "}
+          {itemIDs.length === 1
+            ? tr("components.recipe_gallery.recipe_param_fields.title")
+            : tr("components.recipe_gallery.recipe_param_fields.titles")}
+          {tr("components.recipe_gallery.recipe_param_fields.shown_in_this_order")}
         </span>
         {itemIDs.length === 0 ? (
           <div className="rounded border border-dashed border-white/15 px-3 py-3 text-xs text-white/50">
-            Search above and add at least one title.
+            {tr(
+              "components.recipe_gallery.recipe_param_fields.search_above_and_add_at_least_one_title",
+            )}
           </div>
         ) : (
           <ul className="divide-y divide-white/10 rounded border border-white/10">
@@ -582,7 +756,7 @@ function CuratedItemsParamField({ params, onChange }: ParamFieldProps) {
                   type="button"
                   onClick={() => move(id, -1)}
                   disabled={idx === 0}
-                  aria-label="Move up"
+                  aria-label={tr("components.recipe_gallery.recipe_param_fields.move_up")}
                   className="rounded border border-white/15 px-2 py-0.5 text-xs disabled:opacity-40"
                 >
                   ↑
@@ -591,7 +765,7 @@ function CuratedItemsParamField({ params, onChange }: ParamFieldProps) {
                   type="button"
                   onClick={() => move(id, 1)}
                   disabled={idx === itemIDs.length - 1}
-                  aria-label="Move down"
+                  aria-label={tr("components.recipe_gallery.recipe_param_fields.move_down")}
                   className="rounded border border-white/15 px-2 py-0.5 text-xs disabled:opacity-40"
                 >
                   ↓
@@ -599,7 +773,7 @@ function CuratedItemsParamField({ params, onChange }: ParamFieldProps) {
                 <button
                   type="button"
                   onClick={() => remove(id)}
-                  aria-label="Remove"
+                  aria-label={tr("common.actions.remove")}
                   className="rounded border border-white/15 px-2 py-0.5 text-xs text-red-300"
                 >
                   ✕
@@ -614,6 +788,7 @@ function CuratedItemsParamField({ params, onChange }: ParamFieldProps) {
 }
 
 function CollectionParamField({ params, onChange }: ParamFieldProps) {
+  useUILanguage();
   const { collections, isLoading } = useAllUserCollections();
   const libraryID = (params.library_collection_id as string) ?? "";
   const userID = (params.user_collection_id as string) ?? "";
@@ -640,15 +815,22 @@ function CollectionParamField({ params, onChange }: ParamFieldProps) {
   if (isAutoBackedTraktPreset && !value) {
     return (
       <p className="text-xs text-white/50">
-        A synced Trakt {sourcePreset} {mediaType === "tv" ? "shows" : "movies"} collection will be
-        created automatically.
+        {tr("components.recipe_gallery.recipe_param_fields.a_synced_trakt")} {sourcePreset}{" "}
+        {mediaType === "tv"
+          ? tr("components.recipe_gallery.recipe_param_fields.shows")
+          : tr("components.recipe_gallery.recipe_param_fields.movies_98311619")}{" "}
+        {tr(
+          "components.recipe_gallery.recipe_param_fields.collection_will_be_created_automatically",
+        )}
       </p>
     );
   }
 
   return (
     <div className="space-y-1">
-      <span className="block text-xs text-white/70">Collection</span>
+      <span className="block text-xs text-white/70">
+        {tr("components.recipe_gallery.recipe_param_fields.collection")}
+      </span>
       <CollectionSearchableSelect
         options={collectionOptions}
         value={value}
@@ -671,8 +853,13 @@ function CollectionParamField({ params, onChange }: ParamFieldProps) {
       />
       {isTraktPreset && !isLoading && collectionOptions.length === 0 ? (
         <p className="text-xs text-amber-300">
-          No synced Trakt {sourcePreset} {mediaType === "tv" ? "shows" : "movies"} collection was
-          found. Create and sync one from Admin Collections first.
+          {tr("components.recipe_gallery.recipe_param_fields.no_synced_trakt")} {sourcePreset}{" "}
+          {mediaType === "tv"
+            ? tr("components.recipe_gallery.recipe_param_fields.shows")
+            : tr("components.recipe_gallery.recipe_param_fields.movies_98311619")}{" "}
+          {tr(
+            "components.recipe_gallery.recipe_param_fields.collection_was_found_create_and_sync_one_from_admin_collections",
+          )}
         </p>
       ) : null}
     </div>

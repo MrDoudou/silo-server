@@ -27,7 +27,9 @@ import {
 } from "@/hooks/queries/settingValues";
 import { useAutoPlayNextSetting } from "@/hooks/queries/autoPlayNext";
 import { useProfileDefaultWriter } from "@/hooks/queries/profileDefaults";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Every preference on this screen is the profile's own choice. A device, a
@@ -70,6 +72,8 @@ const NO_BITRATE_LIMIT = "__no_limit__";
  * expressible instead of rendering as a disabled "custom" entry.
  */
 function QualitySetting() {
+  useUILanguage();
+  useUILanguage();
   const { data: effective } = useEffectiveSettings({
     keys: [SETTING_KEYS.PLAYBACK_PREFERRED_QUALITY, SETTING_KEYS.PLAYBACK_MAX_BITRATE_KBPS],
   });
@@ -90,15 +94,17 @@ function QualitySetting() {
   return (
     <>
       <SettingRow
-        label="Preferred quality"
-        description="The resolution your profile should request when playback begins. Auto lets Silo pick based on your connection."
+        label={tr("pages.settings.playback_settings.preferred_quality")}
+        description={tr(
+          "pages.settings.playback_settings.the_resolution_your_profile_should_request_when_playback_begins_auto",
+        )}
         control={(id) => (
           <Select
             value={resolution}
             disabled={isSaving}
             onValueChange={(value) =>
               save(SETTING_KEYS.PLAYBACK_PREFERRED_QUALITY, value).catch(() =>
-                toast.error("Failed to save preferred quality"),
+                toast.error("errors.settings.playback_settings.failed_to_save_preferred_quality"),
               )
             }
           >
@@ -117,8 +123,10 @@ function QualitySetting() {
       />
 
       <SettingRow
-        label="Maximum bitrate"
-        description="Cap how much bandwidth playback may use. No limit means Silo picks for the chosen resolution."
+        label={tr("pages.settings.playback_settings.maximum_bitrate")}
+        description={tr(
+          "pages.settings.playback_settings.cap_how_much_bandwidth_playback_may_use_no_limit_means",
+        )}
         control={(id) => (
           <Select
             value={bitrateValue === "" ? NO_BITRATE_LIMIT : bitrateValue}
@@ -132,7 +140,9 @@ function QualitySetting() {
                 next === NO_BITRATE_LIMIT
                   ? reset(SETTING_KEYS.PLAYBACK_MAX_BITRATE_KBPS)
                   : save(SETTING_KEYS.PLAYBACK_MAX_BITRATE_KBPS, Number(next));
-              request.catch(() => toast.error("Failed to save maximum bitrate"));
+              request.catch(() =>
+                toast.error("errors.settings.playback_settings.failed_to_save_maximum_bitrate"),
+              );
             }}
           >
             <SelectTrigger id={id} className="w-full sm:w-[220px]">
@@ -166,19 +176,25 @@ function QualitySetting() {
  * per-device override becomes reachable from the web UI.
  */
 function AutoPlayNextSetting() {
+  useUILanguage();
+  useUILanguage();
   const { enabled, setEnabled, isSaving } = useAutoPlayNextSetting();
 
   return (
     <SettingRow
-      label="Auto-play next episode"
-      description="Start the next episode automatically after the current one ends."
+      label={tr("pages.settings.playback_settings.auto_play_next_episode")}
+      description={tr(
+        "pages.settings.playback_settings.start_the_next_episode_automatically_after_the_current_one_ends",
+      )}
       control={(id) => (
         <Switch
           id={id}
           checked={enabled}
           disabled={isSaving}
           onCheckedChange={(checked) => {
-            setEnabled(checked).catch(() => toast.error("Failed to save playback setting"));
+            setEnabled(checked).catch(() =>
+              toast.error("errors.settings.playback_settings.failed_to_save_playback_setting"),
+            );
           }}
         />
       )}
@@ -187,6 +203,8 @@ function AutoPlayNextSetting() {
 }
 
 export default function PlaybackSettings() {
+  useUILanguage();
+  useUILanguage();
   const capabilities = useSettingsCapabilities();
   const supportsIntroSkipMode = settingsCapabilitiesSupportKey(
     capabilities.data,
@@ -234,7 +252,9 @@ export default function PlaybackSettings() {
   // several of these keys are device-overridable, and without the clear the
   // control would snap back to the override it cannot see.
   const saveValue = (key: SettingKey, value: unknown) => {
-    saveProfileDefault(key, value).catch(() => toast.error("Failed to save playback setting"));
+    saveProfileDefault(key, value).catch(() =>
+      toast.error("errors.settings.playback_settings.failed_to_save_playback_setting"),
+    );
   };
 
   const nextUpMode = read<string>(SETTING_KEYS.UI_NEXT_UP_MODE);
@@ -261,7 +281,7 @@ export default function PlaybackSettings() {
         ? resetProfileDefault(SETTING_KEYS.CATALOG_METADATA_LANGUAGE_OVERRIDES)
         : saveProfileDefault(SETTING_KEYS.CATALOG_METADATA_LANGUAGE_OVERRIDES, overrides);
     return request.catch((error) => {
-      toast.error("Failed to save metadata language exceptions");
+      toast.error("errors.settings.playback_settings.failed_to_save_metadata_language_exceptions");
       throw error;
     });
   };
@@ -270,7 +290,7 @@ export default function PlaybackSettings() {
     // Nothing stored is the state a reset asks for, which the shared reset
     // already treats as success.
     await resetProfileDefault(SETTING_KEYS.UI_NEXT_UP_MODE).catch(() =>
-      toast.error("Failed to reset the next up preference"),
+      toast.error("errors.settings.playback_settings.failed_to_reset_the_next_up_preference"),
     );
   }
 
@@ -278,22 +298,30 @@ export default function PlaybackSettings() {
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="space-y-3">
-          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Playback</h2>
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {tr("pages.settings.playback_settings.playback")}
+          </h2>
           <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-            Choose the defaults Silo should use when playback starts.
+            {tr(
+              "pages.settings.playback_settings.choose_the_defaults_silo_should_use_when_playback_starts",
+            )}
           </p>
         </div>
       </div>
 
       <SettingsGroup
-        title="Defaults"
-        description="These preferences apply unless a library or item has a more specific playback choice."
+        title={tr("pages.settings.playback_settings.defaults")}
+        description={tr(
+          "pages.settings.playback_settings.these_preferences_apply_unless_a_library_or_item_has_a",
+        )}
       >
         <QualitySetting />
 
         <SettingRow
-          label="Spoken language"
-          description="Prefer a spoken language for this profile when multiple tracks are available."
+          label={tr("pages.settings.playback_settings.spoken_language")}
+          description={tr(
+            "pages.settings.playback_settings.prefer_a_spoken_language_for_this_profile_when_multiple_tracks",
+          )}
           control={(id) => (
             <div className="w-full sm:w-[220px]">
               <LanguageSelect
@@ -301,7 +329,7 @@ export default function PlaybackSettings() {
                 value={audioLanguage ?? "none"}
                 options={audioLanguageOptions}
                 disabled={pending}
-                placeholder="No preference"
+                placeholder={tr("pages.settings.playback_settings.no_preference")}
                 className="w-full"
                 onValueChange={(value) =>
                   // The contract spells "no preference" as null, where the
@@ -309,7 +337,9 @@ export default function PlaybackSettings() {
                   saveValue(SETTING_KEYS.PLAYBACK_AUDIO_LANGUAGE, value === "none" ? null : value)
                 }
               >
-                <SelectItem value="none">No preference</SelectItem>
+                <SelectItem value="none">
+                  {tr("pages.settings.playback_settings.no_preference")}
+                </SelectItem>
               </LanguageSelect>
             </div>
           )}
@@ -330,8 +360,10 @@ export default function PlaybackSettings() {
 
         {introSkipControl === "mode" ? (
           <SettingRow
-            label="Skip intros"
-            description="Leave intros alone, offer a Skip Intro button, or skip automatically with an undo."
+            label={tr("pages.settings.playback_settings.skip_intros")}
+            description={tr(
+              "pages.settings.playback_settings.leave_intros_alone_offer_a_skip_intro_button_or_skip",
+            )}
             control={(id) => (
               <Select
                 value={read<string>(SETTING_KEYS.PLAYBACK_INTRO_SKIP_MODE)}
@@ -356,12 +388,14 @@ export default function PlaybackSettings() {
           // its place and asserts no value at all rather than showing a switch
           // whose position would be a guess the user could act on.
           <SettingRow
-            label="Skip intros"
-            description="Available once Silo has checked what this server supports."
+            label={tr("pages.settings.playback_settings.skip_intros")}
+            description={tr(
+              "pages.settings.playback_settings.available_once_silo_has_checked_what_this_server_supports",
+            )}
             control={(id) => (
               <Select disabled>
                 <SelectTrigger id={id} className="w-full sm:w-[220px]">
-                  <SelectValue placeholder="Unavailable" />
+                  <SelectValue placeholder={tr("pages.settings.playback_settings.unavailable")} />
                 </SelectTrigger>
                 <SelectContent>
                   {INTRO_SKIP_MODES.map((mode) => (
@@ -375,8 +409,10 @@ export default function PlaybackSettings() {
           />
         ) : (
           <SettingRow
-            label="Auto-skip intros"
-            description="Jump past intros automatically when Silo can detect them."
+            label={tr("pages.settings.playback_settings.auto_skip_intros")}
+            description={tr(
+              "pages.settings.playback_settings.jump_past_intros_automatically_when_silo_can_detect_them",
+            )}
             control={(id) => (
               <Switch
                 id={id}
@@ -391,8 +427,10 @@ export default function PlaybackSettings() {
         )}
 
         <SettingRow
-          label="Auto-skip credits"
-          description="Move through end credits automatically when a skip is available."
+          label={tr("pages.settings.playback_settings.auto_skip_credits")}
+          description={tr(
+            "pages.settings.playback_settings.move_through_end_credits_automatically_when_a_skip_is_available",
+          )}
           control={(id) => (
             <Switch
               id={id}
@@ -406,8 +444,10 @@ export default function PlaybackSettings() {
         />
 
         <SettingRow
-          label="Auto-skip recaps"
-          description="Skip 'previously on…' recaps automatically when Silo can detect them."
+          label={tr("pages.settings.playback_settings.auto_skip_recaps")}
+          description={tr(
+            "pages.settings.playback_settings.skip_previously_on_recaps_automatically_when_silo_can_detect_them",
+          )}
           control={(id) => (
             <Switch
               id={id}
@@ -421,8 +461,10 @@ export default function PlaybackSettings() {
         />
 
         <SettingRow
-          label="Start next at preview"
-          description="Begin the next episode when the current one reaches its next-episode preview teaser, rather than waiting for the end credits."
+          label={tr("pages.settings.playback_settings.start_next_at_preview")}
+          description={tr(
+            "pages.settings.playback_settings.begin_the_next_episode_when_the_current_one_reaches_its",
+          )}
           control={(id) => (
             <Switch
               id={id}
@@ -438,8 +480,10 @@ export default function PlaybackSettings() {
         <AutoPlayNextSetting />
 
         <SettingRow
-          label="Next up episodes"
-          description="Choose whether upcoming episodes stay with Continue Watching or get their own row."
+          label={tr("pages.settings.playback_settings.next_up_episodes")}
+          description={tr(
+            "pages.settings.playback_settings.choose_whether_upcoming_episodes_stay_with_continue_watching_or_get",
+          )}
           control={(id) => (
             <div className="flex items-center gap-2">
               <Select
@@ -466,7 +510,7 @@ export default function PlaybackSettings() {
                   onClick={resetNextUpMode}
                   disabled={pending}
                 >
-                  Reset
+                  {tr("common.actions.reset")}
                 </Button>
               ) : null}
             </div>

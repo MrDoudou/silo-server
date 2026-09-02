@@ -22,7 +22,8 @@ import {
   applyNotificationsSnapshot,
   formatEpisodeCode,
 } from "@/hooks/queries/notifications";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import {
   RealtimeEventsContext,
   type EventChannelHandlers,
@@ -47,6 +48,8 @@ import {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface JobWaiter {
   timeoutId: number;
@@ -480,6 +483,7 @@ function handleUserStateEvent(
 }
 
 export function RealtimeEventsProvider({ children }: { children: ReactNode }) {
+  useUILanguage();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const actingAdmin = useIsActingAdmin();
@@ -660,26 +664,47 @@ export function RealtimeEventsProvider({ children }: { children: ReactNode }) {
       applyNotificationCreated(queryClient, notification);
       if (notification.type === "episode.available" && notification.series_title) {
         const episodeCode = formatEpisodeCode(notification);
-        toast(`New episode of ${notification.series_title}`, {
-          description: [episodeCode, notification.episode_title].filter(Boolean).join(" — "),
+        toast("feedback.realtime_events_provider.new_episode_of_series", {
+          values: {
+            series: notification.series_title,
+          },
+          resolvedDescription: [episodeCode, notification.episode_title]
+            .filter(Boolean)
+            .join(" — "),
         });
       } else if (notification.type === "request.fulfilled") {
-        toast(
-          notification.series_title
-            ? `${notification.series_title} is now available`
-            : "Your request is now available",
-          { description: "Your media request has arrived in the library." },
-        );
+        toast("feedback.realtime_events_provider.reported_message", {
+          values: {
+            message: notification.series_title
+              ? tr("feedback.realtime_events_provider.title_is_now_available", {
+                  title: notification.series_title,
+                })
+              : tr("feedback.realtime_events_provider.your_request_is_now_available"),
+          },
+          description:
+            "components.realtime_events_provider.your_media_request_has_arrived_in_the_library",
+        });
       } else if (
         notification.type === "request.approved" ||
         notification.type === "request.declined"
       ) {
-        const verb = notification.type === "request.approved" ? "approved" : "declined";
         const title = notification.reason_flags?.title;
-        toast(title ? `Request ${verb}: ${title}` : `Your request was ${verb}`, {
-          description:
+        toast("feedback.realtime_events_provider.reported_message", {
+          values: {
+            message: title
+              ? tr(
+                  notification.type === "request.approved"
+                    ? "feedback.realtime_events_provider.request_approved_title"
+                    : "feedback.realtime_events_provider.request_declined_title",
+                  { title },
+                )
+              : notification.type === "request.approved"
+                ? tr("feedback.realtime_events_provider.your_request_was_approved")
+                : tr("feedback.realtime_events_provider.your_request_was_declined"),
+          },
+          resolvedDescription:
             notification.type === "request.declined"
-              ? notification.reason_flags?.reason
+              ? tr.remote({ message: notification.reason_flags?.reason })
               : undefined,
         });
       }

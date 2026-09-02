@@ -11,7 +11,7 @@ import type {
   PlexPinResponse,
 } from "@/api/types";
 import { historyImportKeys } from "./keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 const STALE_TIME = 15_000;
 
@@ -48,7 +48,9 @@ export function useLoginEmbyConnect() {
         body: JSON.stringify(body),
       }),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to sign in with Emby Connect");
+      toast.error("errors.queries.history_import.failed_to_sign_in_with_emby_connect", {
+        error: err,
+      });
     },
   });
 }
@@ -60,7 +62,7 @@ export function useCreatePlexPin() {
         method: "POST",
       }),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to start Plex sign-in");
+      toast.error("errors.queries.history_import.failed_to_start_plex_sign_in", { error: err });
     },
   });
 }
@@ -91,12 +93,12 @@ export function useCreateHistoryImportRun() {
         body: JSON.stringify(body),
       }),
     onSuccess: (run) => {
-      toast.success("Import started");
+      toast.success("feedback.queries.history_import.import_started");
       queryClient.invalidateQueries({ queryKey: historyImportKeys.runs() });
       queryClient.invalidateQueries({ queryKey: historyImportKeys.run(run.id) });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to start import");
+      toast.error("errors.queries.history_import.failed_to_start_import", { error: err });
     },
   });
 }

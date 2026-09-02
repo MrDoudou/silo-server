@@ -1,6 +1,8 @@
 import type { QuerySort } from "@/api/types";
 import { getQuerySortOptions, type QuerySortRelevanceScope } from "@/lib/querySortOptions";
 
+import { tr } from "@/i18n/translate";
+
 export interface CollectionOperatorOption {
   value: string;
   label: string;
@@ -20,25 +22,54 @@ export interface CollectionFieldOption {
 export const COLLECTION_FIELD_OPTIONS: CollectionFieldOption[] = [
   {
     value: "genre",
-    label: "Genre",
+    get label() {
+      return tr("components.collections.collection_builder_fields.genre");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
-      { value: "contains", label: "contains" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
+      {
+        value: "contains",
+        get label() {
+          return tr("components.collections.collection_builder_fields.contains");
+        },
+      },
     ],
     inputType: "text",
     valueType: "string",
   },
   {
     value: "year",
-    label: "Year",
+    get label() {
+      return tr("components.collections.collection_builder_fields.year");
+    },
     operators: [
-      { value: "is", label: "equals" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.equals");
+        },
+      },
       { value: "gte", label: ">=" },
       { value: "lte", label: "<=" },
       { value: "gt", label: ">" },
       { value: "lt", label: "<" },
-      { value: "between", label: "between" },
+      {
+        value: "between",
+        get label() {
+          return tr("components.collections.collection_builder_fields.between");
+        },
+      },
     ],
     inputType: "number",
     valueType: "number",
@@ -46,13 +77,20 @@ export const COLLECTION_FIELD_OPTIONS: CollectionFieldOption[] = [
   },
   {
     value: "rating_imdb",
-    label: "IMDb Rating",
+    get label() {
+      return tr("components.collections.collection_builder_fields.imdb_rating");
+    },
     operators: [
       { value: "gte", label: ">=" },
       { value: "lte", label: "<=" },
       { value: "gt", label: ">" },
       { value: "lt", label: "<" },
-      { value: "between", label: "between" },
+      {
+        value: "between",
+        get label() {
+          return tr("components.collections.collection_builder_fields.between");
+        },
+      },
     ],
     inputType: "number",
     valueType: "number",
@@ -60,10 +98,22 @@ export const COLLECTION_FIELD_OPTIONS: CollectionFieldOption[] = [
   },
   {
     value: "type",
-    label: "Type",
+    get label() {
+      return tr("components.collections.collection_builder_fields.type");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "select",
     valueType: "string",
@@ -71,90 +121,198 @@ export const COLLECTION_FIELD_OPTIONS: CollectionFieldOption[] = [
   },
   {
     value: "content_rating",
-    label: "Content Rating",
+    get label() {
+      return tr("components.collections.collection_builder_fields.content_rating");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "text",
     valueType: "string",
   },
   {
     value: "studio",
-    label: "Studio",
+    get label() {
+      return tr("components.collections.collection_builder_fields.studio");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "text",
     valueType: "string",
   },
   {
     value: "actor",
-    label: "Actor",
+    get label() {
+      return tr("components.collections.collection_builder_fields.actor");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "person_search",
     valueType: "string",
   },
   {
     value: "director",
-    label: "Director",
+    get label() {
+      return tr("components.collections.collection_builder_fields.director");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "person_search",
     valueType: "string",
   },
   {
     value: "writer",
-    label: "Writer",
+    get label() {
+      return tr("components.collections.collection_builder_fields.writer");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "person_search",
     valueType: "string",
   },
   {
     value: "producer",
-    label: "Producer",
+    get label() {
+      return tr("components.collections.collection_builder_fields.producer");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "person_search",
     valueType: "string",
   },
   {
     value: "network",
-    label: "Network",
+    get label() {
+      return tr("components.collections.collection_builder_fields.network");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "text",
     valueType: "string",
   },
   {
     value: "country",
-    label: "Country",
+    get label() {
+      return tr("components.collections.collection_builder_fields.country");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "text",
     valueType: "string",
   },
   {
     value: "status",
-    label: "Status",
+    get label() {
+      return tr("components.collections.collection_builder_fields.status");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "select",
     valueType: "string",
@@ -162,12 +320,34 @@ export const COLLECTION_FIELD_OPTIONS: CollectionFieldOption[] = [
   },
   {
     value: "added_at",
-    label: "Added",
+    get label() {
+      return tr("components.collections.collection_builder_fields.added");
+    },
     operators: [
-      { value: "gt", label: "after" },
-      { value: "lt", label: "before" },
-      { value: "between", label: "between" },
-      { value: "in_last", label: "in the last" },
+      {
+        value: "gt",
+        get label() {
+          return tr("components.collections.collection_builder_fields.after");
+        },
+      },
+      {
+        value: "lt",
+        get label() {
+          return tr("components.collections.collection_builder_fields.before");
+        },
+      },
+      {
+        value: "between",
+        get label() {
+          return tr("components.collections.collection_builder_fields.between");
+        },
+      },
+      {
+        value: "in_last",
+        get label() {
+          return tr("components.collections.collection_builder_fields.in_the_last");
+        },
+      },
     ],
     inputType: "text",
     valueType: "string",
@@ -175,12 +355,34 @@ export const COLLECTION_FIELD_OPTIONS: CollectionFieldOption[] = [
   },
   {
     value: "release_date",
-    label: "Release Date",
+    get label() {
+      return tr("components.collections.collection_builder_fields.release_date");
+    },
     operators: [
-      { value: "gt", label: "after" },
-      { value: "lt", label: "before" },
-      { value: "between", label: "between" },
-      { value: "in_last", label: "in the last" },
+      {
+        value: "gt",
+        get label() {
+          return tr("components.collections.collection_builder_fields.after");
+        },
+      },
+      {
+        value: "lt",
+        get label() {
+          return tr("components.collections.collection_builder_fields.before");
+        },
+      },
+      {
+        value: "between",
+        get label() {
+          return tr("components.collections.collection_builder_fields.between");
+        },
+      },
+      {
+        value: "in_last",
+        get label() {
+          return tr("components.collections.collection_builder_fields.in_the_last");
+        },
+      },
     ],
     inputType: "text",
     valueType: "string",
@@ -188,42 +390,90 @@ export const COLLECTION_FIELD_OPTIONS: CollectionFieldOption[] = [
   },
   {
     value: "watched",
-    label: "Watched",
-    operators: [{ value: "is", label: "is" }],
+    get label() {
+      return tr("components.collections.collection_builder_fields.watched");
+    },
+    operators: [
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+    ],
     inputType: "boolean",
     valueType: "boolean",
     personalized: true,
   },
   {
     value: "favorited",
-    label: "Favorited",
-    operators: [{ value: "is", label: "is" }],
+    get label() {
+      return tr("components.collections.collection_builder_fields.favorited");
+    },
+    operators: [
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+    ],
     inputType: "boolean",
     valueType: "boolean",
     personalized: true,
   },
   {
     value: "in_watchlist",
-    label: "In Watchlist",
-    operators: [{ value: "is", label: "is" }],
+    get label() {
+      return tr("components.collections.collection_builder_fields.in_watchlist");
+    },
+    operators: [
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+    ],
     inputType: "boolean",
     valueType: "boolean",
     personalized: true,
   },
   {
     value: "in_progress",
-    label: "In Progress",
-    operators: [{ value: "is", label: "is" }],
+    get label() {
+      return tr("components.collections.collection_builder_fields.in_progress");
+    },
+    operators: [
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+    ],
     inputType: "boolean",
     valueType: "boolean",
     personalized: true,
   },
   {
     value: "resolution",
-    label: "Resolution",
+    get label() {
+      return tr("components.collections.collection_builder_fields.resolution");
+    },
     operators: [
-      { value: "is", label: "is" },
-      { value: "is_not", label: "is not" },
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+      {
+        value: "is_not",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is_not");
+        },
+      },
     ],
     inputType: "select",
     valueType: "string",
@@ -231,27 +481,52 @@ export const COLLECTION_FIELD_OPTIONS: CollectionFieldOption[] = [
   },
   {
     value: "hdr",
-    label: "HDR",
-    operators: [{ value: "is", label: "is" }],
+    get label() {
+      return tr("components.collections.collection_builder_fields.hdr");
+    },
+    operators: [
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+    ],
     inputType: "boolean",
     valueType: "boolean",
   },
   {
     value: "dolby_vision",
-    label: "Dolby Vision",
-    operators: [{ value: "is", label: "is" }],
+    get label() {
+      return tr("components.collections.collection_builder_fields.dolby_vision");
+    },
+    operators: [
+      {
+        value: "is",
+        get label() {
+          return tr("components.collections.collection_builder_fields.is");
+        },
+      },
+    ],
     inputType: "boolean",
     valueType: "boolean",
   },
   {
     value: "bitrate",
-    label: "Bitrate",
+    get label() {
+      return tr("components.collections.collection_builder_fields.bitrate");
+    },
     operators: [
       { value: "gte", label: ">=" },
       { value: "lte", label: "<=" },
       { value: "gt", label: ">" },
       { value: "lt", label: "<" },
-      { value: "between", label: "between" },
+      {
+        value: "between",
+        get label() {
+          return tr("components.collections.collection_builder_fields.between");
+        },
+      },
     ],
     inputType: "number",
     valueType: "number",

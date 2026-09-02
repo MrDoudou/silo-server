@@ -9,6 +9,8 @@ import { formatRelativeTime } from "@/lib/date";
 import { useMeasuredSize } from "../charts/useMeasuredSize";
 import { SectionError } from "../feedback";
 import { formatMbps } from "../format";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * The narrowest card that still fits a name, a meter, and its numbers. Below
@@ -32,6 +34,7 @@ const NODE_CARD_MIN_WIDTH_PX = 260;
  * rather than reading as a missing dependency.
  */
 export function TranscodeNodesWidget() {
+  useUILanguage();
   const nodesQuery = useAdminNodes();
   const nodes = sortNodes(nodesQuery.data ?? []);
   const { ref, size } = useMeasuredSize<HTMLDivElement>();
@@ -42,14 +45,16 @@ export function TranscodeNodesWidget() {
     <Card className="h-full">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 pb-3">
         <div className="flex min-w-0 items-baseline gap-2.5">
-          <CardTitle className="text-sm font-bold">Nodes</CardTitle>
+          <CardTitle className="text-sm font-bold">
+            {tr("components.admin.dashboard.widgets.transcode_nodes_widget.nodes")}
+          </CardTitle>
           {nodes.length > 0 ? <FleetSummary nodes={nodes} /> : null}
         </div>
         <Link
           to="/admin/nodes"
           className="text-muted-foreground hover:text-primary text-[11px] transition-colors"
         >
-          Manage ›
+          {tr("components.admin.dashboard.widgets.transcode_nodes_widget.manage")}
         </Link>
       </CardHeader>
       <CardContent ref={ref} className="min-h-0 flex-1 overflow-y-auto">
@@ -60,10 +65,16 @@ export function TranscodeNodesWidget() {
             ))}
           </div>
         ) : nodesQuery.error ? (
-          <SectionError message="Failed to load stream nodes." />
+          <SectionError
+            message={tr(
+              "components.admin.dashboard.widgets.transcode_nodes_widget.failed_to_load_stream_nodes",
+            )}
+          />
         ) : nodes.length === 0 ? (
           <div className="text-muted-foreground py-4 text-center text-sm">
-            No stream nodes — transcodes run on this server
+            {tr(
+              "components.admin.dashboard.widgets.transcode_nodes_widget.no_stream_nodes_transcodes_run_on_this_server",
+            )}
           </div>
         ) : asCards ? (
           <div
@@ -99,6 +110,7 @@ function sortNodes(nodes: StreamNode[]): StreamNode[] {
  * out: an operator turned them off on purpose.
  */
 function FleetSummary({ nodes }: { nodes: StreamNode[] }) {
+  useUILanguage();
   const enabled = nodes.filter((node) => node.enabled);
   const healthy = enabled.filter((node) => node.healthy).length;
   const jobs = nodes.reduce((sum, node) => sum + node.active_jobs, 0);
@@ -106,14 +118,24 @@ function FleetSummary({ nodes }: { nodes: StreamNode[] }) {
 
   return (
     <span className="text-muted-foreground truncate text-[11px] tabular-nums">
-      {enabled.length > 0 ? `${healthy}/${enabled.length} healthy · ` : ""}
-      {jobs.toLocaleString()} {jobs === 1 ? "job" : "jobs"} · {formatMbps(egressKbps / 1_000)}
+      {enabled.length > 0
+        ? tr("components.admin.dashboard.widgets.transcode_nodes_widget.healthy_length_healthy", {
+            healthy: healthy,
+            length: enabled.length,
+          })
+        : ""}
+      {jobs.toLocaleString()}{" "}
+      {jobs === 1
+        ? tr("components.admin.dashboard.widgets.transcode_nodes_widget.job")
+        : tr("components.admin.dashboard.widgets.transcode_nodes_widget.jobs")}{" "}
+      · {formatMbps(egressKbps / 1_000)}
     </span>
   );
 }
 
 /** Compact stacked row for narrow slots. */
 function NodeRow({ node }: { node: StreamNode }) {
+  useUILanguage();
   const status = nodeStatus(node);
   const StatusIcon = status.icon;
   const jobs = jobLoad(node);
@@ -124,7 +146,9 @@ function NodeRow({ node }: { node: StreamNode }) {
         {/* Status is an icon plus the word: the tint alone would be the only
             signal for anyone who cannot separate the hues. */}
         <span
-          className={`flex flex-shrink-0 items-center gap-1 text-[11px] font-medium ${status.className}`}
+          className={
+            "flex flex-shrink-0 items-center gap-1 text-[11px] font-medium " + status.className
+          }
           title={status.label}
         >
           <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -142,7 +166,13 @@ function NodeRow({ node }: { node: StreamNode }) {
           <span className="text-border/70">·</span>
           <span>
             {node.type}
-            {node.group ? ` · ${node.group}` : ""} · checked {lastCheckLabel(node)}
+            {node.group
+              ? tr("components.admin.dashboard.widgets.transcode_nodes_widget.group", {
+                  group: node.group,
+                })
+              : ""}{" "}
+            {tr("components.admin.dashboard.widgets.transcode_nodes_widget.checked")}{" "}
+            {lastCheckLabel(node)}
           </span>
         </div>
       </div>
@@ -155,6 +185,7 @@ function NodeRow({ node }: { node: StreamNode }) {
  * own room, and the vitals as labelled pairs instead of a squeezed one-liner.
  */
 function NodeCard({ node }: { node: StreamNode }) {
+  useUILanguage();
   const status = nodeStatus(node);
   const StatusIcon = status.icon;
   const jobs = jobLoad(node);
@@ -166,11 +197,17 @@ function NodeCard({ node }: { node: StreamNode }) {
           <div className="truncate text-sm font-bold">{node.name}</div>
           <div className="text-muted-foreground truncate text-[11px]">
             {node.type}
-            {node.group ? ` · ${node.group}` : ""}
+            {node.group
+              ? tr("components.admin.dashboard.widgets.transcode_nodes_widget.group", {
+                  group: node.group,
+                })
+              : ""}
           </div>
         </div>
         <span
-          className={`flex flex-shrink-0 items-center gap-1 text-[11px] font-medium ${status.className}`}
+          className={
+            "flex flex-shrink-0 items-center gap-1 text-[11px] font-medium " + status.className
+          }
         >
           <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {status.label}
@@ -180,13 +217,17 @@ function NodeCard({ node }: { node: StreamNode }) {
       <div className="text-muted-foreground flex items-center justify-between gap-2 text-[11px] tabular-nums">
         <span>{jobs.label}</span>
         <span>{formatMbps(node.egress_kbps / 1_000)}</span>
-        <span>checked {lastCheckLabel(node)}</span>
+        <span>
+          {tr("components.admin.dashboard.widgets.transcode_nodes_widget.checked_75e4aedc")}{" "}
+          {lastCheckLabel(node)}
+        </span>
       </div>
     </div>
   );
 }
 
 function JobsMeter({ node, jobs }: { node: StreamNode; jobs: ReturnType<typeof jobLoad> }) {
+  useUILanguage();
   return (
     <div className="min-w-0 flex-1">
       <div className="bg-muted/60 h-1.5 w-full overflow-hidden rounded-full">
@@ -197,7 +238,10 @@ function JobsMeter({ node, jobs }: { node: StreamNode; jobs: ReturnType<typeof j
             background: "var(--chart-1)",
           }}
           role="meter"
-          aria-label={`${node.name} transcode jobs`}
+          aria-label={tr(
+            "components.admin.dashboard.widgets.transcode_nodes_widget.name_transcode_jobs",
+            { name: node.name },
+          )}
           aria-valuenow={node.active_jobs}
           aria-valuemin={0}
           aria-valuemax={jobs.max ?? undefined}
@@ -218,12 +262,24 @@ function lastCheckLabel(node: StreamNode): string {
 
 function nodeStatus(node: StreamNode) {
   if (!node.enabled) {
-    return { label: "Disabled", icon: CircleSlash, className: "text-muted-foreground" };
+    return {
+      label: tr("components.admin.dashboard.widgets.transcode_nodes_widget.disabled"),
+      icon: CircleSlash,
+      className: "text-muted-foreground",
+    };
   }
   if (!node.healthy) {
-    return { label: "Unhealthy", icon: XCircle, className: "text-destructive" };
+    return {
+      label: tr("components.admin.dashboard.widgets.transcode_nodes_widget.unhealthy"),
+      icon: XCircle,
+      className: "text-destructive",
+    };
   }
-  return { label: "Healthy", icon: CheckCircle2, className: "text-emerald-500" };
+  return {
+    label: tr("components.admin.dashboard.widgets.transcode_nodes_widget.healthy"),
+    icon: CheckCircle2,
+    className: "text-emerald-500",
+  };
 }
 
 /**
@@ -235,14 +291,23 @@ function jobLoad(node: StreamNode): { percent: number; label: string; max: numbe
   if (max === null) {
     return {
       percent: 0,
-      label: `${node.active_jobs.toLocaleString()} jobs`,
+      get label() {
+        return tr("components.admin.dashboard.widgets.transcode_nodes_widget.value1_jobs", {
+          value1: node.active_jobs.toLocaleString(),
+        });
+      },
       max: null,
     };
   }
   const percent = Math.max(0, Math.min(100, Math.round((node.active_jobs / max) * 100)));
   return {
     percent,
-    label: `${node.active_jobs.toLocaleString()}/${max.toLocaleString()} jobs`,
+    get label() {
+      return tr("components.admin.dashboard.widgets.transcode_nodes_widget.value1_value2_jobs", {
+        value1: node.active_jobs.toLocaleString(),
+        value2: max.toLocaleString(),
+      });
+    },
     max,
   };
 }

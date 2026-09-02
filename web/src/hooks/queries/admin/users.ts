@@ -12,7 +12,7 @@ import type {
 import { SETTING_DEFINITIONS, SETTING_KEYS, type SettingKey } from "@/lib/settingsContract";
 import { adminKeys } from "../keys";
 import { useAdminUserProfiles } from "./history";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 const ADMIN_STALE_TIME = 30_000;
 
@@ -202,11 +202,11 @@ export function useCreateUser() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("User created");
+      toast.success("feedback.queries.admin.users.user_created");
       queryClient.invalidateQueries({ queryKey: adminKeys.users() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error("errors.queries.admin.users.failed_to_save", { error: err });
     },
   });
 }
@@ -220,14 +220,14 @@ export function useUpdateUser() {
         body: JSON.stringify(body),
       }),
     onSuccess: (_data, variables) => {
-      toast.success("User updated");
+      toast.success("feedback.queries.admin.users.user_updated");
       queryClient.invalidateQueries({ queryKey: adminKeys.users() });
       queryClient.invalidateQueries({ queryKey: adminKeys.userDetail(variables.id) });
       queryClient.invalidateQueries({ queryKey: adminKeys.userProfiles(variables.id) });
       queryClient.invalidateQueries({ queryKey: adminKeys.accessGroups() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error("errors.queries.admin.users.failed_to_save", { error: err });
     },
   });
 }
@@ -237,12 +237,12 @@ export function useDeleteUser() {
   return useMutation({
     mutationFn: (id: number) => api(`/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("User deleted");
+      toast.success("feedback.queries.admin.users.user_deleted");
       queryClient.invalidateQueries({ queryKey: adminKeys.users() });
       queryClient.invalidateQueries({ queryKey: adminKeys.accessGroups() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete");
+      toast.error("errors.queries.admin.users.failed_to_delete", { error: err });
     },
   });
 }
@@ -292,11 +292,11 @@ export function useUpdateAdminUserSetting() {
         body: JSON.stringify({ value: settingValueFromString(key, value) }),
       }),
     onSuccess: (_data, variables) => {
-      toast.success("User setting updated");
+      toast.success("feedback.queries.admin.users.user_setting_updated");
       queryClient.invalidateQueries({ queryKey: adminKeys.userSettings(variables.userId) });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save setting");
+      toast.error("errors.queries.admin.users.failed_to_save_setting", { error: err });
     },
   });
 }
@@ -325,11 +325,11 @@ export function useDeleteAdminUserSetting() {
       return api(path, { method: "DELETE" });
     },
     onSuccess: (_data, variables) => {
-      toast.success("User setting reset");
+      toast.success("feedback.queries.admin.users.user_setting_reset");
       queryClient.invalidateQueries({ queryKey: adminKeys.userSettings(variables.userId) });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to reset setting");
+      toast.error("errors.queries.admin.users.failed_to_reset_setting", { error: err });
     },
   });
 }
@@ -419,14 +419,14 @@ export function useUpdateAdminUserDeviceSetting() {
         body: JSON.stringify({ value: settingValueFromString(key, value) }),
       }),
     onSuccess: (_data, variables) => {
-      toast.success("Device override updated");
+      toast.success("feedback.queries.admin.users.device_override_updated");
       invalidateAdminDeviceCaches(queryClient, variables.userId);
       queryClient.invalidateQueries({
         queryKey: adminKeys.deviceDetail(variables.userId, variables.deviceId),
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save device override");
+      toast.error("errors.queries.admin.users.failed_to_save_device_override", { error: err });
     },
   });
 }
@@ -449,14 +449,14 @@ export function useDeleteAdminUserDeviceSetting() {
         method: "DELETE",
       }),
     onSuccess: (_data, variables) => {
-      toast.success("Device override reset");
+      toast.success("feedback.queries.admin.users.device_override_reset");
       invalidateAdminDeviceCaches(queryClient, variables.userId);
       queryClient.invalidateQueries({
         queryKey: adminKeys.deviceDetail(variables.userId, variables.deviceId),
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to reset override");
+      toast.error("errors.queries.admin.users.failed_to_reset_override", { error: err });
     },
   });
 }
@@ -494,14 +494,14 @@ export function useDeleteAllAdminUserDeviceSettingsForDevice() {
       }
     },
     onSuccess: (_data, variables) => {
-      toast.success("All device overrides reset");
+      toast.success("feedback.queries.admin.users.all_device_overrides_reset");
       invalidateAdminDeviceCaches(queryClient, variables.userId);
       queryClient.invalidateQueries({
         queryKey: adminKeys.deviceDetail(variables.userId, variables.deviceId),
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to reset device");
+      toast.error("errors.queries.admin.users.failed_to_reset_device", { error: err });
     },
   });
 }

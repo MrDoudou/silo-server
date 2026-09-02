@@ -1,5 +1,7 @@
 import type { MarkerKind } from "@/api/types";
 
+import { tr } from "@/i18n/translate";
+
 /**
  * Canonical marker-kind metadata and timecode helpers shared by app-side
  * marker UI. NOTE: the player module (`web/src/player/`) intentionally keeps
@@ -12,10 +14,18 @@ export const MARKER_KINDS: MarkerKind[] = ["intro", "recap", "credits", "preview
 
 /** Human labels. "credits" doubles as the outro, so we say so. */
 export const MARKER_LABELS: Record<MarkerKind, string> = {
-  intro: "Intro",
-  recap: "Recap",
-  credits: "Credits / Outro",
-  preview: "Preview",
+  get intro() {
+    return tr("lib.markers.intro");
+  },
+  get recap() {
+    return tr("lib.markers.recap");
+  },
+  get credits() {
+    return tr("lib.markers.credits_outro");
+  },
+  get preview() {
+    return tr("lib.markers.preview");
+  },
 };
 
 /** Formats seconds as h:mm:ss / m:ss for display. Empty string for null. */

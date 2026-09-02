@@ -5,18 +5,22 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { formatJobProgress } from "./adminCatalogMaintenanceFormatters";
 import { formatDateTime } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 const JOB_TYPE_LABELS: Record<string, string> = {
-  delete_library: "Library Delete",
-  image_cache_cleanup: "Image Cache Cleanup",
-  catalog_export: "Catalog Export",
-  catalog_import: "Catalog Import",
-  item_refresh: "Item Refresh",
-  library_refresh: "Library Refresh",
+  delete_library: "components.admin_job_history.library_delete",
+  image_cache_cleanup: "components.admin_job_history.image_cache_cleanup",
+  catalog_export: "components.admin_job_history.catalog_export",
+  catalog_import: "components.admin_job_history.catalog_import",
+  item_refresh: "components.admin_job_history.item_refresh",
+  library_refresh: "components.admin_job_history.library_refresh",
 };
 
 function jobTypeLabel(jobType: string) {
-  return JOB_TYPE_LABELS[jobType] ?? jobType;
+  const knownLabel = JOB_TYPE_LABELS[jobType];
+  return knownLabel ? tr(knownLabel) : jobType;
 }
 
 function statusVariant(status: string) {
@@ -112,6 +116,7 @@ function jobResult(job: AdminJob) {
 }
 
 export default function AdminJobHistory() {
+  useUILanguage();
   const jobsQuery = useAllAdminJobs();
   const jobs = jobsQuery.data ?? [];
 
@@ -119,23 +124,27 @@ export default function AdminJobHistory() {
     <div className="border-border/70 bg-card/60 rounded-lg border">
       <div className="border-border/70 flex items-center justify-between border-b px-4 py-3">
         <div>
-          <h3 className="text-sm font-semibold">Job History</h3>
-          <p className="text-muted-foreground text-xs">Recent background jobs across all types.</p>
+          <h3 className="text-sm font-semibold">
+            {tr("components.admin_job_history.job_history")}
+          </h3>
+          <p className="text-muted-foreground text-xs">
+            {tr("components.admin_job_history.recent_background_jobs_across_all_types")}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {jobsQuery.isFetching ? (
-            <Badge variant="outline">Refreshing</Badge>
+            <Badge variant="outline">{tr("components.admin_job_history.refreshing")}</Badge>
           ) : (
             <Badge variant="secondary">{jobs.length}</Badge>
           )}
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Refresh job history"
+            aria-label={tr("components.admin_job_history.refresh_job_history")}
             onClick={() => jobsQuery.refetch()}
           >
             <RefreshCw
-              className={`h-4 w-4 ${jobsQuery.isFetching ? "animate-spin" : ""}`}
+              className={"h-4 w-4 " + (jobsQuery.isFetching ? "animate-spin" : "")}
               aria-hidden="true"
             />
           </Button>
@@ -143,7 +152,9 @@ export default function AdminJobHistory() {
       </div>
       <div className="divide-border/60 divide-y">
         {jobs.length === 0 ? (
-          <div className="text-muted-foreground px-4 py-5 text-sm">No jobs yet.</div>
+          <div className="text-muted-foreground px-4 py-5 text-sm">
+            {tr("components.admin_job_history.no_jobs_yet")}
+          </div>
         ) : (
           jobs.map((job) => {
             const desc = jobDescription(job);
@@ -161,15 +172,24 @@ export default function AdminJobHistory() {
                   </span>
                 </div>
                 <div className="text-muted-foreground flex flex-wrap gap-3 text-xs">
-                  {job.message && <span>{job.message}</span>}
+                  {job.message && <span>{tr.remote({ message: job.message })}</span>}
                   {(job.status === "running" || job.status === "queued") && (
-                    <span>Progress: {progress}</span>
+                    <span>
+                      {tr("components.admin_job_history.progress")} {progress}
+                    </span>
                   )}
                   {result && <span>{result}</span>}
-                  {job.completed_at && <span>Finished: {formatDateTime(job.completed_at)}</span>}
+                  {job.completed_at && (
+                    <span>
+                      {tr("components.admin_job_history.finished")}{" "}
+                      {formatDateTime(job.completed_at)}
+                    </span>
+                  )}
                 </div>
                 {job.error_message && (
-                  <div className="text-destructive text-xs">{job.error_message}</div>
+                  <div className="text-destructive text-xs">
+                    {tr.remote({ message: job.error_message })}
+                  </div>
                 )}
               </div>
             );

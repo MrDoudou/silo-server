@@ -23,10 +23,13 @@ import { cn } from "@/lib/utils";
 import { Menu, Search, X } from "lucide-react";
 import { useWatchPlaybackController } from "@/playback/watchPlaybackContext";
 import { useAudiobookPlaybackController } from "@/pages/audiobooks/player/audiobookPlaybackContext";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const ADMIN_DESKTOP_MEDIA_QUERY = "(min-width: 64rem)";
 
 export default function AdminLayout() {
+  useUILanguage();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const location = useLocation();
@@ -79,7 +82,7 @@ export default function AdminLayout() {
         href="#main-content"
         className="focus:bg-background focus:text-foreground focus:ring-ring sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:ring-2 focus:outline-none"
       >
-        Skip to content
+        {tr("components.admin_layout.skip_to_content")}
       </a>
       <div className="from-primary/6 pointer-events-none fixed inset-x-0 top-0 z-0 h-40 bg-gradient-to-b to-transparent blur-3xl" />
       {/* Desktop sidebar */}
@@ -94,7 +97,7 @@ export default function AdminLayout() {
             <SheetTrigger asChild>
               <button
                 className="text-muted-foreground hover:text-foreground hover:bg-accent/60 focus-visible:ring-ring/60 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all focus-visible:ring-[3px] focus-visible:outline-none"
-                aria-label="Open admin navigation"
+                aria-label={tr("components.admin_layout.open_admin_navigation")}
               >
                 <Menu className="h-5 w-5" />
               </button>
@@ -105,7 +108,7 @@ export default function AdminLayout() {
               </div>
               <div className="min-w-0">
                 <span className="text-muted-foreground block text-[10px] leading-none font-semibold tracking-[0.16em] uppercase">
-                  Admin
+                  {tr("components.admin_layout.admin")}
                 </span>
                 <span className="mt-1 block truncate text-[15px] leading-none font-extrabold tracking-tight">
                   {mobileTitle}
@@ -132,12 +135,12 @@ export default function AdminLayout() {
           className="w-[320px] max-w-[calc(100vw-3rem)] gap-0 border-r-0 p-0 sm:max-w-[320px]"
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Admin Navigation</SheetTitle>
+            <SheetTitle>{tr("components.admin_layout.admin_navigation")}</SheetTitle>
           </SheetHeader>
           <SheetClose asChild>
             <button
               type="button"
-              aria-label="Close admin navigation"
+              aria-label={tr("components.admin_layout.close_admin_navigation")}
               className="text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 absolute top-4 right-4 z-10 flex h-11 w-11 items-center justify-center rounded-xl transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
             >
               <X className="h-5 w-5" aria-hidden="true" />
@@ -156,9 +159,10 @@ export default function AdminLayout() {
       <main
         id="main-content"
         tabIndex={-1}
-        className={`relative z-10 min-h-screen min-w-0 px-4 py-4 sm:px-6 lg:ml-[240px] lg:px-8 lg:py-8 xl:px-10 ${
-          hasBackgroundBar ? "pb-32 sm:pb-36" : ""
-        }`}
+        className={
+          "relative z-10 min-h-screen min-w-0 px-4 py-4 sm:px-6 lg:ml-[240px] lg:px-8 lg:py-8 xl:px-10 " +
+          (hasBackgroundBar ? "pb-32 sm:pb-36" : "")
+        }
       >
         <div className="admin-shell">
           {/* Above the routed page and inside the content column, so every
@@ -187,12 +191,15 @@ function AdminSearchButton({
   className?: string;
   showShortcut?: boolean;
 }) {
+  useUILanguage();
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="Search admin sections"
-      title={`Search admin sections (${SEARCH_SHORTCUT_LABEL})`}
+      aria-label={tr("components.admin_layout.search_admin_sections")}
+      title={tr("components.admin_layout.search_admin_sections_search_shortcut_label", {
+        SEARCH_SHORTCUT_LABEL: SEARCH_SHORTCUT_LABEL,
+      })}
       className={cn(
         "text-muted-foreground hover:text-foreground hover:bg-accent/60 focus-visible:ring-ring/60 border-border/70 bg-surface/70 flex h-9 items-center justify-center gap-2 rounded-xl border px-2.5 transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
         className,
@@ -201,7 +208,9 @@ function AdminSearchButton({
       <Search className="h-4 w-4" aria-hidden="true" />
       {showShortcut ? (
         <>
-          <span className="hidden text-[13px] font-medium xl:inline">Search</span>
+          <span className="hidden text-[13px] font-medium xl:inline">
+            {tr("common.actions.search")}
+          </span>
           <kbd className="border-border/70 pointer-events-none rounded border px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap select-none">
             {SEARCH_SHORTCUT_LABEL}
           </kbd>

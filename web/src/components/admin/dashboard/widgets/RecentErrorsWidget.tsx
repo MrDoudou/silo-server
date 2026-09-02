@@ -7,6 +7,8 @@ import { useOperationalLogs } from "@/hooks/queries/admin/logs";
 import { formatRelativeTime } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { SectionError, UserSkeletonRows } from "../feedback";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const ROW_LIMIT = 8;
 /** One request for both levels — `level` takes a comma-separated list. */
@@ -20,28 +22,37 @@ const LEVELS = "error,warn";
  * widgets would hide that pairing.
  */
 export function RecentErrorsWidget() {
+  useUILanguage();
   const logsQuery = useOperationalLogs({ level: LEVELS, limit: ROW_LIMIT });
   const entries = logsQuery.data?.entries ?? [];
 
   return (
     <Card className="h-full">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-sm font-bold">Recent errors</CardTitle>
+        <CardTitle className="text-sm font-bold">
+          {tr("components.admin.dashboard.widgets.recent_errors_widget.recent_errors")}
+        </CardTitle>
         <Link
           to="/admin/logs"
           className="text-muted-foreground hover:text-primary text-[11px] transition-colors"
         >
-          All logs ›
+          {tr("components.admin.dashboard.widgets.recent_errors_widget.all_logs")}
         </Link>
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-y-auto">
         {logsQuery.isLoading ? (
           <UserSkeletonRows />
         ) : logsQuery.error ? (
-          <SectionError message="Failed to load recent errors." />
+          <SectionError
+            message={tr(
+              "components.admin.dashboard.widgets.recent_errors_widget.failed_to_load_recent_errors",
+            )}
+          />
         ) : entries.length === 0 ? (
           <div className="text-muted-foreground py-4 text-center text-sm">
-            No errors or warnings logged.
+            {tr(
+              "components.admin.dashboard.widgets.recent_errors_widget.no_errors_or_warnings_logged",
+            )}
           </div>
         ) : (
           <div className="space-y-0">
@@ -56,6 +67,7 @@ export function RecentErrorsWidget() {
 }
 
 function LogRow({ entry }: { entry: OperationalLogEntry }) {
+  useUILanguage();
   const tone = levelTone(entry.level);
   const Icon = tone.icon;
   return (
@@ -76,7 +88,7 @@ function LogRow({ entry }: { entry: OperationalLogEntry }) {
           {entry.message}
         </div>
         <div className="text-muted-foreground mt-0.5 text-[10px]">
-          {entry.component || "server"}
+          {entry.component || tr("components.admin.dashboard.widgets.recent_errors_widget.server")}
           {" · "}
           {formatRelativeTime(entry.timestamp, { rounding: "floor", justNowLabel: "Just now" }) ??
             entry.timestamp}
@@ -90,11 +102,25 @@ function levelTone(level: string) {
   switch (level.toLowerCase()) {
     case "error":
     case "fatal":
-      return { label: "Error", icon: XCircle, className: "text-destructive" };
+      return {
+        label: tr("components.admin.dashboard.widgets.recent_errors_widget.error"),
+        icon: XCircle,
+        className: "text-destructive",
+      };
     case "warn":
     case "warning":
-      return { label: "Warn", icon: AlertTriangle, className: "text-amber-500" };
+      return {
+        label: tr("components.admin.dashboard.widgets.recent_errors_widget.warn"),
+        icon: AlertTriangle,
+        className: "text-amber-500",
+      };
     default:
-      return { label: level || "Log", icon: Info, className: "text-muted-foreground" };
+      return {
+        get label() {
+          return level || tr("components.admin.dashboard.widgets.recent_errors_widget.log");
+        },
+        icon: Info,
+        className: "text-muted-foreground",
+      };
   }
 }

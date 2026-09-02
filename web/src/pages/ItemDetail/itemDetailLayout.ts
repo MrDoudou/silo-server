@@ -1,5 +1,7 @@
 import type { ItemDetail, Season } from "@/api/types";
 
+import { tr } from "@/i18n/translate";
+
 export interface SeriesContinueWatchingItem {
   contentId: string;
   seriesId?: string;
@@ -56,7 +58,7 @@ export function resolveLeafPrimaryAction(
 
   if (isInProgress) {
     return {
-      label: "Resume",
+      label: tr("pages.item_detail.item_detail_layout.resume"),
       progress,
     };
   }
@@ -104,7 +106,7 @@ export function resolveSeriesPrimaryAction({
   const resumeItem = continueWatching.find((entry) => entry.seriesId === seriesId);
   if (resumeItem) {
     return {
-      label: "Resume",
+      label: tr("pages.item_detail.item_detail_layout.resume"),
       directHref: `/watch/${resumeItem.contentId}`,
       context: resumeItem.title ? `Continue ${resumeItem.title}` : undefined,
     };
@@ -140,7 +142,7 @@ export function resolveSeriesPrimaryAction({
         : 1;
 
     return {
-      label: "Play Latest",
+      label: tr("pages.item_detail.item_detail_layout.play_latest"),
       targetSeasonId: targetSeason.content_id,
       targetEpisodeNumber,
       context: `Jump back into ${getSeasonDisplayTitle(targetSeason)}`,
@@ -150,7 +152,7 @@ export function resolveSeriesPrimaryAction({
   const firstSeason = sortedSeasons[0];
   if (firstSeason) {
     return {
-      label: "Start From Episode 1",
+      label: tr("pages.item_detail.item_detail_layout.start_from_episode_1"),
       targetSeasonId: firstSeason.content_id,
       targetEpisodeNumber: 1,
       context: `Begin with ${getSeasonDisplayTitle(firstSeason)}`,
@@ -158,7 +160,7 @@ export function resolveSeriesPrimaryAction({
   }
 
   return {
-    label: "Browse Series",
+    label: tr("pages.item_detail.item_detail_layout.browse_series"),
     context: "Episodes are not available yet",
   };
 }

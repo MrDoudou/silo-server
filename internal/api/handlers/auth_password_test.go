@@ -170,6 +170,16 @@ func TestHandleChangePasswordMapsCredentialErrors(t *testing.T) {
 			if response.Error != tt.wantCode {
 				t.Fatalf("error = %q, want %q", response.Error, tt.wantCode)
 			}
+			switch tt.wantCode {
+			case "weak_password":
+				if got := response.Params["min_length"]; got != float64(auth.MinimumPasswordLength) {
+					t.Fatalf("min_length = %v, want %d", got, auth.MinimumPasswordLength)
+				}
+			case "password_too_long":
+				if got := response.Params["max_bytes"]; got != float64(auth.MaximumPasswordBytes) {
+					t.Fatalf("max_bytes = %v, want %d", got, auth.MaximumPasswordBytes)
+				}
+			}
 		})
 	}
 }

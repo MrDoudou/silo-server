@@ -31,6 +31,8 @@ import CompatibilityProxiesSettings from "./CompatibilityProxiesSettings";
 import InfrastructureSettings from "./InfrastructureSettings";
 import SettingsOverview from "./SettingsOverview";
 import "@/styles/admin-settings.css";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SettingsNav extends AdminSettingsSearchItem {
   component: ComponentType;
@@ -65,6 +67,7 @@ const SETTINGS_NAV: SettingsNav[] = ADMIN_SETTINGS_NAV.map((item) => ({
 }));
 
 export default function AdminSettingsLayout() {
+  useUILanguage();
   const params = useParams();
   const [searchParams] = useSearchParams();
   const activeContentRef = useRef<HTMLDivElement>(null);
@@ -122,7 +125,7 @@ export default function AdminSettingsLayout() {
               className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex w-fit items-center gap-1.5 rounded-lg pr-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-              All settings
+              {tr("pages.admin_settings.admin_settings_layout.all_settings")}
             </Link>
           </div>
 
@@ -148,7 +151,9 @@ export default function AdminSettingsLayout() {
               <div
                 ref={activeContentRef}
                 role="region"
-                aria-label={`${active.label} settings`}
+                aria-label={tr("pages.admin_settings.admin_settings_layout.label_settings", {
+                  label: active.label,
+                })}
                 tabIndex={-1}
                 className="w-full max-w-3xl min-w-0 focus:outline-none"
               >

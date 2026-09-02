@@ -2,6 +2,8 @@ import type { Library } from "@/api/types";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface LibraryAccessSelectorProps {
   libraries: Library[];
@@ -28,6 +30,7 @@ export function LibraryAccessSelector({
   allLabel = "All libraries",
   emptyHint,
 }: LibraryAccessSelectorProps) {
+  useUILanguage();
   const allLibraries = value === null;
 
   function handleAllLibrariesChange(checked: boolean) {
@@ -45,7 +48,7 @@ export function LibraryAccessSelector({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label>Library Access</Label>
+        <Label>{tr("components.library_access_selector.library_access")}</Label>
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground text-xs">{allLabel}</span>
           <Switch checked={allLibraries} onCheckedChange={handleAllLibrariesChange} />
@@ -57,7 +60,9 @@ export function LibraryAccessSelector({
       {!allLibraries && (
         <div className="grid gap-1.5">
           {libraries.length === 0 ? (
-            <p className="text-muted-foreground text-xs">No libraries available.</p>
+            <p className="text-muted-foreground text-xs">
+              {tr("components.library_access_selector.no_libraries_available")}
+            </p>
           ) : (
             libraries.map((library) => {
               const checked = value?.includes(library.id) ?? false;
@@ -70,7 +75,7 @@ export function LibraryAccessSelector({
                     <span className="text-sm">{library.name}</span>
                     {!library.enabled && (
                       <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                        Disabled
+                        {tr("components.library_access_selector.disabled")}
                       </Badge>
                     )}
                     <span className="text-muted-foreground text-xs capitalize">{library.type}</span>

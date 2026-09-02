@@ -1,5 +1,7 @@
 import type { AdminSession } from "@/api/types";
 import { getSessionRouteNodes, type ActivityRouteNode } from "@/pages/adminActivityPresentation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const BADGE_COLORS: Record<ActivityRouteNode["kind"], string> = {
   transcode: "border-warning/25 bg-warning/10 text-warning",
@@ -10,12 +12,22 @@ const BADGE_COLORS: Record<ActivityRouteNode["kind"], string> = {
 
 /** Compact, role-labeled badges for each participant in a playback route. */
 export function PlaybackRouteBadges({ session }: { session: AdminSession }) {
+  useUILanguage();
   return getSessionRouteNodes(session).map((node) => (
     <span
       key={node.key}
-      title={`${node.label}: ${node.name}`}
-      aria-label={`${node.label}: ${node.name}`}
-      className={`inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold ${BADGE_COLORS[node.kind]}`}
+      title={tr("components.playback_route_badges.label_name", {
+        label: node.label,
+        name: node.name,
+      })}
+      aria-label={tr("components.playback_route_badges.label_name", {
+        label: node.label,
+        name: node.name,
+      })}
+      className={
+        "inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold " +
+        BADGE_COLORS[node.kind]
+      }
     >
       {node.kind === "transcode" || node.kind === "proxy" ? (
         <>

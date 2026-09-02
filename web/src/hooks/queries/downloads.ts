@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getAccessToken } from "@/api/client";
 import { downloadKeys } from "./keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 export type DownloadQuality = "original" | "20mbps" | "10mbps" | "5mbps" | "2mbps" | "1mbps";
 export type DownloadDeliveryFormat = "original" | "remux" | "transcode";
@@ -65,11 +65,13 @@ export function useCreateDownload() {
         body: JSON.stringify(req),
       }),
     onSuccess: (_data, req) => {
-      toast.success(req.series ? "Series download queued" : "Download queued");
+      toast.success("feedback.queries.downloads.reported_message", {
+        values: { message: req.series ? "Series download queued" : "Download queued" },
+      });
       qc.invalidateQueries({ queryKey: downloadKeys.all });
     },
     onError: () => {
-      toast.error("Failed to start download");
+      toast.error("errors.queries.downloads.failed_to_start_download");
     },
   });
 }

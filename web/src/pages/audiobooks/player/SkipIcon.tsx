@@ -20,13 +20,16 @@ export function SkipIcon({
   const flick =
     direction === "back" ? "group-active:-rotate-[18deg]" : "group-active:rotate-[18deg]";
   return (
-    <span className={`relative flex items-center justify-center ${box}`}>
+    <span className={"relative flex items-center justify-center " + box}>
       <Arrow
-        className={`${box} transition-transform duration-150 ease-out ${flick}`}
+        className={box + " transition-transform duration-150 ease-out" + flick}
         strokeWidth={1.6}
       />
       <span
-        className={`absolute inset-0 flex items-center justify-center pb-[1px] font-semibold tracking-tight tabular-nums ${label}`}
+        className={
+          "absolute inset-0 flex items-center justify-center pb-[1px] font-semibold tracking-tight tabular-nums " +
+          label
+        }
       >
         {seconds}
       </span>

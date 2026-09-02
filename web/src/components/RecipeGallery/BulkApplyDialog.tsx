@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/api/client";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface Library {
   id: number;
@@ -13,6 +15,7 @@ interface Props {
 }
 
 export default function BulkApplyDialog({ open, onClose, onConfirm }: Props) {
+  useUILanguage();
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +49,9 @@ export default function BulkApplyDialog({ open, onClose, onConfirm }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="w-[420px] rounded-xl border border-white/10 bg-zinc-900 p-5">
-        <h3 className="mb-3 text-sm font-semibold">Apply to which libraries?</h3>
+        <h3 className="mb-3 text-sm font-semibold">
+          {tr("components.recipe_gallery.bulk_apply_dialog.apply_to_which_libraries")}
+        </h3>
         <div className="max-h-[40vh] space-y-2 overflow-y-auto">
           {libraries.map((l) => (
             <label key={l.id} className="flex items-center gap-2 text-sm">
@@ -71,7 +76,7 @@ export default function BulkApplyDialog({ open, onClose, onConfirm }: Props) {
             disabled={submitting}
             className="rounded border border-white/15 px-3 py-1 text-sm"
           >
-            Cancel
+            {tr("common.actions.cancel")}
           </button>
           <button
             type="button"
@@ -79,7 +84,11 @@ export default function BulkApplyDialog({ open, onClose, onConfirm }: Props) {
             onClick={() => void handleConfirm()}
             className="rounded bg-indigo-600 px-3 py-1 text-sm text-white disabled:opacity-50"
           >
-            {submitting ? "Applying..." : `Apply (${selected.size})`}
+            {submitting
+              ? tr("components.recipe_gallery.bulk_apply_dialog.applying")
+              : tr("components.recipe_gallery.bulk_apply_dialog.apply_size", {
+                  size: selected.size,
+                })}
           </button>
         </div>
       </div>

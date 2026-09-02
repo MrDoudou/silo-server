@@ -16,6 +16,8 @@ import { useUICustomization } from "@/hooks/useUICustomization";
 import { carouselCardWidthClasses } from "@/lib/uiCustomization";
 import CardPlayOverlay from "@/components/CardPlayOverlay";
 import type { CardQuickActionMode } from "@/lib/cardQuickActions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type ContinueWatchingCardProps = (
   | {
@@ -36,6 +38,7 @@ type ContinueWatchingCardProps = (
 };
 
 export default function ContinueWatchingCard(props: ContinueWatchingCardProps) {
+  useUILanguage();
   const location = useLocation();
   const playbackController = useWatchPlaybackController();
   const { cardPresentation } = useUICustomization();
@@ -232,10 +235,12 @@ export default function ContinueWatchingCard(props: ContinueWatchingCardProps) {
   const imageSrc = imagePrimary || imageFallback;
 
   return (
-    <div ref={cardRef} className={`media-card-longpress group/card ${containerWidth}`}>
+    <div ref={cardRef} className={"media-card-longpress group/card " + containerWidth}>
       <div className="group/media relative">
         <ViewTransitionLink to={detailHref} className="block">
-          <div className={`media-card-image relative ${imageAspect} overflow-hidden rounded-xl`}>
+          <div
+            className={"media-card-image relative " + imageAspect + " overflow-hidden rounded-xl"}
+          >
             {imageSrc ? (
               <img
                 src={imageSrc}
@@ -246,7 +251,7 @@ export default function ContinueWatchingCard(props: ContinueWatchingCardProps) {
               />
             ) : (
               <div className="text-muted-foreground bg-surface flex h-full w-full items-center justify-center text-sm">
-                No Image
+                {tr("components.continue_watching_card.no_image")}
               </div>
             )}
 
@@ -288,7 +293,10 @@ export default function ContinueWatchingCard(props: ContinueWatchingCardProps) {
           <ViewTransitionLink
             to={card.watchHref}
             onClick={handleWatchClick}
-            aria-label={`${card.type === "ebook" ? "Read" : "Play"} ${heading}`}
+            aria-label={tr("components.continue_watching_card.value_heading", {
+              value: card.type === "ebook" ? "Read" : "Play",
+              heading: heading,
+            })}
             className="media-card-play-trigger bg-primary text-primary-foreground absolute top-1/2 left-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl hover:brightness-110 active:scale-95"
           >
             {card.type === "ebook" ? (
@@ -344,9 +352,10 @@ export default function ContinueWatchingCard(props: ContinueWatchingCardProps) {
           {showMetadata && premiereBadge && (
             <div className="mt-1">
               <span
-                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] leading-none font-semibold tracking-wide uppercase backdrop-blur-sm ${upcomingBadgeClass(
-                  premiereBadge,
-                )}`}
+                className={
+                  "inline-flex rounded-full border px-2 py-0.5 text-[10px] leading-none font-semibold tracking-wide uppercase backdrop-blur-sm " +
+                  upcomingBadgeClass(premiereBadge)
+                }
               >
                 {upcomingBadgeLabel(premiereBadge)}
               </span>

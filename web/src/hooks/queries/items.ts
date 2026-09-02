@@ -15,7 +15,9 @@ import type {
   WatchDetail,
 } from "@/api/types";
 import { adminKeys, catalogKeys, episodeKeys, itemKeys, sectionKeys } from "./keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { tr } from "@/i18n/translate";
+
 import {
   getCachedWatchedInvalidationKeys,
   getWatchedToastMessage,
@@ -27,7 +29,6 @@ import {
   updateCatalogItemDetail,
 } from "./mediaSurfaceRefresh";
 import { bumpHomeRefreshSignal } from "@/pages/homeSurfaceRefresh";
-
 function itemPathID(id: string): string {
   return encodeURIComponent(id);
 }
@@ -86,11 +87,14 @@ export function useRefreshItemMetadata() {
   const { awaitAdminJob } = useRealtimeEvents();
   return useMutation({
     onMutate: ({ mode }: RefreshItemMetadataVariables): RefreshItemMetadataContext => ({
-      toastID: toast.loading(
-        mode === "complete"
-          ? "Complete metadata refresh running…"
-          : "Quick metadata refresh running…",
-      ),
+      toastID: toast.loading("feedback.queries.items.reported_message", {
+        values: {
+          message:
+            mode === "complete"
+              ? "Complete metadata refresh running…"
+              : "Quick metadata refresh running…",
+        },
+      }),
     }),
     mutationFn: async ({ item, mode }: RefreshItemMetadataVariables) => {
       const job = await api<AdminJob>(
@@ -111,19 +115,24 @@ export function useRefreshItemMetadata() {
       const artworkWarning = result.artwork_cache_warning;
 
       if (artworkWarning) {
-        toast.warning("Metadata refreshed, but artwork caching did not finish", {
-          id: context?.toastID,
-          description: artworkWarning,
-        });
-      } else if (mode === "complete") {
-        toast.success("Complete refresh finished", { id: context?.toastID });
-      } else if (newFiles > 0) {
-        toast.success(
-          `Metadata refreshed. Found ${newFiles} new file version${newFiles === 1 ? "" : "s"}`,
-          { id: context?.toastID },
+        toast.warning(
+          "feedback.queries.items.metadata_refreshed_but_artwork_caching_did_not_finish",
+          {
+            id: context?.toastID,
+            resolvedDescription: tr.remote({ message: artworkWarning }),
+          },
         );
+      } else if (mode === "complete") {
+        toast.success("feedback.queries.items.complete_refresh_finished", { id: context?.toastID });
+      } else if (newFiles > 0) {
+        toast.success("feedback.queries.items.metadata_refreshed_new_file_versions_found_count", {
+          values: {
+            count: newFiles,
+          },
+          id: context?.toastID,
+        });
       } else {
-        toast.success("Metadata refreshed", { id: context?.toastID });
+        toast.success("feedback.queries.items.metadata_refreshed", { id: context?.toastID });
       }
 
       await Promise.all([
@@ -196,9 +205,7 @@ export function useRefreshItemMetadata() {
       }
     },
     onError: (err, _variables, context) => {
-      toast.error(err instanceof Error ? err.message : "Refresh failed", {
-        id: context?.toastID,
-      });
+      toast.error("errors.queries.items.refresh_failed", { error: err, id: context?.toastID });
     },
   });
 }
@@ -219,14 +226,17 @@ export function useRedetectEpisodeIntro() {
   return useMutation({
     mutationFn: redetectEpisodeIntro,
     onSuccess: (response) => {
-      toast.success(
-        response.status === "already_running"
-          ? "Re-detection already running"
-          : "Re-detection started",
-      );
+      toast.success("feedback.queries.items.reported_message", {
+        values: {
+          message:
+            response.status === "already_running"
+              ? "Re-detection already running"
+              : "Re-detection started",
+        },
+      });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to start re-detection");
+      toast.error("errors.queries.items.failed_to_start_re_detection", { error: error });
     },
   });
 }
@@ -275,10 +285,10 @@ export function useUpdateItemMetadata(contentId: string) {
       void invalidateMediaSurfaceQueries(queryClient, { itemId: contentId }).then(() => {
         bumpHomeRefreshSignal(queryClient);
       });
-      toast.success("Metadata saved");
+      toast.success("feedback.queries.items.metadata_saved");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save metadata");
+      toast.error("errors.queries.items.failed_to_save_metadata", { error: err });
     },
   });
 }
@@ -326,10 +336,12 @@ export function useWatchedStateMutation(item: WatchedMutationItem) {
           in_watchlist: detail.user_state?.in_watchlist ?? false,
         },
       }));
-      toast.error(err instanceof Error ? err.message : "Failed to update watched state");
+      toast.error("errors.queries.items.failed_to_update_watched_state", { error: err });
     },
     onSuccess: (_data, nextPlayed) => {
-      toast.success(getWatchedToastMessage(item, nextPlayed));
+      toast.success("feedback.queries.items.reported_message", {
+        values: { message: getWatchedToastMessage(item, nextPlayed) },
+      });
     },
     onSettled: () => {
       // The detail query has to be refreshed: marking watched also zeroes
@@ -354,7 +366,7 @@ export function useSearchItemMatchCandidates(contentId: string) {
         body: JSON.stringify(params),
       }),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Match search failed");
+      toast.error("errors.queries.items.match_search_failed", { error: err });
     },
     meta: { queryClient },
   });
@@ -385,7 +397,7 @@ export function useApplyItemMatch() {
       });
     },
     onSuccess: async (_, { item }) => {
-      toast.success("Match applied successfully");
+      toast.success("feedback.queries.items.match_applied_successfully");
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["items", "detail", item.content_id] }),
@@ -434,7 +446,7 @@ export function useApplyItemMatch() {
       }
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to apply match");
+      toast.error("errors.queries.items.failed_to_apply_match", { error: err });
     },
   });
 }
@@ -461,9 +473,11 @@ export function useSplitItem() {
       }),
     onSuccess: async (result, { contentId }) => {
       if (result.dry_run) return;
-      toast.success(
-        `Moved ${result.files_moved} file${result.files_moved === 1 ? "" : "s"} to a separate item`,
-      );
+      toast.success("feedback.queries.items.files_moved_to_a_separate_item_count", {
+        values: {
+          count: result.files_moved,
+        },
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["items", "detail", contentId] }),
         queryClient.invalidateQueries({ queryKey: ["catalog", "items", contentId, "detail"] }),
@@ -473,7 +487,7 @@ export function useSplitItem() {
       ]);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to split item");
+      toast.error("errors.queries.items.failed_to_split_item", { error: err });
     },
   });
 }
@@ -507,7 +521,7 @@ export function useApplyItemImage() {
         body: JSON.stringify(request),
       }),
     onSuccess: async (_, { item }) => {
-      toast.success("Image applied successfully");
+      toast.success("feedback.queries.items.image_applied_successfully");
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adminKeys.itemImages(item.content_id) }),
@@ -535,7 +549,7 @@ export function useApplyItemImage() {
       }
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to apply image");
+      toast.error("errors.queries.items.failed_to_apply_image", { error: err });
     },
   });
 }
@@ -594,7 +608,7 @@ export function useTranslateItemMetadata(contentId: string) {
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to start translation");
+      toast.error("errors.queries.items.failed_to_start_translation", { error: err });
     },
   });
 }

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { api } from "@/api/client";
 import type {
@@ -13,6 +13,7 @@ import type {
 import { TEMPLATE_STALE_TIME, type CollectionTemplateCatalog } from "@/lib/collectionTemplates";
 import { invalidateUserCollectionQueries } from "./collectionSurfaceRefresh";
 import { collectionKeys } from "./keys";
+import { tr } from "@/i18n/translate";
 
 export function useUserCollectionTemplates(enabled = true) {
   return useQuery({
@@ -46,9 +47,17 @@ export function useMDBListTop(enabled = true) {
 }
 
 function importToastMessage(label: string, status: string | undefined) {
-  if (status === "warning") return `${label} imported with warnings`;
-  if (status === "failed") return `${label} imported but sync failed`;
-  return `${label} imported`;
+  if (status === "warning") {
+    return tr("feedback.queries.user_collection_imports.collection_imported_with_warnings", {
+      collection: label,
+    });
+  }
+  if (status === "failed") {
+    return tr("feedback.queries.user_collection_imports.collection_imported_but_sync_failed", {
+      collection: label,
+    });
+  }
+  return tr("feedback.queries.user_collection_imports.collection_imported", { collection: label });
 }
 
 export function useImportUserMDBListCollection() {
@@ -60,11 +69,13 @@ export function useImportUserMDBListCollection() {
         body: JSON.stringify(body),
       }),
     onSuccess: (result) => {
-      toast.success(importToastMessage("MDBList", result.sync?.status));
+      toast.success("feedback.queries.user_collection_imports.reported_message", {
+        values: { message: importToastMessage("MDBList", result.sync?.status) },
+      });
       void invalidateUserCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Import failed");
+      toast.error("errors.queries.user_collection_imports.import_failed", { error: error });
     },
   });
 }
@@ -78,11 +89,13 @@ export function useImportUserTMDBCollection() {
         body: JSON.stringify(body),
       }),
     onSuccess: (result) => {
-      toast.success(importToastMessage("TMDB collection", result.sync?.status));
+      toast.success("feedback.queries.user_collection_imports.reported_message", {
+        values: { message: importToastMessage("TMDB collection", result.sync?.status) },
+      });
       void invalidateUserCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Import failed");
+      toast.error("errors.queries.user_collection_imports.import_failed", { error: error });
     },
   });
 }
@@ -96,11 +109,13 @@ export function useImportUserTraktCollection() {
         body: JSON.stringify(body),
       }),
     onSuccess: (result) => {
-      toast.success(importToastMessage("Trakt collection", result.sync?.status));
+      toast.success("feedback.queries.user_collection_imports.reported_message", {
+        values: { message: importToastMessage("Trakt collection", result.sync?.status) },
+      });
       void invalidateUserCollectionQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Import failed");
+      toast.error("errors.queries.user_collection_imports.import_failed", { error: error });
     },
   });
 }
@@ -113,16 +128,19 @@ export function useSyncUserCollection() {
         method: "POST",
       }),
     onSuccess: (result, collectionId) => {
-      const matched = `${result.items_matched} item${result.items_matched === 1 ? "" : "s"}`;
-      const message =
+      const message = tr(
         result.status === "warning"
-          ? `Synced with warnings — matched ${matched}`
-          : `Synced — matched ${matched}`;
-      toast.success(message);
+          ? "feedback.queries.user_collection_imports.synced_with_warnings_matched_items_count"
+          : "feedback.queries.user_collection_imports.synced_matched_items_count",
+        { count: result.items_matched },
+      );
+      toast.success("feedback.queries.user_collection_imports.reported_message", {
+        values: { message: message },
+      });
       void invalidateUserCollectionQueries(queryClient, collectionId);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Sync failed");
+      toast.error("errors.queries.user_collection_imports.sync_failed", { error: error });
     },
   });
 }

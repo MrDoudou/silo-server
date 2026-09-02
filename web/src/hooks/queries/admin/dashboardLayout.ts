@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { api } from "@/api/client";
 import type { AdminDashboardLayoutDocument, AdminDashboardLayoutResponse } from "@/api/types";
@@ -57,7 +57,10 @@ export function useSaveAdminDashboardLayout() {
     },
     onError: () => {
       // The layout still works from local state, so this is informational.
-      toast.error("Failed to save the dashboard layout on the server", { id: SAVE_TOAST_ID });
+      toast.error(
+        "errors.queries.admin.dashboard_layout.failed_to_save_the_dashboard_layout_on_the_server",
+        { id: SAVE_TOAST_ID },
+      );
     },
   });
 }
@@ -74,7 +77,10 @@ export function useResetAdminDashboardLayout() {
       });
     },
     onError: () => {
-      toast.error("Failed to reset the dashboard layout on the server", { id: RESET_TOAST_ID });
+      toast.error(
+        "errors.queries.admin.dashboard_layout.failed_to_reset_the_dashboard_layout_on_the_server",
+        { id: RESET_TOAST_ID },
+      );
     },
   });
 }

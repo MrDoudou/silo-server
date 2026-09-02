@@ -11,6 +11,7 @@ import {
   useLoginEmbyConnect,
 } from "@/hooks/queries/history-import";
 import type { EmbyConnectLoginResponse, HistoryImportRun } from "@/api/types";
+
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,42 +40,55 @@ import {
 import { cn } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, CircleSlash2, Clock, Loader2, XCircle } from "lucide-react";
 import { formatRelativeTime as formatRelativeTimeBase } from "@/lib/date";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const STATUS_CONFIG = {
   queued: {
     icon: Clock,
     colorClass: "text-info",
     bgClass: "bg-info/10 border-info/20",
-    label: "Queued",
+    get label() {
+      return tr("pages.settings.history_import_settings.queued");
+    },
   },
   running: {
     icon: Loader2,
     colorClass: "text-warning",
     bgClass: "bg-warning/10 border-warning/20",
-    label: "Running",
+    get label() {
+      return tr("pages.settings.history_import_settings.running");
+    },
     spin: true,
   },
   completed: {
     icon: CheckCircle2,
     colorClass: "text-success",
     bgClass: "bg-success/10 border-success/20",
-    label: "Completed",
+    get label() {
+      return tr("pages.settings.history_import_settings.completed");
+    },
   },
   failed: {
     icon: XCircle,
     colorClass: "text-destructive",
     bgClass: "bg-destructive/10 border-destructive/20",
-    label: "Failed",
+    get label() {
+      return tr("pages.settings.history_import_settings.failed");
+    },
   },
   cancelled: {
     icon: CircleSlash2,
     colorClass: "text-muted-foreground",
     bgClass: "bg-muted border-border",
-    label: "Cancelled",
+    get label() {
+      return tr("pages.settings.history_import_settings.cancelled");
+    },
   },
 } as const;
 
 export default function HistoryImportSettings() {
+  useUILanguage();
   useEventChannel("history_import");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -150,7 +164,9 @@ export default function HistoryImportSettings() {
 
     if (!returnedPlexPinId || !returnedPlexPinCode) {
       setPlexAuthError(
-        "Plex sign-in returned without the expected session details. Please try again.",
+        tr(
+          "pages.settings.history_import_settings.plex_sign_in_returned_without_the_expected_session_details_please",
+        ),
       );
       void navigate("/settings/history-import", { replace: true });
       return;
@@ -158,7 +174,11 @@ export default function HistoryImportSettings() {
 
     const pinID = Number(returnedPlexPinId);
     if (!Number.isFinite(pinID) || pinID <= 0) {
-      setPlexAuthError("Plex sign-in returned an invalid PIN. Please try again.");
+      setPlexAuthError(
+        tr(
+          "pages.settings.history_import_settings.plex_sign_in_returned_an_invalid_pin_please_try_again",
+        ),
+      );
       void navigate("/settings/history-import", { replace: true });
       return;
     }
@@ -188,7 +208,9 @@ export default function HistoryImportSettings() {
         setPlexAccountToken("");
         setPlexServers([]);
         setPlexServerId("");
-        setPlexAuthError(error instanceof Error ? error.message : "Failed to finish Plex sign-in");
+        setPlexAuthError(
+          tr.error("errors.settings.history_import_settings.failed_to_finish_plex_sign_in", error),
+        );
       } finally {
         if (!cancelled) {
           setPlexAuthPending(false);
@@ -226,7 +248,9 @@ export default function HistoryImportSettings() {
       window.location.assign(buildPlexAuthURL(pin.code, forwardURL.toString()));
     } catch (error) {
       setPlexAuthPending(false);
-      setPlexAuthError(error instanceof Error ? error.message : "Failed to start Plex sign-in");
+      setPlexAuthError(
+        tr.error("errors.settings.history_import_settings.failed_to_start_plex_sign_in", error),
+      );
     }
   }
 
@@ -313,16 +337,22 @@ export default function HistoryImportSettings() {
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">History import</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.settings.history_import_settings.history_import")}
+        </h2>
         <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-          Import watch history from an external media server into a Silo profile.
+          {tr(
+            "pages.settings.history_import_settings.import_watch_history_from_an_external_media_server_into_a",
+          )}
         </p>
       </div>
 
       {/* ── New import ──────────────────────────────────── */}
       <SettingsGroup
-        title="New import"
-        description="Choose a source, sign in, and pick a profile to receive the watch history."
+        title={tr("pages.settings.history_import_settings.new_import")}
+        description={tr(
+          "pages.settings.history_import_settings.choose_a_source_sign_in_and_pick_a_profile_to",
+        )}
       >
         {/* Source cards */}
         <div className="grid gap-3 sm:grid-cols-3">
@@ -350,8 +380,14 @@ export default function HistoryImportSettings() {
               value={embyMode}
               onChange={(v) => setEmbyMode(v as EmbyMode)}
               options={[
-                { value: "connect", label: "Emby Connect" },
-                { value: "saved", label: "Saved Server" },
+                {
+                  value: "connect",
+                  label: tr("pages.settings.history_import_settings.emby_connect"),
+                },
+                {
+                  value: "saved",
+                  label: tr("pages.settings.history_import_settings.saved_server"),
+                },
               ]}
             />
 
@@ -359,14 +395,14 @@ export default function HistoryImportSettings() {
               <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Email or Username</Label>
+                    <Label>{tr("pages.settings.history_import_settings.email_or_username")}</Label>
                     <Input
                       value={connectUsername}
                       onChange={(e) => setConnectUsername(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Password</Label>
+                    <Label>{tr("pages.settings.history_import_settings.password")}</Label>
                     <Input
                       type="password"
                       value={connectPassword}
@@ -375,20 +411,28 @@ export default function HistoryImportSettings() {
                   </div>
                 </div>
                 <Button onClick={handleConnectLogin} disabled={loginMutation.isPending}>
-                  {loginMutation.isPending ? "Connecting\u2026" : "Find Servers"}
+                  {loginMutation.isPending
+                    ? tr("pages.settings.history_import_settings.connecting")
+                    : tr("pages.settings.history_import_settings.find_servers")}
                 </Button>
 
                 {connectSession && (
                   <div className="surface-panel-subtle space-y-3 rounded-[1.2rem] p-4">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                      <span className="text-sm font-medium">Connected</span>
+                      <span className="text-sm font-medium">
+                        {tr("pages.settings.history_import_settings.connected")}
+                      </span>
                     </div>
                     <div className="space-y-2">
-                      <Label>Server</Label>
+                      <Label>{tr("pages.settings.history_import_settings.server")}</Label>
                       <Select value={connectServerId} onValueChange={setConnectServerId}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Choose a server" />
+                          <SelectValue
+                            placeholder={tr(
+                              "pages.settings.history_import_settings.choose_a_server",
+                            )}
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           {connectSession.servers.map((server) => (
@@ -405,13 +449,19 @@ export default function HistoryImportSettings() {
             ) : (
               <div className="space-y-4">
                 {sourcesLoading ? (
-                  <div className="text-muted-foreground text-sm">Loading saved servers\u2026</div>
+                  <div className="text-muted-foreground text-sm">
+                    {tr("pages.settings.history_import_settings.loading_saved_servers_u2026")}
+                  </div>
                 ) : embySources.length === 0 ? (
-                  <EmptyNotice>No admin-defined Emby servers are available yet.</EmptyNotice>
+                  <EmptyNotice>
+                    {tr(
+                      "pages.settings.history_import_settings.no_admin_defined_emby_servers_are_available_yet",
+                    )}
+                  </EmptyNotice>
                 ) : (
                   <>
                     <div className="space-y-2">
-                      <Label>Saved Server</Label>
+                      <Label>{tr("pages.settings.history_import_settings.saved_server")}</Label>
                       <Select value={effectiveSavedSourceId} onValueChange={setSavedSourceId}>
                         <SelectTrigger>
                           <SelectValue />
@@ -427,14 +477,14 @@ export default function HistoryImportSettings() {
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Emby Username</Label>
+                        <Label>{tr("pages.settings.history_import_settings.emby_username")}</Label>
                         <Input
                           value={savedUsername}
                           onChange={(e) => setSavedUsername(e.target.value)}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Emby Password</Label>
+                        <Label>{tr("pages.settings.history_import_settings.emby_password")}</Label>
                         <Input
                           type="password"
                           value={savedPassword}
@@ -456,8 +506,14 @@ export default function HistoryImportSettings() {
               value={plexMode}
               onChange={(v) => setPlexMode(v as PlexMode)}
               options={[
-                { value: "oauth", label: "Plex Account" },
-                { value: "saved", label: "Saved Server" },
+                {
+                  value: "oauth",
+                  label: tr("pages.settings.history_import_settings.plex_account"),
+                },
+                {
+                  value: "saved",
+                  label: tr("pages.settings.history_import_settings.saved_server"),
+                },
               ]}
             />
 
@@ -467,38 +523,52 @@ export default function HistoryImportSettings() {
                   <div className="space-y-3 rounded-[1.2rem] border border-red-500/30 bg-red-500/[0.06] p-4 text-sm">
                     <div className="flex items-center gap-2 font-medium text-red-400">
                       <XCircle className="h-4 w-4" />
-                      Plex sign-in failed
+                      {tr("pages.settings.history_import_settings.plex_sign_in_failed")}
                     </div>
                     <p className="text-red-100/80">{plexAuthError}</p>
                     <Button onClick={handlePlexLogin} disabled={plexAuthPending} variant="outline">
-                      {plexAuthPending ? "Starting\u2026" : "Try Again"}
+                      {plexAuthPending
+                        ? tr("pages.settings.history_import_settings.starting")
+                        : tr("pages.settings.history_import_settings.try_again")}
                     </Button>
                   </div>
                 ) : plexAuthPending ? (
                   <div className="surface-panel-subtle flex items-center gap-3 rounded-[1.2rem] p-4">
                     <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
                     <div>
-                      <div className="text-sm font-medium">Finishing Plex sign-in\u2026</div>
+                      <div className="text-sm font-medium">
+                        {tr("pages.settings.history_import_settings.finishing_plex_sign_in_u2026")}
+                      </div>
                       <p className="text-muted-foreground text-[13px]">
-                        Continue in Plex, then you'll be returned here automatically.
+                        {tr(
+                          "pages.settings.history_import_settings.continue_in_plex_then_you_ll_be_returned_here_automatically",
+                        )}
                       </p>
                     </div>
                   </div>
                 ) : plexServers.length === 0 ? (
                   <Button onClick={handlePlexLogin} disabled={plexAuthPending}>
-                    {plexAuthPending ? "Starting\u2026" : "Sign in with Plex"}
+                    {plexAuthPending
+                      ? tr("pages.settings.history_import_settings.starting")
+                      : tr("pages.settings.history_import_settings.sign_in_with_plex")}
                   </Button>
                 ) : (
                   <div className="surface-panel-subtle space-y-4 rounded-[1.2rem] p-4">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                      <span className="text-sm font-medium">Signed in</span>
+                      <span className="text-sm font-medium">
+                        {tr("pages.settings.history_import_settings.signed_in")}
+                      </span>
                     </div>
                     <div className="space-y-2">
-                      <Label>Server</Label>
+                      <Label>{tr("pages.settings.history_import_settings.server")}</Label>
                       <Select value={plexServerId} onValueChange={setPlexServerId}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Choose a server" />
+                          <SelectValue
+                            placeholder={tr(
+                              "pages.settings.history_import_settings.choose_a_server",
+                            )}
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           {plexServers.map((server) => (
@@ -507,14 +577,16 @@ export default function HistoryImportSettings() {
                               value={server.clientIdentifier}
                             >
                               {server.name}
-                              {server.owned ? "" : " (shared)"}
+                              {server.owned
+                                ? ""
+                                : tr("pages.settings.history_import_settings.shared")}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <Button onClick={handlePlexLogin} disabled={plexAuthPending} variant="outline">
-                      Reconnect Plex Account
+                      {tr("pages.settings.history_import_settings.reconnect_plex_account")}
                     </Button>
                   </div>
                 )}
@@ -522,13 +594,19 @@ export default function HistoryImportSettings() {
             ) : (
               <div className="space-y-4">
                 {sourcesLoading ? (
-                  <div className="text-muted-foreground text-sm">Loading saved servers\u2026</div>
+                  <div className="text-muted-foreground text-sm">
+                    {tr("pages.settings.history_import_settings.loading_saved_servers_u2026")}
+                  </div>
                 ) : plexSources.length === 0 ? (
-                  <EmptyNotice>No admin-defined Plex servers are available yet.</EmptyNotice>
+                  <EmptyNotice>
+                    {tr(
+                      "pages.settings.history_import_settings.no_admin_defined_plex_servers_are_available_yet",
+                    )}
+                  </EmptyNotice>
                 ) : (
                   <>
                     <div className="space-y-2">
-                      <Label>Saved Server</Label>
+                      <Label>{tr("pages.settings.history_import_settings.saved_server")}</Label>
                       <Select
                         value={effectivePlexSavedSourceId}
                         onValueChange={setPlexSavedSourceId}
@@ -546,12 +624,14 @@ export default function HistoryImportSettings() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Plex Auth Token</Label>
+                      <Label>{tr("pages.settings.history_import_settings.plex_auth_token")}</Label>
                       <Input
                         type="password"
                         value={plexToken}
                         onChange={(e) => setPlexToken(e.target.value)}
-                        placeholder="Your Plex authentication token"
+                        placeholder={tr(
+                          "pages.settings.history_import_settings.your_plex_authentication_token",
+                        )}
                       />
                     </div>
                   </>
@@ -566,23 +646,25 @@ export default function HistoryImportSettings() {
           <div className="space-y-4">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Jellyfin Server URL</Label>
+                <Label>{tr("pages.settings.history_import_settings.jellyfin_server_url")}</Label>
                 <Input
                   value={jellyfinServerURL}
                   onChange={(e) => setJellyfinServerURL(e.target.value)}
-                  placeholder="https://jellyfin.example.com"
+                  placeholder={tr(
+                    "pages.settings.history_import_settings.https_jellyfin_example_com",
+                  )}
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Jellyfin Username</Label>
+                  <Label>{tr("pages.settings.history_import_settings.jellyfin_username")}</Label>
                   <Input
                     value={jellyfinUsername}
                     onChange={(e) => setJellyfinUsername(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Jellyfin Password</Label>
+                  <Label>{tr("pages.settings.history_import_settings.jellyfin_password")}</Label>
                   <Input
                     type="password"
                     value={jellyfinPassword}
@@ -591,7 +673,9 @@ export default function HistoryImportSettings() {
                 </div>
               </div>
               <p className="text-muted-foreground text-xs leading-relaxed">
-                Enter the base URL for the Jellyfin server you want to import from.
+                {tr(
+                  "pages.settings.history_import_settings.enter_the_base_url_for_the_jellyfin_server_you_want",
+                )}
               </p>
             </div>
           </div>
@@ -600,10 +684,12 @@ export default function HistoryImportSettings() {
         {/* Action row */}
         <div className="border-border/40 flex flex-col gap-4 border-t pt-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="w-full space-y-2 sm:max-w-[280px]">
-            <Label>Import into profile</Label>
+            <Label>{tr("pages.settings.history_import_settings.import_into_profile")}</Label>
             <Select value={effectiveProfileId} onValueChange={setProfileId}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a profile" />
+                <SelectValue
+                  placeholder={tr("pages.settings.history_import_settings.choose_a_profile")}
+                />
               </SelectTrigger>
               <SelectContent>
                 {profiles.map((item) => (
@@ -615,18 +701,24 @@ export default function HistoryImportSettings() {
             </Select>
           </div>
           <Button onClick={handleStartImport} disabled={!canStart || pending} className="sm:px-8">
-            {createRunMutation.isPending ? "Starting\u2026" : "Start Import"}
+            {createRunMutation.isPending
+              ? tr("pages.settings.history_import_settings.starting")
+              : tr("pages.settings.history_import_settings.start_import")}
           </Button>
         </div>
       </SettingsGroup>
 
       {/* ── Latest import ───────────────────────────────── */}
       <SettingsGroup
-        title={activeRunId && activeRun ? "Selected import" : "Latest import"}
+        title={
+          activeRunId && activeRun
+            ? tr("pages.settings.history_import_settings.selected_import")
+            : tr("pages.settings.history_import_settings.latest_import")
+        }
         description={
           activeRunId && activeRun
-            ? "Details from the selected import run."
-            : "Results from the most recent import run."
+            ? tr("pages.settings.history_import_settings.details_from_the_selected_import_run")
+            : tr("pages.settings.history_import_settings.results_from_the_most_recent_import_run")
         }
       >
         <RunSummary run={displayRun} />
@@ -634,11 +726,15 @@ export default function HistoryImportSettings() {
 
       {/* ── Import history ──────────────────────────────── */}
       <SettingsGroup
-        title="Import history"
-        description="Select a past run to view its details above."
+        title={tr("pages.settings.history_import_settings.import_history")}
+        description={tr(
+          "pages.settings.history_import_settings.select_a_past_run_to_view_its_details_above",
+        )}
       >
         {recentRuns.length === 0 ? (
-          <EmptyNotice>No imports have been started yet.</EmptyNotice>
+          <EmptyNotice>
+            {tr("pages.settings.history_import_settings.no_imports_have_been_started_yet")}
+          </EmptyNotice>
         ) : (
           <div className="space-y-2">
             {recentRuns.map((run) => (
@@ -669,6 +765,7 @@ function SourceCard({
   selected: boolean;
   onClick: () => void;
 }) {
+  useUILanguage();
   const isEmby = type === "emby";
   const isJellyfin = type === "jellyfin";
   const label = isEmby ? "Emby" : isJellyfin ? "Jellyfin" : "Plex";
@@ -737,6 +834,7 @@ function SegmentedControl({
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
 }) {
+  useUILanguage();
   return (
     <div className="surface-panel-subtle flex gap-1 rounded-[1.1rem] p-1">
       {options.map((option) => (
@@ -759,6 +857,7 @@ function SegmentedControl({
 }
 
 function EmptyNotice({ children }: { children: React.ReactNode }) {
+  useUILanguage();
   return (
     <div className="surface-panel-subtle text-muted-foreground rounded-[1.2rem] px-4 py-6 text-center text-sm">
       {children}
@@ -767,6 +866,7 @@ function EmptyNotice({ children }: { children: React.ReactNode }) {
 }
 
 function RunStatusIndicator({ status }: { status: HistoryImportRun["status"] }) {
+  useUILanguage();
   const config = STATUS_CONFIG[status];
   const Icon = config.icon;
   const shouldSpin = "spin" in config && config.spin;
@@ -786,12 +886,15 @@ function RunStatusIndicator({ status }: { status: HistoryImportRun["status"] }) 
 }
 
 function RunSummary({ run }: { run: HistoryImportRun | null }) {
+  useUILanguage();
   if (!run) {
     return (
       <div className="surface-panel-subtle flex flex-col items-center justify-center rounded-[1.2rem] py-10 text-center">
         <Clock className="text-muted-foreground/40 mb-3 h-8 w-8" />
         <p className="text-muted-foreground text-sm">
-          Import summaries will appear here after you start a run.
+          {tr(
+            "pages.settings.history_import_settings.import_summaries_will_appear_here_after_you_start_a_run",
+          )}
         </p>
       </div>
     );
@@ -809,18 +912,22 @@ function RunSummary({ run }: { run: HistoryImportRun | null }) {
           <div className="flex items-center gap-2.5">
             <span className="text-sm font-medium">
               {run.source_type === "emby"
-                ? "Emby"
+                ? tr("pages.settings.history_import_settings.emby")
                 : run.source_type === "jellyfin"
-                  ? "Jellyfin"
-                  : "Plex"}{" "}
-              import
+                  ? tr("pages.settings.history_import_settings.jellyfin")
+                  : tr("pages.settings.history_import_settings.plex")}{" "}
+              {tr("pages.settings.history_import_settings.import")}
             </span>
             <RunStatusIndicator status={run.status} />
           </div>
           <div className="text-muted-foreground text-xs">
             {formatRelativeTime(run.created_at)}
             {run.completed_at && (
-              <span> &middot; took {formatDuration(run.created_at, run.completed_at)}</span>
+              <span>
+                {" "}
+                {tr("pages.settings.history_import_settings.middot_took")}{" "}
+                {formatDuration(run.created_at, run.completed_at)}
+              </span>
             )}
           </div>
         </div>
@@ -836,21 +943,51 @@ function RunSummary({ run }: { run: HistoryImportRun | null }) {
             />
           </div>
           <div className="text-muted-foreground text-xs tabular-nums">
-            {processed} / {run.fetched} processed
+            {processed} / {run.fetched} {tr("pages.settings.history_import_settings.processed")}
           </div>
         </div>
       )}
 
       {/* Metrics */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">
-        <MetricCard label="Fetched" value={run.fetched} />
-        <MetricCard label="Matched" value={run.matched} accent="positive" />
-        <MetricCard label="Unmatched" value={run.unmatched} accent="warning" />
-        <MetricCard label="Progress" value={run.progress_updated} accent="positive" />
-        <MetricCard label="History" value={run.history_created} accent="positive" />
-        <MetricCard label="Watchlist" value={run.watchlist_added} accent="positive" />
-        <MetricCard label="Favorites" value={run.favorites_imported} accent="positive" />
-        <MetricCard label="Skipped" value={run.skipped} />
+        <MetricCard
+          label={tr("pages.settings.history_import_settings.fetched")}
+          value={run.fetched}
+        />
+        <MetricCard
+          label={tr("pages.settings.history_import_settings.matched")}
+          value={run.matched}
+          accent="positive"
+        />
+        <MetricCard
+          label={tr("pages.settings.history_import_settings.unmatched")}
+          value={run.unmatched}
+          accent="warning"
+        />
+        <MetricCard
+          label={tr("pages.settings.history_import_settings.progress")}
+          value={run.progress_updated}
+          accent="positive"
+        />
+        <MetricCard
+          label={tr("pages.settings.history_import_settings.history")}
+          value={run.history_created}
+          accent="positive"
+        />
+        <MetricCard
+          label={tr("pages.settings.history_import_settings.watchlist")}
+          value={run.watchlist_added}
+          accent="positive"
+        />
+        <MetricCard
+          label={tr("pages.settings.history_import_settings.favorites")}
+          value={run.favorites_imported}
+          accent="positive"
+        />
+        <MetricCard
+          label={tr("pages.settings.history_import_settings.skipped")}
+          value={run.skipped}
+        />
       </div>
 
       {/* Error */}
@@ -864,7 +1001,9 @@ function RunSummary({ run }: { run: HistoryImportRun | null }) {
       {/* Warnings */}
       {run.warnings.length > 0 && (
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Warnings</Label>
+          <Label className="text-sm font-medium">
+            {tr("pages.settings.history_import_settings.warnings")}
+          </Label>
           <div className="space-y-1.5">
             {run.warnings.map((warning) => (
               <div key={warning} className="flex items-start gap-2 text-sm">
@@ -879,7 +1018,9 @@ function RunSummary({ run }: { run: HistoryImportRun | null }) {
       {/* Unmatched samples */}
       {run.unmatched_samples.length > 0 && (
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Unmatched examples</Label>
+          <Label className="text-sm font-medium">
+            {tr("pages.settings.history_import_settings.unmatched_examples")}
+          </Label>
           <div className="space-y-2">
             {run.unmatched_samples.map((sample, index) => (
               <div
@@ -895,7 +1036,8 @@ function RunSummary({ run }: { run: HistoryImportRun | null }) {
                   ) : null}
                 </div>
                 <div className="text-muted-foreground mt-0.5 text-xs">
-                  {sample.kind} &middot; {sample.reason}
+                  {sample.kind} {tr("pages.settings.history_import_settings.middot")}{" "}
+                  {sample.reason}
                 </div>
               </div>
             ))}
@@ -915,6 +1057,7 @@ function MetricCard({
   value: number;
   accent?: "positive" | "warning";
 }) {
+  useUILanguage();
   return (
     <div className="surface-panel-subtle rounded-[1rem] px-3 py-2.5">
       <div
@@ -942,6 +1085,7 @@ function HistoryRunCard({
   active: boolean;
   onClick: () => void;
 }) {
+  useUILanguage();
   const isEmby = run.source_type === "emby";
   const isJellyfin = run.source_type === "jellyfin";
 
@@ -965,15 +1109,30 @@ function HistoryRunCard({
                 : "bg-amber-500/10 text-amber-400",
           )}
         >
-          {isEmby ? "E" : isJellyfin ? "J" : "P"}
+          {isEmby
+            ? tr("pages.settings.history_import_settings.e")
+            : isJellyfin
+              ? tr("pages.settings.history_import_settings.j")
+              : tr("pages.settings.history_import_settings.p")}
         </div>
         <div>
           <div className="text-sm font-medium">
-            {isEmby ? "Emby" : isJellyfin ? "Jellyfin" : "Plex"} import
+            {isEmby
+              ? tr("pages.settings.history_import_settings.emby")
+              : isJellyfin
+                ? tr("pages.settings.history_import_settings.jellyfin")
+                : tr("pages.settings.history_import_settings.plex")}{" "}
+            {tr("pages.settings.history_import_settings.import")}
           </div>
           <div className="text-muted-foreground text-xs">
             {formatRelativeTime(run.created_at)}
-            {run.matched > 0 && <span> &middot; {run.matched} matched</span>}
+            {run.matched > 0 && (
+              <span>
+                {" "}
+                {tr("pages.settings.history_import_settings.middot")} {run.matched}{" "}
+                {tr("pages.settings.history_import_settings.matched_d010685f")}
+              </span>
+            )}
           </div>
         </div>
       </div>

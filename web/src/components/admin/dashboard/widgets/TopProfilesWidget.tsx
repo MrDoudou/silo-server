@@ -10,6 +10,8 @@ import { formatWatchTime } from "../format";
 import { rangeDays, rangePhrase, rangeTitle } from "../range";
 import { useWidgetRange } from "../widgetChrome";
 import { WidgetRangePicker } from "../WidgetRangePicker";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const ROW_LIMIT = 8;
 
@@ -20,6 +22,7 @@ const ROW_LIMIT = 8;
  * the label carries both when the account name adds anything.
  */
 export function TopProfilesWidget() {
+  useUILanguage();
   const { range } = useWidgetRange();
   const query = useAdminTopActivity(rangeDays(range));
   const items = useMemo<BarListItem[]>(
@@ -44,14 +47,14 @@ export function TopProfilesWidget() {
     <Card className="h-full">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between gap-2 space-y-0 pb-3">
         <CardTitle className="text-sm font-bold">
-          {rangeTitle("Most active profiles", range)}
+          {rangeTitle("components.admin.dashboard.registry.most_active_profiles", range)}
         </CardTitle>
         <div className="flex min-w-0 items-center gap-2">
           <Link
             to="/admin/history"
             className="text-muted-foreground hover:text-primary text-[11px] whitespace-nowrap transition-colors"
           >
-            All history ›
+            {tr("components.admin.dashboard.widgets.top_profiles_widget.all_history")}
           </Link>
           <WidgetRangePicker />
         </div>
@@ -60,12 +63,16 @@ export function TopProfilesWidget() {
         {query.isLoading ? (
           <BarListSkeleton />
         ) : query.error ? (
-          <SectionError message="Failed to load profile activity." />
+          <SectionError
+            message={tr(
+              "components.admin.dashboard.widgets.top_profiles_widget.failed_to_load_profile_activity",
+            )}
+          />
         ) : (
           <BarList
             items={items}
             formatValue={(plays) => `${plays.toLocaleString()} ${plays === 1 ? "play" : "plays"}`}
-            emptyLabel={`No profile activity in ${rangePhrase(range)}`}
+            emptyLabel={"No profile activity in " + rangePhrase(range)}
           />
         )}
       </CardContent>

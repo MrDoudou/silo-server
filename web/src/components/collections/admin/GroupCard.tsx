@@ -5,6 +5,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { Users } from "lucide-react";
 import type { GroupSortMode, LibraryCollection, LibraryCollectionGroup } from "@/api/types";
 import { CollectionRow } from "./CollectionRow";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface GroupCardProps {
   group: LibraryCollectionGroup;
@@ -27,6 +29,7 @@ export function GroupCard({
   syncingCollectionID = null,
   collapsed = false,
 }: GroupCardProps) {
+  useUILanguage();
   const [viewMode, setViewMode] = useState<GroupSortMode>(group.default_sort_mode);
   const dragDisabled = viewMode !== "manual";
   const isUserCollections = group.kind === "user_collections";
@@ -57,7 +60,7 @@ export function GroupCard({
           {...attributes}
           {...listeners}
           className="text-muted-foreground hover:text-foreground cursor-grab"
-          aria-label="Drag group"
+          aria-label={tr("components.collections.admin.group_card.drag_group")}
           type="button"
         >
           ⋮⋮
@@ -67,27 +70,35 @@ export function GroupCard({
           {isUserCollections && (
             <span className="ml-2 inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-normal">
               <Users className="mr-1 h-3 w-3" />
-              User Collections
+              {tr("components.collections.admin.group_card.user_collections")}
             </span>
           )}
         </h3>
-        <label className="text-muted-foreground text-xs">View:</label>
+        <label className="text-muted-foreground text-xs">
+          {tr("components.collections.admin.group_card.view")}
+        </label>
         <select
           value={viewMode}
           onChange={(e) => setViewMode(e.target.value as GroupSortMode)}
           className="border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm"
-          aria-label="View sort"
+          aria-label={tr("components.collections.admin.group_card.view_sort")}
         >
-          <option value="manual">Manual</option>
-          <option value="name_asc">Name A–Z</option>
-          <option value="name_desc">Name Z–A</option>
-          <option value="recent">Recently Updated</option>
-          <option value="most_items">Most Items</option>
+          <option value="manual">{tr("components.collections.admin.group_card.manual")}</option>
+          <option value="name_asc">{tr("components.collections.admin.group_card.name_a_z")}</option>
+          <option value="name_desc">
+            {tr("components.collections.admin.group_card.name_z_a")}
+          </option>
+          <option value="recent">
+            {tr("components.collections.admin.group_card.recently_updated")}
+          </option>
+          <option value="most_items">
+            {tr("components.collections.admin.group_card.most_items")}
+          </option>
         </select>
         <button
           onClick={() => onEdit(group.id)}
           className="hover:bg-muted rounded p-1"
-          aria-label="Group settings"
+          aria-label={tr("components.collections.admin.group_card.group_settings")}
           type="button"
         >
           ⋯
@@ -95,12 +106,16 @@ export function GroupCard({
       </div>
 
       {!collapsed && (
-        <div ref={setDroppableRef} className={`p-3 ${isOver ? "bg-muted/40" : ""}`}>
+        <div ref={setDroppableRef} className={"p-3 " + (isOver ? "bg-muted/40" : "")}>
           {sorted.length === 0 ? (
             <div className="text-muted-foreground rounded border border-dashed p-4 text-center text-sm">
               {isUserCollections
-                ? "Reserved slot for user-published collections. Drag this group to set where they'd appear on the library tab."
-                : "Drag a collection here, or add one with + New collection."}
+                ? tr(
+                    "components.collections.admin.group_card.reserved_slot_for_user_published_collections_drag_this_group_to",
+                  )
+                : tr(
+                    "components.collections.admin.group_card.drag_a_collection_here_or_add_one_with_new_collection",
+                  )}
             </div>
           ) : (
             <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>

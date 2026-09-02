@@ -3,6 +3,8 @@ import { Check, Settings } from "lucide-react";
 import { resolveActiveQualityOptionId } from "../playback-info";
 import type { QualityOption } from "../types";
 import { PlayerMenuSurface } from "./PlayerMenuSurface";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface VersionInfo {
   fileId: number;
@@ -30,6 +32,7 @@ export function QualityMenu({
   versions,
   onSwitchVersion,
 }: QualityMenuProps) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -103,13 +106,15 @@ export function QualityMenu({
         type="button"
         className="player-utility-btn sm:w-auto sm:gap-1.5 sm:px-3"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Quality"
+        aria-label={tr("player.components.quality_menu.quality")}
         aria-expanded={open}
         aria-haspopup="menu"
       >
         <Settings className="h-[18px] w-[18px]" />
         <span className="hidden text-[11px] font-medium tracking-wide sm:inline">
-          {isTranscoding ? "…" : (activeOption?.label ?? "Quality")}
+          {isTranscoding
+            ? "…"
+            : (activeOption?.label ?? tr("player.components.quality_menu.quality"))}
         </span>
       </button>
 
@@ -124,7 +129,7 @@ export function QualityMenu({
           {versions && versions.length > 1 && onSwitchVersion && (
             <>
               <div className="px-3 py-1 text-xs tracking-wider text-white/40 uppercase">
-                Version
+                {tr("player.components.quality_menu.version")}
               </div>
               {versions.map((v) => {
                 const idx = menuItemIndex++;
@@ -137,9 +142,10 @@ export function QualityMenu({
                     }}
                     role="menuitem"
                     type="button"
-                    className={`flex w-full px-3 py-2 text-left text-sm hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-                      v.isCurrentSource ? "text-white" : "text-white/70"
-                    }`}
+                    className={
+                      "flex w-full px-3 py-2 text-left text-sm hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+                      (v.isCurrentSource ? "text-white" : "text-white/70")
+                    }
                     onClick={() => {
                       onSwitchVersion(v.fileId);
                       setOpen(false);
@@ -165,7 +171,7 @@ export function QualityMenu({
               })}
               <div className="my-1 border-t border-white/10" />
               <div className="px-3 py-1 text-xs tracking-wider text-white/40 uppercase">
-                Quality
+                {tr("player.components.quality_menu.quality")}
               </div>
             </>
           )}
@@ -179,9 +185,10 @@ export function QualityMenu({
                 }}
                 role="menuitem"
                 type="button"
-                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-                  opt.id === resolvedActiveId ? "text-white" : "text-white/70"
-                }`}
+                className={
+                  "flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+                  (opt.id === resolvedActiveId ? "text-white" : "text-white/70")
+                }
                 aria-current={opt.id === resolvedActiveId ? "true" : undefined}
                 onClick={() => handleSelect(opt.id)}
               >
@@ -191,7 +198,9 @@ export function QualityMenu({
                   {opt.id === resolvedActiveId && (
                     <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-white text-black">
                       <Check className="size-3" strokeWidth={3} aria-hidden="true" />
-                      <span className="sr-only">Selected</span>
+                      <span className="sr-only">
+                        {tr("player.components.quality_menu.selected")}
+                      </span>
                     </span>
                   )}
                 </span>

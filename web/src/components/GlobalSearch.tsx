@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { Search } from "lucide-react";
 import { RequestToAddSection } from "./RequestToAddSection";
 import CardPlayOverlay from "./CardPlayOverlay";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const PREVIEW_LIMIT = 8;
 const DEBOUNCE_MS = 200;
@@ -63,6 +65,7 @@ function GlobalSearchResultRow({
   onPick: (contentId: string) => void;
   onPlay: () => void;
 }) {
+  useUILanguage();
   const { loaded, onLoad } = useImageLoaded(item.poster_url);
   const thumbhashUrl = item.poster_thumbhash ? decodeThumbhash(item.poster_thumbhash) : "";
 
@@ -78,7 +81,7 @@ function GlobalSearchResultRow({
   return (
     <div className="group/media hover:bg-muted/80 data-[selected]:bg-accent relative rounded-md transition-colors">
       <div
-        id={`search-result-${index}`}
+        id={"search-result-" + index}
         role="option"
         aria-selected={isSelected}
         aria-label={[item.title, item.year > 0 ? String(item.year) : null, typeLabel(item.type)]
@@ -89,7 +92,7 @@ function GlobalSearchResultRow({
         className={ROW_LAYOUT_CLASSES}
       >
         <div
-          className={`bg-muted overflow-hidden rounded-md ${ROW_POSTER_CLASSES}`}
+          className={"bg-muted overflow-hidden rounded-md " + ROW_POSTER_CLASSES}
           style={
             thumbhashUrl
               ? {
@@ -104,7 +107,7 @@ function GlobalSearchResultRow({
             <img
               src={item.poster_url}
               alt=""
-              className={`h-full w-full object-cover ${loaded ? "opacity-100" : "opacity-0"}`}
+              className={"h-full w-full object-cover " + (loaded ? "opacity-100" : "opacity-0")}
               loading="lazy"
               onLoad={onLoad}
             />
@@ -117,13 +120,13 @@ function GlobalSearchResultRow({
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">{item.title}</div>
           <div className="text-muted-foreground text-xs">
-            {item.year > 0 ? `${item.year} · ` : ""}
+            {item.year > 0 ? tr("components.global_search.year", { year: item.year }) : ""}
             {typeLabel(item.type)}
           </div>
         </div>
       </div>
       {item.play_content_id ? (
-        <div className={`pointer-events-none absolute inset-0 ${ROW_LAYOUT_CLASSES}`}>
+        <div className={"pointer-events-none absolute inset-0 " + ROW_LAYOUT_CLASSES}>
           <div className={ROW_POSTER_CLASSES}>
             <CardPlayOverlay
               contentId={item.play_content_id}
@@ -143,6 +146,7 @@ export function GlobalSearch({
   defaultOpen = false,
   initialQuery = "",
 }: { defaultOpen?: boolean; initialQuery?: string } = {}) {
+  useUILanguage();
   const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState(initialQuery);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -295,7 +299,7 @@ export function GlobalSearch({
         showCloseButton={false}
       >
         <VisuallyHidden.Root>
-          <DialogTitle>Search</DialogTitle>
+          <DialogTitle>{tr("common.actions.search")}</DialogTitle>
         </VisuallyHidden.Root>
         <form onSubmit={handleSubmit}>
           <div className={cn("flex items-center px-5 sm:px-6", showResultsPanel && "border-b")}>
@@ -304,10 +308,10 @@ export function GlobalSearch({
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search library..."
+              placeholder={tr("components.global_search.search_library")}
               className="placeholder:text-muted-foreground flex h-12 w-full bg-transparent text-sm outline-none"
               autoFocus
-              aria-label="Search"
+              aria-label={tr("common.actions.search")}
               role="combobox"
               aria-expanded={showResultsPanel}
               aria-autocomplete="list"
@@ -331,7 +335,7 @@ export function GlobalSearch({
               }}
             />
             <kbd className="bg-muted text-muted-foreground pointer-events-none ml-2 hidden rounded border px-1.5 py-0.5 text-[10px] font-medium select-none sm:inline-flex">
-              ESC
+              {tr("components.global_search.esc")}
             </kbd>
           </div>
         </form>
@@ -341,21 +345,23 @@ export function GlobalSearch({
               <div
                 id="global-search-library-results"
                 role="listbox"
-                aria-label="Library search results"
+                aria-label={tr("components.global_search.library_search_results")}
               >
                 {showLoading && (
                   <div className="text-muted-foreground px-3 py-6 text-center text-sm">
-                    Searching...
+                    {tr("components.global_search.searching")}
                   </div>
                 )}
                 {showError && (
                   <div className="text-destructive px-3 py-4 text-center text-sm">
-                    Could not load results. Press Enter to open the search page.
+                    {tr(
+                      "components.global_search.could_not_load_results_press_enter_to_open_the_search",
+                    )}
                   </div>
                 )}
                 {showEmpty && (
                   <div className="text-muted-foreground px-3 py-6 text-center text-sm">
-                    No matches
+                    {tr("components.global_search.no_matches")}
                   </div>
                 )}
                 {items.map((item, i) => (
@@ -380,14 +386,22 @@ export function GlobalSearch({
             </div>
             <div role="status" aria-live="polite" className="sr-only">
               {tmdbVisibleCount > 0
-                ? `${items.length} library results, ${tmdbVisibleCount} request suggestions`
-                : `${items.length} results found`}
+                ? tr(
+                    "components.global_search.length_library_results_tmdb_visible_count_request_suggestions",
+                    {
+                      length: items.length,
+                      tmdbVisibleCount: tmdbVisibleCount,
+                    },
+                  )
+                : tr("components.global_search.length_results_found", { length: items.length })}
             </div>
             <div className="text-muted-foreground border-t px-3 py-2 text-center text-xs">
               {hasMore ? (
-                <p>Showing top results. Press Enter for all results.</p>
+                <p>
+                  {tr("components.global_search.showing_top_results_press_enter_for_all_results")}
+                </p>
               ) : (
-                <p>Press Enter to open the full search page.</p>
+                <p>{tr("components.global_search.press_enter_to_open_the_full_search_page")}</p>
               )}
             </div>
           </div>

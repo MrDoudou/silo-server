@@ -62,6 +62,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { formatDateTime, formatTime } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type SortField = "username" | "media" | "method" | "node" | "started";
 type SortDir = "asc" | "desc";
@@ -75,6 +77,8 @@ function routeSortValue(session: AdminSession): string {
 }
 
 export default function AdminActivity() {
+  useUILanguage();
+  useUILanguage();
   const { data: sessions = [], isLoading, refetch: refresh } = useAdminSessions();
   const { connectionState } = useRealtimeEvents();
   const pageActivity = usePageActivity();
@@ -235,7 +239,10 @@ export default function AdminActivity() {
     });
   }, []);
 
-  if (isLoading) return <div className="text-muted-foreground p-8">Loading activity...</div>;
+  if (isLoading)
+    return (
+      <div className="text-muted-foreground p-8">{tr("pages.admin_activity.loading_activity")}</div>
+    );
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -243,18 +250,25 @@ export default function AdminActivity() {
       <div className="page-header">
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <h1 className="page-title text-[clamp(2rem,4vw,3.25rem)]">Activity</h1>
+            <h1 className="page-title text-[clamp(2rem,4vw,3.25rem)]">
+              {tr("pages.admin_activity.activity")}
+            </h1>
             {sessions.length > 0 && (
               <span className="live-badge flex items-center gap-1.5">
                 <Radio className="h-3 w-3" />
-                {sessions.length} live
+                {sessions.length} {tr("pages.admin_activity.live")}
               </span>
             )}
           </div>
           <p className="page-subtitle text-sm sm:text-base">
             {sessions.length === 0
-              ? "No active streams"
-              : `${sessions.length} active stream${sessions.length !== 1 ? "s" : ""} across ${routeNodes.length} node${routeNodes.length !== 1 ? "s" : ""}`}
+              ? tr("pages.admin_activity.no_active_streams")
+              : tr("pages.admin_activity.length_active_stream_value_across_length2_node_value2", {
+                  length: sessions.length,
+                  value: sessions.length !== 1 ? "s" : "",
+                  length2: routeNodes.length,
+                  value2: routeNodes.length !== 1 ? "s" : "",
+                })}
           </p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -266,12 +280,16 @@ export default function AdminActivity() {
             disabled={isManualRefreshPending}
             aria-busy={isManualRefreshPending}
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isManualRefreshPending ? "animate-spin" : ""}`} />
-            {isManualRefreshPending ? "Refreshing..." : "Refresh"}
+            <RefreshCw
+              className={"h-3.5 w-3.5 " + (isManualRefreshPending ? "animate-spin" : "")}
+            />
+            {isManualRefreshPending
+              ? tr("pages.admin_activity.refreshing")
+              : tr("common.actions.refresh")}
           </Button>
           <div className="min-w-[8.75rem] px-1 text-right">
             <div className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
-              Realtime Updates
+              {tr("pages.admin_activity.realtime_updates")}
             </div>
             <div className="text-[12px]">{formatConnectionState(connectionState)}</div>
             {error && <div className="text-muted-foreground text-[11px]">{error}</div>}
@@ -287,7 +305,7 @@ export default function AdminActivity() {
         className="surface-panel rounded-2xl border-0"
       >
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium select-none">
-          IP Lookup
+          {tr("pages.admin_activity.ip_lookup")}
         </summary>
         <div className="px-4 pb-4">
           <form
@@ -299,32 +317,37 @@ export default function AdminActivity() {
           >
             <Input
               type="text"
-              placeholder="IP lookup (e.g. 203.0.113.50)"
+              placeholder={tr("pages.admin_activity.ip_lookup_e_g_203_0_113_50")}
               value={ipSearch}
               onChange={(e) => setIPSearch(e.target.value)}
               className="max-w-xs font-mono text-sm"
             />
             <Button type="submit" variant="outline" size="sm" disabled={!ipSearch.trim()}>
               <Search className="mr-1 h-3.5 w-3.5" />
-              Lookup
+              {tr("pages.admin_activity.lookup")}
             </Button>
           </form>
           {activeIP && (
             <div className="mt-3">
               {ipLoading ? (
-                <p className="text-muted-foreground text-sm">Searching...</p>
+                <p className="text-muted-foreground text-sm">
+                  {tr("pages.admin_activity.searching")}
+                </p>
               ) : ipUsers.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
-                  No users found for {activeIP} in the last 30 days.
+                  {tr("pages.admin_activity.no_users_found_for")} {activeIP}{" "}
+                  {tr("pages.admin_activity.in_the_last_30_days")}
                 </p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>First Seen</TableHead>
-                      <TableHead>Last Seen</TableHead>
-                      <TableHead className="text-right">Requests</TableHead>
+                      <TableHead>{tr("pages.admin_activity.user")}</TableHead>
+                      <TableHead>{tr("pages.admin_activity.first_seen")}</TableHead>
+                      <TableHead>{tr("pages.admin_activity.last_seen")}</TableHead>
+                      <TableHead className="text-right">
+                        {tr("pages.admin_activity.requests")}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -332,10 +355,11 @@ export default function AdminActivity() {
                       <TableRow key={entry.user_id}>
                         <TableCell>
                           <Link
-                            to={`/admin/users/${entry.user_id}`}
+                            to={"/admin/users/" + entry.user_id}
                             className="text-primary font-medium hover:underline"
                           >
-                            {entry.username || `User #${entry.user_id}`}
+                            {entry.username ||
+                              tr("pages.admin_activity.user_user_id", { user_id: entry.user_id })}
                           </Link>
                         </TableCell>
                         <TableCell className="text-sm">
@@ -361,7 +385,7 @@ export default function AdminActivity() {
           {/* Method distribution bar */}
           <div className="mb-3">
             <div className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-wider uppercase">
-              Play Method
+              {tr("pages.admin_activity.play_method")}
             </div>
             <div className="flex h-1.5 overflow-hidden rounded-full">
               {Object.entries(methods)
@@ -369,7 +393,9 @@ export default function AdminActivity() {
                 .map(([method, count]) => (
                   <div
                     key={method}
-                    className={`transition-all duration-500 ${activityMethodMeta(method).swatchClass}`}
+                    className={
+                      "transition-all duration-500 " + activityMethodMeta(method).swatchClass
+                    }
                     style={{ width: `${(count / sessions.length) * 100}%` }}
                   />
                 ))}
@@ -381,12 +407,16 @@ export default function AdminActivity() {
                   <button
                     key={method}
                     onClick={() => setMethodFilter(methodFilter === method ? null : method)}
-                    className={`flex items-center gap-1.5 text-[11px] transition-opacity ${
-                      methodFilter && methodFilter !== method ? "opacity-30" : ""
-                    }`}
+                    className={
+                      "flex items-center gap-1.5 text-[11px] transition-opacity " +
+                      (methodFilter && methodFilter !== method ? "opacity-30" : "")
+                    }
                   >
                     <span
-                      className={`inline-block h-2 w-2 rounded-full ${activityMethodMeta(method).swatchClass}`}
+                      className={
+                        "inline-block h-2 w-2 rounded-full " +
+                        activityMethodMeta(method).swatchClass
+                      }
                     />
                     <span className="font-medium capitalize">{method}</span>
                     <span className="text-muted-foreground tabular-nums">{count}</span>
@@ -399,7 +429,7 @@ export default function AdminActivity() {
           {routeNodes.length > 1 && (
             <div className="border-border border-t pt-3">
               <div className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-wider uppercase">
-                By Routing Node
+                {tr("pages.admin_activity.by_routing_node")}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {[...routeNodes]
@@ -408,13 +438,14 @@ export default function AdminActivity() {
                     <button
                       key={node.key}
                       onClick={() => setNodeFilter(nodeFilter === node.key ? null : node.key)}
-                      className={`bg-surface border-border hover:border-primary/20 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-all ${
-                        nodeFilter === node.key
+                      className={
+                        "bg-surface border-border hover:border-primary/20 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-all " +
+                        (nodeFilter === node.key
                           ? "border-primary/40 bg-primary/10 text-primary"
                           : nodeFilter
                             ? "opacity-30"
-                            : ""
-                      }`}
+                            : "")
+                      }
                     >
                       <span className="text-muted-foreground mr-1">{node.label}</span>
                       {node.name}
@@ -434,7 +465,7 @@ export default function AdminActivity() {
         <div className="relative min-w-[200px] flex-1">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2" />
           <Input
-            placeholder="Filter by user, media, client, or node..."
+            placeholder={tr("pages.admin_activity.filter_by_user_media_client_or_node")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8 pl-9 text-[13px]"
@@ -453,13 +484,16 @@ export default function AdminActivity() {
             <button
               key={t}
               onClick={() => setTypeFilter(typeFilter === t ? null : t)}
-              className={`rounded-md border px-2.5 py-1.5 text-[11px] font-medium capitalize transition-all ${
-                typeFilter === t
+              className={
+                "rounded-md border px-2.5 py-1.5 text-[11px] font-medium capitalize transition-all " +
+                (typeFilter === t
                   ? "border-primary/40 bg-primary/10 text-primary"
-                  : "border-border bg-surface text-muted-foreground hover:text-foreground"
-              }`}
+                  : "border-border bg-surface text-muted-foreground hover:text-foreground")
+              }
             >
-              {t === "movie" ? "Movies" : "Series"}
+              {t === "movie"
+                ? tr("pages.admin_activity.movies")
+                : tr("pages.admin_activity.series")}
             </button>
           ))}
         </div>
@@ -473,7 +507,7 @@ export default function AdminActivity() {
             className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[11px]"
           >
             <X className="h-3 w-3" />
-            Clear filters
+            {tr("pages.admin_activity.clear_filters")}
           </button>
         )}
       </div>
@@ -481,7 +515,8 @@ export default function AdminActivity() {
       {/* Filter status */}
       {(search || activeFilters > 0) && (
         <div className="text-muted-foreground text-[11px]">
-          Showing {filtered.length} of {sessions.length} streams
+          {tr("pages.admin_activity.showing")} {filtered.length} {tr("pages.admin_activity.of")}{" "}
+          {sessions.length} {tr("pages.admin_activity.streams")}
         </div>
       )}
 
@@ -493,16 +528,16 @@ export default function AdminActivity() {
           {/* Table header */}
           <div className="border-border bg-surface/50 hidden grid-cols-[minmax(120px,1.1fr)_minmax(190px,1.7fr)_minmax(220px,1.9fr)_minmax(90px,0.8fr)_minmax(125px,0.9fr)_minmax(220px,1.4fr)] items-center gap-2 border-b px-3 py-2.5 sm:grid">
             <SortHeader field="username" current={sortField} dir={sortDir} onClick={toggleSort}>
-              User
+              {tr("pages.admin_activity.user")}
             </SortHeader>
             <SortHeader field="media" current={sortField} dir={sortDir} onClick={toggleSort}>
-              Stream
+              {tr("pages.admin_activity.stream")}
             </SortHeader>
             <SortHeader field="method" current={sortField} dir={sortDir} onClick={toggleSort}>
-              Playback
+              {tr("pages.admin_activity.playback")}
             </SortHeader>
             <SortHeader field="node" current={sortField} dir={sortDir} onClick={toggleSort}>
-              Route
+              {tr("pages.admin_activity.route")}
             </SortHeader>
             <SortHeader
               field="started"
@@ -511,10 +546,10 @@ export default function AdminActivity() {
               onClick={toggleSort}
               className="justify-end"
             >
-              Time
+              {tr("pages.admin_activity.time")}
             </SortHeader>
             <div className="text-muted-foreground text-right text-[10px] font-semibold tracking-wider uppercase">
-              Actions
+              {tr("pages.admin_activity.actions")}
             </div>
           </div>
 
@@ -546,6 +581,8 @@ function StreamRow({
   even: boolean;
   onIPLookup: (ip: string) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [ffmpegOpen, setFFmpegOpen] = useState(false);
   const title = getDisplayTitle(session);
@@ -611,9 +648,10 @@ function StreamRow({
 
   return (
     <div
-      className={`border-border/30 hover:bg-surface/60 border-b transition-colors duration-100 ${
-        even ? "" : "bg-surface/20"
-      }`}
+      className={
+        "border-border/30 hover:bg-surface/60 border-b transition-colors duration-100 " +
+        (even ? "" : "bg-surface/20")
+      }
     >
       {/* Desktop row */}
       <div className="hidden grid-cols-[minmax(120px,1.1fr)_minmax(190px,1.7fr)_minmax(220px,1.9fr)_minmax(90px,0.8fr)_minmax(125px,0.9fr)_minmax(220px,1.4fr)] items-center gap-2 px-3 py-2.5 sm:grid">
@@ -701,7 +739,7 @@ function StreamRow({
               aria-expanded={expandedOpen}
               className="text-muted-foreground hover:text-primary inline-flex items-center gap-0.5 text-[10px] font-medium transition-colors"
             >
-              Details
+              {tr("pages.admin_activity.details")}
               {expandedOpen ? (
                 <ChevronUp className="h-3 w-3" />
               ) : (
@@ -711,17 +749,17 @@ function StreamRow({
           </div>
           <div className="mt-1.5 space-y-1">
             <PlaybackSummaryLine
-              label="Container"
+              label={tr("pages.admin_activity.container")}
               decision={containerDecision}
               value={formatDeliveredContainerSummary(session)}
             />
             <PlaybackSummaryLine
-              label="Video"
+              label={tr("pages.admin_activity.video")}
               decision={videoDecision}
               value={formatDeliveredVideoSummary(session)}
             />
             <PlaybackSummaryLine
-              label="Audio"
+              label={tr("pages.admin_activity.audio")}
               decision={audioDecision}
               value={formatDeliveredAudioSummary(session)}
             />
@@ -739,25 +777,28 @@ function StreamRow({
         <div className="min-w-0 text-right">
           <div className="flex items-center justify-end">
             <span
-              className={`inline-flex min-w-[4.75rem] items-center justify-center gap-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold ${
-                session.is_paused
+              className={
+                "inline-flex min-w-[4.75rem] items-center justify-center gap-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold " +
+                (session.is_paused
                   ? "border-amber-400/35 bg-amber-400/10 text-amber-300"
-                  : "border-emerald-400/35 bg-emerald-400/10 text-emerald-300"
-              }`}
+                  : "border-emerald-400/35 bg-emerald-400/10 text-emerald-300")
+              }
             >
               {session.is_paused ? (
                 <Pause className="h-2.5 w-2.5" />
               ) : (
                 <Play className="h-2.5 w-2.5" />
               )}
-              {session.is_paused ? "Paused" : "Playing"}
+              {session.is_paused
+                ? tr("pages.admin_activity.paused")
+                : tr("pages.admin_activity.playing")}
             </span>
           </div>
           <div className="text-foreground mt-1 font-mono text-[12px] leading-tight tabular-nums">
             {playbackPosition}
           </div>
           <div className="text-muted-foreground mt-0.5 text-[10px] leading-tight tabular-nums">
-            Session active {elapsed}
+            {tr("pages.admin_activity.session_active")} {elapsed}
           </div>
         </div>
 
@@ -776,7 +817,9 @@ function StreamRow({
                 onClick={toggleFFmpeg}
               >
                 <Terminal className="h-3.5 w-3.5" />
-                {ffmpegOpen ? "Hide FFmpeg" : "FFmpeg"}
+                {ffmpegOpen
+                  ? tr("pages.admin_activity.hide_ffmpeg")
+                  : tr("pages.admin_activity.ffmpeg")}
               </Button>
             }
             extraMenuItems={
@@ -784,13 +827,13 @@ function StreamRow({
                 <DropdownMenuItem asChild>
                   <Link to={logsHref}>
                     <FileText className="h-4 w-4" />
-                    View Logs
+                    {tr("pages.admin_activity.view_logs")}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to={ffmpegLogsHref}>
                     <Terminal className="h-4 w-4" />
-                    FFmpeg Logs
+                    {tr("pages.admin_activity.ffmpeg_logs")}
                   </Link>
                 </DropdownMenuItem>
               </>
@@ -819,7 +862,10 @@ function StreamRow({
               ) : null}
             </Link>
             <span
-              className={`inline-flex flex-shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold capitalize ${activityMethodMeta(activityMethod).badgeClass}`}
+              className={
+                "inline-flex flex-shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold capitalize " +
+                activityMethodMeta(activityMethod).badgeClass
+              }
             >
               {activityMethod}
             </span>
@@ -867,18 +913,21 @@ function StreamRow({
           )}
           <div className="text-muted-foreground mt-1 flex items-center gap-2 text-[10px]">
             <span
-              className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold ${
-                session.is_paused
+              className={
+                "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold " +
+                (session.is_paused
                   ? "border-amber-400/35 bg-amber-400/10 text-amber-300"
-                  : "border-emerald-400/35 bg-emerald-400/10 text-emerald-300"
-              }`}
+                  : "border-emerald-400/35 bg-emerald-400/10 text-emerald-300")
+              }
             >
               {session.is_paused ? (
                 <Pause className="h-2.5 w-2.5" />
               ) : (
                 <Play className="h-2.5 w-2.5" />
               )}
-              {session.is_paused ? "Paused" : "Playing"}
+              {session.is_paused
+                ? tr("pages.admin_activity.paused")
+                : tr("pages.admin_activity.playing")}
             </span>
             <span className="font-mono tabular-nums">{playbackPosition}</span>
           </div>
@@ -895,7 +944,7 @@ function StreamRow({
                 aria-expanded={expandedOpen}
                 className="text-muted-foreground hover:text-primary inline-flex items-center gap-0.5 text-[10px] font-medium transition-colors"
               >
-                Details
+                {tr("pages.admin_activity.details")}
                 {expandedOpen ? (
                   <ChevronUp className="h-3 w-3" />
                 ) : (
@@ -905,17 +954,17 @@ function StreamRow({
             </div>
             <div className="mt-1.5 space-y-1">
               <PlaybackSummaryLine
-                label="Container"
+                label={tr("pages.admin_activity.container")}
                 decision={containerDecision}
                 value={formatDeliveredContainerSummary(session)}
               />
               <PlaybackSummaryLine
-                label="Video"
+                label={tr("pages.admin_activity.video")}
                 decision={videoDecision}
                 value={formatDeliveredVideoSummary(session)}
               />
               <PlaybackSummaryLine
-                label="Audio"
+                label={tr("pages.admin_activity.audio")}
                 decision={audioDecision}
                 value={formatDeliveredAudioSummary(session)}
               />
@@ -935,7 +984,9 @@ function StreamRow({
                   onClick={toggleFFmpeg}
                 >
                   <Terminal className="h-3.5 w-3.5" />
-                  {ffmpegOpen ? "Hide FFmpeg" : "FFmpeg"}
+                  {ffmpegOpen
+                    ? tr("pages.admin_activity.hide_ffmpeg")
+                    : tr("pages.admin_activity.ffmpeg")}
                 </Button>
               }
               extraMenuItems={
@@ -943,13 +994,13 @@ function StreamRow({
                   <DropdownMenuItem asChild>
                     <Link to={logsHref}>
                       <FileText className="h-4 w-4" />
-                      View Logs
+                      {tr("pages.admin_activity.view_logs")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to={ffmpegLogsHref}>
                       <Terminal className="h-4 w-4" />
-                      FFmpeg Logs
+                      {tr("pages.admin_activity.ffmpeg_logs")}
                     </Link>
                   </DropdownMenuItem>
                 </>
@@ -972,7 +1023,7 @@ function StreamRow({
           rows={ffmpegRows}
           isLoading={ffmpegLogs.isLoading}
           isFetching={ffmpegLogs.isFetching}
-          logsHref={`${logsHref}&component=ffmpeg`}
+          logsHref={logsHref + "&component=ffmpeg"}
         />
       )}
     </div>
@@ -988,13 +1039,18 @@ function PlaybackSummaryLine({
   decision: string;
   value: string;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="flex min-w-0 items-center gap-1.5 text-[11px] leading-tight">
       <span className="text-muted-foreground w-14 shrink-0 text-[9px] font-semibold tracking-wide uppercase">
         {label}
       </span>
       <span
-        className={`inline-flex shrink-0 rounded border px-1.5 py-0.5 text-[8px] leading-none font-semibold ${decisionBadgeClass(decision)}`}
+        className={
+          "inline-flex shrink-0 rounded border px-1.5 py-0.5 text-[8px] leading-none font-semibold " +
+          decisionBadgeClass(decision)
+        }
       >
         {formatDecisionLabel(decision)}
       </span>
@@ -1004,9 +1060,14 @@ function PlaybackSummaryLine({
 }
 
 function TranscodeModeBadge({ label }: { label: string }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <span
-      className={`inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold ${transcodeModeBadgeColor(label)}`}
+      className={
+        "inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold " +
+        transcodeModeBadgeColor(label)
+      }
     >
       {label}
     </span>
@@ -1023,9 +1084,14 @@ function transcodeModeBadgeColor(label: string): string {
 
 /** Render the compact indicator for the confirmed tone-mapping executor. */
 function ToneMapModeBadge({ summary }: { summary: ToneMapSummary }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <span
-      className={`inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold ${toneMapModeBadgeColor(summary.mode)}`}
+      className={
+        "inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold " +
+        toneMapModeBadgeColor(summary.mode)
+      }
     >
       {summary.badge}
     </span>
@@ -1066,35 +1132,40 @@ function PlaybackExpandedPanel({
   isFetching: boolean;
   logsHref: string;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="terminal-surface border-border/50 bg-card border-t px-4 py-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <div className="rounded-full border border-[var(--terminal-border)] bg-[var(--terminal-bg)] px-2 py-0.5 text-[10px] font-semibold tracking-[0.2em] text-[var(--terminal-fg)] uppercase">
-              Playback
+              {tr("pages.admin_activity.playback")}
             </div>
             <div className="text-foreground/85 text-[11px] font-medium">
-              Stream details{showFFmpeg ? " and live transcode console" : ""}
+              {tr("pages.admin_activity.stream_details")}
+              {showFFmpeg ? tr("pages.admin_activity.and_live_transcode_console") : ""}
             </div>
           </div>
           <div className="text-muted-foreground mt-1 font-mono text-[10px]">{sessionID}</div>
         </div>
         {showFFmpeg && isFetching ? (
-          <div className="text-muted-foreground text-[10px]">Refreshing…</div>
+          <div className="text-muted-foreground text-[10px]">
+            {tr("pages.admin_activity.refreshing_96141178")}
+          </div>
         ) : null}
       </div>
 
       <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <PlaybackDetailCard
-          label="Container"
+          label={tr("pages.admin_activity.container")}
           decision={containerDecision}
           source={formatSourceContainerSummary(session)}
           delivered={formatDeliveredContainerSummary(session)}
           detail={formatContainerDetail(session)}
         />
         <PlaybackDetailCard
-          label="Video"
+          label={tr("pages.admin_activity.video")}
           decision={videoDecision}
           source={formatVideoSummary(session)}
           delivered={formatDeliveredVideoSummary(session)}
@@ -1103,7 +1174,7 @@ function PlaybackExpandedPanel({
           toneMapping={videoDecision === "transcode" ? toneMapping : null}
         />
         <PlaybackDetailCard
-          label="Audio"
+          label={tr("pages.admin_activity.audio")}
           decision={audioDecision}
           source={formatAudioSummary(session)}
           delivered={formatDeliveredAudioSummary(session)}
@@ -1122,18 +1193,17 @@ function PlaybackExpandedPanel({
               to={logsHref}
               className="text-[11px] font-medium text-[var(--terminal-fg)] hover:text-[var(--terminal-fg)]/80"
             >
-              Open full FFmpeg logs
+              {tr("pages.admin_activity.open_full_ffmpeg_logs")}
             </Link>
           </div>
           <div className="overflow-hidden rounded-xl border border-[var(--terminal-border)] bg-[var(--terminal-bg)] shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
             {isLoading ? (
               <div className="px-4 py-6 font-mono text-[11px] text-[var(--terminal-muted)]">
-                Loading ffmpeg output…
+                {tr("pages.admin_activity.loading_ffmpeg_output")}
               </div>
             ) : rows.length === 0 ? (
               <div className="px-4 py-6 font-mono text-[11px] text-[var(--terminal-muted)]">
-                No ffmpeg rows yet for this session. If the session is direct play or remux without
-                a transcode worker, nothing will appear here.
+                {tr("pages.admin_activity.no_ffmpeg_rows_yet_for_this_session_if_the_session")}
               </div>
             ) : (
               <div className="max-h-64 overflow-y-auto">
@@ -1147,7 +1217,9 @@ function PlaybackExpandedPanel({
                         {formatTimeOnly(row.timestamp)}
                       </div>
                       <div className="text-[10px] tracking-[0.18em] text-[var(--terminal-muted)]/60 uppercase">
-                        {row.message.includes("stderr") ? "stderr" : "event"}
+                        {row.message.includes("stderr")
+                          ? tr("pages.admin_activity.stderr")
+                          : tr("pages.admin_activity.event")}
                       </div>
                     </div>
                     <div className="min-w-0">
@@ -1163,7 +1235,9 @@ function PlaybackExpandedPanel({
                           <span>{stringAttr(row, "hw_accel")}</span>
                         )}
                         {stringAttr(row, "restart_count") !== "-" && (
-                          <span>restart {stringAttr(row, "restart_count")}</span>
+                          <span>
+                            {tr("pages.admin_activity.restart")} {stringAttr(row, "restart_count")}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -1195,22 +1269,29 @@ function PlaybackDetailCard({
   mode?: string | null;
   toneMapping?: string | null;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <PlaybackDetailCardShell
       label={label}
       badge={
         <span
-          className={`inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold ${decisionBadgeClass(decision)}`}
+          className={
+            "inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold " +
+            decisionBadgeClass(decision)
+          }
         >
           {formatDecisionLabel(decision)}
         </span>
       }
     >
-      <PlaybackDetailLine label="Source" value={source} />
-      <PlaybackDetailLine label="Delivered" value={delivered} />
-      {mode ? <PlaybackDetailLine label="Mode" value={mode} /> : null}
-      {toneMapping ? <PlaybackDetailLine label="Tone mapping" value={toneMapping} /> : null}
-      <PlaybackDetailLine label="Detail" value={detail} muted />
+      <PlaybackDetailLine label={tr("pages.admin_activity.source")} value={source} />
+      <PlaybackDetailLine label={tr("pages.admin_activity.delivered")} value={delivered} />
+      {mode ? <PlaybackDetailLine label={tr("pages.admin_activity.mode")} value={mode} /> : null}
+      {toneMapping ? (
+        <PlaybackDetailLine label={tr("pages.admin_activity.tone_mapping")} value={toneMapping} />
+      ) : null}
+      <PlaybackDetailLine label={tr("pages.admin_activity.detail")} value={detail} muted />
     </PlaybackDetailCardShell>
   );
 }
@@ -1221,12 +1302,16 @@ function PlaybackDetailCard({
  * this?" — the session rows only have room for the compact label.
  */
 function PlaybackClientCard({ session }: { session: AdminSession }) {
+  useUILanguage();
+  useUILanguage();
   const label = getSessionClientLabelFull(session) || "Unknown client";
   const userAgent = session.client_user_agent?.trim() || "";
   return (
-    <PlaybackDetailCardShell label="Client">
-      <PlaybackDetailLine label="App" value={label} />
-      {userAgent ? <PlaybackDetailLine label="Agent" value={userAgent} muted /> : null}
+    <PlaybackDetailCardShell label={tr("pages.admin_activity.client")}>
+      <PlaybackDetailLine label={tr("pages.admin_activity.app")} value={label} />
+      {userAgent ? (
+        <PlaybackDetailLine label={tr("pages.admin_activity.agent")} value={userAgent} muted />
+      ) : null}
     </PlaybackDetailCardShell>
   );
 }
@@ -1240,6 +1325,8 @@ function PlaybackDetailCardShell({
   badge?: ReactNode;
   children: ReactNode;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="rounded-lg border border-[var(--terminal-border)]/60 bg-[var(--terminal-bg)]/60 px-3 py-2">
       <div className="mb-2 flex items-center gap-2">
@@ -1262,13 +1349,16 @@ function PlaybackDetailLine({
   value: string;
   muted?: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="grid min-w-0 grid-cols-[4.25rem_1fr] gap-2">
       <span className="text-[10px] text-[var(--terminal-muted)]">{label}</span>
       <span
-        className={`min-w-0 font-medium break-words ${
-          muted ? "text-[var(--terminal-muted)]" : "text-[var(--terminal-fg)]"
-        }`}
+        className={
+          "min-w-0 font-medium break-words " +
+          (muted ? "text-[var(--terminal-muted)]" : "text-[var(--terminal-fg)]")
+        }
       >
         {value}
       </span>
@@ -1291,13 +1381,18 @@ function SortHeader({
   children: ReactNode;
   className?: string;
 }) {
+  useUILanguage();
+  useUILanguage();
   const active = current === field;
   return (
     <button
       onClick={() => onClick(field)}
-      className={`text-muted-foreground flex items-center gap-1 text-[10px] font-semibold tracking-wider uppercase transition-colors ${
-        active ? "text-foreground" : "hover:text-foreground"
-      } ${className}`}
+      className={
+        "text-muted-foreground flex items-center gap-1 text-[10px] font-semibold tracking-wider uppercase transition-colors " +
+        (active ? "text-foreground" : "hover:text-foreground") +
+        " " +
+        className
+      }
     >
       {children}
       {active && <span className="text-[8px]">{dir === "asc" ? "▲" : "▼"}</span>}
@@ -1337,17 +1432,19 @@ function formatTimeOnly(value: string) {
 }
 
 function EmptyState({ hasData }: { hasData: boolean }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="text-muted-foreground flex flex-col items-center justify-center py-20 text-sm">
       {hasData ? (
         <>
           <Filter className="mb-3 h-8 w-8 opacity-20" />
-          <span>No streams match your filters</span>
+          <span>{tr("pages.admin_activity.no_streams_match_your_filters")}</span>
         </>
       ) : (
         <>
           <Play className="mb-3 h-8 w-8 opacity-20" />
-          <span>No active streams</span>
+          <span>{tr("pages.admin_activity.no_active_streams")}</span>
         </>
       )}
     </div>

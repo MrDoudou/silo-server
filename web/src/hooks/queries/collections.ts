@@ -19,7 +19,7 @@ import type {
   UpdateCollectionRequest,
 } from "@/api/types";
 import { catalogKeys, collectionKeys } from "./keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { invalidateUserCollectionQueries } from "./collectionSurfaceRefresh";
 
 // Single fetcher for /collections — both useCollections and useCollectionGroups
@@ -99,11 +99,11 @@ export function useCreateCollection() {
         body: buildUserCollectionPayload(body as unknown as Record<string, unknown>, poster),
       }),
     onSuccess: () => {
-      toast.success("Collection created");
+      toast.success("feedback.queries.collections.collection_created");
       return invalidateUserCollectionQueries(queryClient);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error("errors.queries.collections.failed_to_save", { error: err });
     },
   });
 }
@@ -125,11 +125,11 @@ export function useUpdateCollection() {
         body: buildUserCollectionPayload(body as unknown as Record<string, unknown>, poster),
       }),
     onSuccess: (_data, { id }) => {
-      toast.success("Collection updated");
+      toast.success("feedback.queries.collections.collection_updated");
       return invalidateUserCollectionQueries(queryClient, id);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error("errors.queries.collections.failed_to_save", { error: err });
     },
   });
 }
@@ -139,11 +139,11 @@ export function useDeleteCollection() {
   return useMutation({
     mutationFn: (id: string) => api(`/collections/${id}`, { method: "DELETE" }),
     onSuccess: (_data, id) => {
-      toast.success("Collection deleted");
+      toast.success("feedback.queries.collections.collection_deleted");
       return invalidateUserCollectionQueries(queryClient, id);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete");
+      toast.error("errors.queries.collections.failed_to_delete", { error: err });
     },
   });
 }
@@ -177,7 +177,7 @@ export function useAddItemToCollection() {
       });
     },
     onSuccess: (_data, vars) => {
-      toast.success("Added to collection");
+      toast.success("feedback.queries.collections.added_to_collection");
       if (vars.source === "user") {
         return invalidateUserCollectionQueries(queryClient, vars.collectionId);
       }
@@ -187,7 +187,7 @@ export function useAddItemToCollection() {
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to add to collection");
+      toast.error("errors.queries.collections.failed_to_add_to_collection", { error: err });
     },
   });
 }
@@ -199,7 +199,7 @@ export function useRemoveCollectionItem(collectionId: string) {
       api<void>(`/collections/${collectionId}/items/${mediaItemId}`, { method: "DELETE" }),
     onSuccess: () => invalidateUserCollectionQueries(queryClient, collectionId),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to remove item");
+      toast.error("errors.queries.collections.failed_to_remove_item", { error: err });
     },
   });
 }
@@ -261,7 +261,7 @@ export function useReorderCollections() {
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.snapshot) queryClient.setQueryData(collectionKeys.list(), ctx.snapshot);
-      toast.error(err instanceof Error ? err.message : "Failed to reorder");
+      toast.error("errors.queries.collections.failed_to_reorder", { error: err });
     },
     onSettled: () => invalidateUserCollectionQueries(queryClient),
   });
@@ -277,7 +277,7 @@ export function useCreateCollectionGroup() {
       }),
     onSuccess: () => invalidateUserCollectionQueries(queryClient),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to add group");
+      toast.error("errors.queries.collections.failed_to_add_group", { error: err });
     },
   });
 }
@@ -292,7 +292,7 @@ export function useUpdateCollectionGroup() {
       }),
     onSuccess: () => invalidateUserCollectionQueries(queryClient),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to rename group");
+      toast.error("errors.queries.collections.failed_to_rename_group", { error: err });
     },
   });
 }
@@ -304,7 +304,7 @@ export function useDeleteCollectionGroup() {
       api<void>(`/collections/groups/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: () => invalidateUserCollectionQueries(queryClient),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete group");
+      toast.error("errors.queries.collections.failed_to_delete_group", { error: err });
     },
   });
 }
@@ -333,7 +333,7 @@ export function useReorderCollectionGroups() {
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.snapshot) queryClient.setQueryData(collectionKeys.list(), ctx.snapshot);
-      toast.error(err instanceof Error ? err.message : "Failed to reorder groups");
+      toast.error("errors.queries.collections.failed_to_reorder_groups", { error: err });
     },
     onSettled: () => invalidateUserCollectionQueries(queryClient),
   });
@@ -363,7 +363,7 @@ export function useReorderCollectionItems(collectionId: string) {
       if (ctx?.snapshot) {
         queryClient.setQueryData(collectionKeys.items(collectionId), ctx.snapshot);
       }
-      toast.error(err instanceof Error ? err.message : "Failed to reorder items");
+      toast.error("errors.queries.collections.failed_to_reorder_items", { error: err });
     },
     onSettled: () => invalidateUserCollectionQueries(queryClient, collectionId),
   });
@@ -375,11 +375,11 @@ export function useDeleteUserCollectionImage() {
     mutationFn: ({ id }: { id: string; type: "poster" }) =>
       api<void>(`/collections/${id}/image?type=poster`, { method: "DELETE" }).then(() => id),
     onSuccess: (id) => {
-      toast.success("Poster removed");
+      toast.success("feedback.queries.collections.poster_removed");
       return invalidateUserCollectionQueries(queryClient, id);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to remove poster");
+      toast.error("errors.queries.collections.failed_to_remove_poster", { error: err });
     },
   });
 }

@@ -15,6 +15,8 @@ import { useUICustomization } from "@/hooks/useUICustomization";
 import { buildItemHref } from "@/lib/mediaNavigation";
 import CardPlayOverlay from "@/components/CardPlayOverlay";
 import type { CardQuickActionMode } from "@/lib/cardQuickActions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -99,6 +101,7 @@ function mangaStatusChip(item: BrowseItem): { label: string; tone: string } | nu
 }
 
 function SortMeta({ item, sortField }: { item: BrowseItem; sortField?: string }) {
+  useUILanguage();
   const episodeLabels = buildEpisodeCardLabels(item);
   const defaultLabel = [item.year || "", item.type === "series" ? "Series" : ""]
     .filter(Boolean)
@@ -126,7 +129,8 @@ function SortMeta({ item, sortField }: { item: BrowseItem; sortField?: string })
     case "rating_imdb":
       return item.rating_imdb != null ? (
         <>
-          <span className="not-uppercase">★</span> {item.rating_imdb.toFixed(1)} / 10
+          <span className="not-uppercase">★</span> {item.rating_imdb.toFixed(1)}{" "}
+          {tr("components.item_card.value_10")}
         </>
       ) : (
         <>{defaultLabel}</>
@@ -190,6 +194,7 @@ export default function ItemCard({
   selected?: boolean;
   onToggleSelect?: (item: BrowseItem) => void;
 }) {
+  useUILanguage();
   const { loaded, onLoad } = useImageLoaded(item.poster_url);
   const thumbhashUrl = item.poster_thumbhash ? decodeThumbhash(item.poster_thumbhash) : "";
   const itemHref = buildItemHref({ contentId: item.content_id, libraryId });
@@ -215,9 +220,10 @@ export default function ItemCard({
           className="block overflow-hidden rounded-xl"
         >
           <div
-            className={`media-card-image relative ${
-              item.type === "audiobook" ? "aspect-square" : "aspect-[2/3]"
-            }`}
+            className={
+              "media-card-image relative " +
+              (item.type === "audiobook" ? "aspect-square" : "aspect-[2/3]")
+            }
             style={
               thumbhashUrl
                 ? {
@@ -232,28 +238,33 @@ export default function ItemCard({
               <img
                 src={item.poster_url}
                 alt={displayTitle}
-                className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+                className={
+                  "h-full w-full object-cover transition-opacity duration-300 " +
+                  (loaded ? "opacity-100" : "opacity-0")
+                }
                 onLoad={onLoad}
               />
             ) : (
               <div className="text-muted-foreground flex h-full w-full flex-col items-center justify-center gap-1 p-3 text-center text-sm">
-                <span className="line-clamp-3 font-medium">{displayTitle || "No Poster"}</span>
+                <span className="line-clamp-3 font-medium">
+                  {displayTitle || tr("components.item_card.no_poster")}
+                </span>
               </div>
             )}
             <div className="from-background/70 pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t to-transparent opacity-90" />
             {item.status === "pending" && (
               <span className="glass-subtle text-foreground absolute top-2.5 left-2.5 rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] uppercase">
-                Scanning
+                {tr("components.item_card.scanning")}
               </span>
             )}
             {item.status === "unmatched" && (
               <span className="glass-subtle absolute top-2.5 left-2.5 rounded-full border border-red-500/25 px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] text-red-300 uppercase">
-                Unmatched
+                {tr("components.item_card.unmatched")}
               </span>
             )}
             {item.status === "ambiguous" && (
               <span className="glass-subtle absolute top-2.5 left-2.5 rounded-full border border-amber-500/25 px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] text-amber-200 uppercase">
-                Ambiguous
+                {tr("components.item_card.ambiguous")}
               </span>
             )}
             {/* Manga cards carry purpose-built status/count chips in both top
@@ -267,7 +278,10 @@ export default function ItemCard({
               <div className="pointer-events-none absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-1.5">
                 {mangaStatus ? (
                   <span
-                    className={`glass-chip min-w-0 truncate rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] uppercase ${mangaStatus.tone}`}
+                    className={
+                      "glass-chip min-w-0 truncate rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] uppercase " +
+                      mangaStatus.tone
+                    }
                   >
                     {mangaStatus.label}
                   </span>
@@ -295,7 +309,11 @@ export default function ItemCard({
         {selectionMode && onToggleSelect && (
           <button
             type="button"
-            aria-label={selected ? `Deselect ${item.title}` : `Select ${item.title}`}
+            aria-label={
+              selected
+                ? tr("components.item_card.deselect_title", { title: item.title })
+                : tr("components.item_card.select_title", { title: item.title })
+            }
             aria-pressed={selected}
             onClick={(event) => {
               event.preventDefault();
@@ -309,9 +327,10 @@ export default function ItemCard({
             className="absolute top-2.5 left-2.5 z-20 inline-flex size-8 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/70"
           >
             <span
-              className={`flex size-4 items-center justify-center rounded-full border ${
-                selected ? "border-primary bg-primary text-primary-foreground" : "border-white/70"
-              }`}
+              className={
+                "flex size-4 items-center justify-center rounded-full border " +
+                (selected ? "border-primary bg-primary text-primary-foreground" : "border-white/70")
+              }
             >
               {selected && <Check className="size-3" />}
             </span>

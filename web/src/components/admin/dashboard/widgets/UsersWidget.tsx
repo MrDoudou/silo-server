@@ -13,6 +13,8 @@ import type { AdminUser } from "@/api/types";
 import { formatRelativeTime } from "@/lib/date";
 import { useAdminUsers } from "@/hooks/queries/admin/users";
 import { SectionError, UserSkeletonRows } from "../feedback";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Most recently active first; users with no recorded activity sink to the
 // bottom. The list endpoint itself returns account-creation order.
@@ -26,6 +28,7 @@ function byLastActive(a: AdminUser, b: AdminUser): number {
 }
 
 export function UsersWidget() {
+  useUILanguage();
   const navigate = useNavigate();
   const usersQuery = useAdminUsers();
   const users = [...(usersQuery.data ?? [])].sort(byLastActive);
@@ -33,28 +36,38 @@ export function UsersWidget() {
   return (
     <Card className="h-full">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-sm font-bold">Users</CardTitle>
+        <CardTitle className="text-sm font-bold">
+          {tr("components.admin.dashboard.widgets.users_widget.users")}
+        </CardTitle>
         <Link
           to="/admin/users"
           className="text-muted-foreground hover:text-primary text-[11px] transition-colors"
         >
-          Manage ›
+          {tr("components.admin.dashboard.widgets.users_widget.manage")}
         </Link>
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-y-auto">
         {usersQuery.isLoading ? (
           <UserSkeletonRows />
         ) : usersQuery.error ? (
-          <SectionError message="Failed to load users." />
+          <SectionError
+            message={tr("components.admin.dashboard.widgets.users_widget.failed_to_load_users")}
+          />
         ) : users.length === 0 ? (
-          <div className="text-muted-foreground py-4 text-center text-sm">No users.</div>
+          <div className="text-muted-foreground py-4 text-center text-sm">
+            {tr("components.admin.dashboard.widgets.users_widget.no_users")}
+          </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead className="hidden sm:table-cell">Last active</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{tr("components.admin.dashboard.widgets.users_widget.user")}</TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  {tr("components.admin.dashboard.widgets.users_widget.last_active")}
+                </TableHead>
+                <TableHead>
+                  {tr("components.admin.dashboard.widgets.users_widget.status")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -64,7 +77,9 @@ export function UsersWidget() {
                   className="hover:bg-accent/50 focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
                   role="link"
                   tabIndex={0}
-                  aria-label={`Open ${u.username}`}
+                  aria-label={tr("components.admin.dashboard.widgets.users_widget.open_username", {
+                    username: u.username,
+                  })}
                   onClick={() => navigate(`/admin/users/${u.id}`)}
                   onKeyDown={(event) => {
                     // Space scrolls the page by default; a row that behaves like
@@ -88,7 +103,7 @@ export function UsersWidget() {
                           <span className="truncate text-[13px] font-semibold">{u.username}</span>
                           {u.role === "admin" && (
                             <Badge variant="default" className="px-1.5 py-0 text-[9px]">
-                              admin
+                              {tr("components.admin.dashboard.widgets.users_widget.admin")}
                             </Badge>
                           )}
                         </div>
@@ -106,7 +121,9 @@ export function UsersWidget() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={u.enabled ? "outline" : "destructive"}>
-                      {u.enabled ? "Active" : "Disabled"}
+                      {u.enabled
+                        ? tr("components.admin.dashboard.widgets.users_widget.active")
+                        : tr("components.admin.dashboard.widgets.users_widget.disabled")}
                     </Badge>
                   </TableCell>
                 </TableRow>

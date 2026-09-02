@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { api } from "@/api/client";
 import { adminKeys, themeKeys } from "../keys";
@@ -40,7 +40,7 @@ export function useUploadBrandingAsset() {
     },
     onSuccess: () => invalidateBranding(queryClient),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to upload image");
+      toast.error("errors.queries.admin.branding.failed_to_upload_image", { error: err });
     },
   });
 }
@@ -53,7 +53,7 @@ export function useDeleteBrandingAsset() {
       api<void>(`/admin/branding/assets/${kind}`, { method: "DELETE" }),
     onSuccess: () => invalidateBranding(queryClient),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to remove image");
+      toast.error("errors.queries.admin.branding.failed_to_remove_image", { error: err });
     },
   });
 }

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import type { RateLimitConfig, RateLimitUpdateResponse } from "@/api/types";
 import { adminKeys } from "../keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 const ADMIN_STALE_TIME = 30_000;
 
@@ -24,9 +24,11 @@ export function useUpdateRateLimitConfig() {
       }),
     onSuccess: async (data) => {
       if (data.restart_required) {
-        toast.success("Rate limit settings saved — restart the server to apply them");
+        toast.success(
+          "feedback.queries.admin.rate_limits.rate_limit_settings_saved_restart_the_server_to_apply_them",
+        );
       } else {
-        toast.success("Rate limit settings saved");
+        toast.success("feedback.queries.admin.rate_limits.rate_limit_settings_saved");
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adminKeys.rateLimitConfig() }),
@@ -34,7 +36,9 @@ export function useUpdateRateLimitConfig() {
       ]);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save rate limit settings");
+      toast.error("errors.queries.admin.rate_limits.failed_to_save_rate_limit_settings", {
+        error: err,
+      });
     },
   });
 }

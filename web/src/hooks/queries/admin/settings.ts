@@ -11,7 +11,7 @@ import type {
   JellyfinCompatWebInstallRequest,
 } from "@/api/types";
 import { adminKeys, compatKeys, settingsKeys, themeKeys } from "../keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 type ServerSettings = Record<string, string>;
 
@@ -176,7 +176,7 @@ export function useUpdateServerSettings() {
       await Promise.all(invalidations);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update settings");
+      toast.error("errors.queries.admin.settings.failed_to_update_settings", { error: err });
     },
   });
 }
@@ -225,7 +225,7 @@ export function useUpdateServerSetting() {
       await Promise.all(invalidations);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update setting");
+      toast.error("errors.queries.admin.settings.failed_to_update_setting", { error: err });
     },
   });
 }
@@ -285,7 +285,9 @@ export function useUpdateJellyfinCompatSettings() {
       ]);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update Jellyfin compatibility");
+      toast.error("errors.queries.admin.settings.failed_to_update_jellyfin_compatibility", {
+        error: err,
+      });
     },
   });
 }
@@ -299,7 +301,7 @@ export function useInstallJellyfinCompatWeb() {
         body: JSON.stringify(body),
       }),
     onSuccess: async () => {
-      toast.success("Jellyfin Web install started");
+      toast.success("feedback.queries.admin.settings.jellyfin_web_install_started");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adminKeys.jellyfinCompatStatus() }),
         queryClient.invalidateQueries({ queryKey: adminKeys.serverSettings() }),
@@ -307,7 +309,9 @@ export function useInstallJellyfinCompatWeb() {
       ]);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to install Jellyfin Web assets");
+      toast.error("errors.queries.admin.settings.failed_to_install_jellyfin_web_assets", {
+        error: err,
+      });
     },
   });
 }
@@ -321,7 +325,7 @@ export function useRemoveJellyfinCompatWeb() {
         body: JSON.stringify({}),
       }),
     onSuccess: async () => {
-      toast.success("Jellyfin Web removal started");
+      toast.success("feedback.queries.admin.settings.jellyfin_web_removal_started");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adminKeys.jellyfinCompatStatus() }),
         queryClient.invalidateQueries({ queryKey: adminKeys.serverSettings() }),
@@ -329,7 +333,9 @@ export function useRemoveJellyfinCompatWeb() {
       ]);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to remove Jellyfin Web assets");
+      toast.error("errors.queries.admin.settings.failed_to_remove_jellyfin_web_assets", {
+        error: err,
+      });
     },
   });
 }

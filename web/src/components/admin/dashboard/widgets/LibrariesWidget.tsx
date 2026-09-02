@@ -15,8 +15,11 @@ import { cn } from "@/lib/utils";
 import type { ScanRun } from "@/api/types";
 import { formatDashboardLibraryScanProgress } from "../format";
 import { LibrarySkeletonRows, SectionError } from "../feedback";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export function LibrariesWidget() {
+  useUILanguage();
   useEventChannel("scans");
   const librariesQuery = useAdminLibraries();
   const libraries = librariesQuery.data ?? [];
@@ -43,22 +46,28 @@ export function LibrariesWidget() {
   return (
     <Card className="h-full">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-sm font-bold">Libraries</CardTitle>
+        <CardTitle className="text-sm font-bold">
+          {tr("components.admin.dashboard.widgets.libraries_widget.libraries")}
+        </CardTitle>
         <Link
           to="/admin/libraries"
           className="text-muted-foreground hover:text-primary text-[11px] transition-colors"
         >
-          Manage ›
+          {tr("components.admin.dashboard.widgets.libraries_widget.manage")}
         </Link>
       </CardHeader>
       <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto">
         {librariesQuery.isLoading ? (
           <LibrarySkeletonRows />
         ) : librariesQuery.error ? (
-          <SectionError message="Failed to load libraries." />
+          <SectionError
+            message={tr(
+              "components.admin.dashboard.widgets.libraries_widget.failed_to_load_libraries",
+            )}
+          />
         ) : libraries.length === 0 ? (
           <div className="text-muted-foreground py-4 text-center text-sm">
-            No libraries configured.
+            {tr("components.admin.dashboard.widgets.libraries_widget.no_libraries_configured")}
           </div>
         ) : (
           libraries.map((lib) => {
@@ -93,7 +102,10 @@ export function LibrariesWidget() {
                   <div className="text-sm font-bold">{lib.name}</div>
                   <div className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
                     <span>
-                      {lib.type} · {lib.paths.length} {lib.paths.length === 1 ? "path" : "paths"}
+                      {lib.type} · {lib.paths.length}{" "}
+                      {lib.paths.length === 1
+                        ? tr("components.admin.dashboard.widgets.libraries_widget.path")
+                        : tr("components.admin.dashboard.widgets.libraries_widget.paths")}
                     </span>
                     {scanProgressLabel ? (
                       <>
@@ -119,8 +131,23 @@ export function LibrariesWidget() {
                       scanLibrary.mutate(lib.id);
                     }}
                     disabled={hasActiveScan ? isCancellingScan : isScanStarting}
-                    title={hasActiveScan ? "Stop Library Scans" : "Scan Library"}
-                    aria-label={hasActiveScan ? `Stop scans for ${lib.name}` : `Scan ${lib.name}`}
+                    title={
+                      hasActiveScan
+                        ? tr(
+                            "components.admin.dashboard.widgets.libraries_widget.stop_library_scans",
+                          )
+                        : tr("components.admin.dashboard.widgets.libraries_widget.scan_library")
+                    }
+                    aria-label={
+                      hasActiveScan
+                        ? tr(
+                            "components.admin.dashboard.widgets.libraries_widget.stop_scans_for_name",
+                            { name: lib.name },
+                          )
+                        : tr("components.admin.dashboard.widgets.libraries_widget.scan_name", {
+                            name: lib.name,
+                          })
+                    }
                   >
                     {hasActiveScan ? (
                       <Square className="h-3 w-3 fill-current" />
@@ -140,10 +167,14 @@ export function LibrariesWidget() {
                     )}
                     title={
                       hasActiveScan
-                        ? "Scan in progress"
+                        ? tr("components.admin.dashboard.widgets.libraries_widget.scan_in_progress")
                         : lib.enabled
-                          ? "Library enabled"
-                          : "Library disabled"
+                          ? tr(
+                              "components.admin.dashboard.widgets.libraries_widget.library_enabled",
+                            )
+                          : tr(
+                              "components.admin.dashboard.widgets.libraries_widget.library_disabled",
+                            )
                     }
                   />
                 </div>

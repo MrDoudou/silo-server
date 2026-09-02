@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 
 import type { OverlayIconId } from "./types";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Lucide icons render directly from the icon ID via this map. Anything not
 // here is expected to be a brand mark in BRAND_ICONS below.
@@ -46,6 +48,7 @@ const LUCIDE_ICONS: Partial<Record<OverlayIconId, LucideIcon>> = {
 // brand without using trademarked logo artwork.
 
 function HDRMark(props: SVGProps<SVGSVGElement>) {
+  useUILanguage();
   return (
     <svg viewBox="0 0 26 12" fill="currentColor" {...props}>
       <text
@@ -56,13 +59,14 @@ function HDRMark(props: SVGProps<SVGSVGElement>) {
         textAnchor="middle"
         fontFamily="system-ui, sans-serif"
       >
-        HDR
+        {tr("lib.overlays.icons.hdr")}
       </text>
     </svg>
   );
 }
 
 function HDR10Mark(props: SVGProps<SVGSVGElement>) {
+  useUILanguage();
   return (
     <svg viewBox="0 0 40 12" fill="currentColor" {...props}>
       <text
@@ -73,7 +77,7 @@ function HDR10Mark(props: SVGProps<SVGSVGElement>) {
         textAnchor="middle"
         fontFamily="system-ui, sans-serif"
       >
-        HDR10
+        {tr("lib.overlays.icons.hdr10")}
       </text>
     </svg>
   );
@@ -88,6 +92,7 @@ function DolbyVisionMark(props: SVGProps<SVGSVGElement>) {
 }
 
 function AtmosMark(props: SVGProps<SVGSVGElement>) {
+  useUILanguage();
   return (
     <svg viewBox="0 0 40 12" fill="currentColor" {...props}>
       <text
@@ -99,13 +104,14 @@ function AtmosMark(props: SVGProps<SVGSVGElement>) {
         fontFamily="system-ui, sans-serif"
         letterSpacing="0.5"
       >
-        ATMOS
+        {tr("lib.overlays.icons.atmos")}
       </text>
     </svg>
   );
 }
 
 function AV1Mark(props: SVGProps<SVGSVGElement>) {
+  useUILanguage();
   return (
     <svg viewBox="0 0 24 12" fill="currentColor" {...props}>
       <text
@@ -116,7 +122,7 @@ function AV1Mark(props: SVGProps<SVGSVGElement>) {
         textAnchor="middle"
         fontFamily="system-ui, sans-serif"
       >
-        AV1
+        {tr("lib.overlays.icons.av1")}
       </text>
     </svg>
   );

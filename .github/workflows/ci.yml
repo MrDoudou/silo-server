@@ -144,6 +144,12 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Verify generated translation catalogs
+        run: pnpm run i18n:sync:check
+
+      - name: Verify translation keys
+        run: pnpm run i18n:check
+
       - name: Lint
         run: pnpm run lint
 

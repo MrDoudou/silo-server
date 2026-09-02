@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
@@ -6,10 +7,11 @@ import type {
   PluginSettingsListResponse,
   UpdatePluginSettingsRequest,
 } from "@/api/types";
+import { EMPTY_PLUGIN_CATALOG_TARGETS, usePluginCatalogs } from "@/i18n/pluginCatalogs";
 import { settingsKeys } from "./keys";
 
 export function usePluginSettingsList() {
-  return useQuery({
+  const query = useQuery({
     queryKey: settingsKeys.plugins(),
     queryFn: () =>
       api<PluginSettingsListResponse>("/settings/plugins").then(
@@ -17,15 +19,23 @@ export function usePluginSettingsList() {
       ),
     staleTime: 30_000,
   });
+  usePluginCatalogs(query.data?.installations ?? EMPTY_PLUGIN_CATALOG_TARGETS);
+  return query;
 }
 
 export function usePluginSettingsDetail(installationId: number, enabled = true) {
-  return useQuery({
+  const query = useQuery({
     queryKey: settingsKeys.pluginDetail(installationId),
     queryFn: () => api<PluginSettingsDetailResponse>(`/settings/plugins/${installationId}`),
     enabled,
     staleTime: 30_000,
   });
+  const catalogTargets = useMemo(
+    () => (query.data ? [query.data.installation] : EMPTY_PLUGIN_CATALOG_TARGETS),
+    [query.data],
+  );
+  usePluginCatalogs(catalogTargets);
+  return query;
 }
 
 export function useUpdatePluginSettings() {

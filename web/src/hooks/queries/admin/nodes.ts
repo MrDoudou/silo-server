@@ -10,7 +10,9 @@ import type {
 import { adminKeys } from "../keys";
 import { usePageActivity } from "@/hooks/usePageActivity";
 import { describeReprobeOutcome } from "@/pages/adminNodesPresentation";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
+import { tr } from "@/i18n/translate";
 
 const ADMIN_STALE_TIME = 30_000;
 
@@ -49,11 +51,11 @@ export function useCreateNode() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Node created");
+      toast.success("feedback.queries.admin.nodes.node_created");
       queryClient.invalidateQueries({ queryKey: adminKeys.nodes() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error("errors.queries.admin.nodes.failed_to_save", { error: err });
     },
   });
 }
@@ -73,7 +75,7 @@ export function useUpdateNode() {
       queryClient.invalidateQueries({ queryKey: adminKeys.nodes() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update node");
+      toast.error("errors.queries.admin.nodes.failed_to_update_node", { error: err });
     },
   });
 }
@@ -83,11 +85,11 @@ export function useDeleteNode() {
   return useMutation({
     mutationFn: (id: number) => api(`/admin/nodes/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Node deleted");
+      toast.success("feedback.queries.admin.nodes.node_deleted");
       queryClient.invalidateQueries({ queryKey: adminKeys.nodes() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete node");
+      toast.error("errors.queries.admin.nodes.failed_to_delete_node", { error: err });
     },
   });
 }
@@ -99,12 +101,16 @@ export function useCheckNodeHealth() {
       api<CheckNodeResponse>(`/admin/nodes/${node.id}/check`, {
         method: "POST",
       }).then((result) => ({ node, result })),
-    onSuccess: ({ node, result }) => {
-      toast.success(result.healthy ? `${node.name} is healthy` : `${node.name} is unhealthy`);
+    onSuccess: ({ node }) => {
+      toast.success("feedback.queries.admin.nodes.node_is_healthy", {
+        values: {
+          node: node.name,
+        },
+      });
       queryClient.invalidateQueries({ queryKey: adminKeys.nodes() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Health check failed");
+      toast.error("errors.queries.admin.nodes.health_check_failed", { error: err });
     },
   });
 }
@@ -134,13 +140,17 @@ export function useReprobeNode() {
     onSuccess: ({ node, result }) => {
       const outcome = describeReprobeOutcome(node, result);
       if (outcome.ok) {
-        toast.success(outcome.message);
+        toast.success("feedback.queries.admin.nodes.reported_message", {
+          values: { message: tr.remote({ message: outcome.message }) },
+        });
       } else {
-        toast.error(outcome.message);
+        toast.error("errors.queries.admin.nodes.reported_message", {
+          values: { message: tr.remote({ message: outcome.message }) },
+        });
       }
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Re-probe failed");
+      toast.error("errors.queries.admin.nodes.re_probe_failed", { error: err });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.nodes() });
@@ -157,11 +167,15 @@ export function useToggleNode() {
         body: JSON.stringify({ enabled: !node.enabled }),
       }),
     onSuccess: (updated) => {
-      toast.success(`${updated.name} ${updated.enabled ? "enabled" : "disabled"}`);
+      toast.success("feedback.queries.admin.nodes.node_enabled", {
+        values: {
+          node: updated.name,
+        },
+      });
       queryClient.invalidateQueries({ queryKey: adminKeys.nodes() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update node");
+      toast.error("errors.queries.admin.nodes.failed_to_update_node", { error: err });
     },
   });
 }

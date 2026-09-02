@@ -86,13 +86,16 @@ import {
   shortenId,
   type DeviceProfileTabEntry,
 } from "@/components/admin/deviceOverrides";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import {
   formatDate as formatPreferredDate,
   formatDateTime as formatDateTimePreferred,
 } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function AdminUserDetail() {
+  useUILanguage();
   const { id } = useParams<{ id: string }>();
   const userId = Number(id);
   const navigate = useNavigate();
@@ -104,9 +107,14 @@ export default function AdminUserDetail() {
   const deleteMutation = useDeleteUser();
   const impersonateMutation = useImpersonateUser();
 
-  if (isLoading) return <div className="page-shell py-8">Loading user...</div>;
+  if (isLoading)
+    return <div className="page-shell py-8">{tr("pages.admin_user_detail.loading_user")}</div>;
   if (error || !user)
-    return <div className="page-shell text-destructive py-8">User not found.</div>;
+    return (
+      <div className="page-shell text-destructive py-8">
+        {tr("pages.admin_user_detail.user_not_found")}
+      </div>
+    );
 
   const impersonationDisabled = user.role === "admin" || !user.enabled;
 
@@ -117,15 +125,15 @@ export default function AdminUserDetail() {
   return (
     <div className="page-shell space-y-6 py-4 sm:py-6">
       <nav
-        aria-label="Breadcrumb"
+        aria-label={tr("pages.admin_user_detail.breadcrumb")}
         className="text-muted-foreground flex items-center gap-1.5 text-sm"
       >
         <Link to="/admin" className="hover:text-foreground transition-colors">
-          Admin
+          {tr("pages.admin_user_detail.admin")}
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
         <Link to="/admin/users" className="hover:text-foreground transition-colors">
-          Users
+          {tr("pages.admin_user_detail.users")}
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
         <span className="text-foreground font-medium">{user.username}</span>
@@ -137,7 +145,9 @@ export default function AdminUserDetail() {
             <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">{user.username}</h1>
             <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
             <Badge variant={user.enabled ? "outline" : "destructive"}>
-              {user.enabled ? "Active" : "Disabled"}
+              {user.enabled
+                ? tr("pages.admin_user_detail.active")
+                : tr("pages.admin_user_detail.disabled")}
             </Badge>
           </div>
           <p className="page-subtitle text-sm sm:text-base">{user.email}</p>
@@ -150,17 +160,17 @@ export default function AdminUserDetail() {
             onClick={() => setConfirmImpersonateOpen(true)}
             disabled={impersonationDisabled || impersonateMutation.isPending}
           >
-            Impersonate
+            {tr("pages.admin_user_detail.impersonate")}
           </Button>
           <Dialog open={editOpen} onOpenChange={setEditOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
-                <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                <Pencil className="mr-1 h-3.5 w-3.5" /> {tr("common.actions.edit")}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Edit User</DialogTitle>
+                <DialogTitle>{tr("pages.admin_user_detail.edit_user")}</DialogTitle>
               </DialogHeader>
               <EditUserForm user={user} onClose={() => setEditOpen(false)} />
             </DialogContent>
@@ -172,7 +182,7 @@ export default function AdminUserDetail() {
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
           >
-            Delete
+            {tr("common.actions.delete")}
           </Button>
         </div>
       </div>
@@ -182,12 +192,12 @@ export default function AdminUserDetail() {
           variant="line"
           className="surface-panel-subtle h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border-0 bg-transparent p-1"
         >
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="devices">Devices</TabsTrigger>
-          <TabsTrigger value="profiles">Profiles</TabsTrigger>
-          <TabsTrigger value="history">Watch History</TabsTrigger>
-          <TabsTrigger value="ips">IP History</TabsTrigger>
+          <TabsTrigger value="overview">{tr("pages.admin_user_detail.overview")}</TabsTrigger>
+          <TabsTrigger value="settings">{tr("pages.admin_user_detail.settings")}</TabsTrigger>
+          <TabsTrigger value="devices">{tr("pages.admin_user_detail.devices")}</TabsTrigger>
+          <TabsTrigger value="profiles">{tr("pages.admin_user_detail.profiles")}</TabsTrigger>
+          <TabsTrigger value="history">{tr("pages.admin_user_detail.watch_history")}</TabsTrigger>
+          <TabsTrigger value="ips">{tr("pages.admin_user_detail.ip_history")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -214,9 +224,12 @@ export default function AdminUserDetail() {
         onOpenChange={(open) => {
           if (!open) setConfirmImpersonateOpen(false);
         }}
-        title="Impersonate user"
-        description={`Continue as "${user.username}"? Admin access will be removed until you end impersonation.`}
-        confirmLabel="Impersonate"
+        title={tr("pages.admin_user_detail.impersonate_user")}
+        description={tr(
+          "pages.admin_user_detail.continue_as_username_admin_access_will_be_removed_until_you",
+          { username: user.username },
+        )}
+        confirmLabel={tr("pages.admin_user_detail.impersonate")}
         onConfirm={() => {
           setConfirmImpersonateOpen(false);
           void impersonateMutation
@@ -226,7 +239,9 @@ export default function AdminUserDetail() {
               navigate("/profiles");
             })
             .catch((error: unknown) => {
-              toast.error(error instanceof Error ? error.message : "Failed to start impersonation");
+              toast.error("errors.admin_user_detail.failed_to_start_impersonation", {
+                error: error,
+              });
             });
         }}
       />
@@ -235,9 +250,11 @@ export default function AdminUserDetail() {
         onOpenChange={(open) => {
           if (!open) setConfirmDeleteOpen(false);
         }}
-        title="Delete user"
-        description={`Delete user "${user.username}"? This cannot be undone.`}
-        confirmLabel="Delete"
+        title={tr("pages.admin_user_detail.delete_user")}
+        description={tr("pages.admin_user_detail.delete_user_username_this_cannot_be_undone", {
+          username: user.username,
+        })}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         onConfirm={() => {
           setConfirmDeleteOpen(false);
@@ -251,6 +268,7 @@ export default function AdminUserDetail() {
 }
 
 function OverviewTab({ user }: { user: AdminUser }) {
+  useUILanguage();
   const { data: libraries = [] } = useAdminLibraries();
   const { data: accessGroups = [] } = useAccessGroups();
 
@@ -280,58 +298,70 @@ function OverviewTab({ user }: { user: AdminUser }) {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="surface-panel overflow-hidden rounded-2xl border-0">
         <div className="border-border border-b px-4 py-3">
-          <h3 className="text-sm font-medium">Account</h3>
+          <h3 className="text-sm font-medium">{tr("pages.admin_user_detail.account")}</h3>
         </div>
         <div className="divide-border divide-y">
-          <DetailRow label="Username" value={user.username} />
-          <DetailRow label="Email" value={user.email} />
-          <DetailRow label="Role" value={user.role} />
-          <DetailRow label="Status" value={user.enabled ? "Active" : "Disabled"} />
-          <DetailRow label="Created" value={formatDate(user.created_at)} />
-          <DetailRow label="Updated" value={formatDate(user.updated_at)} />
+          <DetailRow label={tr("pages.admin_user_detail.username")} value={user.username} />
+          <DetailRow label={tr("pages.admin_user_detail.email")} value={user.email} />
+          <DetailRow label={tr("pages.admin_user_detail.role")} value={user.role} />
+          <DetailRow
+            label={tr("pages.admin_user_detail.status")}
+            value={user.enabled ? "Active" : "Disabled"}
+          />
+          <DetailRow
+            label={tr("pages.admin_user_detail.created")}
+            value={formatDate(user.created_at)}
+          />
+          <DetailRow
+            label={tr("pages.admin_user_detail.updated")}
+            value={formatDate(user.updated_at)}
+          />
         </div>
       </div>
 
       <div className="surface-panel overflow-hidden rounded-2xl border-0">
         <div className="border-border border-b px-4 py-3">
-          <h3 className="text-sm font-medium">Permissions & Limits</h3>
+          <h3 className="text-sm font-medium">
+            {tr("pages.admin_user_detail.permissions_limits")}
+          </h3>
           <p className="text-muted-foreground text-xs">
-            Effective values. Fields marked (override) are set on this account; everything else
-            follows the group.
+            {tr(
+              "pages.admin_user_detail.effective_values_fields_marked_override_are_set_on_this_account",
+            )}
           </p>
         </div>
         <div className="divide-border divide-y">
-          <DetailRow label="Group" value={groupName} />
+          <DetailRow label={tr("pages.admin_user_detail.group")} value={groupName} />
           <DetailRow
-            label="Library Access"
+            label={tr("pages.admin_user_detail.library_access")}
             value={libraryNames + overridden(user.library_ids !== null)}
           />
           <DetailRow
-            label="Marker Editing"
+            label={tr("pages.admin_user_detail.marker_editing")}
             value={allowed(hasAssignedPermission(effective.permissions, PERMISSION_MARKER_EDIT))}
           />
           <DetailRow
-            label="Metadata Curation"
+            label={tr("pages.admin_user_detail.metadata_curation")}
             value={allowed(
               hasAssignedPermission(effective.permissions, PERMISSION_METADATA_CURATION),
             )}
           />
           <DetailRow
-            label="Max Playback Quality"
+            label={tr("pages.admin_user_detail.max_playback_quality")}
             value={
               formatPlaybackQualityPreset(effective.max_playback_quality) +
               overridden(user.max_playback_quality !== null)
             }
           />
           <DetailRow
-            label="Max Streams"
+            label={tr("pages.admin_user_detail.max_streams")}
             value={
               (effective.max_streams === 0 ? "Unlimited" : String(effective.max_streams)) +
               overridden(user.max_streams !== null)
             }
           />
           <DetailRow
-            label="Max Transcodes"
+            label={tr("pages.admin_user_detail.max_transcodes")}
             value={
               (!effective.transcode_allowed
                 ? "Disabled"
@@ -341,26 +371,29 @@ function OverviewTab({ user }: { user: AdminUser }) {
             }
           />
           <DetailRow
-            label="Audio Transcodes"
+            label={tr("pages.admin_user_detail.audio_transcodes")}
             value={
               allowed(effective.audio_transcode_allowed) +
               overridden(user.audio_transcode_allowed !== null)
             }
           />
-          <DetailRow label="Max Profiles" value={String(user.max_profiles)} />
           <DetailRow
-            label="Downloads"
+            label={tr("pages.admin_user_detail.max_profiles")}
+            value={String(user.max_profiles)}
+          />
+          <DetailRow
+            label={tr("pages.admin_user_detail.downloads")}
             value={allowed(effective.download_allowed) + overridden(user.download_allowed !== null)}
           />
           <DetailRow
-            label="Download Transcode"
+            label={tr("pages.admin_user_detail.download_transcode")}
             value={
               allowed(effective.download_transcode_allowed) +
               overridden(user.download_transcode_allowed !== null)
             }
           />
           <DetailRow
-            label="Media Requests"
+            label={tr("pages.admin_user_detail.media_requests")}
             value={allowed(effective.requests_allowed) + overridden(user.requests_allowed !== null)}
           />
         </div>
@@ -370,6 +403,7 @@ function OverviewTab({ user }: { user: AdminUser }) {
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
+  useUILanguage();
   return (
     <div className="flex items-center justify-between px-4 py-2.5">
       <span className="text-muted-foreground text-sm">{label}</span>
@@ -379,17 +413,20 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 function ProfilesTab({ userId }: { userId: number }) {
+  useUILanguage();
   const { data: profiles, isLoading } = useAdminUserProfiles(userId);
 
   if (isLoading)
     return (
-      <div className="text-muted-foreground py-8 text-center text-sm">Loading profiles...</div>
+      <div className="text-muted-foreground py-8 text-center text-sm">
+        {tr("pages.admin_user_detail.loading_profiles")}
+      </div>
     );
 
   if (!profiles || profiles.length === 0)
     return (
       <div className="surface-panel text-muted-foreground rounded-2xl py-10 text-center text-sm">
-        No profiles found for this user.
+        {tr("pages.admin_user_detail.no_profiles_found_for_this_user")}
       </div>
     );
 
@@ -403,6 +440,7 @@ function ProfilesTab({ userId }: { userId: number }) {
 }
 
 function ProfileCard({ profile }: { profile: AdminUserProfile }) {
+  useUILanguage();
   return (
     <div className="surface-panel flex items-center gap-3 rounded-xl border-0 px-4 py-3">
       <UserCircle className="text-muted-foreground h-8 w-8" />
@@ -415,6 +453,7 @@ function ProfileCard({ profile }: { profile: AdminUserProfile }) {
 }
 
 function WatchHistoryTab({ userId }: { userId: number }) {
+  useUILanguage();
   const {
     data: rows = [],
     isLoading,
@@ -426,18 +465,22 @@ function WatchHistoryTab({ userId }: { userId: number }) {
 
   if (isLoading)
     return (
-      <div className="text-muted-foreground py-8 text-center text-sm">Loading watch history...</div>
+      <div className="text-muted-foreground py-8 text-center text-sm">
+        {tr("pages.admin_user_detail.loading_watch_history")}
+      </div>
     );
 
   if (error)
     return (
-      <div className="text-destructive py-8 text-center text-sm">Failed to load watch history.</div>
+      <div className="text-destructive py-8 text-center text-sm">
+        {tr("pages.admin_user_detail.failed_to_load_watch_history")}
+      </div>
     );
 
   if (rows.length === 0)
     return (
       <div className="surface-panel text-muted-foreground rounded-2xl py-10 text-center text-sm">
-        No playback history for this user.
+        {tr("pages.admin_user_detail.no_playback_history_for_this_user")}
       </div>
     );
 
@@ -446,12 +489,12 @@ function WatchHistoryTab({ userId }: { userId: number }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Media</TableHead>
-            <TableHead>Profile</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead>Watch Time</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Ended</TableHead>
+            <TableHead>{tr("pages.admin_user_detail.media")}</TableHead>
+            <TableHead>{tr("pages.admin_user_detail.profile")}</TableHead>
+            <TableHead>{tr("pages.admin_user_detail.method")}</TableHead>
+            <TableHead>{tr("pages.admin_user_detail.watch_time")}</TableHead>
+            <TableHead>{tr("pages.admin_user_detail.status")}</TableHead>
+            <TableHead>{tr("pages.admin_user_detail.ended")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -462,7 +505,7 @@ function WatchHistoryTab({ userId }: { userId: number }) {
                 <TableCell>
                   {row.media_item_id ? (
                     <Link
-                      to={`/item/${encodeURIComponent(row.media_item_id)}`}
+                      to={"/item/" + encodeURIComponent(row.media_item_id)}
                       className="hover:text-primary block font-medium transition-colors hover:underline"
                     >
                       {title}
@@ -470,11 +513,18 @@ function WatchHistoryTab({ userId }: { userId: number }) {
                   ) : (
                     <div className="font-medium">{title}</div>
                   )}
-                  <div className="text-muted-foreground text-xs">{row.media_type || "unknown"}</div>
+                  <div className="text-muted-foreground text-xs">
+                    {row.media_type || tr("pages.admin_user_detail.unknown")}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Link
-                    to={`/admin/history?user_id=${userId}&profile_id=${encodeURIComponent(row.profile_id)}`}
+                    to={
+                      "/admin/history?user_id=" +
+                      userId +
+                      "&profile_id=" +
+                      encodeURIComponent(row.profile_id)
+                    }
                     className="hover:text-primary transition-colors hover:underline"
                   >
                     {row.profile_name || row.profile_id}
@@ -486,18 +536,20 @@ function WatchHistoryTab({ userId }: { userId: number }) {
                 <TableCell>
                   <div>{formatDuration(row.watched_seconds)}</div>
                   <div className="text-muted-foreground text-xs">
-                    of {formatDuration(row.duration_seconds)}
+                    {tr("pages.admin_user_detail.of")} {formatDuration(row.duration_seconds)}
                   </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={row.completed ? "default" : "outline"}>
-                    {row.completed ? "Completed" : "Partial"}
+                    {row.completed
+                      ? tr("pages.admin_user_detail.completed")
+                      : tr("pages.admin_user_detail.partial")}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <div>{formatDateTime(row.ended_at)}</div>
                   <div className="text-muted-foreground text-xs">
-                    started {formatRelative(row.started_at)}
+                    {tr("pages.admin_user_detail.started")} {formatRelative(row.started_at)}
                   </div>
                 </TableCell>
               </TableRow>
@@ -510,17 +562,20 @@ function WatchHistoryTab({ userId }: { userId: number }) {
 }
 
 function IPHistoryTab({ userId }: { userId: number }) {
+  useUILanguage();
   const { data: ips = [], isLoading } = useUserIPs(userId);
 
   if (isLoading)
     return (
-      <div className="text-muted-foreground py-8 text-center text-sm">Loading IP history...</div>
+      <div className="text-muted-foreground py-8 text-center text-sm">
+        {tr("pages.admin_user_detail.loading_ip_history")}
+      </div>
     );
 
   if (ips.length === 0)
     return (
       <div className="surface-panel text-muted-foreground rounded-2xl py-10 text-center text-sm">
-        No IP history found for this user.
+        {tr("pages.admin_user_detail.no_ip_history_found_for_this_user")}
       </div>
     );
 
@@ -529,10 +584,10 @@ function IPHistoryTab({ userId }: { userId: number }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>IP Address</TableHead>
-            <TableHead>First Seen</TableHead>
-            <TableHead>Last Seen</TableHead>
-            <TableHead className="text-right">Requests</TableHead>
+            <TableHead>{tr("pages.admin_user_detail.ip_address")}</TableHead>
+            <TableHead>{tr("pages.admin_user_detail.first_seen")}</TableHead>
+            <TableHead>{tr("pages.admin_user_detail.last_seen")}</TableHead>
+            <TableHead className="text-right">{tr("pages.admin_user_detail.requests")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -551,6 +606,7 @@ function IPHistoryTab({ userId }: { userId: number }) {
 }
 
 function UserSettingsTab({ userId }: { userId: number }) {
+  useUILanguage();
   const { data: settings = [], isLoading } = useAdminUserSettings(userId);
   const updateSetting = useUpdateAdminUserSetting();
   const deleteSetting = useDeleteAdminUserSetting();
@@ -569,7 +625,9 @@ function UserSettingsTab({ userId }: { userId: number }) {
 
   if (isLoading) {
     return (
-      <div className="text-muted-foreground py-8 text-center text-sm">Loading settings...</div>
+      <div className="text-muted-foreground py-8 text-center text-sm">
+        {tr("pages.admin_user_detail.loading_settings")}
+      </div>
     );
   }
 
@@ -624,8 +682,10 @@ function UserSettingsTab({ userId }: { userId: number }) {
           </div>
           <p className="text-muted-foreground text-[13px] leading-relaxed">{description}</p>
           <p className="text-muted-foreground text-xs">
-            Current: {formatSettingValue(entry.key, entry.value)}
-            {scopeDetail ? ` · ${scopeDetail}` : ""}
+            {tr("pages.admin_user_detail.current")} {formatSettingValue(entry.key, entry.value)}
+            {scopeDetail
+              ? tr("pages.admin_user_detail.scope_detail", { scopeDetail: scopeDetail })
+              : ""}
           </p>
         </div>
         <div className="flex flex-col items-stretch gap-2 md:items-end">
@@ -653,7 +713,7 @@ function UserSettingsTab({ userId }: { userId: number }) {
                 setJsonValue(entry.value);
               }}
             >
-              Edit JSON
+              {tr("pages.admin_user_detail.edit_json")}
             </Button>
           )}
           <Button
@@ -664,7 +724,7 @@ function UserSettingsTab({ userId }: { userId: number }) {
             disabled={updateSetting.isPending || deleteSetting.isPending}
           >
             <RotateCcw className="mr-1 h-3 w-3" />
-            Reset
+            {tr("common.actions.reset")}
           </Button>
         </div>
       </div>
@@ -682,24 +742,23 @@ function UserSettingsTab({ userId }: { userId: number }) {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-mono text-sm">
-              {jsonEditor?.entry.key ?? "JSON"}
+              {jsonEditor?.entry.key ?? tr("pages.admin_user_detail.json")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-muted-foreground text-[12.5px]">
-              Edit the raw value. This setting has no inline control, so saving replaces the stored
-              value wholesale — clearing it entirely is what the Reset button does.
+              {tr("pages.admin_user_detail.edit_the_raw_value_this_setting_has_no_inline_control")}
             </p>
             <textarea
               spellCheck={false}
-              aria-label="Raw value"
+              aria-label={tr("pages.admin_user_detail.raw_value")}
               className="border-border bg-background focus:border-foreground/40 min-h-[260px] w-full rounded-md border px-3 py-2 font-mono text-[13px] leading-relaxed transition-colors outline-none"
               value={jsonValue}
               onChange={(event) => setJsonValue(event.target.value)}
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={closeJsonEditor}>
-                Cancel
+                {tr("common.actions.cancel")}
               </Button>
               <Button
                 size="sm"
@@ -716,7 +775,7 @@ function UserSettingsTab({ userId }: { userId: number }) {
                   );
                 }}
               >
-                Save value
+                {tr("pages.admin_user_detail.save_value")}
               </Button>
             </div>
           </div>
@@ -728,10 +787,11 @@ function UserSettingsTab({ userId }: { userId: number }) {
             <Settings2 className="h-4 w-4 text-emerald-100" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold">User Settings</h3>
+            <h3 className="text-sm font-semibold">{tr("pages.admin_user_detail.user_settings")}</h3>
             <p className="text-muted-foreground text-sm">
-              Explicit values this user has stored, across account, profile, library and series
-              scopes. Device overrides live in the next tab.
+              {tr(
+                "pages.admin_user_detail.explicit_values_this_user_has_stored_across_account_profile_library",
+              )}
             </p>
           </div>
         </div>
@@ -740,7 +800,7 @@ function UserSettingsTab({ userId }: { userId: number }) {
             settings.map(renderSettingRow)
           ) : (
             <div className="text-muted-foreground py-6 text-center text-sm">
-              No account-wide settings are stored for this user.
+              {tr("pages.admin_user_detail.no_account_wide_settings_are_stored_for_this_user")}
             </div>
           )}
         </div>
@@ -750,6 +810,7 @@ function UserSettingsTab({ userId }: { userId: number }) {
 }
 
 function DeviceOverridesTab({ userId }: { userId: number }) {
+  useUILanguage();
   const { data: settings = [], isLoading } = useAdminUserDeviceSettings(userId);
   const updateSetting = useUpdateAdminUserDeviceSetting();
   const deleteSetting = useDeleteAdminUserDeviceSetting();
@@ -789,7 +850,7 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
   if (isLoading) {
     return (
       <div className="text-muted-foreground py-8 text-center text-sm">
-        Loading device overrides...
+        {tr("pages.admin_user_detail.loading_device_overrides")}
       </div>
     );
   }
@@ -806,11 +867,15 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
         }}
         title={
           deviceToReset?.profileName
-            ? `Reset overrides for ${deviceToReset.profileName}?`
-            : "Reset profile overrides"
+            ? tr("pages.admin_user_detail.reset_overrides_for_profile_name", {
+                profileName: deviceToReset.profileName,
+              })
+            : tr("pages.admin_user_detail.reset_profile_overrides")
         }
-        description="Every override for this profile on this device will be cleared. Playback falls back to account or default values."
-        confirmLabel="Reset all"
+        description={tr(
+          "pages.admin_user_detail.every_override_for_this_profile_on_this_device_will_be",
+        )}
+        confirmLabel={tr("pages.admin_user_detail.reset_all")}
         variant="destructive"
         onConfirm={() => {
           if (deviceToReset) {
@@ -829,9 +894,11 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
         onOpenChange={(open) => {
           if (!open) setSettingToReset(null);
         }}
-        title="Reset this override?"
-        description="The override will be removed and the device will fall back to the profile default."
-        confirmLabel="Reset override"
+        title={tr("pages.admin_user_detail.reset_this_override")}
+        description={tr(
+          "pages.admin_user_detail.the_override_will_be_removed_and_the_device_will_fall",
+        )}
+        confirmLabel={tr("pages.admin_user_detail.reset_override")}
         variant="destructive"
         onConfirm={() => {
           if (settingToReset) {
@@ -856,12 +923,13 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="font-mono text-sm">{jsonEditor?.key ?? "JSON"}</DialogTitle>
+            <DialogTitle className="font-mono text-sm">
+              {jsonEditor?.key ?? tr("pages.admin_user_detail.json")}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-muted-foreground text-[12.5px]">
-              Edit the raw value. Invalid JSON is saved as-is and may cause clients to fall back to
-              defaults.
+              {tr("pages.admin_user_detail.edit_the_raw_value_invalid_json_is_saved_as_is")}
             </p>
             <textarea
               spellCheck={false}
@@ -878,7 +946,7 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
                   setJsonValue("");
                 }}
               >
-                Cancel
+                {tr("common.actions.cancel")}
               </Button>
               <Button
                 size="sm"
@@ -901,7 +969,7 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
                   );
                 }}
               >
-                Save override
+                {tr("pages.admin_user_detail.save_override")}
               </Button>
             </div>
           </div>
@@ -912,26 +980,34 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
         <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] tabular-nums">
           <span>
             <span className="text-foreground font-medium">{deviceEntries.length}</span>{" "}
-            {deviceEntries.length === 1 ? "device" : "devices"}
+            {deviceEntries.length === 1
+              ? tr("pages.admin_user_detail.device")
+              : tr("pages.admin_user_detail.devices_728190e7")}
           </span>
           <span className="text-muted-foreground/40">·</span>
           <span>
             <span className="text-foreground font-medium">{totalOverrides}</span>{" "}
-            {totalOverrides === 1 ? "override" : "overrides"}
+            {totalOverrides === 1
+              ? tr("pages.admin_user_detail.override")
+              : tr("pages.admin_user_detail.overrides")}
           </span>
           <span className="text-muted-foreground/40">·</span>
           <span>
             <span className="text-foreground font-medium">{totalProfiles}</span>{" "}
-            {totalProfiles === 1 ? "profile" : "profiles"}
+            {totalProfiles === 1
+              ? tr("pages.admin_user_detail.profile_5d45a009")
+              : tr("pages.admin_user_detail.profiles_b2cf5805")}
           </span>
         </div>
       )}
 
       {deviceEntries.length === 0 ? (
         <div className="surface-panel rounded-xl border-0 px-6 py-12 text-center">
-          <p className="text-foreground text-sm font-medium">No device overrides</p>
+          <p className="text-foreground text-sm font-medium">
+            {tr("pages.admin_user_detail.no_device_overrides")}
+          </p>
           <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-[12.5px] leading-relaxed">
-            Overrides appear here as soon as this user tunes a per-device playback setting.
+            {tr("pages.admin_user_detail.overrides_appear_here_as_soon_as_this_user_tunes_a")}
           </p>
         </div>
       ) : (
@@ -954,7 +1030,7 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
                     <PlatformTile kind={kind} />
                     <div className="min-w-0 space-y-1">
                       <h3 className="text-foreground text-[14px] leading-tight font-semibold">
-                        {first.device_name || "Unnamed device"}
+                        {first.device_name || tr("pages.admin_user_detail.unnamed_device")}
                       </h3>
                       <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px]">
                         <span className="text-foreground/80 font-mono">
@@ -965,7 +1041,10 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
                         {lastUpdated && (
                           <>
                             <span className="text-muted-foreground/40">·</span>
-                            <span>updated {formatRelative(lastUpdated)}</span>
+                            <span>
+                              {tr("pages.admin_user_detail.updated_13a1891a")}{" "}
+                              {formatRelative(lastUpdated)}
+                            </span>
                           </>
                         )}
                       </div>
@@ -976,7 +1055,9 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
                         >
                           <span className="text-foreground font-medium">{profileCount}</span>
                           <span className="text-muted-foreground">
-                            {profileCount === 1 ? "profile" : "profiles"}
+                            {profileCount === 1
+                              ? tr("pages.admin_user_detail.profile_5d45a009")
+                              : tr("pages.admin_user_detail.profiles_b2cf5805")}
                           </span>
                         </Badge>
                         <Badge
@@ -985,15 +1066,17 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
                         >
                           <span className="text-foreground font-medium">{overrideCount}</span>
                           <span className="text-muted-foreground">
-                            {overrideCount === 1 ? "override" : "overrides"}
+                            {overrideCount === 1
+                              ? tr("pages.admin_user_detail.override")
+                              : tr("pages.admin_user_detail.overrides")}
                           </span>
                         </Badge>
                       </div>
                     </div>
                   </div>
                   <Button variant="outline" size="sm" asChild>
-                    <Link to={`/admin/devices/${userId}/${encodeURIComponent(deviceId)}`}>
-                      Open device
+                    <Link to={"/admin/devices/" + userId + "/" + encodeURIComponent(deviceId)}>
+                      {tr("pages.admin_user_detail.open_device")}
                       <ArrowUpRight className="h-3 w-3" />
                     </Link>
                   </Button>
@@ -1045,6 +1128,7 @@ function DeviceOverridesTab({ userId }: { userId: number }) {
 }
 
 function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void }) {
+  useUILanguage();
   const { data: libraries = [] } = useAdminLibraries();
   const { data: accessGroups = [] } = useAccessGroups();
   const [username, setUsername] = useState(user.username);
@@ -1098,13 +1182,13 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
       <Tabs defaultValue="account" className="min-h-0 flex-1">
         <TabsList variant="line" className="border-border mb-4 w-full justify-start border-b pb-1">
           <TabsTrigger value="account" className="flex-none px-1">
-            Account
+            {tr("pages.admin_user_detail.account")}
           </TabsTrigger>
           <TabsTrigger value="access" className="flex-none px-1">
-            Access
+            {tr("pages.admin_user_detail.access")}
           </TabsTrigger>
           <TabsTrigger value="limits" className="flex-none px-1">
-            Limits
+            {tr("pages.admin_user_detail.limits")}
           </TabsTrigger>
         </TabsList>
 
@@ -1112,11 +1196,11 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
           <TabsContent value="account" className="mt-0 space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Username</Label>
+                <Label>{tr("pages.admin_user_detail.username")}</Label>
                 <Input value={username} onChange={(e) => setUsername(e.target.value)} required />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>{tr("pages.admin_user_detail.email")}</Label>
                 <Input
                   type="email"
                   value={email}
@@ -1125,7 +1209,7 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
                 />
               </div>
               <div className="space-y-2">
-                <Label>Password (leave blank to keep current)</Label>
+                <Label>{tr("pages.admin_user_detail.password_leave_blank_to_keep_current")}</Label>
                 <Input
                   type="password"
                   value={password}
@@ -1133,27 +1217,29 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor={roleSelectId}>Role</Label>
+                <Label htmlFor={roleSelectId}>{tr("pages.admin_user_detail.role")}</Label>
                 <Select value={role} onValueChange={setRole}>
                   <SelectTrigger id={roleSelectId}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="user">{tr("pages.admin_user_detail.user")}</SelectItem>
+                    <SelectItem value="admin">{tr("pages.admin_user_detail.admin")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="border-border flex items-center justify-between rounded-md border px-3 py-2">
               <div>
-                <div className="text-sm font-medium">Account status</div>
+                <div className="text-sm font-medium">
+                  {tr("pages.admin_user_detail.account_status")}
+                </div>
                 <div className="text-muted-foreground text-xs">
-                  Disable access without deleting the user.
+                  {tr("pages.admin_user_detail.disable_access_without_deleting_the_user")}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Label className="text-xs">Enabled</Label>
+                <Label className="text-xs">{tr("pages.admin_user_detail.enabled")}</Label>
                 <Switch checked={enabled} onCheckedChange={setEnabled} />
               </div>
             </div>
@@ -1161,7 +1247,7 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
 
           <TabsContent value="access" className="mt-0 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor={accessGroupSelectId}>Group</Label>
+              <Label htmlFor={accessGroupSelectId}>{tr("pages.admin_user_detail.group")}</Label>
               <Select
                 value={accessGroupValue}
                 onValueChange={(value) => {
@@ -1173,7 +1259,7 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No group</SelectItem>
+                  <SelectItem value="none">{tr("pages.admin_user_detail.no_group")}</SelectItem>
                   {selectedGroupMissing && (
                     <SelectItem value={String(accessGroupID)}>#{accessGroupID}</SelectItem>
                   )}
@@ -1187,9 +1273,11 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
             </div>
             <div className="border-border flex items-center justify-between rounded-md border px-3 py-2">
               <div>
-                <Label htmlFor={markerEditId}>Marker Editing</Label>
+                <Label htmlFor={markerEditId}>{tr("pages.admin_user_detail.marker_editing")}</Label>
                 <p className="text-muted-foreground text-xs">
-                  Edit intro, recap, credits, and preview markers within assigned libraries.
+                  {tr(
+                    "pages.admin_user_detail.edit_intro_recap_credits_and_preview_markers_within_assigned_libraries",
+                  )}
                 </p>
               </div>
               <Switch
@@ -1204,9 +1292,13 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
             </div>
             <div className="border-border flex items-center justify-between rounded-md border px-3 py-2">
               <div>
-                <Label htmlFor={metadataCurationId}>Metadata Curation</Label>
+                <Label htmlFor={metadataCurationId}>
+                  {tr("pages.admin_user_detail.metadata_curation")}
+                </Label>
                 <p className="text-muted-foreground text-xs">
-                  Edit, refresh, and rematch metadata within assigned libraries.
+                  {tr(
+                    "pages.admin_user_detail.edit_refresh_and_rematch_metadata_within_assigned_libraries",
+                  )}
                 </p>
               </div>
               <Switch
@@ -1230,7 +1322,7 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
           <TabsContent value="limits" className="mt-0 space-y-4">
             <PolicyLimitFields state={policy} onChange={setPolicy} effective={inheritHints} />
             <div className="space-y-1">
-              <Label>Max Profiles</Label>
+              <Label>{tr("pages.admin_user_detail.max_profiles")}</Label>
               <Input
                 type="number"
                 min={1}
@@ -1244,7 +1336,9 @@ function EditUserForm({ user, onClose }: { user: AdminUser; onClose: () => void 
 
       <div className="border-border mt-4 border-t pt-4">
         <Button type="submit" className="w-full" disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? "Saving..." : "Save"}
+          {updateMutation.isPending
+            ? tr("pages.admin_user_detail.saving")
+            : tr("common.actions.save")}
         </Button>
       </div>
     </form>

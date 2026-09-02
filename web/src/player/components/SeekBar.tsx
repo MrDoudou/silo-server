@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { MarkerKind, MarkerRegionView, PlayerChapter } from "../types";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SeekBarProps {
   currentTime: number;
@@ -41,10 +43,18 @@ const REGION_DOT_COLORS: Record<MarkerKind, string> = {
 };
 
 const MARKER_LABELS: Record<MarkerKind, string> = {
-  intro: "Intro",
-  recap: "Recap",
-  credits: "Credits / Outro",
-  preview: "Preview",
+  get intro() {
+    return tr("player.components.seek_bar.intro");
+  },
+  get recap() {
+    return tr("player.components.seek_bar.recap");
+  },
+  get credits() {
+    return tr("player.components.seek_bar.credits_outro");
+  },
+  get preview() {
+    return tr("player.components.seek_bar.preview");
+  },
 };
 
 function findChapterAtTime(chapters: PlayerChapter[], time: number): PlayerChapter | null {
@@ -91,6 +101,7 @@ export function SeekBar({
   onRegionEdgeChange,
   onSeek,
 }: SeekBarProps) {
+  useUILanguage();
   const barRef = useRef<HTMLDivElement>(null);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -370,7 +381,7 @@ export function SeekBar({
         ref={barRef}
         role="slider"
         tabIndex={0}
-        aria-label="Seek"
+        aria-label={tr("player.components.seek_bar.seek")}
         aria-valuemin={0}
         aria-valuemax={duration}
         aria-valuenow={displayTime}
@@ -447,12 +458,12 @@ export function SeekBar({
             <>
               <MarkerHandle
                 percent={(activeRegion.start / duration) * 100}
-                label="Drag marker start"
+                label={tr("player.components.seek_bar.drag_marker_start")}
                 onPointerDown={handleEdgePointerDown(activeRegion.kind, "start")}
               />
               <MarkerHandle
                 percent={(activeRegion.end / duration) * 100}
-                label="Drag marker end"
+                label={tr("player.components.seek_bar.drag_marker_end")}
                 onPointerDown={handleEdgePointerDown(activeRegion.kind, "end")}
               />
             </>
@@ -472,6 +483,7 @@ function MarkerHandle({
   label: string;
   onPointerDown: (e: React.PointerEvent) => void;
 }) {
+  useUILanguage();
   return (
     <div
       aria-label={label}

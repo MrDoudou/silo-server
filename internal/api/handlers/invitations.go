@@ -70,7 +70,13 @@ func (h *InvitationHandler) HandleAcceptInvitation(w http.ResponseWriter, r *htt
 		return
 	}
 	if len(req.Password) < 8 {
-		writeError(w, http.StatusBadRequest, "weak_password", "Password must be at least 8 characters")
+		writeErrorWithParams(
+			w,
+			http.StatusBadRequest,
+			"weak_password",
+			"Password must be at least 8 characters",
+			map[string]any{"min_length": 8},
+		)
 		return
 	}
 

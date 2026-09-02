@@ -1,5 +1,7 @@
 import CardOverlays from "./CardOverlays";
 import { SAMPLE_MOVIE_DATA, SAMPLE_SHOW_DATA, type CardOverlayPrefs } from "@/lib/overlays";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /** Which sample item the preview stands in for. Picked by <OverlayPreviewVariantToggle />. */
 export type OverlayPreviewVariant = "movie" | "show";
@@ -26,13 +28,16 @@ export function OverlayPreviewCard({
   size = "md",
   showPosterOverlays = true,
 }: OverlayPreviewCardProps) {
+  useUILanguage();
   const data = variant === "show" ? SAMPLE_SHOW_DATA : SAMPLE_MOVIE_DATA;
   const sizeClass = SIZE_CLASSES[size];
   return (
-    <div className={`mx-auto ${sizeClass}`}>
+    <div className={"mx-auto " + sizeClass}>
       <div className="bg-muted/40 relative aspect-[2/3] overflow-hidden rounded-xl border">
         <div className="text-muted-foreground/30 flex h-full items-center justify-center text-xs font-medium tracking-wider uppercase">
-          {variant === "show" ? "Show preview" : "Movie preview"}
+          {variant === "show"
+            ? tr("components.overlays.overlay_preview_card.show_preview")
+            : tr("components.overlays.overlay_preview_card.movie_preview")}
         </div>
         {showPosterOverlays ? <CardOverlays data={data} prefs={prefs} /> : null}
       </div>

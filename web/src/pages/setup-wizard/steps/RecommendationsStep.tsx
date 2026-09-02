@@ -7,14 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { useCheckAdminSettingsConnection } from "@/hooks/queries/admin/settings";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
+
 import {
   RECOMMENDATION_PROVIDER_OPTIONS,
   type RecommendationProviderPreset,
 } from "@/lib/recommendation-provider-presets";
 import { useWizardContext } from "../WizardContext";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const KEYS = [
   "recommendations.enabled",
@@ -24,6 +27,7 @@ const KEYS = [
 ];
 
 export function RecommendationsStep() {
+  useUILanguage();
   const { markDone } = useWizardContext();
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
   const checkConnection = useCheckAdminSettingsConnection();
@@ -47,9 +51,11 @@ export function RecommendationsStep() {
     try {
       await form.save();
       markDone("recommendations");
-      toast.success("Recommendations settings saved");
+      toast.success(
+        "feedback.setup_wizard.steps.recommendations_step.recommendations_settings_saved",
+      );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error("errors.setup.recommendations_save_failed", { error: err });
     } finally {
       setSubmitting(false);
     }
@@ -70,7 +76,7 @@ export function RecommendationsStep() {
     } catch (error) {
       setConnectionResult({
         success: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error("errors.setup.connection_check_failed", error),
       });
     }
   }
@@ -96,7 +102,7 @@ export function RecommendationsStep() {
       {/* Enable toggle */}
       <div className="border-foreground/[0.07] bg-foreground/[0.03] flex items-center justify-between rounded-xl border px-4 py-3.5">
         <Label htmlFor="recs-enabled" className="text-sm font-medium">
-          Enable recommendations
+          {tr("pages.setup_wizard.steps.recommendations_step.enable_recommendations")}
         </Label>
         <Switch
           id="recs-enabled"
@@ -110,7 +116,7 @@ export function RecommendationsStep() {
           {/* Provider presets */}
           <div className="space-y-3">
             <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.1em] uppercase">
-              Provider
+              {tr("pages.setup_wizard.steps.recommendations_step.provider")}
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {RECOMMENDATION_PROVIDER_OPTIONS.map((preset) => (
@@ -118,20 +124,22 @@ export function RecommendationsStep() {
                   key={preset.id}
                   type="button"
                   onClick={() => applyPreset(preset)}
-                  className={`relative rounded-lg border px-3 py-2.5 text-left transition-all ${
-                    selectedPreset === preset.id
+                  className={
+                    "relative rounded-lg border px-3 py-2.5 text-left transition-all " +
+                    (selectedPreset === preset.id
                       ? "border-foreground/20 bg-foreground/10 text-foreground"
-                      : "border-foreground/[0.07] bg-foreground/[0.03] text-foreground/60 hover:border-foreground/[0.12] hover:text-foreground/80"
-                  }`}
+                      : "border-foreground/[0.07] bg-foreground/[0.03] text-foreground/60 hover:border-foreground/[0.12] hover:text-foreground/80")
+                  }
                 >
                   <span className="text-sm font-medium">{preset.label}</span>
                   {preset.tag && (
                     <span
-                      className={`mt-0.5 block text-[10px] ${
-                        selectedPreset === preset.id
+                      className={
+                        "mt-0.5 block text-[10px] " +
+                        (selectedPreset === preset.id
                           ? "text-foreground/50"
-                          : "text-muted-foreground"
-                      }`}
+                          : "text-muted-foreground")
+                      }
                     >
                       {preset.tag}
                     </span>
@@ -148,7 +156,7 @@ export function RecommendationsStep() {
           <div className="border-foreground/[0.07] bg-foreground/[0.03] space-y-3 rounded-xl border p-4">
             <div className="space-y-1.5">
               <Label htmlFor="recs-url" className="text-xs">
-                Base URL
+                {tr("pages.setup_wizard.steps.recommendations_step.base_url")}
               </Label>
               <Input
                 id="recs-url"
@@ -156,24 +164,28 @@ export function RecommendationsStep() {
                 onChange={(e) =>
                   form.setValue("recommendations.embedding_base_url", e.target.value)
                 }
-                placeholder="https://generativelanguage.googleapis.com"
+                placeholder={tr(
+                  "pages.setup_wizard.steps.recommendations_step.https_generativelanguage_googleapis_com",
+                )}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="recs-model" className="text-xs">
-                Model
+                {tr("pages.setup_wizard.steps.recommendations_step.model")}
               </Label>
               <Input
                 id="recs-model"
                 value={form.getValue("recommendations.embedding_model")}
                 onChange={(e) => form.setValue("recommendations.embedding_model", e.target.value)}
-                placeholder="gemini-embedding-001"
+                placeholder={tr(
+                  "pages.setup_wizard.steps.recommendations_step.gemini_embedding_001",
+                )}
               />
             </div>
             {showToken && (
               <div className="space-y-1.5">
                 <Label htmlFor="recs-token" className="text-xs">
-                  API Key
+                  {tr("pages.setup_wizard.steps.recommendations_step.api_key")}
                 </Label>
                 <Input
                   id="recs-token"
@@ -184,8 +196,8 @@ export function RecommendationsStep() {
                   }
                   placeholder={
                     form.sensitiveConfigured.includes("recommendations.embedding_auth_token")
-                      ? "Configured"
-                      : "Enter API key"
+                      ? tr("pages.setup_wizard.steps.recommendations_step.configured")
+                      : tr("pages.setup_wizard.steps.recommendations_step.enter_api_key")
                   }
                 />
               </div>
@@ -202,7 +214,9 @@ export function RecommendationsStep() {
 
       <div className="flex gap-3 pt-2">
         <Button type="submit" disabled={submitting || form.isSaving}>
-          {submitting || form.isSaving ? "Saving..." : "Save & continue"}
+          {submitting || form.isSaving
+            ? tr("pages.setup_wizard.steps.recommendations_step.saving")
+            : tr("pages.setup_wizard.steps.recommendations_step.save_continue")}
         </Button>
         <Button
           type="button"
@@ -210,7 +224,7 @@ export function RecommendationsStep() {
           onClick={handleSkip}
           disabled={submitting || form.isSaving}
         >
-          Skip
+          {tr("common.actions.skip")}
         </Button>
       </div>
     </form>

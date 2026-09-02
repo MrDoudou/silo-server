@@ -12,20 +12,34 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CircleCheck, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useWizardContext } from "../WizardContext";
 
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
+
 // --- Provider metadata ---
 
 const PROVIDER_META: Record<string, { name: string; description: string }> = {
   opensubtitles: {
     name: "OpenSubtitles",
-    description: "Largest subtitle database. Requires a free account.",
+    get description() {
+      return tr(
+        "pages.setup_wizard.steps.integrations_step.largest_subtitle_database_requires_a_free_account",
+      );
+    },
   },
   subdl: {
     name: "SubDL",
-    description: "Fast, modern subtitle API with generous free tier.",
+    get description() {
+      return tr(
+        "pages.setup_wizard.steps.integrations_step.fast_modern_subtitle_api_with_generous_free_tier",
+      );
+    },
   },
   subsource: {
     name: "SubSource",
-    description: "Community-driven subtitle source.",
+    get description() {
+      return tr("pages.setup_wizard.steps.integrations_step.community_driven_subtitle_source");
+    },
   },
 };
 
@@ -34,6 +48,7 @@ const SUBTITLE_PROVIDER_ORDER = ["opensubtitles", "subdl", "subsource"];
 // --- Provider card ---
 
 function ProviderCard({ config }: { config: SubtitleProviderConfig }) {
+  useUILanguage();
   const [enabled, setEnabled] = useState(config.enabled);
   const [apiKey, setApiKey] = useState("");
   const [username, setUsername] = useState("");
@@ -72,11 +87,15 @@ function ProviderCard({ config }: { config: SubtitleProviderConfig }) {
         },
       },
       {
-        onSuccess: (result) => setTestResult({ success: result.success, error: result.error }),
+        onSuccess: (result) =>
+          setTestResult({
+            success: result.success,
+            error: result.error ? tr.remote({ message: result.error }) : undefined,
+          }),
         onError: (err) =>
           setTestResult({
             success: false,
-            error: err instanceof Error ? err.message : "Test failed",
+            error: tr.error("errors.setup.provider_test_failed", err),
           }),
       },
     );
@@ -97,7 +116,7 @@ function ProviderCard({ config }: { config: SubtitleProviderConfig }) {
           <p className="text-muted-foreground mt-0.5 text-xs">{meta.description}</p>
         </div>
         <Switch
-          id={`${providerName}-enabled`}
+          id={providerName + "-enabled"}
           checked={enabled}
           onCheckedChange={setEnabled}
           className="ml-4 shrink-0"
@@ -111,14 +130,22 @@ function ProviderCard({ config }: { config: SubtitleProviderConfig }) {
             <div className="grid gap-2.5 sm:grid-cols-2">
               <Input
                 type="text"
-                placeholder={config.has_credentials ? "Leave blank to keep" : "Username"}
+                placeholder={
+                  config.has_credentials
+                    ? tr("pages.setup_wizard.steps.integrations_step.leave_blank_to_keep")
+                    : tr("pages.setup_wizard.steps.integrations_step.username")
+                }
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="h-8 text-sm"
               />
               <Input
                 type="password"
-                placeholder={config.has_credentials ? "Leave blank to keep" : "Password"}
+                placeholder={
+                  config.has_credentials
+                    ? tr("pages.setup_wizard.steps.integrations_step.leave_blank_to_keep")
+                    : tr("pages.setup_wizard.steps.integrations_step.password")
+                }
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-8 text-sm"
@@ -128,7 +155,11 @@ function ProviderCard({ config }: { config: SubtitleProviderConfig }) {
             <div className="flex items-center gap-2">
               <Input
                 type={showApiKey ? "text" : "password"}
-                placeholder={config.has_api_key ? "Leave blank to keep" : "API key"}
+                placeholder={
+                  config.has_api_key
+                    ? tr("pages.setup_wizard.steps.integrations_step.leave_blank_to_keep")
+                    : tr("pages.setup_wizard.steps.integrations_step.api_key")
+                }
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="h-8 flex-1 text-sm"
@@ -155,10 +186,10 @@ function ProviderCard({ config }: { config: SubtitleProviderConfig }) {
               {testProvider.isPending ? (
                 <>
                   <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-                  Testing
+                  {tr("pages.setup_wizard.steps.integrations_step.testing")}
                 </>
               ) : (
-                "Test connection"
+                tr("pages.setup_wizard.steps.integrations_step.test_connection")
               )}
             </Button>
             <Button
@@ -168,11 +199,17 @@ function ProviderCard({ config }: { config: SubtitleProviderConfig }) {
               onClick={handleSave}
               disabled={updateProvider.isPending}
             >
-              {updateProvider.isPending ? "Saving..." : "Save"}
+              {updateProvider.isPending
+                ? tr("pages.setup_wizard.steps.integrations_step.saving")
+                : tr("common.actions.save")}
             </Button>
             {testResult !== null && (
-              <span className={`text-xs ${testResult.success ? "text-green-500" : "text-red-400"}`}>
-                {testResult.success ? "Connected" : (testResult.error ?? "Failed")}
+              <span
+                className={"text-xs " + (testResult.success ? "text-green-500" : "text-red-400")}
+              >
+                {testResult.success
+                  ? tr("pages.setup_wizard.steps.integrations_step.connected")
+                  : (testResult.error ?? tr("pages.setup_wizard.steps.integrations_step.failed"))}
               </span>
             )}
           </div>
@@ -185,6 +222,7 @@ function ProviderCard({ config }: { config: SubtitleProviderConfig }) {
 // --- Main step ---
 
 export function IntegrationsStep() {
+  useUILanguage();
   const { markDone } = useWizardContext();
   const { data, isLoading } = useSubtitleProviders();
 
@@ -219,14 +257,14 @@ export function IntegrationsStep() {
         </div>
       ) : (
         <p className="text-muted-foreground py-6 text-center text-sm">
-          No subtitle providers available.
+          {tr("pages.setup_wizard.steps.integrations_step.no_subtitle_providers_available")}
         </p>
       )}
 
       <div className="flex gap-3 pt-2">
-        <Button onClick={() => markDone("integrations")}>Continue</Button>
+        <Button onClick={() => markDone("integrations")}>{tr("common.actions.continue")}</Button>
         <Button variant="ghost" onClick={() => markDone("integrations")}>
-          Skip
+          {tr("common.actions.skip")}
         </Button>
       </div>
     </div>

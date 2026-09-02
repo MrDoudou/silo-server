@@ -14,6 +14,8 @@ import {
   getPlaybackSessionSubtitle,
   getPlaybackSessionTitle,
 } from "@/pages/adminActivityPresentation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function formatElapsed(startedAt: string): string {
   const started = new Date(startedAt).getTime();
@@ -41,6 +43,7 @@ function streamMeta(session: AdminSession): string {
 }
 
 function StreamRow({ session }: { session: AdminSession }) {
+  useUILanguage();
   const title = getPlaybackSessionTitle(session);
   const subtitle = getPlaybackSessionSubtitle(session);
   const profileLabel = session.profile_name?.trim() || "Profile";
@@ -64,12 +67,16 @@ function StreamRow({ session }: { session: AdminSession }) {
           <Badge variant="outline">{profileLabel}</Badge>
           <Badge variant="outline" className="gap-1">
             {session.is_paused ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-            {session.is_paused ? "Paused" : "Playing"}
+            {session.is_paused
+              ? tr("components.profiles.household_streams_panel.paused")
+              : tr("components.profiles.household_streams_panel.playing")}
           </Badge>
-          <span className={`inline-flex h-2 w-2 rounded-full ${methodMeta.swatchClass}`} />
+          <span className={"inline-flex h-2 w-2 rounded-full " + methodMeta.swatchClass} />
           <span className="text-muted-foreground text-xs">
             {methodMeta.label}
-            {bitrate ? ` · ${bitrate}` : ""}
+            {bitrate
+              ? tr("components.profiles.household_streams_panel.bitrate", { bitrate: bitrate })
+              : ""}
           </span>
           <JellyfinSessionPill session={session} />
         </div>
@@ -92,6 +99,7 @@ function StreamRow({ session }: { session: AdminSession }) {
 }
 
 export function HouseholdStreamsPanel() {
+  useUILanguage();
   const { data: sessions = [], isLoading, isFetching } = useHouseholdSessions();
 
   return (
@@ -99,16 +107,20 @@ export function HouseholdStreamsPanel() {
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">Active streams</h3>
+            <h3 className="text-sm font-semibold">
+              {tr("components.profiles.household_streams_panel.active_streams")}
+            </h3>
             {sessions.length > 0 ? (
               <span className="live-badge flex items-center gap-1">
                 <Radio className="h-3 w-3" />
-                {sessions.length} live
+                {sessions.length} {tr("components.profiles.household_streams_panel.live")}
               </span>
             ) : null}
           </div>
           <p className="text-muted-foreground text-sm">
-            Playback happening on any profile in this account.
+            {tr(
+              "components.profiles.household_streams_panel.playback_happening_on_any_profile_in_this_account",
+            )}
           </p>
         </div>
         {isFetching && !isLoading ? (
@@ -122,7 +134,9 @@ export function HouseholdStreamsPanel() {
           <Skeleton className="h-20 w-full rounded-md" />
         </div>
       ) : sessions.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No one is streaming right now.</p>
+        <p className="text-muted-foreground text-sm">
+          {tr("components.profiles.household_streams_panel.no_one_is_streaming_right_now")}
+        </p>
       ) : (
         <div className="space-y-2">
           {sessions.map((session) => (

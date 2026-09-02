@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { AudioLines, CircleAlert, Languages } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { AdvancedSection } from "@/components/settings/AdvancedSection";
 import { LimitField } from "@/components/settings/LimitField";
@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { FieldGroup } from "./FieldGroup";
 import { SaveBar } from "./SaveBar";
 import { SettingField, SettingFieldStatus } from "./SettingField";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // ---------------------------------------------------------------------------
 // Setting keys
@@ -88,30 +90,51 @@ const KEYS: string[] = Array.from(
 const TRANSCRIPTION_PRESETS = [
   {
     id: "self-hosted",
-    label: "Self-hosted",
-    description:
-      "Speaches or faster-whisper on your network. Replace the hostname with one reachable from the Silo container.",
+    get label() {
+      return tr("pages.admin_settings.aisettings.self_hosted");
+    },
+    get description() {
+      return tr(
+        "pages.admin_settings.aisettings.speaches_or_faster_whisper_on_your_network_replace_the_hostname",
+      );
+    },
     baseUrl: "http://speaches:8000",
     model: "deepdml/faster-whisper-large-v3-turbo-ct2",
   },
   {
     id: "groq-turbo",
-    label: "Groq - fast",
-    description: "Hosted whisper-large-v3-turbo. Requires a Groq API key.",
+    get label() {
+      return tr("pages.admin_settings.aisettings.groq_fast");
+    },
+    get description() {
+      return tr(
+        "pages.admin_settings.aisettings.hosted_whisper_large_v3_turbo_requires_a_groq_api_key",
+      );
+    },
     baseUrl: "https://api.groq.com/openai",
     model: "whisper-large-v3-turbo",
   },
   {
     id: "groq-accurate",
-    label: "Groq - accurate",
-    description: "Hosted whisper-large-v3. Requires a Groq API key.",
+    get label() {
+      return tr("pages.admin_settings.aisettings.groq_accurate");
+    },
+    get description() {
+      return tr("pages.admin_settings.aisettings.hosted_whisper_large_v3_requires_a_groq_api_key");
+    },
     baseUrl: "https://api.groq.com/openai",
     model: "whisper-large-v3",
   },
   {
     id: "openai",
-    label: "OpenAI",
-    description: "Hosted whisper-1. The transcription key can inherit the Text AI key.",
+    get label() {
+      return tr("pages.admin_settings.aisettings.open_ai");
+    },
+    get description() {
+      return tr(
+        "pages.admin_settings.aisettings.hosted_whisper_1_the_transcription_key_can_inherit_the_text",
+      );
+    },
     baseUrl: "https://api.openai.com",
     model: "whisper-1",
   },
@@ -193,6 +216,8 @@ function ModelPanelActions({
   canCollapse: boolean;
   test: AITestState | undefined;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     // Buttons right-aligned to match the collapsed tile's Manage button (and
     // the shared ProviderPanelActions); the test status takes the left side.
@@ -206,7 +231,12 @@ function ModelPanelActions({
             test.ok ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400",
           )}
         >
-          {test.ok ? `${test.message} · ${testedLabel(test)}` : test.message}
+          {test.ok
+            ? tr("pages.admin_settings.aisettings.message_value", {
+                message: test.message,
+                value: testedLabel(test),
+              })
+            : test.message}
         </span>
       ) : null}
       <Button
@@ -220,7 +250,7 @@ function ModelPanelActions({
       </Button>
       {canCollapse ? (
         <Button type="button" size="sm" variant="outline" onClick={onCollapse}>
-          Close
+          {tr("common.actions.close")}
         </Button>
       ) : null}
     </div>
@@ -245,6 +275,8 @@ function TuningScope({
   caption: string;
   children: ReactNode;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div>
       <SettingsSubheading caption={caption}>{label}</SettingsSubheading>
@@ -255,9 +287,13 @@ function TuningScope({
 
 /** Note shown on a model tile whose values are staged in the page's save bar. */
 function PendingSaveNote({ dirty }: { dirty: boolean }) {
+  useUILanguage();
+  useUILanguage();
   if (!dirty) return null;
   return (
-    <p className="text-muted-foreground mt-2 text-xs">Unsaved. Test uses what is typed here.</p>
+    <p className="text-muted-foreground mt-2 text-xs">
+      {tr("pages.admin_settings.aisettings.unsaved_test_uses_what_is_typed_here")}
+    </p>
   );
 }
 
@@ -302,6 +338,8 @@ function TextModelTile({
   onExpand: () => void;
   onCollapse: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const failed = test != null && !test.ok;
   const state: ProviderTileState = expanded
     ? "editing"
@@ -314,10 +352,14 @@ function TextModelTile({
   return (
     <ProviderTile
       name="Text model"
-      tagline="Subtitle text, descriptions, and taglines"
+      tagline={tr("pages.admin_settings.aisettings.subtitle_text_descriptions_and_taglines")}
       logo={<Languages className="text-muted-foreground size-4" aria-hidden="true" />}
       state={state}
-      statePill={!expanded && ready && !test?.ok ? "Configured" : undefined}
+      statePill={
+        !expanded && ready && !test?.ok
+          ? tr("pages.admin_settings.aisettings.configured")
+          : undefined
+      }
       meta={
         expanded
           ? undefined
@@ -328,27 +370,36 @@ function TextModelTile({
               : "Base URL and model required"
       }
       expanded={expanded}
-      primaryAction={{ label: ready ? "Manage" : "Connect", onClick: onExpand }}
+      primaryAction={{
+        get label() {
+          return tr(
+            ready
+              ? "pages.admin_settings.aisettings.manage"
+              : "pages.admin_settings.aisettings.connect",
+          );
+        },
+        onClick: onExpand,
+      }}
     >
       <p className="text-muted-foreground mb-1 text-xs">
-        Any chat endpoint that speaks the OpenAI API.
+        {tr("pages.admin_settings.aisettings.any_chat_endpoint_that_speaks_the_open_ai_api")}
       </p>
       <SettingField
-        label="Base URL"
+        label={tr("pages.admin_settings.aisettings.base_url")}
         value={baseURL}
         onChange={(next) => onChange("ai.base_url", next)}
-        hint="https://api.openai.com"
+        hint={tr("pages.admin_settings.aisettings.https_api_openai_com")}
         restartRequired={restartKeys.has("ai.base_url")}
       />
       <SettingField
-        label="Model"
+        label={tr("pages.admin_settings.aisettings.model")}
         value={chatModel}
         onChange={(next) => onChange("ai.chat_model", next)}
-        hint="gpt-4o-mini, gemini-flash-latest, llama3.1"
+        hint={tr("pages.admin_settings.aisettings.gpt_4o_mini_gemini_flash_latest_llama3_1")}
         restartRequired={restartKeys.has("ai.chat_model")}
       />
       <SecretField
-        label="API key"
+        label={tr("pages.admin_settings.aisettings.api_key")}
         value={apiKeyValue}
         configured={apiKeyConfigured}
         onChange={(next) => onChange("ai.api_key", next)}
@@ -359,12 +410,12 @@ function TextModelTile({
         // having none, and nothing else on this page erases one.
         onClear={onClearApiKey}
         cleared={apiKeyCleared}
-        hint="Empty for a local endpoint that needs none."
+        hint={tr("pages.admin_settings.aisettings.empty_for_a_local_endpoint_that_needs_none")}
         restartRequired={restartKeys.has("ai.api_key")}
       />
       <ModelPanelActions
         testLabel="Test text model"
-        pendingLabel="Testing text model..."
+        pendingLabel={tr("pages.admin_settings.aisettings.testing_text_model")}
         onTest={onTest}
         isTesting={isTesting}
         testDisabled={!ready}
@@ -420,6 +471,8 @@ function SpeechModelTile({
   onExpand: () => void;
   onCollapse: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const failed = test != null && !test.ok;
   const statePill = !compatible
     ? "Cannot transcribe"
@@ -441,7 +494,7 @@ function SpeechModelTile({
   return (
     <ProviderTile
       name="Speech-to-text"
-      tagline="Writes subtitles from an audio track"
+      tagline={tr("pages.admin_settings.aisettings.writes_subtitles_from_an_audio_track")}
       logo={<AudioLines className="text-muted-foreground size-4" aria-hidden="true" />}
       state={state}
       statePill={expanded ? undefined : statePill}
@@ -457,10 +510,21 @@ function SpeechModelTile({
                 : undefined
       }
       expanded={expanded}
-      primaryAction={{ label: ready ? "Manage" : "Connect", onClick: onExpand }}
+      primaryAction={{
+        get label() {
+          return tr(
+            ready
+              ? "pages.admin_settings.aisettings.manage"
+              : "pages.admin_settings.aisettings.connect",
+          );
+        },
+        onClick: onExpand,
+      }}
     >
       <p className="text-muted-foreground mb-1 text-xs">
-        A Whisper-compatible endpoint that returns timestamps.
+        {tr(
+          "pages.admin_settings.aisettings.a_whisper_compatible_endpoint_that_returns_timestamps",
+        )}
       </p>
       <div className="flex flex-wrap gap-2 py-2">
         {TRANSCRIPTION_PRESETS.map((preset) => {
@@ -486,29 +550,31 @@ function SpeechModelTile({
         })}
       </div>
       <SettingField
-        label="Base URL"
+        label={tr("pages.admin_settings.aisettings.base_url")}
         value={asrBaseURL}
         onChange={(next) => onChange("ai.asr_base_url", next)}
-        hint="http://speaches:8000 or https://api.groq.com/openai"
+        hint={tr("pages.admin_settings.aisettings.http_speaches_8000_or_https_api_groq_com_openai")}
         restartRequired={restartKeys.has("ai.asr_base_url")}
       />
       {usesTextEndpoint && (
         <div className="my-2 flex gap-2 rounded-md border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed">
           <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
           <span>
-            Empty sends audio to the text endpoint, which may not transcribe. Test it first.
+            {tr(
+              "pages.admin_settings.aisettings.empty_sends_audio_to_the_text_endpoint_which_may_not",
+            )}
           </span>
         </div>
       )}
       <SettingField
-        label="Model"
+        label={tr("pages.admin_settings.aisettings.model")}
         value={asrModel}
         onChange={(next) => onChange("ai.asr_model", next)}
-        hint="whisper-large-v3-turbo or whisper-1"
+        hint={tr("pages.admin_settings.aisettings.whisper_large_v3_turbo_or_whisper_1")}
         restartRequired={restartKeys.has("ai.asr_model")}
       />
       <SecretField
-        label="API key"
+        label={tr("pages.admin_settings.aisettings.api_key")}
         value={apiKeyValue}
         configured={apiKeyConfigured}
         onChange={(next) => onChange("ai.asr_api_key", next)}
@@ -517,12 +583,12 @@ function SpeechModelTile({
         // speech endpoint goes back to borrowing the text model's key.
         onClear={onClearApiKey}
         cleared={apiKeyCleared}
-        hint="Empty reuses the text model key."
+        hint={tr("pages.admin_settings.aisettings.empty_reuses_the_text_model_key")}
         restartRequired={restartKeys.has("ai.asr_api_key")}
       />
       <ModelPanelActions
         testLabel="Test speech-to-text"
-        pendingLabel="Testing speech-to-text..."
+        pendingLabel={tr("pages.admin_settings.aisettings.testing_speech_to_text")}
         onTest={onTest}
         isTesting={isTesting}
         testDisabled={!checkable}
@@ -531,8 +597,9 @@ function SpeechModelTile({
         test={test}
       />
       <p className="text-muted-foreground mt-2 text-xs">
-        Use a host the Silo container can reach;<code className="mx-1">localhost</code>is Silo
-        itself.
+        {tr("pages.admin_settings.aisettings.use_a_host_the_silo_container_can_reach")}
+        <code className="mx-1">{tr("pages.admin_settings.aisettings.localhost")}</code>
+        {tr("pages.admin_settings.aisettings.is_silo_itself")}
       </p>
       <PendingSaveNote dirty={dirty} />
     </ProviderTile>
@@ -544,6 +611,8 @@ function SpeechModelTile({
 // ---------------------------------------------------------------------------
 
 export default function AISettings() {
+  useUILanguage();
+  useUILanguage();
   const form = useSettingsForm({ keys: KEYS });
   const restartKeys = useRestartKeys();
   const textCheck = useCheckAdminSettingsConnection();
@@ -554,12 +623,18 @@ export default function AISettings() {
 
   if (form.isLoading) {
     return (
-      <div className="max-w-5xl space-y-6" role="status" aria-label="Loading AI Services settings">
+      <div
+        className="max-w-5xl space-y-6"
+        role="status"
+        aria-label={tr("pages.admin_settings.aisettings.loading_ai_services_settings")}
+      >
         <Skeleton className="h-9 w-48" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-64 w-full" />
-        <span className="sr-only">Loading AI Services settings</span>
+        <span className="sr-only">
+          {tr("pages.admin_settings.aisettings.loading_ai_services_settings")}
+        </span>
       </div>
     );
   }
@@ -610,14 +685,17 @@ export default function AISettings() {
       });
       setTextResult({
         ok: result.success,
-        message: result.message,
+        message: tr.remote({ message: result.message }),
         at: Date.now(),
         durationMs: Date.now() - started,
       });
     } catch (error) {
       setTextResult({
         ok: false,
-        message: error instanceof Error ? error.message : "Text model connection check failed.",
+        message: tr.error(
+          "errors.admin_settings.aisettings.text_model_connection_check_failed",
+          error,
+        ),
         at: Date.now(),
         durationMs: Date.now() - started,
       });
@@ -633,14 +711,17 @@ export default function AISettings() {
       });
       setSpeechResult({
         ok: result.success,
-        message: result.message,
+        message: tr.remote({ message: result.message }),
         at: Date.now(),
         durationMs: Date.now() - started,
       });
     } catch (error) {
       setSpeechResult({
         ok: false,
-        message: error instanceof Error ? error.message : "Speech-to-text connection check failed.",
+        message: tr.error(
+          "errors.admin_settings.aisettings.speech_to_text_connection_check_failed",
+          error,
+        ),
         at: Date.now(),
         durationMs: Date.now() - started,
       });
@@ -657,27 +738,37 @@ export default function AISettings() {
     );
 
     if (!textReady) {
-      toast.error("Text AI base URL and chat model are required.");
+      toast.error("errors.admin_settings.aisettings.text_ai_base_url_and_chat_model_are_required");
       return;
     }
     if (maxConcurrent === null || maxConcurrent < 1) {
-      toast.error("Max concurrent jobs must be a positive whole number.");
+      toast.error(
+        "errors.admin_settings.aisettings.max_concurrent_jobs_must_be_a_positive_whole_number",
+      );
       return;
     }
     if (batchSize === null || batchSize < 1) {
-      toast.error("Subtitle batch size must be a positive whole number.");
+      toast.error(
+        "errors.admin_settings.aisettings.subtitle_batch_size_must_be_a_positive_whole_number",
+      );
       return;
     }
     if (contextLines === null || contextLines < 0) {
-      toast.error("Subtitle context lines must be zero or a positive whole number.");
+      toast.error(
+        "errors.admin_settings.aisettings.subtitle_context_lines_must_be_zero_or_a_positive_whole",
+      );
       return;
     }
     if (chunkSeconds === null || chunkSeconds < 60 || chunkSeconds > 600) {
-      toast.error("Transcription chunk length must be between 60 and 600 seconds.");
+      toast.error(
+        "errors.admin_settings.aisettings.transcription_chunk_length_must_be_between_60_and_600_seconds",
+      );
       return;
     }
     if (quotaJobs === null || quotaJobs < 0) {
-      toast.error("Transcription limit must be zero or a positive whole number.");
+      toast.error(
+        "errors.admin_settings.aisettings.transcription_limit_must_be_zero_or_a_positive_whole_number",
+      );
       return;
     }
     await form.save();
@@ -691,9 +782,9 @@ export default function AISettings() {
 
   return (
     <div className="flex h-full max-w-5xl flex-col gap-7">
-      <SettingsPageHeader title="AI Services" />
+      <SettingsPageHeader title={tr("pages.admin_settings.aisettings.ai_services")} />
 
-      <FieldGroup label="Models">
+      <FieldGroup label={tr("pages.admin_settings.aisettings.models")}>
         <div className="py-3.5">
           <ProviderTileGrid>
             <TextModelTile
@@ -752,11 +843,11 @@ export default function AISettings() {
         </div>
       </FieldGroup>
 
-      <FieldGroup label="Features">
+      <FieldGroup label={tr("pages.admin_settings.aisettings.features")}>
         <p className="text-muted-foreground py-3.5 text-xs leading-relaxed">
-          Nothing here runs on a schedule: subtitle work starts when a viewer or admin asks for a
-          track, and description translation when an admin queues it or a viewer opens a detail
-          page.
+          {tr(
+            "pages.admin_settings.aisettings.nothing_here_runs_on_a_schedule_subtitle_work_starts_when",
+          )}
         </p>
         {/*
           A feature whose model is not configured only queues jobs that fail at
@@ -765,60 +856,77 @@ export default function AISettings() {
           turned off without being fixed first.
         */}
         <SettingField
-          label="Translate subtitles"
+          label={tr("pages.admin_settings.aisettings.translate_subtitles")}
           type="toggle"
           value={value("subtitle_ai.enabled", "false")}
           onChange={(next) => setValue("subtitle_ai.enabled", next)}
-          description="Turns an existing subtitle track into another language, on request."
+          description={tr(
+            "pages.admin_settings.aisettings.turns_an_existing_subtitle_track_into_another_language_on_request",
+          )}
           disabled={!textReady && !subtitleTranslateEnabled}
           status={
             textReady ? undefined : (
-              <SettingFieldStatus tone="warn">Needs the text model</SettingFieldStatus>
+              <SettingFieldStatus tone="warn">
+                {tr("pages.admin_settings.aisettings.needs_the_text_model")}
+              </SettingFieldStatus>
             )
           }
           restartRequired={restartKeys.has("subtitle_ai.enabled")}
         />
         <SettingField
-          label="Create subtitles from audio"
+          label={tr("pages.admin_settings.aisettings.create_subtitles_from_audio")}
           type="toggle"
           value={value("subtitle_ai.transcribe_enabled", "false")}
           onChange={(next) => setValue("subtitle_ai.transcribe_enabled", next)}
-          description="Writes timed subtitles from the audio track, on request."
+          description={tr(
+            "pages.admin_settings.aisettings.writes_timed_subtitles_from_the_audio_track_on_request",
+          )}
           disabled={!speechReady && !transcribeEnabled}
           status={
             speechReady ? undefined : (
-              <SettingFieldStatus tone="warn">Needs speech-to-text</SettingFieldStatus>
+              <SettingFieldStatus tone="warn">
+                {tr("pages.admin_settings.aisettings.needs_speech_to_text")}
+              </SettingFieldStatus>
             )
           }
           restartRequired={restartKeys.has("subtitle_ai.transcribe_enabled")}
         />
         <SettingField
-          label="Translate descriptions"
+          label={tr("pages.admin_settings.aisettings.translate_descriptions")}
           type="toggle"
           value={value("metadata_ai.enabled", "false")}
           onChange={(next) => setValue("metadata_ai.enabled", next)}
-          description="Translates overviews and taglines for the items an admin or viewer asks for."
+          description={tr(
+            "pages.admin_settings.aisettings.translates_overviews_and_taglines_for_the_items_an_admin_or",
+          )}
           disabled={!textReady && !descriptionEnabled}
           status={
             textReady ? undefined : (
-              <SettingFieldStatus tone="warn">Needs the text model</SettingFieldStatus>
+              <SettingFieldStatus tone="warn">
+                {tr("pages.admin_settings.aisettings.needs_the_text_model")}
+              </SettingFieldStatus>
             )
           }
           restartRequired={restartKeys.has("metadata_ai.enabled")}
         />
         <SettingField
-          label="Description translation for viewers"
+          label={tr("pages.admin_settings.aisettings.description_translation_for_viewers")}
           type="select"
           value={value("metadata_ai.on_view", "off")}
           onChange={(next) => setValue("metadata_ai.on_view", next)}
           disabled={!descriptionEnabled}
           options={[
-            { value: "off", label: "Off" },
-            { value: "button", label: "Translate button on detail pages" },
-            { value: "auto", label: "Automatic on view" },
+            { value: "off", label: tr("pages.admin_settings.aisettings.off") },
+            {
+              value: "button",
+              label: tr("pages.admin_settings.aisettings.translate_button_on_detail_pages"),
+            },
+            { value: "auto", label: tr("pages.admin_settings.aisettings.automatic_on_view") },
           ]}
           description={
-            descriptionEnabled ? undefined : "Inactive until Translate descriptions is on."
+            descriptionEnabled
+              ? undefined
+              : tr("pages.admin_settings.aisettings.inactive_until_translate_descriptions_is_on")
           }
           restartRequired={restartKeys.has("metadata_ai.on_view")}
         />
@@ -828,11 +936,11 @@ export default function AISettings() {
           forceOpen={advancedChangedCount > 0}
         >
           <TuningScope
-            label="Server-wide tuning"
+            label={tr("pages.admin_settings.aisettings.server_wide_tuning")}
             caption="One setting for the whole server, whoever the job belongs to."
           >
             <SettingField
-              label="Jobs running at once"
+              label={tr("pages.admin_settings.aisettings.jobs_running_at_once")}
               type="number"
               value={effectiveValue(
                 "ai.max_concurrent_jobs",
@@ -840,55 +948,66 @@ export default function AISettings() {
                 "2",
               )}
               onChange={(next) => setValue("ai.max_concurrent_jobs", next)}
-              description="One budget shared by every AI job on the server."
+              description={tr(
+                "pages.admin_settings.aisettings.one_budget_shared_by_every_ai_job_on_the_server",
+              )}
               restartRequired={restartKeys.has("ai.max_concurrent_jobs")}
             />
             <SettingField
-              label="Subtitle lines per request"
+              label={tr("pages.admin_settings.aisettings.subtitle_lines_per_request")}
               type="number"
               value={value("subtitle_ai.batch_size", "40")}
               onChange={(next) => setValue("subtitle_ai.batch_size", next)}
               restartRequired={restartKeys.has("subtitle_ai.batch_size")}
             />
             <SettingField
-              label="Surrounding lines sent for context"
+              label={tr("pages.admin_settings.aisettings.surrounding_lines_sent_for_context")}
               type="number"
               value={value("subtitle_ai.context_neighbors", "2")}
               onChange={(next) => setValue("subtitle_ai.context_neighbors", next)}
               restartRequired={restartKeys.has("subtitle_ai.context_neighbors")}
             />
             <SettingField
-              label="Audio per request"
+              label={tr("pages.admin_settings.aisettings.audio_per_request")}
               type="number"
               unit="seconds"
               value={value("subtitle_ai.asr_chunk_seconds", "600")}
               onChange={(next) => setValue("subtitle_ai.asr_chunk_seconds", next)}
-              description="Between 60 and 600."
+              description={tr("pages.admin_settings.aisettings.between_60_and_600")}
               restartRequired={restartKeys.has("subtitle_ai.asr_chunk_seconds")}
             />
           </TuningScope>
           <TuningScope
-            label="Per-account limits"
+            label={tr("pages.admin_settings.aisettings.per_account_limits")}
             caption="Counted per login account, shared by every profile on it."
           >
             <LimitField
-              label="Transcriptions per account"
+              label={tr("pages.admin_settings.aisettings.transcriptions_per_account")}
               value={value("subtitle_ai.transcribe_quota_jobs", "0")}
               onChange={(next) => setValue("subtitle_ai.transcribe_quota_jobs", next)}
               fallbackValue="10"
-              hint="Every profile on the account draws from this one allowance."
+              hint={tr(
+                "pages.admin_settings.aisettings.every_profile_on_the_account_draws_from_this_one_allowance",
+              )}
               restartRequired={restartKeys.has("subtitle_ai.transcribe_quota_jobs")}
             />
             <SettingField
-              label="Allowance resets"
+              label={tr("pages.admin_settings.aisettings.allowance_resets")}
               type="select"
               value={value("subtitle_ai.transcribe_quota_period", "day")}
               onChange={(next) => setValue("subtitle_ai.transcribe_quota_period", next)}
               options={QUOTA_PERIODS.map((period) => ({
                 value: period,
-                label: `Per ${period} (rolling ${QUOTA_PERIOD_WINDOW_LABELS[period]})`,
+                get label() {
+                  return tr("pages.admin_settings.aisettings.per_value1_rolling_value2", {
+                    value1: period,
+                    value2: QUOTA_PERIOD_WINDOW_LABELS[period],
+                  });
+                },
               }))}
-              description="Rolling window for the transcription allowance above."
+              description={tr(
+                "pages.admin_settings.aisettings.rolling_window_for_the_transcription_allowance_above",
+              )}
               restartRequired={restartKeys.has("subtitle_ai.transcribe_quota_period")}
             />
           </TuningScope>
@@ -896,12 +1015,12 @@ export default function AISettings() {
       </FieldGroup>
 
       <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-        Recommendation embeddings use their own models.
+        {tr("pages.admin_settings.aisettings.recommendation_embeddings_use_their_own_models")}
         <Link
           to="/admin/recommendations"
           className="text-primary inline-flex shrink-0 items-center gap-1 font-medium hover:underline"
         >
-          Open Recommendations
+          {tr("pages.admin_settings.aisettings.open_recommendations")}
         </Link>
       </p>
 

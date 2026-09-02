@@ -6,13 +6,33 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ItemDetail, RemoteImage } from "@/api/types";
 import { useItemImages, useApplyItemImage } from "@/hooks/queries/items";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type ImageTab = "poster" | "backdrop" | "logo";
 
 const IMAGE_TABS: { key: ImageTab; label: string; aspect: string }[] = [
-  { key: "poster", label: "Posters", aspect: "aspect-[2/3]" },
-  { key: "backdrop", label: "Backdrops", aspect: "aspect-video" },
-  { key: "logo", label: "Logos", aspect: "aspect-video" },
+  {
+    key: "poster",
+    get label() {
+      return tr("components.image_selector_tab.posters");
+    },
+    aspect: "aspect-[2/3]",
+  },
+  {
+    key: "backdrop",
+    get label() {
+      return tr("components.image_selector_tab.backdrops");
+    },
+    aspect: "aspect-video",
+  },
+  {
+    key: "logo",
+    get label() {
+      return tr("components.image_selector_tab.logos");
+    },
+    aspect: "aspect-video",
+  },
 ];
 
 // Seasons only store a poster; the server rejects other image types for them.
@@ -24,6 +44,7 @@ interface ImageSelectorTabProps {
 }
 
 export default function ImageSelectorTab({ item, enabled }: ImageSelectorTabProps) {
+  useUILanguage();
   const availableTabs = item.type === "season" ? SEASON_TABS : IMAGE_TABS;
   const [activeTab, setActiveTab] = useState<ImageTab>("poster");
   const [textlessOnly, setTextlessOnly] = useState(false);
@@ -91,7 +112,9 @@ export default function ImageSelectorTab({ item, enabled }: ImageSelectorTabProp
     <div className="flex h-full flex-col gap-3">
       {/* Info banner */}
       <div className="bg-muted/50 text-muted-foreground shrink-0 rounded-lg px-3 py-2 text-[11px]">
-        Image changes apply immediately and are not affected by Cancel.
+        {tr(
+          "components.image_selector_tab.image_changes_apply_immediately_and_are_not_affected_by_cancel",
+        )}
       </div>
 
       {/* Image type tabs */}
@@ -128,7 +151,7 @@ export default function ImageSelectorTab({ item, enabled }: ImageSelectorTabProp
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            Textless
+            {tr("components.image_selector_tab.textless")}
           </button>
         )}
       </div>
@@ -138,7 +161,7 @@ export default function ImageSelectorTab({ item, enabled }: ImageSelectorTabProp
         <div className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
           <AlertCircle className="size-3.5 shrink-0" />
           <span>
-            Could not load from{" "}
+            {tr("components.image_selector_tab.could_not_load_from")}{" "}
             {Object.keys(providerErrors)
               .map((k) => k.toUpperCase())
               .join(", ")}
@@ -153,12 +176,16 @@ export default function ImageSelectorTab({ item, enabled }: ImageSelectorTabProp
         </div>
       ) : isError ? (
         <div className="flex flex-1 items-center justify-center">
-          <p className="text-muted-foreground text-sm">Failed to load images.</p>
+          <p className="text-muted-foreground text-sm">
+            {tr("components.image_selector_tab.failed_to_load_images")}
+          </p>
         </div>
       ) : filteredImages.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <p className="text-muted-foreground text-sm">
-            {textlessOnly ? "No textless images available." : "No images available."}
+            {textlessOnly
+              ? tr("components.image_selector_tab.no_textless_images_available")
+              : tr("components.image_selector_tab.no_images_available")}
           </p>
         </div>
       ) : (
@@ -204,7 +231,7 @@ export default function ImageSelectorTab({ item, enabled }: ImageSelectorTabProp
                   {isCurrent && (
                     <div className="bg-primary/90 text-primary-foreground absolute top-1 left-1 flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold">
                       <Check className="size-2.5" />
-                      Current
+                      {tr("components.image_selector_tab.current")}
                     </div>
                   )}
 
@@ -243,10 +270,12 @@ export default function ImageSelectorTab({ item, enabled }: ImageSelectorTabProp
             {applyMutation.isPending ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Applying...
+                {tr("components.image_selector_tab.applying")}
               </>
             ) : (
-              `Apply ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`
+              tr("components.image_selector_tab.apply_value", {
+                value: activeTab.charAt(0).toUpperCase() + activeTab.slice(1),
+              })
             )}
           </Button>
         </div>

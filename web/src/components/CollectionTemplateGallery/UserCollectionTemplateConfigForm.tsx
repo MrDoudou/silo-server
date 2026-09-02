@@ -48,6 +48,8 @@ import { Switch } from "@/components/ui/switch";
 
 import { MDBListBrowser } from "./MDBListBrowser";
 import { TemplatePosterField, type TemplatePosterMode } from "./TemplatePosterField";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface Props {
   template: CollectionTemplate;
@@ -65,10 +67,38 @@ type ScheduleChoice = typeof MANUAL_SCHEDULE | Exclude<UserCollectionSyncSchedul
 // usercollections.AllowedSyncSchedules map on the backend, which caps user
 // schedules to >= 24h to keep TMDB/Trakt API quota usage bounded.
 const SCHEDULE_OPTIONS: Array<{ value: ScheduleChoice; label: string }> = [
-  { value: MANUAL_SCHEDULE, label: "Manual only" },
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
+  {
+    value: MANUAL_SCHEDULE,
+    get label() {
+      return tr(
+        "components.collection_template_gallery.user_collection_template_config_form.manual_only",
+      );
+    },
+  },
+  {
+    value: "daily",
+    get label() {
+      return tr(
+        "components.collection_template_gallery.user_collection_template_config_form.daily",
+      );
+    },
+  },
+  {
+    value: "weekly",
+    get label() {
+      return tr(
+        "components.collection_template_gallery.user_collection_template_config_form.weekly",
+      );
+    },
+  },
+  {
+    value: "monthly",
+    get label() {
+      return tr(
+        "components.collection_template_gallery.user_collection_template_config_form.monthly",
+      );
+    },
+  },
 ];
 
 function scheduleChoiceToRequest(choice: ScheduleChoice): UserCollectionSyncSchedule {
@@ -89,6 +119,7 @@ function templateDefaultSchedule(cron: string | undefined): ScheduleChoice {
 }
 
 export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated }: Props) {
+  useUILanguage();
   const tmdbMutation = useImportUserTMDBCollection();
   const traktMutation = useImportUserTraktCollection();
   const mdblistMutation = useImportUserMDBListCollection();
@@ -198,7 +229,11 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="user-template-title">Collection Title</Label>
+        <Label htmlFor="user-template-title">
+          {tr(
+            "components.collection_template_gallery.user_collection_template_config_form.collection_title",
+          )}
+        </Label>
         <Input
           id="user-template-title"
           value={title}
@@ -208,12 +243,18 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="user-template-description">Description</Label>
+        <Label htmlFor="user-template-description">
+          {tr(
+            "components.collection_template_gallery.user_collection_template_config_form.description",
+          )}
+        </Label>
         <Input
           id="user-template-description"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          placeholder="Optional summary"
+          placeholder={tr(
+            "components.collection_template_gallery.user_collection_template_config_form.optional_summary",
+          )}
         />
       </div>
 
@@ -228,24 +269,43 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
             }}
           />
           <div className="space-y-2">
-            <Label htmlFor="user-template-mdblist-url">MDBList URL</Label>
+            <Label htmlFor="user-template-mdblist-url">
+              {tr(
+                "components.collection_template_gallery.user_collection_template_config_form.mdblist_url",
+              )}
+            </Label>
             <Input
               id="user-template-mdblist-url"
               value={mdblistUrl}
               onChange={(event) => setMdblistUrl(event.target.value)}
-              placeholder="https://mdblist.com/lists/user/slug"
+              placeholder={tr(
+                "components.collection_template_gallery.user_collection_template_config_form.https_mdblist_com_lists_user_slug",
+              )}
               required
             />
             <p className="text-muted-foreground text-xs">
-              Pick a list above or paste any public MDBList list URL (with or without{" "}
-              <code>/json</code>). Items resolve via TMDB/IMDb/TVDB IDs.
+              {tr(
+                "components.collection_template_gallery.user_collection_template_config_form.pick_a_list_above_or_paste_any_public_mdblist_list",
+              )}{" "}
+              <code>
+                {tr(
+                  "components.collection_template_gallery.user_collection_template_config_form.json",
+                )}
+              </code>
+              {tr(
+                "components.collection_template_gallery.user_collection_template_config_form.items_resolve_via_tmdb_imdb_tvdb_ids",
+              )}
             </p>
           </div>
         </div>
       ) : null}
 
       <div className="space-y-2">
-        <Label>Libraries</Label>
+        <Label>
+          {tr(
+            "components.collection_template_gallery.user_collection_template_config_form.libraries",
+          )}
+        </Label>
         <CollectionLibraryPicker
           libraries={pickerLibraries}
           value={libraryIds}
@@ -253,13 +313,19 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
           eligibility={eligibility}
         />
         <p className="text-muted-foreground text-xs">
-          Leave empty to span every library you can see.
+          {tr(
+            "components.collection_template_gallery.user_collection_template_config_form.leave_empty_to_span_every_library_you_can_see",
+          )}
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="user-template-watch-filter">Watch state</Label>
+          <Label htmlFor="user-template-watch-filter">
+            {tr(
+              "components.collection_template_gallery.user_collection_template_config_form.watch_state",
+            )}
+          </Label>
           <Select
             value={watchFilter}
             onValueChange={(next) => setWatchFilter(next as UserCollectionWatchFilter)}
@@ -277,7 +343,11 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="user-template-media-filter">Content</Label>
+          <Label htmlFor="user-template-media-filter">
+            {tr(
+              "components.collection_template_gallery.user_collection_template_config_form.content",
+            )}
+          </Label>
           <Select
             value={mediaFilter}
             onValueChange={(next) => setMediaFilter(next as UserCollectionMediaFilter)}
@@ -296,12 +366,16 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
         </div>
       </div>
       <p className="text-muted-foreground text-xs">
-        Uses the active profile&rsquo;s watched state. Shared profiles may see different results.
+        {tr(
+          "components.collection_template_gallery.user_collection_template_config_form.uses_the_active_profile_rsquo_s_watched_state_shared_profiles",
+        )}
       </p>
 
       {template.requires_profile ? (
         <p className="text-muted-foreground text-xs">
-          This template uses your active profile&rsquo;s connected Trakt account.
+          {tr(
+            "components.collection_template_gallery.user_collection_template_config_form.this_template_uses_your_active_profile_rsquo_s_connected_trakt",
+          )}
         </p>
       ) : null}
 
@@ -316,7 +390,11 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="user-template-limit">Max Items</Label>
+          <Label htmlFor="user-template-limit">
+            {tr(
+              "components.collection_template_gallery.user_collection_template_config_form.max_items",
+            )}
+          </Label>
           <Input
             id="user-template-limit"
             type="number"
@@ -326,11 +404,21 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
             inputMode="numeric"
             value={limit}
             onChange={(event) => setLimit(event.target.value)}
-            placeholder={template.default_limit ? String(template.default_limit) : "No limit"}
+            placeholder={
+              template.default_limit
+                ? String(template.default_limit)
+                : tr(
+                    "components.collection_template_gallery.user_collection_template_config_form.no_limit",
+                  )
+            }
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="user-template-schedule">Auto Refresh</Label>
+          <Label htmlFor="user-template-schedule">
+            {tr(
+              "components.collection_template_gallery.user_collection_template_config_form.auto_refresh",
+            )}
+          </Label>
           <Select value={schedule} onValueChange={(next) => setSchedule(next as ScheduleChoice)}>
             <SelectTrigger id="user-template-schedule">
               <SelectValue />
@@ -355,9 +443,15 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
 
       <div className="border-border flex items-center justify-between rounded-md border px-3 py-2">
         <div className="space-y-0.5">
-          <p className="text-sm font-medium">Share with other profiles</p>
+          <p className="text-sm font-medium">
+            {tr(
+              "components.collection_template_gallery.user_collection_template_config_form.share_with_other_profiles",
+            )}
+          </p>
           <p className="text-muted-foreground text-xs">
-            When on, profiles you choose can browse this collection too.
+            {tr(
+              "components.collection_template_gallery.user_collection_template_config_form.when_on_profiles_you_choose_can_browse_this_collection_too",
+            )}
           </p>
         </div>
         <Switch checked={isShared} onCheckedChange={setIsShared} />
@@ -365,10 +459,16 @@ export function UserCollectionTemplateConfigForm({ template, onCancel, onCreated
 
       <div className="border-border flex justify-end gap-2 border-t pt-4">
         <Button type="button" variant="ghost" onClick={onCancel} disabled={isPending}>
-          Cancel
+          {tr("common.actions.cancel")}
         </Button>
         <Button type="submit" disabled={submitDisabled}>
-          {isPending ? "Importing..." : "Create Collection"}
+          {isPending
+            ? tr(
+                "components.collection_template_gallery.user_collection_template_config_form.importing",
+              )
+            : tr(
+                "components.collection_template_gallery.user_collection_template_config_form.create_collection",
+              )}
         </Button>
       </div>
     </form>

@@ -11,6 +11,8 @@ import type {
 } from "@/api/types";
 import type { AdminLogQuery } from "@/hooks/queries/admin/logs";
 
+import { tr } from "@/i18n/translate";
+
 type StreamEntryMap = {
   app: OperationalLogEntry;
   audit: AuditLogEntry;
@@ -137,7 +139,7 @@ export function useAdminLogStream<TStream extends AdminLogStream>(
         ws = new WebSocket(url);
       } catch {
         setConnectionState("disconnected");
-        setError("Unable to open log stream.");
+        setError(tr("hooks.admin.use_admin_log_stream.unable_to_open_log_stream"));
         return;
       }
 
@@ -171,12 +173,12 @@ export function useAdminLogStream<TStream extends AdminLogStream>(
           return;
         }
 
-        setError(message.message);
+        setError(tr.remote({ message: message.message }));
       };
 
       ws.onerror = () => {
         setConnectionState("disconnected");
-        setError("Log stream disconnected.");
+        setError(tr("api.messages.log_stream_disconnected"));
       };
 
       ws.onclose = () => {

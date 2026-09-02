@@ -1,3 +1,4 @@
+import { tr } from "@/i18n/translate";
 export interface RecFieldDef {
   key: string;
   label: string;
@@ -19,83 +20,137 @@ export interface RecommendationEmbeddingLockViewModel {
 }
 
 const RECOMMENDATIONS_GENERAL_SECTION: RecSectionDef = {
-  title: "General",
-  fields: [{ key: "recommendations.enabled", label: "Enable Recommendations", type: "toggle" }],
+  get title() {
+    return tr("pages.admin_settings.recommendations_settings.general");
+  },
+  fields: [
+    {
+      key: "recommendations.enabled",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.enable_recommendations");
+      },
+      type: "toggle",
+    },
+  ],
 };
 
 const RECOMMENDATIONS_EMBEDDING_SECTION: RecSectionDef = {
-  title: "Embedding Configuration",
+  get title() {
+    return tr("pages.admin_settings.recommendations_settings.embedding_configuration");
+  },
   fields: [
     {
       key: "recommendations.embedding_base_url",
-      label: "Base URL",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.base_url");
+      },
       type: "text",
-      hint: "e.g. http://ollama:11434",
+      get hint() {
+        return tr("pages.admin_settings.recommendations_settings.e_g_http_ollama_11434");
+      },
     },
     {
       key: "recommendations.embedding_model",
-      label: "Model",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.model");
+      },
       type: "text",
-      hint: "e.g. text-embedding-3-large",
+      get hint() {
+        return tr("pages.admin_settings.recommendations_settings.e_g_text_embedding_3_large");
+      },
     },
     {
       key: "recommendations.embedding_auth_token",
-      label: "Auth Token",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.auth_token");
+      },
       type: "password",
-      hint: "Optional bearer token",
+      get hint() {
+        return tr("pages.admin_settings.recommendations_settings.optional_bearer_token");
+      },
     },
   ],
 };
 
 const RECOMMENDATIONS_SCHEDULE_SECTION: RecSectionDef = {
-  title: "Schedule",
+  get title() {
+    return tr("pages.admin_settings.recommendations_settings.schedule");
+  },
   fields: [
     {
       key: "recommendations.embeddings_cron",
-      label: "Embeddings Cron",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.embeddings_cron");
+      },
       type: "text",
-      hint: "Cron expression",
+      get hint() {
+        return tr("pages.admin_settings.recommendations_settings.cron_expression");
+      },
       defaultValue: "0 3 * * *",
     },
     {
       key: "recommendations.taste_profiles_cron",
-      label: "Taste Profiles Cron",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.taste_profiles_cron");
+      },
       type: "text",
-      hint: "Cron expression",
+      get hint() {
+        return tr("pages.admin_settings.recommendations_settings.cron_expression");
+      },
       defaultValue: "0 4 * * *",
     },
     {
       key: "recommendations.cowatch_cron",
-      label: "Co-Watch Cron",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.co_watch_cron");
+      },
       type: "text",
-      hint: "Cron expression",
+      get hint() {
+        return tr("pages.admin_settings.recommendations_settings.cron_expression");
+      },
       defaultValue: "30 4 * * *",
     },
     {
       key: "recommendations.recommendations_cron",
-      label: "Recommendations Cron",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.recommendations_cron");
+      },
       type: "text",
-      hint: "Cron expression",
+      get hint() {
+        return tr("pages.admin_settings.recommendations_settings.cron_expression");
+      },
       defaultValue: "0 5 * * *",
     },
   ],
 };
 
 const RECOMMENDATIONS_ADVANCED_SECTION: RecSectionDef = {
-  title: "Advanced",
+  get title() {
+    return tr("pages.admin_settings.recommendations_settings.advanced");
+  },
   fields: [
     {
       key: "recommendations.taste_decay_half_life_days",
-      label: "Time Decay Half-Life (days)",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.time_decay_half_life_days");
+      },
       type: "number",
-      hint: "How fast old signals lose weight",
+      get hint() {
+        return tr("pages.admin_settings.recommendations_settings.how_fast_old_signals_lose_weight");
+      },
       defaultValue: "180",
     },
     {
       key: "recommendations.diversity_lambda",
-      label: "Diversity Lambda",
+      get label() {
+        return tr("pages.admin_settings.recommendations_settings.diversity_lambda");
+      },
       type: "text",
-      hint: "0 = max diversity, 1 = max relevance",
+      get hint() {
+        return tr(
+          "pages.admin_settings.recommendations_settings.value_0_max_diversity_1_max_relevance",
+        );
+      },
       defaultValue: "0.7",
     },
   ],

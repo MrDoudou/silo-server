@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { Copy, Folder, Plus, Search, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import MediaLocations from "@/components/MediaLocations";
 import { useSearchItemMatchCandidates, useApplyItemMatch } from "@/hooks/queries/items";
 import { useCatalogItemDetail } from "@/hooks/queries/catalogRead";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type MatchableItem = Pick<
   ItemDetail,
@@ -54,6 +56,7 @@ function isVideoMatchType(type: string): boolean {
 }
 
 export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemDialogProps) {
+  useUILanguage();
   const [title, setTitle] = useState(item.title);
   const [year, setYear] = useState(item.year ? String(item.year) : "");
   const [imdbId, setImdbId] = useState("");
@@ -161,7 +164,7 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Match Item</DialogTitle>
+          <DialogTitle>{tr("components.match_item_dialog.match_item")}</DialogTitle>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
@@ -180,74 +183,76 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
               : effectiveItem.versions !== undefined)) &&
             (enrichedItemLoading ? (
               <div className="text-muted-foreground bg-muted/30 shrink-0 rounded-lg border px-3 py-2 text-sm">
-                Loading local media…
+                {tr("components.match_item_dialog.loading_local_media")}
               </div>
             ) : isSeries ? (
               <FolderPathsList paths={effectiveItem.folder_paths ?? []} />
             ) : (
               <MediaLocations
-                title="Local media"
+                title={tr("components.match_item_dialog.local_media")}
                 versions={effectiveItem.versions ?? []}
                 className="shrink-0"
                 compact
-                emptyMessage="No file paths are available for this item."
+                emptyMessage={tr(
+                  "components.match_item_dialog.no_file_paths_are_available_for_this_item",
+                )}
               />
             ))}
 
           {/* Search inputs */}
           <div className="grid shrink-0 grid-cols-2 gap-3">
             <div className="col-span-2">
-              <Label htmlFor="match-title">Title</Label>
+              <Label htmlFor="match-title">{tr("components.match_item_dialog.title")}</Label>
               <Input
                 id="match-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Title"
+                placeholder={tr("components.match_item_dialog.title")}
               />
             </div>
             <div>
-              <Label htmlFor="match-year">Year</Label>
+              <Label htmlFor="match-year">{tr("components.match_item_dialog.year")}</Label>
               <Input
                 id="match-year"
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
-                placeholder="Year"
+                placeholder={tr("components.match_item_dialog.year")}
                 type="number"
               />
             </div>
             {showVideoExternalIds ? (
               <>
                 <div>
-                  <Label htmlFor="match-imdb">IMDb ID</Label>
+                  <Label htmlFor="match-imdb">{tr("components.match_item_dialog.imdb_id")}</Label>
                   <Input
                     id="match-imdb"
                     value={imdbId}
                     onChange={(e) => setImdbId(e.target.value)}
-                    placeholder="tt1234567"
+                    placeholder={tr("components.match_item_dialog.tt1234567")}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="match-tmdb">TMDB ID</Label>
+                  <Label htmlFor="match-tmdb">{tr("components.match_item_dialog.tmdb_id")}</Label>
                   <Input
                     id="match-tmdb"
                     value={tmdbId}
                     onChange={(e) => setTmdbId(e.target.value)}
-                    placeholder="12345"
+                    placeholder={tr("components.match_item_dialog.value_12345")}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="match-tvdb">TVDB ID</Label>
+                  <Label htmlFor="match-tvdb">{tr("components.match_item_dialog.tvdb_id")}</Label>
                   <Input
                     id="match-tvdb"
                     value={tvdbId}
                     onChange={(e) => setTvdbId(e.target.value)}
-                    placeholder="12345"
+                    placeholder={tr("components.match_item_dialog.value_12345")}
                   />
                 </div>
               </>
             ) : (
               <div className="col-span-2 space-y-2">
-                <Label>Provider IDs</Label>
+                <Label>{tr("components.match_item_dialog.provider_ids")}</Label>
                 {providerIdInputs.map((entry, index) => (
                   <div
                     key={entry.id}
@@ -256,14 +261,14 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
                     <Input
                       value={entry.provider}
                       onChange={(e) => updateProviderIdInput(index, "provider", e.target.value)}
-                      placeholder="isbn"
-                      aria-label="Provider"
+                      placeholder={tr("components.match_item_dialog.isbn")}
+                      aria-label={tr("components.match_item_dialog.provider")}
                     />
                     <Input
                       value={entry.value}
                       onChange={(e) => updateProviderIdInput(index, "value", e.target.value)}
-                      placeholder="978..."
-                      aria-label="Provider ID"
+                      placeholder={tr("components.match_item_dialog.value_978")}
+                      aria-label={tr("components.match_item_dialog.provider_id")}
                     />
                     <Button
                       type="button"
@@ -272,8 +277,8 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
                       className="h-9 w-9"
                       onClick={() => removeProviderIdInput(index)}
                       disabled={providerIdInputs.length === 1 && !entry.provider && !entry.value}
-                      aria-label="Remove provider ID"
-                      title="Remove provider ID"
+                      aria-label={tr("components.match_item_dialog.remove_provider_id")}
+                      title={tr("components.match_item_dialog.remove_provider_id")}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -285,8 +290,8 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
                   size="icon"
                   className="h-9 w-9"
                   onClick={addProviderIdInput}
-                  aria-label="Add provider ID"
-                  title="Add provider ID"
+                  aria-label={tr("components.match_item_dialog.add_provider_id")}
+                  title={tr("components.match_item_dialog.add_provider_id")}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -300,13 +305,13 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
             className="w-full shrink-0 gap-2"
           >
             <Search className={cn("h-4 w-4", searchMutation.isPending && "animate-spin")} />
-            Search
+            {tr("common.actions.search")}
           </Button>
 
           {/* Candidate list */}
           {candidates.length > 0 && (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden">
-              <Label className="shrink-0">Results</Label>
+              <Label className="shrink-0">{tr("components.match_item_dialog.results")}</Label>
               <TooltipProvider delayDuration={150}>
                 <div className="overlay-scroll min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1 pb-1">
                   {candidates.map((candidate, index) => {
@@ -360,12 +365,13 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
                           <div className="truncate text-sm font-medium">{displayTitle}</div>
                           {matchedFallbackTitle ? (
                             <div className="text-muted-foreground truncate text-xs">
-                              Native title: {candidate.title}
+                              {tr("components.match_item_dialog.native_title")} {candidate.title}
                             </div>
                           ) : candidate.original_title &&
                             candidate.original_title !== candidate.title ? (
                             <div className="text-muted-foreground truncate text-xs">
-                              Original: {candidate.original_title}
+                              {tr("components.match_item_dialog.original")}{" "}
+                              {candidate.original_title}
                             </div>
                           ) : null}
                           {!matchedFallbackTitle &&
@@ -373,7 +379,8 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
                           candidate.matched_title !== candidate.title &&
                           candidate.matched_title !== candidate.original_title ? (
                             <div className="text-muted-foreground truncate text-xs">
-                              Matched alias: {candidate.matched_title}
+                              {tr("components.match_item_dialog.matched_alias")}{" "}
+                              {candidate.matched_title}
                             </div>
                           ) : null}
                           <div className="text-muted-foreground text-xs">
@@ -382,7 +389,8 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
                           <div className="mt-1 flex min-w-0 flex-wrap gap-1">
                             {candidate.match_score !== undefined ? (
                               <Badge variant="secondary" className="text-[10px] tabular-nums">
-                                Score {candidate.match_score.toFixed(1)}
+                                {tr("components.match_item_dialog.score")}{" "}
+                                {candidate.match_score.toFixed(1)}
                               </Badge>
                             ) : null}
                             {candidate.sources.map((source) => (
@@ -392,13 +400,14 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
                             ))}
                             {candidate.sources.length > 1 && (
                               <Badge variant="secondary" className="text-[10px]">
-                                {candidate.sources.length} sources agree
+                                {candidate.sources.length}{" "}
+                                {tr("components.match_item_dialog.sources_agree")}
                               </Badge>
                             )}
                           </div>
                           {candidate.match_reasons?.length ? (
                             <div className="text-muted-foreground mt-1 text-xs">
-                              Match reasons:{" "}
+                              {tr("components.match_item_dialog.match_reasons")}{" "}
                               {candidate.match_reasons
                                 .map((reason) => reason.replace(/_/g, " "))
                                 .join(", ")}
@@ -414,7 +423,9 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
           )}
 
           {searchMutation.isSuccess && candidates.length === 0 && (
-            <p className="text-muted-foreground text-center text-sm">No candidates found.</p>
+            <p className="text-muted-foreground text-center text-sm">
+              {tr("components.match_item_dialog.no_candidates_found")}
+            </p>
           )}
         </div>
 
@@ -427,7 +438,9 @@ export default function MatchItemDialog({ item, open, onOpenChange }: MatchItemD
               className="w-full"
               data-testid="apply-match"
             >
-              {applyMutation.isPending ? "Applying..." : "Apply Match"}
+              {applyMutation.isPending
+                ? tr("components.match_item_dialog.applying")
+                : tr("components.match_item_dialog.apply_match")}
             </Button>
           </div>
         )}
@@ -468,6 +481,7 @@ function computeRootPath(paths: string[]): string {
 }
 
 function FolderPathsList({ paths }: { paths: string[] }) {
+  useUILanguage();
   const folderData = useMemo(() => {
     return {
       folders: paths.map((fullPath) => ({
@@ -481,9 +495,11 @@ function FolderPathsList({ paths }: { paths: string[] }) {
   if (paths.length === 0) {
     return (
       <section className="shrink-0 space-y-3">
-        <h2 className="text-base font-semibold tracking-tight">Local media</h2>
+        <h2 className="text-base font-semibold tracking-tight">
+          {tr("components.match_item_dialog.local_media")}
+        </h2>
         <div className="text-muted-foreground bg-muted/30 rounded-lg border px-3 py-2 text-sm">
-          No folder paths are available for this item.
+          {tr("components.match_item_dialog.no_folder_paths_are_available_for_this_item")}
         </div>
       </section>
     );
@@ -491,12 +507,14 @@ function FolderPathsList({ paths }: { paths: string[] }) {
 
   return (
     <section className="shrink-0 space-y-2">
-      <h2 className="text-base font-semibold tracking-tight">Local media</h2>
+      <h2 className="text-base font-semibold tracking-tight">
+        {tr("components.match_item_dialog.local_media")}
+      </h2>
       <div className="bg-background/70 rounded-lg border">
         {folderData.rootPath ? (
           <div className="border-b px-3 py-2">
             <div className="text-muted-foreground mb-1 text-[11px] font-medium tracking-[0.08em] uppercase">
-              Root path
+              {tr("components.match_item_dialog.root_path")}
             </div>
             <div className="flex items-center gap-2">
               <span
@@ -513,13 +531,15 @@ function FolderPathsList({ paths }: { paths: string[] }) {
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(folderData.rootPath);
-                    toast.success("Copied root path");
+                    toast.success("feedback.match_item_dialog.copied_root_path");
                   } catch {
-                    toast.error("Failed to copy path");
+                    toast.error("errors.match_item_dialog.failed_to_copy_path");
                   }
                 }}
-                title="Copy root path"
-                aria-label={`Copy root path ${folderData.rootPath}`}
+                title={tr("components.match_item_dialog.copy_root_path")}
+                aria-label={tr("components.match_item_dialog.copy_root_path_root_path", {
+                  rootPath: folderData.rootPath,
+                })}
               >
                 <Copy className="h-3 w-3" />
               </Button>
@@ -544,13 +564,15 @@ function FolderPathsList({ paths }: { paths: string[] }) {
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(fullPath);
-                    toast.success("Copied folder path");
+                    toast.success("feedback.match_item_dialog.copied_folder_path");
                   } catch {
-                    toast.error("Failed to copy path");
+                    toast.error("errors.match_item_dialog.failed_to_copy_path");
                   }
                 }}
-                title="Copy full path"
-                aria-label={`Copy folder path ${fullPath}`}
+                title={tr("components.match_item_dialog.copy_full_path")}
+                aria-label={tr("components.match_item_dialog.copy_folder_path_full_path", {
+                  fullPath: fullPath,
+                })}
               >
                 <Copy className="h-3 w-3" />
               </Button>
