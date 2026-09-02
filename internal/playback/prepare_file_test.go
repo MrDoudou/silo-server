@@ -72,19 +72,19 @@ func TestBuildPrepareFileArgsSharesHigh10DecodeFallback(t *testing.T) {
 		{
 			name:      "vaapi keeps hardware encode with software decode upload",
 			hwAccel:   "vaapi",
-			want:      []string{"-c:v h264_vaapi", "scale=-2:720,format=nv12,hwupload"},
+			want:      []string{"-c:v h264_vaapi", "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,format=nv12,hwupload"},
 			forbidden: []string{"-hwaccel vaapi"},
 		},
 		{
 			name:      "nvenc falls back to software encode",
 			hwAccel:   "nvenc",
-			want:      []string{"-c:v libx264", "-vf scale=-2:720"},
+			want:      []string{"-c:v libx264", "-vf scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2"},
 			forbidden: []string{"-hwaccel cuda", "h264_nvenc", "scale_cuda"},
 		},
 		{
 			name:      "videotoolbox keeps hardware encode with software decode",
 			hwAccel:   "videotoolbox",
-			want:      []string{"-c:v h264_videotoolbox", "-vf scale=-2:720"},
+			want:      []string{"-c:v h264_videotoolbox", "-vf scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2"},
 			forbidden: []string{"-hwaccel videotoolbox"},
 		},
 	}

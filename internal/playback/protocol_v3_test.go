@@ -2393,6 +2393,33 @@ func TestResolveQualityPolicyV3PreservesNonStandardSourceHeight(t *testing.T) {
 	}
 }
 
+func TestResolveQualityPolicyV3FitsCinemaSourceWithinRungBounds(t *testing.T) {
+	req := validStartRequestV3()
+	req.QualityPreference = "auto"
+	source := SourceDescriptorV3{Width: 3840, Height: 1600, BitrateKbps: 16_000}
+
+	req.Capabilities.MaxResolution = "1080p"
+	result := ResolveQualityPolicyV3(req, source)
+	if result.Width != 1920 || result.Height != 800 || result.Label != "1080p" {
+		t.Fatalf("1080p quality result = %#v, want 1920x800", result)
+	}
+
+	req.Capabilities.MaxResolution = "720p"
+	result = ResolveQualityPolicyV3(req, source)
+	if result.Width != 1280 || result.Height != 532 || result.Label != "720p" {
+		t.Fatalf("720p quality result = %#v, want 1280x532", result)
+	}
+}
+
+func TestResolveQualityPolicyV3CompoundRungFitsCinemaSource(t *testing.T) {
+	req := validStartRequestV3()
+	req.QualityPreference = QualityRung1080pMediumV3
+	result := ResolveQualityPolicyV3(req, SourceDescriptorV3{Width: 3840, Height: 1600, BitrateKbps: 16_000})
+	if result.Width != 1920 || result.Height != 800 || result.Label != "1080p" {
+		t.Fatalf("compound quality result = %#v, want 1920x800", result)
+	}
+}
+
 func TestPlanPlaybackV3SeekedHLSCopyPreservesVideo(t *testing.T) {
 	file := detailedFixtureFileV3()
 	file.Resolution = "1080p"

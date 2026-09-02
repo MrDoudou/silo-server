@@ -238,12 +238,12 @@ func TestToneMapGraphOrdersTextAndBitmapSubtitles(t *testing.T) {
 			last = index
 		}
 	}
-	assertTokenOrder(textGraph, "tonemapx=tonemap=bt2390", "scale=-2:1080", "subtitles=")
+	assertTokenOrder(textGraph, "tonemapx=tonemap=bt2390", "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2", "subtitles=")
 
 	bitmapOpts := base
 	bitmapOpts.SubtitleCodec = "hdmv_pgs_subtitle"
 	bitmapGraph := strings.Join(buildFFmpegArgs(bitmapOpts), " ")
-	assertTokenOrder(bitmapGraph, "tonemapx=tonemap=bt2390", "overlay=eof_action=pass", "scale=-2:1080")
+	assertTokenOrder(bitmapGraph, "tonemapx=tonemap=bt2390", "overlay=eof_action=pass", "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2")
 }
 
 func TestVideoToolboxToneMapDownloadsBeforeSubtitleComposition(t *testing.T) {
@@ -272,7 +272,7 @@ func TestVideoToolboxToneMapDownloadsBeforeSubtitleComposition(t *testing.T) {
 			if convert < 0 || download <= convert || compose <= download || metadata <= compose {
 				t.Fatalf("unsafe VideoToolbox subtitle order: %s", graph)
 			}
-			if strings.Contains(graph, "scale=-2:1080") {
+			if strings.Contains(graph, "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2") {
 				t.Fatalf("VideoToolbox scaling ran a second time on the CPU: %s", graph)
 			}
 		})
@@ -787,7 +787,7 @@ func TestBuildFFmpegArgs_MPEG4Part2DisablesHardwareDecode(t *testing.T) {
 			if !strings.Contains(joined, "-c:v libx264") {
 				t.Fatalf("mpeg4 part 2 source should fall back to libx264: %s", joined)
 			}
-			if !strings.Contains(joined, "-vf scale=-2:420") {
+			if !strings.Contains(joined, "-vf scale=746:420:force_original_aspect_ratio=decrease:force_divisible_by=2") {
 				t.Fatalf("mpeg4 part 2 software fallback should preserve requested scaling: %s", joined)
 			}
 		})
@@ -840,7 +840,7 @@ func TestBuildFFmpegArgs_H264High10QSVUsesSoftwareDecodeUpload(t *testing.T) {
 		"-init_hw_device vaapi=va:",
 		"-init_hw_device qsv=qs@va",
 		"-c:v h264_qsv",
-		"-vf scale=-2:720,format=nv12,hwupload,hwmap=derive_device=qsv,format=qsv",
+		"-vf scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,format=nv12,hwupload,hwmap=derive_device=qsv,format=qsv",
 	} {
 		if !strings.Contains(joined, required) {
 			t.Fatalf("High 10 QSV recipe missing %q: %s", required, joined)
@@ -986,7 +986,7 @@ func TestBuildFFmpegArgs_H264High10QSVASSBurnInUsesSoftwareFrames(t *testing.T) 
 	})
 
 	joined := strings.Join(args, " ")
-	want := "-vf format=yuv420p,scale=-2:720,subtitles=filename='/media/high10.mkv':si=0,format=nv12,hwupload,hwmap=derive_device=qsv,format=qsv"
+	want := "-vf format=yuv420p,scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,subtitles=filename='/media/high10.mkv':si=0,format=nv12,hwupload,hwmap=derive_device=qsv,format=qsv"
 	if !strings.Contains(joined, want) {
 		t.Fatalf("High 10 ASS burn-in should render on software frames then upload %q: %s", want, joined)
 	}
@@ -1013,7 +1013,7 @@ func TestBuildFFmpegArgs_H264High10QSVBitmapBurnInUsesSoftwareFrames(t *testing.
 	})
 
 	joined := strings.Join(args, " ")
-	want := "-filter_complex [0:v:0]format=yuv420p[vmain];[vmain][0:s:2]overlay=eof_action=pass,scale=-2:720,format=nv12,hwupload,hwmap=derive_device=qsv,format=qsv[vout]"
+	want := "-filter_complex [0:v:0]format=yuv420p[vmain];[vmain][0:s:2]overlay=eof_action=pass,scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,format=nv12,hwupload,hwmap=derive_device=qsv,format=qsv[vout]"
 	if !strings.Contains(joined, want) {
 		t.Fatalf("High 10 PGS burn-in should composite on software frames then upload %q: %s", want, joined)
 	}
@@ -1040,7 +1040,7 @@ func TestBuildFFmpegArgs_BitmapBurnInCPUUsesOverlayFilterComplex(t *testing.T) {
 
 	joined := strings.Join(args, " ")
 	// Overlay runs at native resolution first, then scales.
-	want := "-filter_complex [0:v:0][0:s:2]overlay=eof_action=pass,scale=-2:1080[vout]"
+	want := "-filter_complex [0:v:0][0:s:2]overlay=eof_action=pass,scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2[vout]"
 	if !strings.Contains(joined, want) {
 		t.Fatalf("bitmap burn-in should use overlay filter_complex %q: %s", want, joined)
 	}
@@ -1102,7 +1102,7 @@ func TestBuildFFmpegArgs_BitmapBurnInVAAPICompositesOnGPU(t *testing.T) {
 	joined := strings.Join(args, " ")
 	// Only the subtitle bitmap is uploaded; the video stays on the VAAPI surface
 	// and is composited with overlay_vaapi — no full-frame hwdownload roundtrip.
-	want := "-filter_complex [0:s:1]format=bgra,hwupload[sub];[0:v:0][sub]overlay_vaapi=eof_action=pass,scale_vaapi=w=-2:h=720:format=nv12[vout]"
+	want := "-filter_complex [0:s:1]format=bgra,hwupload[sub];[0:v:0][sub]overlay_vaapi=eof_action=pass,scale_vaapi=w=1280:h=720:format=nv12:force_original_aspect_ratio=decrease:force_divisible_by=2[vout]"
 	if !strings.Contains(joined, want) {
 		t.Fatalf("vaapi bitmap burn-in should composite on GPU %q: %s", want, joined)
 	}
@@ -1139,7 +1139,7 @@ func TestBuildFFmpegArgs_BitmapBurnInQSVCompositesOnGPU(t *testing.T) {
 	joined := strings.Join(args, " ")
 	// GPU composite via overlay_vaapi, then map the VAAPI surface to QSV for the
 	// encoder — the video never leaves hardware memory.
-	want := "-filter_complex [0:s:1]format=bgra,hwupload[sub];[0:v:0][sub]overlay_vaapi=eof_action=pass,scale_vaapi=w=-2:h=720:format=nv12,hwmap=derive_device=qsv,format=qsv[vout]"
+	want := "-filter_complex [0:s:1]format=bgra,hwupload[sub];[0:v:0][sub]overlay_vaapi=eof_action=pass,scale_vaapi=w=1280:h=720:format=nv12:force_original_aspect_ratio=decrease:force_divisible_by=2,hwmap=derive_device=qsv,format=qsv[vout]"
 	if !strings.Contains(joined, want) {
 		t.Fatalf("qsv bitmap burn-in should composite on GPU %q: %s", want, joined)
 	}
@@ -1173,7 +1173,7 @@ func TestBuildFFmpegArgs_BitmapBurnInNVENCStaysOnCPUOverlay(t *testing.T) {
 	})
 
 	joined := strings.Join(args, " ")
-	want := "-filter_complex [0:v:0]hwdownload,format=yuv420p[vmain];[vmain][0:s:1]overlay=eof_action=pass,scale=-2:720,format=nv12,hwupload_cuda[vout]"
+	want := "-filter_complex [0:v:0]hwdownload,format=yuv420p[vmain];[vmain][0:s:1]overlay=eof_action=pass,scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,format=nv12,hwupload_cuda[vout]"
 	if !strings.Contains(joined, want) {
 		t.Fatalf("nvenc bitmap burn-in should keep the CPU roundtrip %q: %s", want, joined)
 	}
@@ -1198,7 +1198,7 @@ func TestBuildFFmpegArgs_TextBurnInStillUsesSubtitlesFilter(t *testing.T) {
 	})
 
 	joined := strings.Join(args, " ")
-	if !strings.Contains(joined, "-vf scale=-2:1080,subtitles=filename='/media/movie.mkv':si=1") {
+	if !strings.Contains(joined, "-vf scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2,subtitles=filename='/media/movie.mkv':si=1") {
 		t.Fatalf("text burn-in should keep the libass subtitles -vf path: %s", joined)
 	}
 	if strings.Contains(joined, "-filter_complex") {
@@ -1426,10 +1426,10 @@ func TestBuildFFmpegArgs_NVENCH264UsesCudaPipeline(t *testing.T) {
 	if !strings.Contains(joined, "-c:v h264_nvenc") {
 		t.Fatalf("nvenc args should use h264_nvenc encoder: %s", joined)
 	}
-	if !strings.Contains(joined, "-vf scale_cuda=w=-2:h=720:format=nv12") {
+	if !strings.Contains(joined, "-vf scale_cuda=w=1280:h=720:format=nv12:force_original_aspect_ratio=decrease:force_divisible_by=2") {
 		t.Fatalf("nvenc args should use scale_cuda, not software scale: %s", joined)
 	}
-	if strings.Contains(joined, "-vf scale=-2:720") {
+	if strings.Contains(joined, "-vf scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2") {
 		t.Fatalf("nvenc args must not use software scale on cuda frames: %s", joined)
 	}
 	if !strings.Contains(joined, "-b:v 2000k -maxrate 2000k -bufsize 4000k") {
@@ -1455,10 +1455,10 @@ func TestBuildFFmpegArgs_VAAPIScalingUsesHardwareFilter(t *testing.T) {
 	if !strings.Contains(joined, "-hwaccel vaapi") {
 		t.Fatalf("vaapi args should enable vaapi hwaccel: %s", joined)
 	}
-	if !strings.Contains(joined, "-vf scale_vaapi=w=-2:h=720:format=nv12") {
+	if !strings.Contains(joined, "-vf scale_vaapi=w=1280:h=720:format=nv12:force_original_aspect_ratio=decrease:force_divisible_by=2") {
 		t.Fatalf("vaapi args should use scale_vaapi, not software scale: %s", joined)
 	}
-	if strings.Contains(joined, "-vf scale=-2:720") {
+	if strings.Contains(joined, "-vf scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2") {
 		t.Fatalf("vaapi args must not use software scale on hardware frames: %s", joined)
 	}
 }
@@ -1633,7 +1633,7 @@ func TestBuildFFmpegArgs_VideoToolboxH264UsesSoftwareFilters(t *testing.T) {
 	if !strings.Contains(joined, "-pix_fmt yuv420p") {
 		t.Fatalf("videotoolbox h264 should force 8-bit output: %s", joined)
 	}
-	if !strings.Contains(joined, "-vf scale=-2:720") {
+	if !strings.Contains(joined, "-vf scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2") {
 		t.Fatalf("videotoolbox args should use the software scale filter: %s", joined)
 	}
 	if !strings.Contains(joined, "-b:v 2000k -maxrate 2000k -bufsize 4000k") {

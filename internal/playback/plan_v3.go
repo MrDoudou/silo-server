@@ -1169,7 +1169,7 @@ func ResolveQualityPolicyV3(request StartRequestV3, source SourceDescriptorV3) Q
 		effectiveHeight = source.Height
 		label = resolutionLabelV3(effectiveHeight)
 	}
-	width, bitrate := qualityDimensionsV3(effectiveHeight, source.Width, source.Height)
+	width, effectiveHeight, bitrate := qualityDimensionsV3(effectiveHeight, source.Width, source.Height)
 	if capKbps > 0 && bitrate > capKbps {
 		// The ladder has no rung below 480p, so a cap under the lowest rung's
 		// bitrate is honored by lowering the encode target directly: the cap
@@ -1218,15 +1218,11 @@ func compoundRungQualityResultV3(rung ladderRungV3, source SourceDescriptorV3, c
 			Warnings:        warnings,
 		}
 	}
-	width := 0
-	if source.Width > 0 && source.Height > 0 {
-		width = source.Width * height / source.Height
-		width -= width % 2
+	targetLabel := resolutionLabelV3(rung.Height)
+	width, fittedHeight := fitDimensionsV3(source.Width, source.Height, height)
+	if sameResolutionClass && source.Width > 0 && source.Height > 0 && source.Height != rung.Height {
+		width, fittedHeight = source.Width, source.Height
 	}
-	if width == 0 {
-		width, _ = dimensionsFromResolutionV3(resolutionLabelV3(height))
-	}
-	targetLabel := resolutionLabelV3(height)
 	if sameResolutionClass && source.Height > 0 && source.Height != rung.Height {
 		// The transcoder treats an unknown exact-height label as "do not scale",
 		// which preserves the source's cinema crop while still applying the
@@ -1236,7 +1232,7 @@ func compoundRungQualityResultV3(rung ladderRungV3, source SourceDescriptorV3, c
 	return QualityResultV3{
 		Label:             targetLabel,
 		Width:             width,
-		Height:            height,
+		Height:            fittedHeight,
 		BitrateKbps:       bitrate,
 		RequiresTranscode: true,
 		ExplicitRung:      true,
@@ -1563,17 +1559,38 @@ func ladderRungPublishableV3(rung ladderRungV3, source SourceDescriptorV3) bool 
 	return source.BitrateKbps > 0 && rung.BitrateKbps < source.BitrateKbps
 }
 
-func qualityDimensionsV3(height, sourceWidth, sourceHeight int) (int, int) {
+func qualityDimensionsV3(height, sourceWidth, sourceHeight int) (int, int, int) {
 	rung := resolutionHeightV3(resolutionLabelV3(height))
-	width := 0
-	if sourceWidth > 0 && sourceHeight > 0 {
-		width = sourceWidth * rung / sourceHeight
-		width -= width % 2
+	width, fittedHeight := fitDimensionsV3(sourceWidth, sourceHeight, rung)
+	return width, fittedHeight, ladderBitrateKbpsV3(rung)
+}
+
+// fitDimensionsV3 keeps a transcode inside the ladder's width and height
+// bounds while preserving the source aspect ratio. Cinema-aspect sources must
+// not become wider than the client can decode just because their target height
+// matches a nominal rung.
+func fitDimensionsV3(sourceWidth, sourceHeight, targetHeight int) (int, int) {
+	targetWidth, targetBoundHeight := dimensionsFromResolutionV3(resolutionLabelV3(targetHeight))
+	if targetWidth == 0 || targetBoundHeight == 0 {
+		return sourceWidth, sourceHeight
 	}
-	if width == 0 {
-		width, _ = dimensionsFromResolutionV3(resolutionLabelV3(rung))
+	if sourceWidth <= 0 || sourceHeight <= 0 {
+		return targetWidth, targetBoundHeight
 	}
-	return width, ladderBitrateKbpsV3(rung)
+
+	width, height := sourceWidth, sourceHeight
+	if width > targetWidth {
+		width = targetWidth
+		height = sourceHeight * width / sourceWidth
+	}
+	if height > targetBoundHeight {
+		height = targetBoundHeight
+		width = sourceWidth * height / sourceHeight
+	}
+
+	width -= width % 2
+	height -= height % 2
+	return width, height
 }
 
 func SortedTransformationNamesV3(values []TransformationV3) []string {
