@@ -1,3 +1,4 @@
+import { tr } from "@/i18n/translate";
 export type PlaybackQualityPreset = "any" | "standard" | "4k";
 
 export const PLAYBACK_QUALITY_OPTIONS: Array<{
@@ -5,9 +6,33 @@ export const PLAYBACK_QUALITY_OPTIONS: Array<{
   label: string;
   description: string;
 }> = [
-  { value: "any", label: "Any", description: "Allow all resolutions" },
-  { value: "standard", label: "Standard", description: "Hide 4K and higher versions" },
-  { value: "4k", label: "4K", description: "Allow 4K and lower versions" },
+  {
+    value: "any",
+    get label() {
+      return tr("lib.playback_quality.any");
+    },
+    get description() {
+      return tr("lib.playback_quality.allow_all_resolutions");
+    },
+  },
+  {
+    value: "standard",
+    get label() {
+      return tr("lib.playback_quality.standard");
+    },
+    get description() {
+      return tr("lib.playback_quality.hide_4_k_and_higher_versions");
+    },
+  },
+  {
+    value: "4k",
+    get label() {
+      return tr("lib.playback_quality.value_4_k");
+    },
+    get description() {
+      return tr("lib.playback_quality.allow_4_k_and_lower_versions");
+    },
+  },
 ];
 
 export function canonicalPlaybackQuality(value: string | null | undefined): string {

@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { api } from "@/api/client";
 import type { GroupSortMode, LibraryCollection, LibraryCollectionGroup } from "@/api/types";
 import { adminKeys } from "../keys";
+import { tr } from "@/i18n/translate";
 
 const ADMIN_STALE_TIME = 30_000;
 
@@ -86,10 +88,14 @@ export function useCreateCollectionGroup(libraryId: number) {
       queryClient.invalidateQueries({
         queryKey: adminKeys.collectionGroups(libraryId),
       });
-      toast.success("Group created");
+      toast.success("feedback.queries.admin.collection_groups.group_created");
     },
     onError: (e) =>
-      toast.error(`Failed to create group: ${e instanceof Error ? e.message : "unknown"}`),
+      toast.error("errors.queries.admin.collection_groups.failed_to_create_group_message", {
+        values: {
+          message: tr.error("errors.common.request_failed", e),
+        },
+      }),
   });
 }
 
@@ -114,7 +120,11 @@ export function useUpdateCollectionGroup(libraryId: number) {
       });
     },
     onError: (e) =>
-      toast.error(`Failed to update group: ${e instanceof Error ? e.message : "unknown"}`),
+      toast.error("errors.queries.admin.collection_groups.failed_to_update_group_message", {
+        values: {
+          message: tr.error("errors.common.request_failed", e),
+        },
+      }),
   });
 }
 
@@ -126,10 +136,14 @@ export function useDeleteCollectionGroup(libraryId: number) {
       queryClient.invalidateQueries({
         queryKey: adminKeys.collectionGroups(libraryId),
       });
-      toast.success("Group deleted");
+      toast.success("feedback.queries.admin.collection_groups.group_deleted");
     },
     onError: (e) =>
-      toast.error(`Failed to delete group: ${e instanceof Error ? e.message : "unknown"}`),
+      toast.error("errors.queries.admin.collection_groups.failed_to_delete_group_message", {
+        values: {
+          message: tr.error("errors.common.request_failed", e),
+        },
+      }),
   });
 }
 
@@ -147,7 +161,11 @@ export function useReorderCollectionGroups(libraryId: number) {
       });
     },
     onError: (e) =>
-      toast.error(`Failed to reorder groups: ${e instanceof Error ? e.message : "unknown"}`),
+      toast.error("errors.queries.admin.collection_groups.failed_to_reorder_groups_message", {
+        values: {
+          message: tr.error("errors.common.request_failed", e),
+        },
+      }),
   });
 }
 
@@ -185,6 +203,10 @@ export function useReorderCollectionsInGroup(libraryId: number) {
       });
     },
     onError: (e) =>
-      toast.error(`Failed to reorder collections: ${e instanceof Error ? e.message : "unknown"}`),
+      toast.error("errors.queries.admin.collection_groups.failed_to_reorder_collections_message", {
+        values: {
+          message: tr.error("errors.common.request_failed", e),
+        },
+      }),
   });
 }

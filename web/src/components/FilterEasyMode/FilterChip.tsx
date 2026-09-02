@@ -1,4 +1,6 @@
 import type { FilterChipModel } from "@/lib/filterEasyMode";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface Props {
   chip: FilterChipModel;
@@ -14,13 +16,14 @@ function formatValue(v: FilterChipModel["value"]): string {
 }
 
 export default function FilterChip({ chip, onRemove }: Props) {
+  useUILanguage();
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 py-1 pr-1 pl-3 text-xs text-indigo-200">
       <span className="text-[10px] tracking-wider uppercase opacity-65">{chip.field}</span>
       <span className="font-semibold">{formatValue(chip.value)}</span>
       <button
         type="button"
-        aria-label="remove filter"
+        aria-label={tr("components.filter_easy_mode.filter_chip.remove_filter")}
         onClick={onRemove}
         className="px-1.5 opacity-65 hover:opacity-100"
       >

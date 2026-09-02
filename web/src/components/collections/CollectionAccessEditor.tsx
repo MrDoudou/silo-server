@@ -2,6 +2,8 @@ import type { SmartCollectionAccess } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CollectionAccessEditorProps {
   value: SmartCollectionAccess;
@@ -18,20 +20,31 @@ export default function CollectionAccessEditor({
   readOnly = false,
   creatorProfileId,
 }: CollectionAccessEditorProps) {
+  useUILanguage();
   return (
     <div className="space-y-4">
       {readOnly ? (
         <div className="text-muted-foreground rounded-md border px-3 py-2 text-sm">
-          Only the creator can edit this collection.
-          {creatorProfileId ? ` Created by ${creatorProfileId}.` : ""}
+          {tr(
+            "components.collections.collection_access_editor.only_the_creator_can_edit_this_collection",
+          )}
+          {creatorProfileId
+            ? tr("components.collections.collection_access_editor.created_by_creator_profile_id", {
+                creatorProfileId: creatorProfileId,
+              })
+            : ""}
         </div>
       ) : null}
 
       <div className="border-border flex items-center justify-between rounded-lg border px-4 py-3">
         <div>
-          <Label className="text-sm font-medium">Share with this account</Label>
+          <Label className="text-sm font-medium">
+            {tr("components.collections.collection_access_editor.share_with_this_account")}
+          </Label>
           <p className="text-muted-foreground mt-1 text-xs">
-            Shared collections appear for the selected profiles across the account.
+            {tr(
+              "components.collections.collection_access_editor.shared_collections_appear_for_the_selected_profiles_across_the_account",
+            )}
           </p>
         </div>
         <Switch
@@ -49,7 +62,7 @@ export default function CollectionAccessEditor({
 
       {value.is_shared && profiles.length > 0 ? (
         <div className="space-y-2">
-          <Label>Allowed Profiles</Label>
+          <Label>{tr("components.collections.collection_access_editor.allowed_profiles")}</Label>
           <div className="flex flex-wrap gap-2">
             {profiles.map((profile) => {
               const selected = value.allowed_profile_ids.includes(profile.id);

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import type { BrowseItem } from "@/api/types";
 import { favoriteKeys } from "./keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import {
   cancelItemDetailQueries,
   scheduleMediaSurfaceInvalidation,
@@ -46,10 +46,12 @@ export function useToggleFavorite(itemId: string) {
           in_watchlist: detail.user_state?.in_watchlist ?? false,
         },
       }));
-      toast.error("Failed to update favorites");
+      toast.error("errors.queries.favorites.failed_to_update_favorites");
     },
     onSuccess: (_data, currentlyFavorite) => {
-      toast.success(currentlyFavorite ? "Removed from favorites" : "Added to favorites");
+      toast.success("feedback.queries.favorites.reported_message", {
+        values: { message: currentlyFavorite ? "Removed from favorites" : "Added to favorites" },
+      });
     },
     onSettled: () => {
       scheduleMediaSurfaceInvalidation(queryClient, {

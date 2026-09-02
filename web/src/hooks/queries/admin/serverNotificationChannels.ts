@@ -6,7 +6,7 @@ import type {
   ServerNotificationChannelInput,
 } from "@/api/types";
 import { adminKeys } from "../keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 export function useServerNotificationChannels() {
   return useQuery({
@@ -44,7 +44,9 @@ export function useUpdateServerNotificationChannel() {
       void queryClient.invalidateQueries({ queryKey: adminKeys.serverNotificationChannels() });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to update channel");
+      toast.error("errors.queries.admin.server_notification_channels.failed_to_update_channel", {
+        error: error,
+      });
     },
   });
 }
@@ -55,11 +57,11 @@ export function useDeleteServerNotificationChannel() {
     mutationFn: (id: string) =>
       api(`/admin/notifications/server-channels/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Channel deleted");
+      toast.success("feedback.queries.admin.server_notification_channels.channel_deleted");
       void queryClient.invalidateQueries({ queryKey: adminKeys.serverNotificationChannels() });
     },
     onError: () => {
-      toast.error("Failed to delete channel");
+      toast.error("errors.queries.admin.server_notification_channels.failed_to_delete_channel");
     },
   });
 }
@@ -80,7 +82,10 @@ export function useRotateServerNotificationChannelSecret() {
         method: "POST",
       }),
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to rotate signing secret");
+      toast.error(
+        "errors.queries.admin.server_notification_channels.failed_to_rotate_signing_secret",
+        { error: error },
+      );
     },
   });
 }

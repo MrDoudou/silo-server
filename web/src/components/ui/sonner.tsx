@@ -2,8 +2,11 @@ import type { CSSProperties } from "react";
 import { Toaster as SonnerToaster, type ToasterProps } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
 import { THEMES } from "@/lib/themes";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  useUILanguage();
   const { activeTheme } = useTheme();
   const sonnerTheme = THEMES[activeTheme].appearance;
 
@@ -14,8 +17,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast: "!text-[var(--popover-foreground)]",
-          title: "!text-[var(--popover-foreground)]",
-          description: "!text-[var(--popover-foreground)]",
+          title: tr("components.ui.sonner.text_var_popover_foreground"),
+          description: tr("components.ui.sonner.text_var_popover_foreground"),
         },
       }}
       style={

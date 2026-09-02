@@ -20,6 +20,8 @@ import {
   type OverviewCard,
   type OverviewTile,
 } from "@/hooks/admin/useSettingsOverview";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /** Icon per health tile, keyed by the tile ids the hook emits. */
 const TILE_ICONS: Record<string, LucideIcon> = {
@@ -47,12 +49,13 @@ const PANEL = "border-border/70 rounded-xl border";
  * says what is wrong and links to the page that fixes it.
  */
 export function HealthTile({ tile }: { tile: OverviewTile }) {
+  useUILanguage();
   const Icon = TILE_ICONS[tile.id] ?? Server;
   const warn = tile.state === "warn";
 
   return (
     <div
-      data-testid={`overview-tile-${tile.id}`}
+      data-testid={"overview-tile-" + tile.id}
       data-state={tile.state}
       className={cn(PANEL, "flex flex-col p-3.5")}
     >
@@ -72,7 +75,10 @@ export function HealthTile({ tile }: { tile: OverviewTile }) {
       {tile.action ? (
         <Link
           to={settingsPageHref(tile.action.page)}
-          aria-label={`${tile.action.label} — ${tile.label}`}
+          aria-label={tr("pages.admin_settings.overview_cards.label_label2", {
+            label: tile.action.label,
+            label2: tile.label,
+          })}
           className={cn(
             "text-foreground/80 hover:text-foreground mt-auto inline-flex items-center gap-1 pt-2.5",
             "focus-visible:ring-ring rounded-sm text-xs font-medium focus-visible:ring-2 focus-visible:outline-none",
@@ -88,13 +94,14 @@ export function HealthTile({ tile }: { tile: OverviewTile }) {
 
 /** One settings group and the named subareas the admin will find inside it. */
 export function SectionCard({ card }: { card: OverviewCard }) {
+  useUILanguage();
   const metadata = CARD_METADATA[card.id];
   const Icon = metadata?.icon ?? Settings2;
 
   return (
     <Link
       to={settingsPageHref(card.id)}
-      data-testid={`overview-card-${card.id}`}
+      data-testid={"overview-card-" + card.id}
       className={cn(
         PANEL,
         "group hover:border-ring/40 bg-card/25 flex min-h-40 flex-col p-4 transition-all",

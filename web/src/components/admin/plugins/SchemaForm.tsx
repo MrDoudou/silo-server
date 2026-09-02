@@ -23,6 +23,8 @@ import {
   validateSchemaValues,
   type SchemaOption,
 } from "./schemaFormUtils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type Props = {
   descriptor: PluginAdminForm;
@@ -80,15 +82,17 @@ function SelectSkeleton() {
 // label — shared so the markup can't drift between the field/switch/section
 // renderers.
 function FieldDescription({ text }: { text?: string }) {
+  useUILanguage();
   return text ? <p className="text-muted-foreground text-xs leading-relaxed">{text}</p> : null;
 }
 
 // Loading placeholder for a dynamic MULTI_SELECT (tags): a few shimmer chips.
 function ChipsSkeleton() {
+  useUILanguage();
   return (
     <div aria-busy="true" className="flex flex-wrap gap-2">
       {["w-16", "w-12", "w-20", "w-14"].map((w) => (
-        <Skeleton key={w} className={`h-7 rounded-md ${w}`} />
+        <Skeleton key={w} className={"h-7 rounded-md " + w} />
       ))}
     </div>
   );
@@ -107,6 +111,7 @@ function SchemaFormSection({
   forceOpen: boolean;
   renderFields: (keys: string[]) => React.ReactNode;
 }) {
+  useUILanguage();
   // null = operator hasn't toggled; fall back to collapsed_default. forceOpen
   // (the section has unresolved errors) always wins so setup can't be hidden.
   const [userOpen, setUserOpen] = useState<boolean | null>(null);
@@ -127,7 +132,9 @@ function SchemaFormSection({
         </div>
         {section.collapsible ? (
           <Button type="button" size="xs" variant="ghost" onClick={() => setUserOpen(!open)}>
-            {open ? "Hide" : "Show"}
+            {open
+              ? tr("components.admin.plugins.schema_form.hide")
+              : tr("components.admin.plugins.schema_form.show")}
           </Button>
         ) : null}
       </div>
@@ -146,6 +153,7 @@ export function SchemaForm({
   idPrefix = "schema",
   onValidityChange,
 }: Props) {
+  useUILanguage();
   const byKey = useMemo(() => {
     const map = new Map<string, PluginAdminFormField>();
     for (const field of descriptor.fields) {
@@ -199,7 +207,9 @@ export function SchemaForm({
           onValueChange={(nextValue) => setField(field.key, nextValue)}
         >
           <SelectTrigger id={id} className="w-full">
-            <SelectValue placeholder={field.placeholder || "Select"} />
+            <SelectValue
+              placeholder={field.placeholder || tr("components.admin.plugins.schema_form.select")}
+            />
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (
@@ -222,7 +232,7 @@ export function SchemaForm({
       if (options.length === 0) {
         return (
           <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-xs">
-            No options available.
+            {tr("components.admin.plugins.schema_form.no_options_available")}
           </p>
         );
       }
@@ -349,7 +359,7 @@ export function SchemaForm({
       run = [];
       nodes.push(
         <div
-          key={`switch-group-${groupIndex++}`}
+          key={"switch-group-" + groupIndex++}
           className="divide-border/70 bg-card divide-y overflow-hidden rounded-lg border"
         >
           {group.map((field) => renderSwitchRow(field))}

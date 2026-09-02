@@ -84,6 +84,8 @@ import { useTask } from "@/hooks/queries/admin/tasks";
 import { adminKeys } from "@/hooks/queries/keys";
 import { pluginRouteHref } from "@/lib/pluginRouteHref";
 import { navigateToPluginRoute } from "@/lib/buildPluginHref";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const INSTALLED_PAGE_SIZE = 10;
 const CATALOG_PAGE_SIZE = 12;
@@ -151,10 +153,17 @@ function PluginResourceLinks({
   presentation?: PluginPresentation;
   repoURL?: string;
 }) {
+  useUILanguage();
   const links = [
-    { label: "Source", url: safeExternalURL(presentation?.source_url || repoURL) },
-    { label: "Changelog", url: safeExternalURL(presentation?.changelog_url) },
-    { label: "Support", url: safeExternalURL(presentation?.support_url) },
+    {
+      label: tr("pages.admin_plugins.source"),
+      url: safeExternalURL(presentation?.source_url || repoURL),
+    },
+    {
+      label: tr("pages.admin_plugins.changelog"),
+      url: safeExternalURL(presentation?.changelog_url),
+    },
+    { label: tr("pages.admin_plugins.support"), url: safeExternalURL(presentation?.support_url) },
   ].filter((link): link is { label: string; url: string } => Boolean(link.url));
 
   if (links.length === 0) return null;
@@ -234,6 +243,7 @@ function PluginListToolbar({
   placeholder: string;
   onQueryChange: (query: string) => void;
 }) {
+  useUILanguage();
   return (
     <div className="flex flex-col gap-2 border-b pb-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="relative w-full sm:max-w-sm">
@@ -255,7 +265,7 @@ function PluginListToolbar({
             variant="ghost"
             size="icon-sm"
             onClick={() => onQueryChange("")}
-            aria-label="Clear plugin search"
+            aria-label={tr("pages.admin_plugins.clear_plugin_search")}
             className="absolute top-1/2 right-1 -translate-y-1/2"
           >
             <X className="h-3.5 w-3.5" />
@@ -263,7 +273,12 @@ function PluginListToolbar({
         ) : null}
       </div>
       <span className="text-muted-foreground shrink-0 text-xs tabular-nums" aria-live="polite">
-        {query.trim() ? `${matchingTotal} of ${total} plugins` : `${total} plugins`}
+        {query.trim()
+          ? tr("pages.admin_plugins.matching_total_of_total_plugins", {
+              matchingTotal: matchingTotal,
+              total: total,
+            })
+          : tr("pages.admin_plugins.total_plugins", { total: total })}
       </span>
     </div>
   );
@@ -280,6 +295,7 @@ function InstalledPluginCard({
   catalogEntry?: PluginCatalogEntry;
   onConfigure: (installation: PluginInstallation) => void;
 }) {
+  useUILanguage();
   const updateInstallation = useUpdatePluginInstallation();
   const deleteInstallation = useDeletePluginInstallation();
   const applyUpdate = useApplyPluginUpdate();
@@ -299,11 +315,12 @@ function InstalledPluginCard({
           {/* Left: icon + info */}
           <div className="flex items-start gap-4">
             <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
-                installation.enabled
+              className={
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold " +
+                (installation.enabled
                   ? "bg-primary/15 text-primary"
-                  : "bg-muted text-muted-foreground"
-              }`}
+                  : "bg-muted text-muted-foreground")
+              }
             >
               <Blocks className="h-5 w-5" />
             </div>
@@ -323,12 +340,13 @@ function InstalledPluginCard({
                     variant="outline"
                     className="border-amber-500/40 text-[11px] text-amber-500"
                   >
-                    {installation.version} &rarr; {installation.available_version} available
+                    {installation.version} {tr("pages.admin_plugins.rarr")}{" "}
+                    {installation.available_version} {tr("pages.admin_plugins.available")}
                   </Badge>
                 )}
                 {installation.updates_paused ? (
                   <Badge variant="outline" className="text-muted-foreground text-[11px]">
-                    Updates paused
+                    {tr("pages.admin_plugins.updates_paused")}
                   </Badge>
                 ) : null}
                 {installation.available_version && (
@@ -345,19 +363,24 @@ function InstalledPluginCard({
                     {applyUpdate.isPending ? (
                       <>
                         <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                        Updating...
+                        {tr("pages.admin_plugins.updating")}
                       </>
                     ) : (
-                      "Update"
+                      tr("common.actions.update")
                     )}
                   </Button>
                 )}
                 <span className="flex items-center gap-1.5">
                   <span
-                    className={`inline-block h-2 w-2 rounded-full ${installation.enabled ? "bg-success" : "bg-muted-foreground"}`}
+                    className={
+                      "inline-block h-2 w-2 rounded-full " +
+                      (installation.enabled ? "bg-success" : "bg-muted-foreground")
+                    }
                   />
                   <span className="text-muted-foreground text-[11px] font-medium">
-                    {installation.enabled ? "Active" : "Inactive"}
+                    {installation.enabled
+                      ? tr("pages.admin_plugins.active")
+                      : tr("pages.admin_plugins.inactive")}
                   </span>
                 </span>
               </div>
@@ -404,8 +427,8 @@ function InstalledPluginCard({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  title="Plugin settings"
-                  aria-label="Plugin settings"
+                  title={tr("pages.admin_plugins.plugin_settings")}
+                  aria-label={tr("pages.admin_plugins.plugin_settings")}
                   onClick={() => onConfigure(installation)}
                 >
                   <Settings2 className="h-3.5 w-3.5" />
@@ -414,7 +437,7 @@ function InstalledPluginCard({
             ) : (
               <Button variant="outline" size="sm" onClick={() => onConfigure(installation)}>
                 <Settings2 className="mr-1.5 h-3.5 w-3.5" />
-                Configure
+                {tr("pages.admin_plugins.configure")}
               </Button>
             )}
             <Select
@@ -430,9 +453,9 @@ function InstalledPluginCard({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Auto</SelectItem>
-                <SelectItem value="notify">Notify</SelectItem>
-                <SelectItem value="off">Off</SelectItem>
+                <SelectItem value="auto">{tr("pages.admin_plugins.auto")}</SelectItem>
+                <SelectItem value="notify">{tr("pages.admin_plugins.notify")}</SelectItem>
+                <SelectItem value="off">{tr("pages.admin_plugins.off")}</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5">
@@ -449,7 +472,9 @@ function InstalledPluginCard({
               size="icon-sm"
               className="text-muted-foreground hover:text-destructive"
               onClick={() => setConfirmDelete(true)}
-              aria-label={`Uninstall ${pluginDisplayName(installation.plugin_id, presentation)}`}
+              aria-label={tr("pages.admin_plugins.uninstall_value", {
+                value: pluginDisplayName(installation.plugin_id, presentation),
+              })}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -460,21 +485,25 @@ function InstalledPluginCard({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Uninstall {pluginDisplayName(installation.plugin_id, presentation)}?
+              {tr("pages.admin_plugins.uninstall")}{" "}
+              {pluginDisplayName(installation.plugin_id, presentation)}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Silo will stop the plugin, then remove its installation, configuration, and installed
-              files. This cannot be undone.
+              {tr(
+                "pages.admin_plugins.silo_will_stop_the_plugin_then_remove_its_installation_configuration",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteInstallation.mutate(installation.id)}
               disabled={deleteInstallation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteInstallation.isPending ? "Uninstalling..." : "Uninstall plugin"}
+              {deleteInstallation.isPending
+                ? tr("pages.admin_plugins.uninstalling")
+                : tr("pages.admin_plugins.uninstall_plugin")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -492,6 +521,7 @@ function ConfigureDialog({
   installation: PluginInstallation;
   onClose: () => void;
 }) {
+  useUILanguage();
   const saveConfig = useSavePluginConfig();
   const testConfig = useTestPluginConfig();
   const saveAuthBinding = useSavePluginAuthBinding();
@@ -523,7 +553,7 @@ function ConfigureDialog({
             </Badge>
           </DialogTitle>
           <DialogDescription>
-            Configure bindings, credentials, and runtime settings.
+            {tr("pages.admin_plugins.configure_bindings_credentials_and_runtime_settings")}
           </DialogDescription>
         </DialogHeader>
 
@@ -534,7 +564,7 @@ function ConfigureDialog({
               <AccordionTrigger>
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <Settings2 className="h-4 w-4" />
-                  Global Configuration
+                  {tr("pages.admin_plugins.global_configuration")}
                 </span>
               </AccordionTrigger>
               <AccordionContent>
@@ -578,14 +608,15 @@ function ConfigureDialog({
               <AccordionTrigger>
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <Shield className="h-4 w-4" />
-                  Auth Providers
+                  {tr("pages.admin_plugins.auth_providers")}
                 </span>
               </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-3">
                   <p className="text-muted-foreground text-xs">
-                    Auth-provider bindings are registered at server startup. Saved changes require a
-                    restart.
+                    {tr(
+                      "pages.admin_plugins.auth_provider_bindings_are_registered_at_server_startup_saved_changes",
+                    )}
                   </p>
                   {authCapabilities.map((capability, index) => {
                     const binding = authBindings.find((e) => e.capability_id === capability.id);
@@ -630,14 +661,15 @@ function ConfigureDialog({
               <AccordionTrigger>
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <CircleDot className="h-4 w-4" />
-                  Scheduled Tasks
+                  {tr("pages.admin_plugins.scheduled_tasks")}
                 </span>
               </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-3">
                   <p className="text-muted-foreground text-xs">
-                    Enable or disable each declared task binding. Task registration is rebuilt at
-                    server startup, so saved changes require a restart.
+                    {tr(
+                      "pages.admin_plugins.enable_or_disable_each_declared_task_binding_task_registration_is",
+                    )}
                   </p>
                   {taskCapabilities.map((capability) => {
                     const binding = taskBindings.find((e) => e.capability_id === capability.id);
@@ -652,7 +684,8 @@ function ConfigureDialog({
                           </p>
                           <p className="text-muted-foreground font-mono text-xs">{capability.id}</p>
                           <p className="text-muted-foreground mt-1 text-xs">
-                            Trigger: {JSON.stringify(binding?.trigger ?? { type: "startup" })}
+                            {tr("pages.admin_plugins.trigger")}{" "}
+                            {JSON.stringify(binding?.trigger ?? { type: "startup" })}
                           </p>
                         </div>
                         <Switch
@@ -683,7 +716,7 @@ function ConfigureDialog({
               <AccordionTrigger>
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <ExternalLink className="h-4 w-4" />
-                  Plugin Pages
+                  {tr("pages.admin_plugins.plugin_pages")}
                 </span>
               </AccordionTrigger>
               <AccordionContent>
@@ -713,7 +746,7 @@ function ConfigureDialog({
 
         {!hasSections && (
           <p className="text-muted-foreground py-4 text-center text-sm">
-            This plugin has no additional configuration.
+            {tr("pages.admin_plugins.this_plugin_has_no_additional_configuration")}
           </p>
         )}
 
@@ -726,6 +759,7 @@ function ConfigureDialog({
 /* ─── Available plugin card ─────────────────────────────────────── */
 
 function CatalogCard({ entry, isInstalled }: { entry: PluginCatalogEntry; isInstalled: boolean }) {
+  useUILanguage();
   const installPlugin = useInstallPlugin();
   const capabilities = entry.capabilities ?? [];
 
@@ -769,7 +803,7 @@ function CatalogCard({ entry, isInstalled }: { entry: PluginCatalogEntry; isInst
         <PluginResourceLinks presentation={entry.presentation} repoURL={entry.repo_url} />
         {isInstalled ? (
           <Badge variant="outline" className="text-muted-foreground text-xs">
-            Installed
+            {tr("pages.admin_plugins.installed")}
           </Badge>
         ) : (
           <Button
@@ -784,7 +818,7 @@ function CatalogCard({ entry, isInstalled }: { entry: PluginCatalogEntry; isInst
             disabled={installPlugin.isPending}
           >
             <Download className="mr-1.5 h-3.5 w-3.5" />
-            Install
+            {tr("pages.admin_plugins.install")}
           </Button>
         )}
       </div>
@@ -793,6 +827,7 @@ function CatalogCard({ entry, isInstalled }: { entry: PluginCatalogEntry; isInst
 }
 
 function CommunityCatalogControl({ settings }: { settings: PluginCatalogSettings }) {
+  useUILanguage();
   const updateSettings = useUpdatePluginCatalogSettings();
   const [confirmDisable, setConfirmDisable] = useState(false);
 
@@ -816,18 +851,19 @@ function CommunityCatalogControl({ settings }: { settings: PluginCatalogSettings
           <div className="flex items-center gap-2">
             <Shield className="text-muted-foreground h-4 w-4" />
             <label htmlFor="approved-community-plugins" className="text-sm font-medium">
-              Include approved community plugins
+              {tr("pages.admin_plugins.include_approved_community_plugins")}
             </label>
           </div>
           <p className="text-muted-foreground text-xs leading-relaxed">
-            Reviewed by Silo maintainers to work as described and be safe for their documented use.
-            These plugins remain maintained and supported by community contributors.
+            {tr("pages.admin_plugins.reviewed_by_silo_maintainers_to_work_as_described_and_be")}
           </p>
           {settings.migrated_plugin_count > 0 ? (
             <p className="text-muted-foreground text-xs">
-              {settings.migrated_plugin_count} existing{" "}
-              {settings.migrated_plugin_count === 1 ? "installation was" : "installations were"}{" "}
-              moved here without changing configuration.
+              {settings.migrated_plugin_count} {tr("pages.admin_plugins.existing")}{" "}
+              {settings.migrated_plugin_count === 1
+                ? tr("pages.admin_plugins.installation_was")
+                : tr("pages.admin_plugins.installations_were")}{" "}
+              {tr("pages.admin_plugins.moved_here_without_changing_configuration")}
             </p>
           ) : null}
         </div>
@@ -836,29 +872,33 @@ function CommunityCatalogControl({ settings }: { settings: PluginCatalogSettings
           checked={settings.include_approved_community_plugins}
           disabled={updateSettings.isPending}
           onCheckedChange={setIncluded}
-          aria-label="Include approved community plugins"
+          aria-label={tr("pages.admin_plugins.include_approved_community_plugins")}
         />
       </div>
 
       <AlertDialog open={confirmDisable} onOpenChange={setConfirmDisable}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hide approved community plugins?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {tr("pages.admin_plugins.hide_approved_community_plugins")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {settings.installed_community_plugin_count}{" "}
               {settings.installed_community_plugin_count === 1
-                ? "installed plugin will"
-                : "installed plugins will"}{" "}
-              keep running, but update discovery will pause until this catalog is included again.
+                ? tr("pages.admin_plugins.installed_plugin_will")
+                : tr("pages.admin_plugins.installed_plugins_will")}{" "}
+              {tr(
+                "pages.admin_plugins.keep_running_but_update_discovery_will_pause_until_this_catalog",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={disableCommunityCatalog}
               disabled={updateSettings.isPending}
             >
-              Hide and pause updates
+              {tr("pages.admin_plugins.hide_and_pause_updates")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -870,6 +910,7 @@ function CommunityCatalogControl({ settings }: { settings: PluginCatalogSettings
 /* ─── Repository management ─────────────────────────────────────── */
 
 function RepositorySection() {
+  useUILanguage();
   const { repositories } = useAdminPlugins();
   const createRepository = useCreatePluginRepository();
   const updateRepository = useUpdatePluginRepository();
@@ -892,8 +933,10 @@ function RepositorySection() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold">Repositories</h3>
-          <p className="text-muted-foreground text-xs">Sources for discovering plugins.</p>
+          <h3 className="text-sm font-semibold">{tr("pages.admin_plugins.repositories")}</h3>
+          <p className="text-muted-foreground text-xs">
+            {tr("pages.admin_plugins.sources_for_discovering_plugins")}
+          </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setShowForm(!showForm)}>
           {showForm ? (
@@ -901,7 +944,7 @@ function RepositorySection() {
           ) : (
             <Plus className="mr-1.5 h-3.5 w-3.5" />
           )}
-          {showForm ? "Cancel" : "Add"}
+          {showForm ? tr("common.actions.cancel") : tr("common.actions.add")}
         </Button>
       </div>
 
@@ -913,17 +956,17 @@ function RepositorySection() {
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Repository name"
+            placeholder={tr("pages.admin_plugins.repository_name")}
             className="sm:flex-1"
           />
           <Input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://plugins.example.test/index.json"
+            placeholder={tr("pages.admin_plugins.https_plugins_example_test_index_json")}
             className="sm:flex-[2]"
           />
           <Button type="submit" size="sm">
-            Add
+            {tr("common.actions.add")}
           </Button>
         </form>
       )}
@@ -939,14 +982,19 @@ function RepositorySection() {
                 <div className="flex items-center gap-2">
                   <p className="truncate text-sm font-medium">{repo.display_name}</p>
                   <span
-                    className={`inline-block h-1.5 w-1.5 rounded-full ${repo.enabled ? "bg-success" : "bg-muted-foreground"}`}
+                    className={
+                      "inline-block h-1.5 w-1.5 rounded-full " +
+                      (repo.enabled ? "bg-success" : "bg-muted-foreground")
+                    }
                   />
                 </div>
                 <p className="text-muted-foreground truncate font-mono text-xs">{repo.url}</p>
               </div>
               <div className="flex shrink-0 gap-2">
                 {repo.managed ? (
-                  <span className="text-muted-foreground self-center text-xs">Managed by Silo</span>
+                  <span className="text-muted-foreground self-center text-xs">
+                    {tr("pages.admin_plugins.managed_by_silo")}
+                  </span>
                 ) : (
                   <>
                     <Button
@@ -956,7 +1004,7 @@ function RepositorySection() {
                         updateRepository.mutate({ id: repo.id, body: { enabled: !repo.enabled } })
                       }
                     >
-                      {repo.enabled ? "Disable" : "Enable"}
+                      {repo.enabled ? tr("common.actions.disable") : tr("common.actions.enable")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -976,7 +1024,7 @@ function RepositorySection() {
 
       {repositories.length === 0 && !showForm && (
         <p className="text-muted-foreground py-4 text-center text-sm">
-          No repositories configured. Add one to browse available plugins.
+          {tr("pages.admin_plugins.no_repositories_configured_add_one_to_browse_available_plugins")}
         </p>
       )}
     </div>
@@ -986,6 +1034,7 @@ function RepositorySection() {
 /* ─── Upload section ────────────────────────────────────────────── */
 
 function UploadSection() {
+  useUILanguage();
   const { upload, progress, isPending } = usePluginUpload();
   const [file, setFile] = useState<File | null>(null);
 
@@ -998,8 +1047,10 @@ function UploadSection() {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="text-sm font-semibold">Manual Install</h3>
-        <p className="text-muted-foreground text-xs">Upload a plugin binary directly.</p>
+        <h3 className="text-sm font-semibold">{tr("pages.admin_plugins.manual_install")}</h3>
+        <p className="text-muted-foreground text-xs">
+          {tr("pages.admin_plugins.upload_a_plugin_binary_directly")}
+        </p>
       </div>
       <form
         onSubmit={handleSubmit}
@@ -1008,7 +1059,7 @@ function UploadSection() {
         <label className="border-border hover:border-foreground/20 flex h-10 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed px-4 text-sm transition-colors">
           <Upload className="text-muted-foreground h-4 w-4 shrink-0" />
           <span className="text-muted-foreground truncate">
-            {file ? file.name : "Choose plugin file..."}
+            {file ? file.name : tr("pages.admin_plugins.choose_plugin_file")}
           </span>
           <input
             type="file"
@@ -1018,10 +1069,12 @@ function UploadSection() {
         </label>
         <Button type="submit" variant="outline" size="sm" disabled={!file || isPending}>
           <Upload className="mr-1.5 h-3.5 w-3.5" />
-          {isPending ? "Uploading..." : "Upload"}
+          {isPending ? tr("pages.admin_plugins.uploading") : tr("common.actions.upload")}
         </Button>
       </form>
-      {progress !== null && <Progress value={progress} aria-label="Plugin upload progress" />}
+      {progress !== null && (
+        <Progress value={progress} aria-label={tr("pages.admin_plugins.plugin_upload_progress")} />
+      )}
     </div>
   );
 }
@@ -1029,6 +1082,7 @@ function UploadSection() {
 /* ─── Main page ─────────────────────────────────────────────────── */
 
 export default function AdminPlugins() {
+  useUILanguage();
   const { installations, catalog, catalogSettings, isLoading } = useAdminPlugins();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -1149,12 +1203,16 @@ export default function AdminPlugins() {
     return (
       <div className="space-y-6">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Plugins</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_plugins.plugins")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Extend Silo with community and first-party plugins.
+            {tr("pages.admin_plugins.extend_silo_with_community_and_first_party_plugins")}
           </p>
         </div>
-        <div className="text-muted-foreground py-12 text-center text-sm">Loading plugins...</div>
+        <div className="text-muted-foreground py-12 text-center text-sm">
+          {tr("pages.admin_plugins.loading_plugins")}
+        </div>
       </div>
     );
   }
@@ -1163,9 +1221,11 @@ export default function AdminPlugins() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Plugins</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_plugins.plugins")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Extend Silo with community and first-party plugins.
+            {tr("pages.admin_plugins.extend_silo_with_community_and_first_party_plugins")}
           </p>
         </div>
         <Button
@@ -1174,7 +1234,9 @@ export default function AdminPlugins() {
           disabled={checkPluginUpdates.isPending || isCheckingUpdates}
         >
           <Download className="mr-1.5 h-3.5 w-3.5" />
-          {isCheckingUpdates ? "Checking updates..." : "Check for updates"}
+          {isCheckingUpdates
+            ? tr("pages.admin_plugins.checking_updates")
+            : tr("pages.admin_plugins.check_for_updates")}
         </Button>
       </div>
 
@@ -1186,7 +1248,7 @@ export default function AdminPlugins() {
       >
         <TabsList variant="line" className="mb-2">
           <TabsTrigger value="installed">
-            Installed
+            {tr("pages.admin_plugins.installed")}
             {installations.length > 0 && (
               <Badge variant="secondary" className="ml-1.5 text-[10px]">
                 {installations.length}
@@ -1194,7 +1256,7 @@ export default function AdminPlugins() {
             )}
           </TabsTrigger>
           <TabsTrigger value="catalog">
-            Catalog
+            {tr("pages.admin_plugins.catalog")}
             {catalog.length > 0 && (
               <Badge variant="secondary" className="ml-1.5 text-[10px]">
                 {catalog.length}
@@ -1210,7 +1272,7 @@ export default function AdminPlugins() {
               query={installedQuery}
               total={installations.length}
               matchingTotal={filteredInstallations.length}
-              placeholder="Search installed plugins"
+              placeholder={tr("pages.admin_plugins.search_installed_plugins")}
               onQueryChange={(query) =>
                 updatePluginView({ installed_q: query || undefined, installed_page: undefined })
               }
@@ -1220,15 +1282,19 @@ export default function AdminPlugins() {
             <div className="surface-panel-subtle flex flex-col items-center gap-3 rounded-xl py-16">
               <Blocks className="text-muted-foreground h-10 w-10" />
               <div className="text-center">
-                <p className="text-sm font-medium">No plugins installed</p>
+                <p className="text-sm font-medium">
+                  {tr("pages.admin_plugins.no_plugins_installed")}
+                </p>
                 <p className="text-muted-foreground text-xs">
-                  Browse the Catalog tab to find and install plugins.
+                  {tr("pages.admin_plugins.browse_the_catalog_tab_to_find_and_install_plugins")}
                 </p>
               </div>
             </div>
           ) : filteredInstallations.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-sm font-medium">No installed plugins match your search</p>
+              <p className="text-sm font-medium">
+                {tr("pages.admin_plugins.no_installed_plugins_match_your_search")}
+              </p>
               <button
                 type="button"
                 className="text-muted-foreground hover:text-foreground mt-1 text-xs transition-colors"
@@ -1236,7 +1302,7 @@ export default function AdminPlugins() {
                   updatePluginView({ installed_q: undefined, installed_page: undefined })
                 }
               >
-                Clear search
+                {tr("pages.admin_plugins.clear_search")}
               </button>
             </div>
           ) : (
@@ -1278,7 +1344,7 @@ export default function AdminPlugins() {
               query={catalogQuery}
               total={catalog.length}
               matchingTotal={filteredCatalog.length}
-              placeholder="Search the plugin catalog"
+              placeholder={tr("pages.admin_plugins.search_the_plugin_catalog")}
               onQueryChange={(query) =>
                 updatePluginView({ catalog_q: query || undefined, catalog_page: undefined })
               }
@@ -1289,21 +1355,25 @@ export default function AdminPlugins() {
             <div className="surface-panel-subtle flex flex-col items-center gap-3 rounded-xl py-12">
               <Package className="text-muted-foreground h-10 w-10" />
               <div className="text-center">
-                <p className="text-sm font-medium">No plugins available</p>
+                <p className="text-sm font-medium">
+                  {tr("pages.admin_plugins.no_plugins_available")}
+                </p>
                 <p className="text-muted-foreground text-xs">
-                  Add a repository or upload a plugin archive.
+                  {tr("pages.admin_plugins.add_a_repository_or_upload_a_plugin_archive")}
                 </p>
               </div>
             </div>
           ) : filteredCatalog.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-sm font-medium">No catalog plugins match your search</p>
+              <p className="text-sm font-medium">
+                {tr("pages.admin_plugins.no_catalog_plugins_match_your_search")}
+              </p>
               <button
                 type="button"
                 className="text-muted-foreground hover:text-foreground mt-1 text-xs transition-colors"
                 onClick={() => updatePluginView({ catalog_q: undefined, catalog_page: undefined })}
               >
-                Clear search
+                {tr("pages.admin_plugins.clear_search")}
               </button>
             </div>
           ) : (

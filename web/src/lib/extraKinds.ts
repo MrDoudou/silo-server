@@ -1,3 +1,5 @@
+import { tr } from "@/i18n/translate";
+
 /**
  * Shared kind vocabulary for remote provider videos (ItemVideo) and local
  * extras files (ItemExtra). Keep in sync with the server's kind list.
@@ -17,26 +19,26 @@ export type ExtraKind = (typeof EXTRA_KINDS)[number];
 
 /** Singular label, used for individual video/extra cards. */
 const EXTRA_KIND_LABELS: Record<string, string> = {
-  trailer: "Trailer",
-  teaser: "Teaser",
-  featurette: "Featurette",
-  clip: "Clip",
-  behind_the_scenes: "Behind the Scenes",
-  bloopers: "Bloopers",
-  deleted_scene: "Deleted Scene",
-  other: "Extra",
+  trailer: "lib.extra_kinds.trailer",
+  teaser: "lib.extra_kinds.teaser",
+  featurette: "lib.extra_kinds.featurette",
+  clip: "lib.extra_kinds.clip",
+  behind_the_scenes: "lib.extra_kinds.behind_the_scenes",
+  bloopers: "lib.extra_kinds.bloopers",
+  deleted_scene: "lib.extra_kinds.deleted_scene",
+  other: "lib.extra_kinds.extra",
 };
 
 /** Plural group label, used for section headings when grouping by kind. */
 const EXTRA_KIND_GROUP_LABELS: Record<string, string> = {
-  trailer: "Trailers",
-  teaser: "Teasers",
-  featurette: "Featurettes",
-  clip: "Clips",
-  behind_the_scenes: "Behind the Scenes",
-  bloopers: "Bloopers",
-  deleted_scene: "Deleted Scenes",
-  other: "Other",
+  trailer: "lib.extra_kinds.trailers",
+  teaser: "lib.extra_kinds.teasers",
+  featurette: "lib.extra_kinds.featurettes",
+  clip: "lib.extra_kinds.clips",
+  behind_the_scenes: "lib.extra_kinds.behind_the_scenes",
+  bloopers: "lib.extra_kinds.bloopers",
+  deleted_scene: "lib.extra_kinds.deleted_scenes",
+  other: "lib.extra_kinds.other",
 };
 
 /**
@@ -48,9 +50,9 @@ export const PROVIDER_TRAILER_KINDS: ExtraKind[] = EXTRA_KINDS.filter(
 );
 
 export function extraKindLabel(kind: string): string {
-  return EXTRA_KIND_LABELS[kind] ?? "Extra";
+  return tr(EXTRA_KIND_LABELS[kind] ?? "lib.extra_kinds.extra");
 }
 
 export function extraKindGroupLabel(kind: string): string {
-  return EXTRA_KIND_GROUP_LABELS[kind] ?? "Other";
+  return tr(EXTRA_KIND_GROUP_LABELS[kind] ?? "lib.extra_kinds.other");
 }

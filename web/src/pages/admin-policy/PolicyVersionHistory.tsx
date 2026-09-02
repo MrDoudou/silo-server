@@ -1,6 +1,6 @@
 import { RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { RegoEditor } from "@/components/policy/RegoEditor";
 import {
@@ -30,6 +30,8 @@ import {
 } from "@/hooks/queries/admin/policy";
 
 import { formatPolicyDate, messageFromError } from "./policyPageUtils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface PolicyVersionHistoryProps {
   documentId: number;
@@ -37,6 +39,7 @@ interface PolicyVersionHistoryProps {
 }
 
 export function PolicyVersionHistory({ documentId, activeVersionId }: PolicyVersionHistoryProps) {
+  useUILanguage();
   const { data: versions, isLoading } = usePolicyVersions(documentId);
   const [selectedVersionId, setSelectedVersionId] = useState<number | undefined>(undefined);
   const [rollbackVersionId, setRollbackVersionId] = useState<number | undefined>(undefined);
@@ -60,10 +63,12 @@ export function PolicyVersionHistory({ documentId, activeVersionId }: PolicyVers
     if (!rollbackVersionId) return;
     try {
       await activate.mutateAsync({ documentId, version: rollbackVersionId });
-      toast.success("Policy version activated");
+      toast.success("feedback.admin_policy.policy_version_history.policy_version_activated");
       setRollbackVersionId(undefined);
     } catch (error) {
-      toast.error(messageFromError(error, "Failed to activate policy version"));
+      toast.error("errors.admin_policy.policy_version_history.reported_message", {
+        values: { message: messageFromError(error, "Failed to activate policy version") },
+      });
     }
   }
 
@@ -73,26 +78,30 @@ export function PolicyVersionHistory({ documentId, activeVersionId }: PolicyVers
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Version</TableHead>
-              <TableHead>Author</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Comment</TableHead>
-              <TableHead>Compile</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_version_history.version")}</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_version_history.author")}</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_version_history.created")}</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_version_history.comment")}</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_version_history.compile")}</TableHead>
+              <TableHead className="text-right">
+                {tr("pages.admin_policy.policy_version_history.actions")}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
               <TableRow>
                 <TableCell colSpan={6} className="text-muted-foreground py-6 text-center">
-                  Loading versions...
+                  {tr("pages.admin_policy.policy_version_history.loading_versions")}
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && versions?.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-muted-foreground py-6 text-center">
-                  No versions have been saved for this document.
+                  {tr(
+                    "pages.admin_policy.policy_version_history.no_versions_have_been_saved_for_this_document",
+                  )}
                 </TableCell>
               </TableRow>
             )}
@@ -115,15 +124,20 @@ export function PolicyVersionHistory({ documentId, activeVersionId }: PolicyVers
                   }}
                 >
                   <TableCell className="font-medium">
-                    v{version.version_number}
+                    {tr("pages.admin_policy.policy_version_history.v")}
+                    {version.version_number}
                     {isActive && (
                       <Badge variant="secondary" className="ml-2">
-                        Live
+                        {tr("pages.admin_policy.policy_version_history.live")}
                       </Badge>
                     )}
                   </TableCell>
                   <TableCell>
-                    {version.created_by_user_id ? `User ${version.created_by_user_id}` : "—"}
+                    {version.created_by_user_id
+                      ? tr("pages.admin_policy.policy_version_history.user_created_by_user_id", {
+                          created_by_user_id: version.created_by_user_id,
+                        })
+                      : "—"}
                   </TableCell>
                   <TableCell>{formatPolicyDate(version.created_at)}</TableCell>
                   <TableCell className="max-w-[260px] truncate">
@@ -131,7 +145,9 @@ export function PolicyVersionHistory({ documentId, activeVersionId }: PolicyVers
                   </TableCell>
                   <TableCell>
                     <Badge variant={version.compiled_ok ? "secondary" : "destructive"}>
-                      {version.compiled_ok ? "Compiled" : "Failed"}
+                      {version.compiled_ok
+                        ? tr("pages.admin_policy.policy_version_history.compiled")
+                        : tr("pages.admin_policy.policy_version_history.failed")}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -146,7 +162,7 @@ export function PolicyVersionHistory({ documentId, activeVersionId }: PolicyVers
                       }}
                     >
                       <RotateCcw className="size-4" />
-                      Make live
+                      {tr("pages.admin_policy.policy_version_history.make_live")}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -158,7 +174,9 @@ export function PolicyVersionHistory({ documentId, activeVersionId }: PolicyVers
 
       {sourceVersion?.source !== undefined && (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">Selected Source</h3>
+          <h3 className="text-sm font-semibold">
+            {tr("pages.admin_policy.policy_version_history.selected_source")}
+          </h3>
           <RegoEditor value={sourceVersion.source} readOnly height="260px" />
         </div>
       )}
@@ -170,17 +188,20 @@ export function PolicyVersionHistory({ documentId, activeVersionId }: PolicyVers
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Make v{rollbackVersion?.version_number} the live policy?
+              {tr("pages.admin_policy.policy_version_history.make_v")}
+              {rollbackVersion?.version_number}{" "}
+              {tr("pages.admin_policy.policy_version_history.the_live_policy")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              New requests start using it immediately, on every server node. The version it replaces
-              stays in this history.
+              {tr(
+                "pages.admin_policy.policy_version_history.new_requests_start_using_it_immediately_on_every_server_node",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmRollback} disabled={activate.isPending}>
-              Activate
+              {tr("pages.admin_policy.policy_version_history.activate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

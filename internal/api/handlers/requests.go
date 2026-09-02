@@ -646,17 +646,21 @@ func writeRequestServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.As(err, &quota):
 		writeJSON(w, http.StatusTooManyRequests, struct {
-			Error      string `json:"error"`
-			Message    string `json:"message"`
-			Used       int    `json:"used"`
-			Limit      int    `json:"limit"`
-			WindowDays int    `json:"window_days"`
+			Error          string         `json:"error"`
+			Message        string         `json:"message"`
+			Params         map[string]any `json:"params"`
+			TranslationKey string         `json:"translation_key"`
+			Used           int            `json:"used"`
+			Limit          int            `json:"limit"`
+			WindowDays     int            `json:"window_days"`
 		}{
-			Error:      "quota_exceeded",
-			Message:    "Request quota exceeded",
-			Used:       quota.Used,
-			Limit:      quota.Limit,
-			WindowDays: quota.WindowDays,
+			Error:          "quota_exceeded",
+			Message:        "Request quota exceeded",
+			Params:         map[string]any{"limit": quota.Limit, "window_days": quota.WindowDays},
+			TranslationKey: "errors.api.quota_exceeded",
+			Used:           quota.Used,
+			Limit:          quota.Limit,
+			WindowDays:     quota.WindowDays,
 		})
 	case errors.Is(err, mediarequests.ErrInvalidInput), errors.Is(err, mediarequests.ErrInvalidMediaType):
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())

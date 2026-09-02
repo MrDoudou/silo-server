@@ -1,6 +1,8 @@
 import type { GuidedFormState } from "@/components/collections/CollectionGuidedRulesEditor";
 import { formatLanguage } from "@/lib/languageDisplay";
 
+import { tr } from "@/i18n/translate";
+
 export interface ActiveFilterBadge {
   key: string;
   label: string;
@@ -21,7 +23,9 @@ export function getActiveFilterBadges(
   for (const genre of state.genres) {
     badges.push({
       key: `genre:${genre}`,
-      label: `Genre: ${genre}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.genre_value1", { value1: genre });
+      },
       clearPatch: { genres: state.genres.filter((g) => g !== genre) },
     });
   }
@@ -30,19 +34,32 @@ export function getActiveFilterBadges(
   if (state.yearFrom && state.yearTo) {
     badges.push({
       key: "year",
-      label: `Year: ${state.yearFrom}–${state.yearTo}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.year_value1_value2", {
+          value1: state.yearFrom,
+          value2: state.yearTo,
+        });
+      },
       clearPatch: { yearFrom: "", yearTo: "" },
     });
   } else if (state.yearFrom) {
     badges.push({
       key: "year",
-      label: `Year: >= ${state.yearFrom}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.year_value1", {
+          value1: state.yearFrom,
+        });
+      },
       clearPatch: { yearFrom: "" },
     });
   } else if (state.yearTo) {
     badges.push({
       key: "year",
-      label: `Year: <= ${state.yearTo}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.year_value1_0451aa6a", {
+          value1: state.yearTo,
+        });
+      },
       clearPatch: { yearTo: "" },
     });
   }
@@ -51,7 +68,11 @@ export function getActiveFilterBadges(
   if (state.minRating) {
     badges.push({
       key: "minRating",
-      label: `IMDb: >= ${state.minRating}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.imdb_value1", {
+          value1: state.minRating,
+        });
+      },
       clearPatch: { minRating: "" },
     });
   }
@@ -60,7 +81,11 @@ export function getActiveFilterBadges(
   if (state.contentRating) {
     badges.push({
       key: "contentRating",
-      label: `Rated: ${state.contentRating}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.rated_value1", {
+          value1: state.contentRating,
+        });
+      },
       clearPatch: { contentRating: "" },
     });
   }
@@ -68,7 +93,11 @@ export function getActiveFilterBadges(
   for (const lang of state.originalLanguages) {
     badges.push({
       key: `originalLanguage:${lang}`,
-      label: `Language: ${formatLanguage(lang)}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.language_value1", {
+          value1: formatLanguage(lang),
+        });
+      },
       clearPatch: {
         originalLanguages: state.originalLanguages.filter((l) => l !== lang),
       },
@@ -78,7 +107,9 @@ export function getActiveFilterBadges(
   if (state.actor) {
     badges.push({
       key: "actor",
-      label: `Actor: ${state.actor}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.actor_value1", { value1: state.actor });
+      },
       clearPatch: { actor: "" },
     });
   }
@@ -86,7 +117,11 @@ export function getActiveFilterBadges(
   if (state.director) {
     badges.push({
       key: "director",
-      label: `Director: ${state.director}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.director_value1", {
+          value1: state.director,
+        });
+      },
       clearPatch: { director: "" },
     });
   }
@@ -94,7 +129,11 @@ export function getActiveFilterBadges(
   if (state.writer) {
     badges.push({
       key: "writer",
-      label: `Writer: ${state.writer}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.writer_value1", {
+          value1: state.writer,
+        });
+      },
       clearPatch: { writer: "" },
     });
   }
@@ -102,7 +141,11 @@ export function getActiveFilterBadges(
   if (state.producer) {
     badges.push({
       key: "producer",
-      label: `Producer: ${state.producer}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.producer_value1", {
+          value1: state.producer,
+        });
+      },
       clearPatch: { producer: "" },
     });
   }
@@ -110,7 +153,11 @@ export function getActiveFilterBadges(
   if (state.author) {
     badges.push({
       key: "author",
-      label: `Author: ${state.author}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.author_value1", {
+          value1: state.author,
+        });
+      },
       clearPatch: { author: "" },
     });
   }
@@ -118,7 +165,11 @@ export function getActiveFilterBadges(
   if (state.narrator && state.mediaScope === "audiobook") {
     badges.push({
       key: "narrator",
-      label: `Narrator: ${state.narrator}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.narrator_value1", {
+          value1: state.narrator,
+        });
+      },
       clearPatch: { narrator: "" },
     });
   }
@@ -126,7 +177,11 @@ export function getActiveFilterBadges(
   if (state.series) {
     badges.push({
       key: "series",
-      label: `Series: ${state.series}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.series_value1", {
+          value1: state.series,
+        });
+      },
       clearPatch: { series: "" },
     });
   }
@@ -135,7 +190,11 @@ export function getActiveFilterBadges(
   if (state.studio) {
     badges.push({
       key: "studio",
-      label: `Studio: ${state.studio}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.studio_value1", {
+          value1: state.studio,
+        });
+      },
       clearPatch: { studio: "" },
     });
   }
@@ -144,7 +203,11 @@ export function getActiveFilterBadges(
   if (state.network) {
     badges.push({
       key: "network",
-      label: `Network: ${state.network}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.network_value1", {
+          value1: state.network,
+        });
+      },
       clearPatch: { network: "" },
     });
   }
@@ -153,7 +216,11 @@ export function getActiveFilterBadges(
   if (state.country) {
     badges.push({
       key: "country",
-      label: `Country: ${state.country}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.country_value1", {
+          value1: state.country,
+        });
+      },
       clearPatch: { country: "" },
     });
   }
@@ -162,7 +229,11 @@ export function getActiveFilterBadges(
   if (state.status) {
     badges.push({
       key: "status",
-      label: `Match: ${state.status}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.match_value1", {
+          value1: state.status,
+        });
+      },
       clearPatch: { status: "" },
     });
   }
@@ -191,7 +262,11 @@ export function getActiveFilterBadges(
   if (state.addedInLast) {
     badges.push({
       key: "addedInLast",
-      label: `Added in last: ${state.addedInLast}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.added_in_last_value1", {
+          value1: state.addedInLast,
+        });
+      },
       clearPatch: { addedInLast: "" },
     });
   }
@@ -200,7 +275,11 @@ export function getActiveFilterBadges(
   if (state.releasedInLast) {
     badges.push({
       key: "releasedInLast",
-      label: `Released in last: ${state.releasedInLast}`,
+      get label() {
+        return tr("components.catalog.catalog_filter_badges.released_in_last_value1", {
+          value1: state.releasedInLast,
+        });
+      },
       clearPatch: { releasedInLast: "" },
     });
   }
@@ -208,7 +287,7 @@ export function getActiveFilterBadges(
   if (state.fourK) {
     badges.push({
       key: "fourK",
-      label: "4K",
+      label: tr("components.catalog.catalog_filter_badges.value_4_k"),
       clearPatch: { fourK: false },
     });
   }
@@ -216,7 +295,7 @@ export function getActiveFilterBadges(
   if (state.hdr) {
     badges.push({
       key: "hdr",
-      label: "HDR",
+      label: tr("components.catalog.catalog_filter_badges.hdr"),
       clearPatch: { hdr: false },
     });
   }
@@ -224,7 +303,7 @@ export function getActiveFilterBadges(
   if (state.dolbyVision) {
     badges.push({
       key: "dolbyVision",
-      label: "DOVI",
+      label: tr("components.catalog.catalog_filter_badges.dovi"),
       clearPatch: { dolbyVision: false },
     });
   }

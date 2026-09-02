@@ -33,6 +33,8 @@ import {
   prettyPolicyJson,
   toRFC3339FromLocalInput,
 } from "./policyPageUtils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface PolicyDecisionLogTableProps {
   domains: readonly string[];
@@ -48,6 +50,7 @@ function decisionLabel(value: string) {
 }
 
 export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps) {
+  useUILanguage();
   const [decisionName, setDecisionName] = useState("all");
   const [userID, setUserID] = useState("");
   const [allowed, setAllowed] = useState("all");
@@ -114,13 +117,17 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
     <div className="space-y-4">
       <div className="surface-panel-subtle grid gap-3 rounded-2xl p-4 md:grid-cols-[minmax(160px,220px)_120px_130px_1fr_1fr_auto] md:items-end">
         <div className="space-y-2">
-          <Label htmlFor="policy-decision-name">Decision</Label>
+          <Label htmlFor="policy-decision-name">
+            {tr("pages.admin_policy.policy_decision_log_table.decision")}
+          </Label>
           <Select value={decisionName} onValueChange={setDecisionName}>
             <SelectTrigger id="policy-decision-name" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All decisions</SelectItem>
+              <SelectItem value="all">
+                {tr("pages.admin_policy.policy_decision_log_table.all_decisions")}
+              </SelectItem>
               {domains.map((domain) => {
                 const value = decisionNameForDomain(domain);
                 return (
@@ -134,32 +141,44 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="policy-user-id">User ID</Label>
+          <Label htmlFor="policy-user-id">
+            {tr("pages.admin_policy.policy_decision_log_table.user_id")}
+          </Label>
           <Input
             id="policy-user-id"
             value={userID}
             onChange={(event) => setUserID(event.target.value)}
             inputMode="numeric"
-            placeholder="42"
+            placeholder={tr("pages.admin_policy.policy_decision_log_table.value_42")}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="policy-allowed">Allowed</Label>
+          <Label htmlFor="policy-allowed">
+            {tr("pages.admin_policy.policy_decision_log_table.allowed")}
+          </Label>
           <Select value={allowed} onValueChange={setAllowed}>
             <SelectTrigger id="policy-allowed" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="true">Allowed</SelectItem>
-              <SelectItem value="false">Denied</SelectItem>
+              <SelectItem value="all">
+                {tr("pages.admin_policy.policy_decision_log_table.all")}
+              </SelectItem>
+              <SelectItem value="true">
+                {tr("pages.admin_policy.policy_decision_log_table.allowed")}
+              </SelectItem>
+              <SelectItem value="false">
+                {tr("pages.admin_policy.policy_decision_log_table.denied")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="policy-from">From</Label>
+          <Label htmlFor="policy-from">
+            {tr("pages.admin_policy.policy_decision_log_table.from")}
+          </Label>
           <Input
             id="policy-from"
             type="datetime-local"
@@ -169,7 +188,7 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="policy-to">To</Label>
+          <Label htmlFor="policy-to">{tr("pages.admin_policy.policy_decision_log_table.to")}</Label>
           <Input
             id="policy-to"
             type="datetime-local"
@@ -180,10 +199,10 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
 
         <div className="flex gap-2">
           <Button type="button" variant="outline" onClick={resetFilters}>
-            Reset
+            {tr("common.actions.reset")}
           </Button>
           <Button type="button" onClick={applyFilters}>
-            Apply
+            {tr("common.actions.apply")}
           </Button>
         </div>
       </div>
@@ -192,12 +211,12 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Decision</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Allowed</TableHead>
-              <TableHead>Eval</TableHead>
-              <TableHead>Digest</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_decision_log_table.time")}</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_decision_log_table.decision")}</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_decision_log_table.user")}</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_decision_log_table.allowed")}</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_decision_log_table.eval")}</TableHead>
+              <TableHead>{tr("pages.admin_policy.policy_decision_log_table.digest")}</TableHead>
               <TableHead className="w-[48px]"> </TableHead>
             </TableRow>
           </TableHeader>
@@ -205,14 +224,16 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
             {decisions.isLoading && (
               <TableRow>
                 <TableCell colSpan={7} className="text-muted-foreground py-6 text-center">
-                  Loading policy decisions...
+                  {tr("pages.admin_policy.policy_decision_log_table.loading_policy_decisions")}
                 </TableCell>
               </TableRow>
             )}
             {!decisions.isLoading && decisions.data?.entries.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-muted-foreground py-6 text-center">
-                  No policy decisions matched the current filters.
+                  {tr(
+                    "pages.admin_policy.policy_decision_log_table.no_policy_decisions_matched_the_current_filters",
+                  )}
                 </TableCell>
               </TableRow>
             )}
@@ -239,10 +260,10 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
                         }
                       >
                         {entry.allowed === false
-                          ? "Denied"
+                          ? tr("pages.admin_policy.policy_decision_log_table.denied")
                           : entry.allowed === true
-                            ? "Allowed"
-                            : "Error"}
+                            ? tr("pages.admin_policy.policy_decision_log_table.allowed")
+                            : tr("pages.admin_policy.policy_decision_log_table.error")}
                       </Badge>
                     </TableCell>
                     <TableCell>{formatPolicyEvalMicros(entry.eval_time_ns)}</TableCell>
@@ -258,7 +279,7 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
                     </TableCell>
                   </TableRow>
                   {expanded && (
-                    <TableRow key={`${entry.id}-detail`}>
+                    <TableRow key={entry.id + "-detail"}>
                       <TableCell colSpan={7} className="bg-muted/20 p-4">
                         <DecisionDetail
                           error={entry.error}
@@ -284,10 +305,14 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
           disabled={cursorStack.length === 0 || decisions.isFetching}
           onClick={goPrevious}
         >
-          Previous
+          {tr("common.actions.previous")}
         </Button>
         <div className="text-muted-foreground text-xs">
-          {decisions.isFetching ? "Refreshing..." : decisions.data?.next_cursor ? "More rows" : ""}
+          {decisions.isFetching
+            ? tr("pages.admin_policy.policy_decision_log_table.refreshing")
+            : decisions.data?.next_cursor
+              ? tr("pages.admin_policy.policy_decision_log_table.more_rows")
+              : ""}
         </div>
         <Button
           type="button"
@@ -295,7 +320,7 @@ export function PolicyDecisionLogTable({ domains }: PolicyDecisionLogTableProps)
           disabled={!decisions.data?.next_cursor || decisions.isFetching}
           onClick={goNext}
         >
-          Next
+          {tr("common.actions.next")}
         </Button>
       </div>
     </div>
@@ -315,15 +340,24 @@ function DecisionDetail({
   inputSample?: unknown;
   resultSample?: unknown;
 }) {
+  useUILanguage();
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">Loading decision details...</p>;
+    return (
+      <p className="text-muted-foreground text-sm">
+        {tr("pages.admin_policy.policy_decision_log_table.loading_decision_details")}
+      </p>
+    );
   }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold">Input</h3>
-        <p className="text-muted-foreground font-mono text-xs">Digest: {inputDigest || "—"}</p>
+        <h3 className="text-sm font-semibold">
+          {tr("pages.admin_policy.policy_decision_log_table.input")}
+        </h3>
+        <p className="text-muted-foreground font-mono text-xs">
+          {tr("pages.admin_policy.policy_decision_log_table.digest_7da270b0")} {inputDigest || "—"}
+        </p>
         {inputSample !== undefined && (
           <pre className="border-border bg-background max-h-[260px] overflow-auto rounded-lg border p-3 font-mono text-xs">
             {prettyPolicyJson(inputSample)}
@@ -331,7 +365,9 @@ function DecisionDetail({
         )}
       </div>
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold">Result</h3>
+        <h3 className="text-sm font-semibold">
+          {tr("pages.admin_policy.policy_decision_log_table.result")}
+        </h3>
         {error && <p className="text-destructive text-sm">{error}</p>}
         {resultSample !== undefined && (
           <pre className="border-border bg-background max-h-[260px] overflow-auto rounded-lg border p-3 font-mono text-xs">
@@ -339,7 +375,9 @@ function DecisionDetail({
           </pre>
         )}
         {!error && resultSample === undefined && (
-          <p className="text-muted-foreground text-sm">No verbose result sample was logged.</p>
+          <p className="text-muted-foreground text-sm">
+            {tr("pages.admin_policy.policy_decision_log_table.no_verbose_result_sample_was_logged")}
+          </p>
         )}
       </div>
     </div>

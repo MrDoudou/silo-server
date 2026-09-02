@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { api } from "@/api/client";
 import type {
@@ -24,6 +24,7 @@ import {
   type ChunkedUploadProgress,
   uploadFileInChunks,
 } from "@/lib/chunkedUpload";
+import { EMPTY_PLUGIN_CATALOG_TARGETS, usePluginCatalogs } from "@/i18n/pluginCatalogs";
 import { adminKeys } from "../keys";
 
 const ADMIN_STALE_TIME = 30_000;
@@ -42,12 +43,14 @@ function invalidatePluginQueries(queryClient: ReturnType<typeof useQueryClient>)
 // that only need the installations list. Shares its cache key with
 // useAdminPlugins() so triggering a refetch in either keeps both in sync.
 export function useAdminPluginInstallations() {
-  return useQuery({
+  const query = useQuery({
     queryKey: adminKeys.pluginInstallations(),
     queryFn: () =>
       api<PluginInstallation[]>("/admin/plugins/installations").then((data) => data ?? []),
     staleTime: ADMIN_STALE_TIME,
   });
+  usePluginCatalogs(query.data ?? EMPTY_PLUGIN_CATALOG_TARGETS);
+  return query;
 }
 
 export function useAdminPlugins() {
@@ -70,6 +73,7 @@ export function useAdminPlugins() {
       api<PluginInstallation[]>("/admin/plugins/installations").then((data) => data ?? []),
     staleTime: ADMIN_STALE_TIME,
   });
+  usePluginCatalogs(installationsQuery.data ?? EMPTY_PLUGIN_CATALOG_TARGETS);
 
   const catalogSettingsQuery = useQuery({
     queryKey: adminKeys.pluginCatalogSettings(),
@@ -104,13 +108,11 @@ export function useUpdatePluginCatalogSettings() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Plugin catalog settings updated");
+      toast.success("feedback.queries.admin.plugins.plugin_catalog_settings_updated");
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update plugin catalog settings",
-      );
+      toast.error("errors.plugins.catalog_settings_update_failed", { error: error });
     },
   });
 }
@@ -124,11 +126,11 @@ export function useCreatePluginRepository() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Repository added");
+      toast.success("feedback.queries.admin.plugins.repository_added");
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to add repository");
+      toast.error("errors.plugins.repository_add_failed", { error: error });
     },
   });
 }
@@ -142,11 +144,11 @@ export function useUpdatePluginRepository() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Repository updated");
+      toast.success("feedback.queries.admin.plugins.repository_updated");
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to update repository");
+      toast.error("errors.plugins.repository_update_failed", { error: error });
     },
   });
 }
@@ -156,11 +158,11 @@ export function useDeletePluginRepository() {
   return useMutation({
     mutationFn: (id: number) => api(`/admin/plugins/repositories/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Repository removed");
+      toast.success("feedback.queries.admin.plugins.repository_removed");
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to remove repository");
+      toast.error("errors.plugins.repository_remove_failed", { error: error });
     },
   });
 }
@@ -174,11 +176,11 @@ export function useInstallPlugin() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Plugin installed");
+      toast.success("feedback.queries.admin.plugins.plugin_installed");
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to install plugin");
+      toast.error("errors.plugins.install_failed", { error: error });
     },
   });
 }
@@ -214,11 +216,11 @@ export function useUploadPlugin() {
       });
     },
     onSuccess: () => {
-      toast.success("Plugin uploaded");
+      toast.success("feedback.queries.admin.plugins.plugin_uploaded");
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to upload plugin");
+      toast.error("errors.plugins.upload_failed", { error: error });
     },
   });
 }
@@ -260,11 +262,11 @@ export function useUpdatePluginInstallation() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Plugin updated");
+      toast.success("feedback.queries.admin.plugins.plugin_updated");
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to update plugin");
+      toast.error("errors.plugins.update_failed", { error: error });
     },
   });
 }
@@ -277,11 +279,11 @@ export function useApplyPluginUpdate() {
         method: "POST",
       }),
     onSuccess: () => {
-      toast.success("Plugin updated");
+      toast.success("feedback.queries.admin.plugins.plugin_updated");
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to update plugin");
+      toast.error("errors.plugins.update_failed", { error: error });
     },
   });
 }
@@ -291,11 +293,11 @@ export function useDeletePluginInstallation() {
   return useMutation({
     mutationFn: (id: number) => api(`/admin/plugins/installations/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Plugin removed");
+      toast.success("feedback.queries.admin.plugins.plugin_removed");
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to remove plugin");
+      toast.error("errors.plugins.remove_failed", { error: error });
     },
   });
 }
@@ -314,10 +316,10 @@ export function useCheckPluginUpdates() {
       queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
       queryClient.invalidateQueries({ queryKey: adminKeys.task(CHECK_PLUGIN_UPDATES_TASK_KEY) });
       invalidatePluginQueries(queryClient);
-      toast.success("Plugin update check started");
+      toast.success("feedback.queries.admin.plugins.plugin_update_check_started");
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to start plugin update check");
+      toast.error("errors.plugins.update_check_start_failed", { error: error });
     },
   });
 }
@@ -331,11 +333,11 @@ export function useSavePluginConfig() {
         body: JSON.stringify(body),
       }),
     onSuccess: async () => {
-      toast.success("Plugin config saved");
+      toast.success("feedback.queries.admin.plugins.plugin_config_saved");
       await invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to save plugin config");
+      toast.error("errors.plugins.config_save_failed", { error: error });
     },
   });
 }
@@ -359,11 +361,13 @@ export function useSavePluginAuthBinding() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Auth binding saved — restart the server to apply it");
+      toast.success(
+        "feedback.queries.admin.plugins.auth_binding_saved_restart_the_server_to_apply_it",
+      );
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to save auth binding");
+      toast.error("errors.plugins.auth_binding_save_failed", { error: error });
     },
   });
 }
@@ -388,15 +392,17 @@ export function useSavePluginTaskBinding() {
         },
       ),
     onSuccess: (data) => {
-      toast.success(
-        data.restart_required
-          ? "Task binding saved — restart the server to apply it"
-          : "Task binding saved",
-      );
+      toast.success("feedback.queries.admin.plugins.reported_message", {
+        values: {
+          message: data.restart_required
+            ? "Task binding saved — restart the server to apply it"
+            : "Task binding saved",
+        },
+      });
       invalidatePluginQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to save task binding");
+      toast.error("errors.plugins.task_binding_save_failed", { error: error });
     },
   });
 }

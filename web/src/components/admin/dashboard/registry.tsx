@@ -33,6 +33,8 @@ import { ScanActivityWidget } from "./widgets/ScanActivityWidget";
 import { RecentErrorsWidget } from "./widgets/RecentErrorsWidget";
 import { RecentActivityWidget } from "./widgets/RecentActivityWidget";
 
+import { tr } from "@/i18n/translate";
+
 /**
  * Sampled charts read `dashboard_metric_samples`, which the sampler keeps for a
  * month, so they offer the full spread down to a single hour.
@@ -54,8 +56,12 @@ const LEADERBOARD_RANGES: WidgetRangeOptions = {
 export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   {
     id: "stat-active-streams",
-    title: "Active streams",
-    description: "Live count of playback sessions",
+    get title() {
+      return tr("components.admin.dashboard.registry.active_streams");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.live_count_of_playback_sessions");
+    },
     minSpan: 2,
     maxSpan: 4,
     defaultSpan: 2,
@@ -66,8 +72,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "stat-egress-now",
-    title: "Egress now",
-    description: "Egress the deployment is serving this minute",
+    get title() {
+      return tr("components.admin.dashboard.registry.egress_now");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.egress_the_deployment_is_serving_this_minute");
+    },
     minSpan: 2,
     maxSpan: 4,
     defaultSpan: 2,
@@ -78,8 +88,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "stat-transcode-share",
-    title: "Transcode share",
-    description: "Share of live streams being transcoded",
+    get title() {
+      return tr("components.admin.dashboard.registry.transcode_share");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.share_of_live_streams_being_transcoded");
+    },
     minSpan: 2,
     maxSpan: 4,
     defaultSpan: 2,
@@ -90,8 +104,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "stat-profiles-active",
-    title: "Profiles · 24h",
-    description: "Profiles that watched something in the last 24 hours",
+    get title() {
+      return tr("components.admin.dashboard.registry.profiles_24h");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.profiles_that_watched_something_in_the_last_24_hours",
+      );
+    },
     minSpan: 2,
     maxSpan: 4,
     defaultSpan: 2,
@@ -102,8 +122,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "stat-movies",
-    title: "Movies",
-    description: "Total movies and movie files",
+    get title() {
+      return tr("components.admin.dashboard.registry.movies");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.total_movies_and_movie_files");
+    },
     minSpan: 2,
     maxSpan: 4,
     defaultSpan: 2,
@@ -114,8 +138,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "stat-shows",
-    title: "Shows",
-    description: "Total series and episode files",
+    get title() {
+      return tr("components.admin.dashboard.registry.shows");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.total_series_and_episode_files");
+    },
     minSpan: 2,
     maxSpan: 4,
     defaultSpan: 2,
@@ -126,8 +154,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "stat-users",
-    title: "User count",
-    description: "Registered accounts on the server",
+    get title() {
+      return tr("components.admin.dashboard.registry.user_count");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.registered_accounts_on_the_server");
+    },
     minSpan: 2,
     maxSpan: 4,
     defaultSpan: 2,
@@ -138,8 +170,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "stat-storage",
-    title: "Storage",
-    description: "Used space across all libraries",
+    get title() {
+      return tr("components.admin.dashboard.registry.storage");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.used_space_across_all_libraries");
+    },
     minSpan: 2,
     maxSpan: 4,
     defaultSpan: 2,
@@ -150,8 +186,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "health-strip",
-    title: "Server health",
-    description: "Version, uptime, dependencies, nodes, and 24h error count",
+    get title() {
+      return tr("components.admin.dashboard.registry.server_health");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.version_uptime_dependencies_nodes_and_24h_error_count",
+      );
+    },
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 12,
@@ -162,8 +204,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "server-resources",
-    title: "Server resources",
-    description: "CPU, memory, disk, network, and GPU usage on the API host",
+    get title() {
+      return tr("components.admin.dashboard.registry.server_resources");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.cpu_memory_disk_network_and_gpu_usage_on_the_api",
+      );
+    },
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 6,
@@ -174,8 +222,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "playback-24h",
-    title: "Playback activity",
-    description: "Playback starts stacked by play method",
+    get title() {
+      return tr("components.admin.dashboard.registry.playback_activity");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.playback_starts_stacked_by_play_method");
+    },
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 6,
@@ -187,8 +239,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "concurrent-streams-24h",
-    title: "Concurrent streams",
-    description: "Sampled concurrent playback sessions",
+    get title() {
+      return tr("components.admin.dashboard.registry.concurrent_streams");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.sampled_concurrent_playback_sessions");
+    },
     minSpan: 4,
     maxSpan: 12,
     defaultSpan: 6,
@@ -200,8 +256,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "egress-24h",
-    title: "Egress",
-    description: "Sampled egress in Mbps",
+    get title() {
+      return tr("components.admin.dashboard.registry.egress");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.sampled_egress_in_mbps");
+    },
     minSpan: 4,
     maxSpan: 12,
     defaultSpan: 6,
@@ -213,8 +273,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "playback-reliability",
-    title: "Playback reliability",
-    description: "Sessions started, transcode starts, completion rate, profiles",
+    get title() {
+      return tr("components.admin.dashboard.registry.playback_reliability");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.sessions_started_transcode_starts_completion_rate_profiles",
+      );
+    },
     minSpan: 4,
     maxSpan: 8,
     defaultSpan: 6,
@@ -226,8 +292,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "top-titles",
-    title: "Top titles",
-    description: "Most-played titles over the chosen window",
+    get title() {
+      return tr("components.admin.dashboard.registry.top_titles");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.most_played_titles_over_the_chosen_window");
+    },
     minSpan: 4,
     maxSpan: 8,
     defaultSpan: 6,
@@ -239,8 +309,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "top-profiles",
-    title: "Most active profiles",
-    description: "Profiles with the most plays over the chosen window",
+    get title() {
+      return tr("components.admin.dashboard.registry.most_active_profiles");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.profiles_with_the_most_plays_over_the_chosen_window",
+      );
+    },
     minSpan: 4,
     maxSpan: 8,
     defaultSpan: 6,
@@ -252,8 +328,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "watch-providers",
-    title: "Watch providers",
-    description: "Per-provider connection and 24h sync status",
+    get title() {
+      return tr("components.admin.dashboard.registry.watch_providers");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.per_provider_connection_and_24h_sync_status");
+    },
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 12,
@@ -267,8 +347,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "now-playing",
-    title: "Now playing",
-    description: "Active streams with client, method, and progress",
+    get title() {
+      return tr("components.admin.dashboard.registry.now_playing");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.active_streams_with_client_method_and_progress",
+      );
+    },
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 12,
@@ -282,8 +368,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "transcode-nodes",
-    title: "Nodes",
-    description: "Stream node health, job load, and egress",
+    get title() {
+      return tr("components.admin.dashboard.registry.nodes");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.stream_node_health_job_load_and_egress");
+    },
     minSpan: 4,
     maxSpan: 12,
     defaultSpan: 6,
@@ -294,8 +384,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "scanner",
-    title: "Scanner",
-    description: "Live scan progress, queue depth, and autoscan state",
+    get title() {
+      return tr("components.admin.dashboard.registry.scanner");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.live_scan_progress_queue_depth_and_autoscan_state",
+      );
+    },
     minSpan: 4,
     maxSpan: 12,
     defaultSpan: 4,
@@ -306,8 +402,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "libraries",
-    title: "Libraries",
-    description: "Library list with scan controls and progress",
+    get title() {
+      return tr("components.admin.dashboard.registry.libraries");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.library_list_with_scan_controls_and_progress");
+    },
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 7,
@@ -318,8 +418,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "users",
-    title: "Users",
-    description: "Recent user accounts with role and status",
+    get title() {
+      return tr("components.admin.dashboard.registry.users");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.recent_user_accounts_with_role_and_status");
+    },
     minSpan: 4,
     maxSpan: 8,
     defaultSpan: 5,
@@ -330,8 +434,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "downloads",
-    title: "Offline downloads",
-    description: "Who has media downloaded to devices, and how much",
+    get title() {
+      return tr("components.admin.dashboard.registry.offline_downloads");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.who_has_media_downloaded_to_devices_and_how_much",
+      );
+    },
     minSpan: 3,
     maxSpan: 8,
     defaultSpan: 4,
@@ -342,8 +452,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "scan-activity",
-    title: "Scan activity",
-    description: "Recent scan runs with trigger, status, and duration",
+    get title() {
+      return tr("components.admin.dashboard.registry.scan_activity");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.recent_scan_runs_with_trigger_status_and_duration",
+      );
+    },
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 8,
@@ -354,8 +470,14 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "recent-errors",
-    title: "Recent errors",
-    description: "Latest error and warning lines from the operational log",
+    get title() {
+      return tr("components.admin.dashboard.registry.recent_errors");
+    },
+    get description() {
+      return tr(
+        "components.admin.dashboard.registry.latest_error_and_warning_lines_from_the_operational_log",
+      );
+    },
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 12,
@@ -366,8 +488,12 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "recent-activity",
-    title: "Recent activity",
-    description: "Feed of recently started playback sessions",
+    get title() {
+      return tr("components.admin.dashboard.registry.recent_activity");
+    },
+    get description() {
+      return tr("components.admin.dashboard.registry.feed_of_recently_started_playback_sessions");
+    },
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 12,

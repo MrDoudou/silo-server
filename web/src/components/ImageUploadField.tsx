@@ -3,6 +3,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, X } from "lucide-react";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ImageUploadFieldProps {
   label: string;
@@ -27,6 +29,7 @@ export function ImageUploadField({
   onSourceUrlChange,
   sourceUrlPlaceholder = "https://example.com/image.jpg",
 }: ImageUploadFieldProps) {
+  useUILanguage();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const previewUrl = file ? URL.createObjectURL(file) : currentUrl;
@@ -64,7 +67,7 @@ export function ImageUploadField({
                 size="icon"
                 className="h-6 w-6"
                 onClick={() => onFileChange(null)}
-                title="Remove selected file"
+                title={tr("components.image_upload_field.remove_selected_file")}
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -76,7 +79,7 @@ export function ImageUploadField({
                 size="icon"
                 className="h-6 w-6"
                 onClick={onDelete}
-                title="Delete image"
+                title={tr("components.image_upload_field.delete_image")}
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -92,7 +95,7 @@ export function ImageUploadField({
           className="border-border text-muted-foreground hover:border-primary hover:bg-accent flex h-32 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed transition-colors"
         >
           <Upload className="h-6 w-6" />
-          <span className="text-xs">Click or drop image</span>
+          <span className="text-xs">{tr("components.image_upload_field.click_or_drop_image")}</span>
         </button>
       )}
       <input
@@ -115,8 +118,7 @@ export function ImageUploadField({
             placeholder={sourceUrlPlaceholder}
           />
           <p className="text-muted-foreground text-xs">
-            Paste an image URL instead of uploading a file. If both are provided, the uploaded file
-            wins.
+            {tr("components.image_upload_field.paste_an_image_url_instead_of_uploading_a_file_if")}
           </p>
         </div>
       ) : null}

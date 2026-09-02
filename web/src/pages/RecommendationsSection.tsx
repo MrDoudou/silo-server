@@ -9,6 +9,8 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useOverlayPrefs } from "@/hooks/useOverlayPrefs";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { cardGridClasses } from "@/lib/uiCustomization";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const KIND_FALLBACK_LABEL: Record<string, (key?: string) => string> = {
   "for-you-main": () => "For You",
@@ -26,6 +28,7 @@ function fallbackTitle(kind: string, key?: string) {
 }
 
 function GridSkeleton() {
+  useUILanguage();
   const { cardPresentation } = useUICustomization();
   return (
     <div className={cardGridClasses(cardPresentation.poster_size)}>
@@ -41,28 +44,36 @@ function GridSkeleton() {
 }
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
+  useUILanguage();
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-      <p className="text-muted-foreground text-sm">Failed to load this section.</p>
+      <p className="text-muted-foreground text-sm">
+        {tr("pages.recommendations_section.failed_to_load_this_section")}
+      </p>
       <button
         onClick={onRetry}
         className="text-primary hover:text-primary/80 inline-flex items-center gap-2 text-sm font-medium"
       >
         <RefreshCw className="h-4 w-4" />
-        Retry
+        {tr("common.actions.retry")}
       </button>
     </div>
   );
 }
 
 function EmptyState() {
+  useUILanguage();
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
       <Sparkles className="text-muted-foreground/50 h-10 w-10" />
       <div className="space-y-1">
-        <p className="text-sm font-medium">Nothing here yet</p>
+        <p className="text-sm font-medium">
+          {tr("pages.recommendations_section.nothing_here_yet")}
+        </p>
         <p className="text-muted-foreground max-w-sm text-xs">
-          Watch and rate more content to surface picks for this section.
+          {tr(
+            "pages.recommendations_section.watch_and_rate_more_content_to_surface_picks_for_this",
+          )}
         </p>
       </div>
     </div>
@@ -70,6 +81,7 @@ function EmptyState() {
 }
 
 export default function RecommendationsSection() {
+  useUILanguage();
   const params = useParams<{ kind: string; key?: string }>();
   const kind = params.kind ?? "";
   const key = params.key;
@@ -88,7 +100,10 @@ export default function RecommendationsSection() {
         <h1 className="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
         {data && data.items.length > 0 && (
           <p className="text-muted-foreground text-sm">
-            {data.items.length} {data.items.length === 1 ? "title" : "titles"}
+            {data.items.length}{" "}
+            {data.items.length === 1
+              ? tr("pages.recommendations_section.title")
+              : tr("pages.recommendations_section.titles")}
           </p>
         )}
       </div>

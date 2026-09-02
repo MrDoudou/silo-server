@@ -84,6 +84,8 @@ make test-go
 # Web
 cd web
 pnpm install --frozen-lockfile
+pnpm run i18n:sync:check
+pnpm run i18n:check
 pnpm run lint
 pnpm run format:check
 pnpm run build
@@ -95,6 +97,15 @@ make verify-settings-bindings-all
 make verify-playback-fixtures
 make verify-local-paths
 ```
+
+The translation gate reports stale generated API mappings, missing or unused
+English keys, translation-only keys, invalid semantic names, interpolation
+placeholder drift, and untranslated visible JSX, attributes, or UI descriptor
+fields. Dynamic keys must be declared with their source and a reason in
+`web/i18n-key-exceptions.json`; stale exceptions fail too. The repository
+pre-commit hook runs the semantic analysis against the staged index whenever
+frontend or API message code changes. Run `pnpm run i18n:prune` to remove keys
+that are no longer referenced from every language catalog.
 
 `make lint` runs `golangci-lint` over the whole tree and reports inherited
 findings the repository does not pass yet; CI only gates the lines your branch

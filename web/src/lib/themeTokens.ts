@@ -1,4 +1,4 @@
-/** All CSS custom property tokens that a theme can override. */
+import { tr } from "@/i18n/translate"; /** All CSS custom property tokens that a theme can override. */
 
 export type ThemeToken =
   | "background"
@@ -54,73 +54,286 @@ export interface TokenMeta {
 
 export const THEME_TOKENS: TokenMeta[] = [
   // Surfaces
-  { token: "background", label: "Background", group: "Surfaces", inputType: "color" },
-  { token: "foreground", label: "Foreground", group: "Surfaces", inputType: "color" },
-  { token: "card", label: "Card", group: "Surfaces", inputType: "color" },
-  { token: "card-foreground", label: "Card Text", group: "Surfaces", inputType: "color" },
-  { token: "popover", label: "Popover", group: "Surfaces", inputType: "color" },
-  { token: "popover-foreground", label: "Popover Text", group: "Surfaces", inputType: "color" },
-  { token: "surface", label: "Surface", group: "Surfaces", inputType: "color" },
-  { token: "surface-hover", label: "Surface Hover", group: "Surfaces", inputType: "color" },
-  { token: "surface-raised", label: "Surface Raised", group: "Surfaces", inputType: "color" },
+  {
+    token: "background",
+    get label() {
+      return tr("lib.theme_tokens.background");
+    },
+    group: "Surfaces",
+    inputType: "color",
+  },
+  {
+    token: "foreground",
+    get label() {
+      return tr("lib.theme_tokens.foreground");
+    },
+    group: "Surfaces",
+    inputType: "color",
+  },
+  {
+    token: "card",
+    get label() {
+      return tr("lib.theme_tokens.card");
+    },
+    group: "Surfaces",
+    inputType: "color",
+  },
+  {
+    token: "card-foreground",
+    get label() {
+      return tr("lib.theme_tokens.card_text");
+    },
+    group: "Surfaces",
+    inputType: "color",
+  },
+  {
+    token: "popover",
+    get label() {
+      return tr("lib.theme_tokens.popover");
+    },
+    group: "Surfaces",
+    inputType: "color",
+  },
+  {
+    token: "popover-foreground",
+    get label() {
+      return tr("lib.theme_tokens.popover_text");
+    },
+    group: "Surfaces",
+    inputType: "color",
+  },
+  {
+    token: "surface",
+    get label() {
+      return tr("lib.theme_tokens.surface");
+    },
+    group: "Surfaces",
+    inputType: "color",
+  },
+  {
+    token: "surface-hover",
+    get label() {
+      return tr("lib.theme_tokens.surface_hover");
+    },
+    group: "Surfaces",
+    inputType: "color",
+  },
+  {
+    token: "surface-raised",
+    get label() {
+      return tr("lib.theme_tokens.surface_raised");
+    },
+    group: "Surfaces",
+    inputType: "color",
+  },
 
   // Interactive
-  { token: "primary", label: "Primary", group: "Interactive", inputType: "color" },
-  { token: "primary-foreground", label: "Primary Text", group: "Interactive", inputType: "color" },
-  { token: "secondary", label: "Secondary", group: "Interactive", inputType: "color" },
+  {
+    token: "primary",
+    get label() {
+      return tr("lib.theme_tokens.primary");
+    },
+    group: "Interactive",
+    inputType: "color",
+  },
+  {
+    token: "primary-foreground",
+    get label() {
+      return tr("lib.theme_tokens.primary_text");
+    },
+    group: "Interactive",
+    inputType: "color",
+  },
+  {
+    token: "secondary",
+    get label() {
+      return tr("lib.theme_tokens.secondary");
+    },
+    group: "Interactive",
+    inputType: "color",
+  },
   {
     token: "secondary-foreground",
-    label: "Secondary Text",
+    get label() {
+      return tr("lib.theme_tokens.secondary_text");
+    },
     group: "Interactive",
     inputType: "color",
   },
-  { token: "muted", label: "Muted", group: "Interactive", inputType: "color" },
-  { token: "muted-foreground", label: "Muted Text", group: "Interactive", inputType: "color" },
-  { token: "accent", label: "Accent", group: "Interactive", inputType: "color" },
-  { token: "accent-foreground", label: "Accent Text", group: "Interactive", inputType: "color" },
-  { token: "destructive", label: "Destructive", group: "Interactive", inputType: "color" },
+  {
+    token: "muted",
+    get label() {
+      return tr("lib.theme_tokens.muted");
+    },
+    group: "Interactive",
+    inputType: "color",
+  },
+  {
+    token: "muted-foreground",
+    get label() {
+      return tr("lib.theme_tokens.muted_text");
+    },
+    group: "Interactive",
+    inputType: "color",
+  },
+  {
+    token: "accent",
+    get label() {
+      return tr("lib.theme_tokens.accent");
+    },
+    group: "Interactive",
+    inputType: "color",
+  },
+  {
+    token: "accent-foreground",
+    get label() {
+      return tr("lib.theme_tokens.accent_text");
+    },
+    group: "Interactive",
+    inputType: "color",
+  },
+  {
+    token: "destructive",
+    get label() {
+      return tr("lib.theme_tokens.destructive");
+    },
+    group: "Interactive",
+    inputType: "color",
+  },
   {
     token: "destructive-foreground",
-    label: "Destructive Text",
+    get label() {
+      return tr("lib.theme_tokens.destructive_text");
+    },
     group: "Interactive",
     inputType: "color",
   },
-  { token: "ambient", label: "Ambient Glow", group: "Interactive", inputType: "color" },
+  {
+    token: "ambient",
+    get label() {
+      return tr("lib.theme_tokens.ambient_glow");
+    },
+    group: "Interactive",
+    inputType: "color",
+  },
 
   // Sidebar
-  { token: "sidebar", label: "Sidebar", group: "Sidebar", inputType: "color" },
-  { token: "sidebar-foreground", label: "Sidebar Text", group: "Sidebar", inputType: "color" },
-  { token: "sidebar-primary", label: "Sidebar Primary", group: "Sidebar", inputType: "color" },
+  {
+    token: "sidebar",
+    get label() {
+      return tr("lib.theme_tokens.sidebar");
+    },
+    group: "Sidebar",
+    inputType: "color",
+  },
+  {
+    token: "sidebar-foreground",
+    get label() {
+      return tr("lib.theme_tokens.sidebar_text");
+    },
+    group: "Sidebar",
+    inputType: "color",
+  },
+  {
+    token: "sidebar-primary",
+    get label() {
+      return tr("lib.theme_tokens.sidebar_primary");
+    },
+    group: "Sidebar",
+    inputType: "color",
+  },
   {
     token: "sidebar-primary-foreground",
-    label: "Sidebar Primary Text",
+    get label() {
+      return tr("lib.theme_tokens.sidebar_primary_text");
+    },
     group: "Sidebar",
     inputType: "color",
   },
-  { token: "sidebar-accent", label: "Sidebar Accent", group: "Sidebar", inputType: "color" },
+  {
+    token: "sidebar-accent",
+    get label() {
+      return tr("lib.theme_tokens.sidebar_accent");
+    },
+    group: "Sidebar",
+    inputType: "color",
+  },
   {
     token: "sidebar-accent-foreground",
-    label: "Sidebar Accent Text",
+    get label() {
+      return tr("lib.theme_tokens.sidebar_accent_text");
+    },
     group: "Sidebar",
     inputType: "color",
   },
-  { token: "sidebar-border", label: "Sidebar Border", group: "Sidebar", inputType: "color" },
+  {
+    token: "sidebar-border",
+    get label() {
+      return tr("lib.theme_tokens.sidebar_border");
+    },
+    group: "Sidebar",
+    inputType: "color",
+  },
   {
     token: "sidebar-section-divider",
-    label: "Sidebar Section Divider",
+    get label() {
+      return tr("lib.theme_tokens.sidebar_section_divider");
+    },
     group: "Sidebar",
     inputType: "color",
   },
-  { token: "sidebar-ring", label: "Sidebar Ring", group: "Sidebar", inputType: "color" },
+  {
+    token: "sidebar-ring",
+    get label() {
+      return tr("lib.theme_tokens.sidebar_ring");
+    },
+    group: "Sidebar",
+    inputType: "color",
+  },
 
   // Borders & Focus
-  { token: "border", label: "Border", group: "Borders & Focus", inputType: "color" },
-  { token: "input", label: "Input Border", group: "Borders & Focus", inputType: "color" },
-  { token: "ring", label: "Focus Ring", group: "Borders & Focus", inputType: "color" },
+  {
+    token: "border",
+    get label() {
+      return tr("lib.theme_tokens.border");
+    },
+    group: "Borders & Focus",
+    inputType: "color",
+  },
+  {
+    token: "input",
+    get label() {
+      return tr("lib.theme_tokens.input_border");
+    },
+    group: "Borders & Focus",
+    inputType: "color",
+  },
+  {
+    token: "ring",
+    get label() {
+      return tr("lib.theme_tokens.focus_ring");
+    },
+    group: "Borders & Focus",
+    inputType: "color",
+  },
 
   // Shape & Font
-  { token: "radius", label: "Border Radius", group: "Shape & Font", inputType: "radius" },
-  { token: "font-body", label: "Font Family", group: "Shape & Font", inputType: "font" },
+  {
+    token: "radius",
+    get label() {
+      return tr("lib.theme_tokens.border_radius");
+    },
+    group: "Shape & Font",
+    inputType: "radius",
+  },
+  {
+    token: "font-body",
+    get label() {
+      return tr("lib.theme_tokens.font_family");
+    },
+    group: "Shape & Font",
+    inputType: "font",
+  },
 ];
 
 /** Tokens grouped by category for the editor UI. */

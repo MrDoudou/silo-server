@@ -8,6 +8,8 @@ import { videoRangeLabel } from "@/lib/videoRange";
 import DetailPopover from "./DetailPopover";
 import { sortPlaybackVariantsByEditionPreference } from "./versionRankingUtils";
 import { buildDetailLine, buildQualitySummary, sortByResolution } from "./VersionFlyout";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface VersionDropdownProps {
   versions: FileVersion[];
@@ -30,6 +32,8 @@ function VersionDropdown({
   selectedVersion,
   onSelectVersion,
 }: VersionDropdownProps) {
+  useUILanguage();
+  useUILanguage();
   const [editionOpen, setEditionOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
 
@@ -70,7 +74,7 @@ function VersionDropdown({
               className="h-8 max-w-full min-w-0 shrink gap-1.5 rounded-full px-3 text-xs font-medium"
             >
               <Layers3 className="size-3.5" />
-              Edition
+              {tr("pages.item_detail.components.version_dropdown.edition")}
               <span className="text-muted-foreground max-w-44 truncate text-[11px] font-normal sm:max-w-64">
                 {selectedEdition.label}
               </span>
@@ -92,9 +96,10 @@ function VersionDropdown({
                     setEditionOpen(false);
                     setVersionOpen(false);
                   }}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
-                    isSelected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-                  }`}
+                  className={
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors " +
+                    (isSelected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")
+                  }
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{option.label}</div>
@@ -121,7 +126,7 @@ function VersionDropdown({
               className="h-8 max-w-full min-w-0 shrink gap-1.5 rounded-full px-3 text-xs font-medium"
             >
               <Disc3 className="size-3.5" />
-              Version
+              {tr("pages.item_detail.components.version_dropdown.version")}
               <span className="text-muted-foreground max-w-44 truncate text-[11px] font-normal sm:max-w-64">
                 {activeVersion ? buildVersionTriggerSummary(activeVersion) : ""}
               </span>
@@ -144,14 +149,18 @@ function VersionDropdown({
                     onSelectVersion(version);
                     setVersionOpen(false);
                   }}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
-                    isSelected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-                  }`}
+                  className={
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors " +
+                    (isSelected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")
+                  }
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium">
-                        {summary || `Version ${version.file_id}`}
+                        {summary ||
+                          tr("pages.item_detail.components.version_dropdown.version_file_id", {
+                            file_id: version.file_id,
+                          })}
                       </span>
                       {rangeLabel ? (
                         <Badge variant="secondary" className="px-1.5 py-0 text-[10px] uppercase">

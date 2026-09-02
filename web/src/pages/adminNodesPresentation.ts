@@ -11,6 +11,8 @@ import type {
 import { parseHWDeviceList } from "@/lib/hwDevices";
 import { formatFileSize } from "@/lib/mediaFormat";
 
+import { tr } from "@/i18n/translate";
+
 /**
  * How long a stored capability report may go unconfirmed before it is called
  * out. The health sweep only refetches when a node advertises a changed hash,
@@ -117,8 +119,10 @@ export function describeNodeGPU(node: StreamNode, now: number = Date.now()): Nod
   if (!capabilities) {
     return {
       kind: "awaiting",
-      label: "Awaiting first report",
-      title: "No hardware capability report has been stored for this node yet.",
+      label: tr("pages.admin_nodes_presentation.awaiting_first_report"),
+      title: tr(
+        "pages.admin_nodes_presentation.no_hardware_capability_report_has_been_stored_for_this_node",
+      ),
     };
   }
 
@@ -390,7 +394,11 @@ function summarizeRenderDevices(capabilities: NodeCapabilities): {
     return { summary: null, title: null };
   }
   return {
-    summary: paths.length === 1 ? "1 render device" : `${paths.length} render devices`,
+    get summary() {
+      return paths.length === 1
+        ? tr("pages.admin_nodes_presentation.value_1_render_device")
+        : tr("pages.admin_nodes_presentation.count_render_devices", { count: paths.length });
+    },
     title: paths.join("\n"),
   };
 }
@@ -460,8 +468,12 @@ export function describeSharedGPU(
   }
 
   return {
-    label: "Shared GPU",
-    title: `Shares a physical GPU with: ${others.join(", ")}`,
+    label: tr("pages.admin_nodes_presentation.shared_gpu"),
+    get title() {
+      return tr("pages.admin_nodes_presentation.shares_a_physical_gpu_with_value1", {
+        value1: others.join(", "),
+      });
+    },
   };
 }
 
@@ -490,7 +502,7 @@ export function describeCapabilityDrift(node: StreamNode): CapabilityDriftBadge 
     return null;
   }
   return {
-    label: "Drift",
+    label: tr("pages.admin_nodes_presentation.drift"),
     title: [
       note,
       "A capability refetch found this node's hardware got worse than the report it replaced.",
@@ -540,7 +552,7 @@ function reportedDevices(node: StreamNode | null | undefined): ReportedDevice[] 
   return (node?.capabilities?.render_devices ?? [])
     .map((path) => path.trim())
     .filter((path) => path !== "")
-    .map((path) => ({ path, description: "GPU", title: path }));
+    .map((path) => ({ path, description: tr("pages.admin_nodes_presentation.gpu"), title: path }));
 }
 
 /**
@@ -580,10 +592,15 @@ export function buildNodeHWDeviceRows(
     }
     rows.push({
       path,
-      description: "Pinned device this node does not report",
+      description: tr("pages.admin_nodes_presentation.pinned_device_this_node_does_not_report"),
       reported: false,
       selected: true,
-      title: `${path} — not in this node's last capability report. A transcode pinned to a device the node cannot open falls back to software.`,
+      get title() {
+        return tr(
+          "pages.admin_nodes_presentation.value1_not_in_this_node_s_last_capability_report_a",
+          { value1: path },
+        );
+      },
     });
   }
   return rows;
@@ -614,7 +631,13 @@ export function describeReprobeOutcome(
   const name = result.node_name?.trim() || node.name;
   if (result.status !== "ok") {
     const reason = result.error?.trim() || "the node reported no reason";
-    return { ok: false, message: `${name}: re-probe failed — ${reason}` };
+    return {
+      ok: false,
+      message: tr("feedback.admin_nodes_presentation.node_re_probe_failed_reason", {
+        node: name,
+        reason,
+      }),
+    };
   }
 
   const backend = reprobeBackendLabel(result.resolved);
@@ -622,16 +645,35 @@ export function describeReprobeOutcome(
   const previous = node.capabilities_hash?.trim() ?? "";
   let message: string;
   if (hash !== "" && previous !== "" && hash === previous) {
-    message = `${name}: re-probed, no change${backend ? ` (${backend})` : ""}`;
+    message = backend
+      ? tr("feedback.admin_nodes_presentation.node_re_probed_no_change_backend", {
+          node: name,
+          backend,
+        })
+      : tr("feedback.admin_nodes_presentation.node_re_probed_no_change", { node: name });
   } else if (hash !== "" && previous !== "") {
-    message = `${name}: re-probed, hardware report changed${backend ? ` — now ${backend}` : ""}`;
+    message = backend
+      ? tr("feedback.admin_nodes_presentation.node_re_probed_hardware_report_changed_now_backend", {
+          node: name,
+          backend,
+        })
+      : tr("feedback.admin_nodes_presentation.node_re_probed_hardware_report_changed", {
+          node: name,
+        });
   } else {
-    message = `${name}: re-probed${backend ? ` — ${backend}` : ""}`;
+    message = backend
+      ? tr("feedback.admin_nodes_presentation.node_re_probed_backend", { node: name, backend })
+      : tr("feedback.admin_nodes_presentation.node_re_probed", { node: name });
   }
   // The node has recomputed either way; only the stored row lags, and saying so
   // stops an operator re-running the action to explain an unchanged table.
   if (!result.capabilities_refreshed) {
-    message += ". The stored report will catch up on the next health check";
+    message = tr(
+      "feedback.admin_nodes_presentation.message_the_stored_report_will_catch_up_on_the_next",
+      {
+        message,
+      },
+    );
   }
   return { ok: true, message };
 }
@@ -659,12 +701,42 @@ export const HW_ACCEL_INHERIT = "inherit";
  * backend the cluster-wide setting could also name.
  */
 export const HW_ACCEL_OVERRIDE_OPTIONS: readonly { value: string; label: string }[] = [
-  { value: HW_ACCEL_INHERIT, label: "Cluster default" },
-  { value: "auto", label: "Auto" },
-  { value: "qsv", label: "Intel Quick Sync (QSV)" },
-  { value: "vaapi", label: "VA-API" },
-  { value: "nvenc", label: "NVIDIA NVENC" },
-  { value: "none", label: "Software" },
+  {
+    value: HW_ACCEL_INHERIT,
+    get label() {
+      return tr("pages.admin_nodes_presentation.cluster_default");
+    },
+  },
+  {
+    value: "auto",
+    get label() {
+      return tr("pages.admin_nodes_presentation.auto");
+    },
+  },
+  {
+    value: "qsv",
+    get label() {
+      return tr("pages.admin_nodes_presentation.intel_quick_sync_qsv");
+    },
+  },
+  {
+    value: "vaapi",
+    get label() {
+      return tr("pages.admin_nodes_presentation.va_api");
+    },
+  },
+  {
+    value: "nvenc",
+    get label() {
+      return tr("pages.admin_nodes_presentation.nvidia_nvenc");
+    },
+  },
+  {
+    value: "none",
+    get label() {
+      return tr("pages.admin_nodes_presentation.software");
+    },
+  },
 ];
 
 /**
@@ -787,7 +859,12 @@ export function describeNodeAccelerationOverride(
     "A changed override applies to new transcodes within a minute; sessions already running keep the backend they started with.",
   ].join("\n");
 
-  return { label: `override: ${label}`, title };
+  return {
+    get label() {
+      return tr("pages.admin_nodes_presentation.override_value1", { value1: label });
+    },
+    title,
+  };
 }
 
 // --- Host resource samples -------------------------------------------------
@@ -862,17 +939,20 @@ export function describeNodeSystem(node: StreamNode): NodeSystemPresentation {
     return {
       kind: "unreported",
       label: DASH,
-      title: node.healthy
-        ? "This node reported no resource sample. Sampling is Linux-only, and a node running a build from before resource sampling reports none."
-        : "This node is not answering health checks, so it has no current resource sample.",
+      get title() {
+        return tr(
+          node.healthy
+            ? "pages.admin_nodes_presentation.this_node_reported_no_resource_sample_sampling_is_linux_only"
+            : "pages.admin_nodes_presentation.this_node_is_not_answering_health_checks_so_it_has",
+        );
+      },
     };
   }
   if (!node.healthy) {
     return {
       kind: "unreported",
       label: DASH,
-      title:
-        "The last health check did not reach this node, so its most recent resource sample is no longer current.",
+      title: tr("pages.admin_nodes_presentation.the_last_health_check_did_not_reach_this_node_so"),
     };
   }
   return describeSystemStats(system);
@@ -924,7 +1004,7 @@ function describeCPU(system: HostSystemStats): ResourceMetric {
     .join(" ");
 
   return {
-    label: "CPU",
+    label: tr("pages.admin_nodes_presentation.cpu"),
     value: `${percent}%`,
     detail,
     title,
@@ -944,10 +1024,17 @@ function describeMemory(system: HostSystemStats): ResourceMetric {
   const value = formatUsedOfTotal(used, total, mebibytesToBytes) ?? DASH;
   const percent = clampPercent((used / total) * 100);
   return {
-    label: "RAM",
+    label: tr("pages.admin_nodes_presentation.ram"),
     value,
-    detail: `${percent}% used`,
-    title: `${value} used (${percent}%). Under a cgroup this is the container's limit and working set, not the host's.`,
+    get detail() {
+      return tr("pages.admin_nodes_presentation.value1_used", { value1: percent });
+    },
+    get title() {
+      return tr(
+        "pages.admin_nodes_presentation.value1_used_value2_under_a_cgroup_this_is_the_container",
+        { value1: value, value2: percent },
+      );
+    },
     muted: false,
     warning: false,
     fill: percent,
@@ -975,9 +1062,11 @@ export function describeWorstDisk(disks: readonly HostDiskStats[]): ResourceMetr
   const worst = measured.reduce((a, b) => (b.fill > a.fill ? b : a));
   const name = diskName(worst.disk);
   return {
-    label: "Disk",
+    label: tr("pages.admin_nodes_presentation.disk"),
     value: `${worst.fill}%`,
-    detail: name === "" ? "full" : name,
+    get detail() {
+      return name === "" ? tr("pages.admin_nodes_presentation.full") : name;
+    },
     title,
     muted: false,
     warning: worst.fill >= DISK_FILL_WARNING_PCT,
@@ -993,10 +1082,17 @@ function describeNetwork(system: HostSystemStats): ResourceMetric {
   }
 
   return {
-    label: "Net",
+    label: tr("pages.admin_nodes_presentation.net"),
     value: `↓ ${rx ?? DASH} · ↑ ${tx ?? DASH}`,
-    detail: "rx · tx",
-    title: `Aggregate throughput with loopback excluded: ${rx ?? DASH} in, ${tx ?? DASH} out. In a container this is the container's own network namespace.`,
+    get detail() {
+      return tr("pages.admin_nodes_presentation.rx_tx");
+    },
+    get title() {
+      return tr(
+        "pages.admin_nodes_presentation.aggregate_throughput_with_loopback_excluded_value1_in_value2_out_in",
+        { value1: rx ?? DASH, value2: tx ?? DASH },
+      );
+    },
     muted: false,
     warning: false,
     // A link's throughput has no ceiling this sample knows: the sampler reports
@@ -1035,8 +1131,9 @@ export function describeResourceSample(
   if (!resources || resources.available !== true || !system) {
     return {
       kind: "unavailable",
-      title:
-        "This host is not being sampled. Resource sampling is Linux-only, and the first sample lands a few seconds after startup.",
+      title: tr(
+        "pages.admin_nodes_presentation.this_host_is_not_being_sampled_resource_sampling_is_linux",
+      ),
     };
   }
 
@@ -1084,7 +1181,7 @@ export function describeGPUBusy(gpu: readonly HostGPUStats[]): ResourceMetric | 
 
   const label = gpu.length === 1 ? "video engine" : `busiest of ${gpu.length} GPUs`;
   return {
-    label: "GPU",
+    label: tr("pages.admin_nodes_presentation.gpu"),
     value: `${clampPercent(busiest)}%`,
     detail: `${label} · ${sessionLabel}`,
     title,
@@ -1196,7 +1293,9 @@ function describeNodeGroup(value: string, members: readonly StreamNode[]): NodeG
 
   return {
     value,
-    label: value === "" ? "Ungrouped" : value,
+    get label() {
+      return value === "" ? tr("pages.admin_nodes_presentation.ungrouped") : value;
+    },
     count: members.length,
     proxies,
     transcodes,
@@ -1275,11 +1374,27 @@ export function describeNodeJobs(node: StreamNode): ResourceMetric {
   return {
     label,
     value: capped == null ? `${active}` : `${active} / ${capped}`,
-    detail: capped == null ? "no cap" : "in use",
-    title:
-      capped == null
-        ? `${active} running. This node has no concurrency cap, so the planner places work on it by load alone.`
-        : `${active} of ${capped} running. New work goes elsewhere once this node is full.`,
+    get detail() {
+      return tr(
+        capped == null
+          ? "pages.admin_nodes_presentation.no_cap"
+          : "pages.admin_nodes_presentation.in_use",
+      );
+    },
+    get title() {
+      return capped == null
+        ? tr(
+            "pages.admin_nodes_presentation.active_running_this_node_has_no_concurrency_cap_so_the",
+            { active },
+          )
+        : tr(
+            "pages.admin_nodes_presentation.active_of_capped_running_new_work_goes_elsewhere_once_this",
+            {
+              active,
+              capped,
+            },
+          );
+    },
     muted: false,
     warning: capped != null && active >= capped,
     fill: capacityFill(active, capped),
@@ -1294,13 +1409,26 @@ export function describeNodeEgress(node: StreamNode): ResourceMetric {
   const used = formatMbps(kbps);
 
   return {
-    label: "Egress",
+    label: tr("pages.admin_nodes_presentation.egress"),
     value: capped == null ? `${used} Mbps` : `${used} / ${formatMbps(capped)} Mbps`,
-    detail: capped == null ? "no cap" : "of cap",
-    title:
-      capped == null
-        ? `Measured egress ${used} Mbps. This node has no bandwidth cap.`
-        : `Measured egress ${used} Mbps of ${formatMbps(capped)} Mbps. New streams are routed elsewhere once this node's egress plus the new stream's expected bitrate would exceed the cap; streams already running are never interrupted.`,
+    get detail() {
+      return tr(
+        capped == null
+          ? "pages.admin_nodes_presentation.no_cap"
+          : "pages.admin_nodes_presentation.of_cap",
+      );
+    },
+    get title() {
+      return capped == null
+        ? tr(
+            "pages.admin_nodes_presentation.measured_egress_used_mbps_this_node_has_no_bandwidth_cap",
+            { used },
+          )
+        : tr(
+            "pages.admin_nodes_presentation.measured_egress_used_mbps_of_capped_mbps_new_streams_are",
+            { used, capped: formatMbps(capped) },
+          );
+    },
     muted: false,
     warning: capped != null && kbps >= capped,
     fill: capacityFill(kbps, capped),

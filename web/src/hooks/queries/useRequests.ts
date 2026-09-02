@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { api, ApiClientError } from "@/api/client";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import type {
@@ -218,11 +218,11 @@ export function useCreateMediaRequest() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Request submitted");
+      toast.success("feedback.queries.use_requests.request_submitted");
       invalidateRequestSurfaces(queryClient);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to submit request");
+      toast.error("errors.queries.use_requests.failed_to_submit_request", { error: err });
     },
   });
 }
@@ -259,11 +259,11 @@ export function useApproveMediaRequest() {
         method: "POST",
       }),
     onSuccess: () => {
-      toast.success("Request approved");
+      toast.success("feedback.queries.use_requests.request_approved");
       invalidateRequestSurfaces(queryClient);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to approve request");
+      toast.error("errors.queries.use_requests.failed_to_approve_request", { error: err });
     },
   });
 }
@@ -277,11 +277,11 @@ export function useDeclineMediaRequest() {
         body: JSON.stringify({ reason }),
       }),
     onSuccess: () => {
-      toast.success("Request declined");
+      toast.success("feedback.queries.use_requests.request_declined");
       invalidateRequestSurfaces(queryClient);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to decline request");
+      toast.error("errors.queries.use_requests.failed_to_decline_request", { error: err });
     },
   });
 }
@@ -294,11 +294,11 @@ export function useRetryMediaRequest() {
         method: "POST",
       }),
     onSuccess: () => {
-      toast.success("Request queued for retry");
+      toast.success("feedback.queries.use_requests.request_queued_for_retry");
       invalidateRequestSurfaces(queryClient);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to retry request");
+      toast.error("errors.queries.use_requests.failed_to_retry_request", { error: err });
     },
   });
 }
@@ -320,13 +320,13 @@ export function useUpdateRequestSettings() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Request settings saved");
+      toast.success("feedback.queries.use_requests.request_settings_saved");
       queryClient.invalidateQueries({ queryKey: adminKeys.requestSettings() });
       queryClient.invalidateQueries({ queryKey: requestKeys.status() });
       invalidateRequestSurfaces(queryClient);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save request settings");
+      toast.error("errors.queries.use_requests.failed_to_save_request_settings", { error: err });
     },
   });
 }
@@ -351,13 +351,13 @@ export function useCreateRequestIntegration() {
         body: JSON.stringify(integration),
       }),
     onSuccess: () => {
-      toast.success("Integration created");
+      toast.success("feedback.queries.use_requests.integration_created");
       queryClient.invalidateQueries({ queryKey: adminKeys.requestIntegrations() });
       invalidateRequestSurfaces(queryClient);
     },
     onError: (err) => {
       if (isValidationFailure(err)) return;
-      toast.error(err instanceof Error ? err.message : "Failed to create integration");
+      toast.error("errors.queries.use_requests.failed_to_create_integration", { error: err });
     },
   });
 }
@@ -371,13 +371,13 @@ export function useUpdateRequestIntegration() {
         body: JSON.stringify({ id, ...integration }),
       }),
     onSuccess: () => {
-      toast.success("Integration saved");
+      toast.success("feedback.queries.use_requests.integration_saved");
       queryClient.invalidateQueries({ queryKey: adminKeys.requestIntegrations() });
       invalidateRequestSurfaces(queryClient);
     },
     onError: (err) => {
       if (isValidationFailure(err)) return;
-      toast.error(err instanceof Error ? err.message : "Failed to save integration");
+      toast.error("errors.queries.use_requests.failed_to_save_integration", { error: err });
     },
   });
 }
@@ -390,12 +390,12 @@ export function useDeleteRequestIntegration() {
         method: "DELETE",
       }),
     onSuccess: () => {
-      toast.success("Integration deleted");
+      toast.success("feedback.queries.use_requests.integration_deleted");
       queryClient.invalidateQueries({ queryKey: adminKeys.requestIntegrations() });
       invalidateRequestSurfaces(queryClient);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete integration");
+      toast.error("errors.queries.use_requests.failed_to_delete_integration", { error: err });
     },
   });
 }
@@ -432,12 +432,12 @@ export function useUpdateRequestUserLimit() {
         body: JSON.stringify(body),
       }),
     onSuccess: (_data, variables) => {
-      toast.success("User request limit saved");
+      toast.success("feedback.queries.use_requests.user_request_limit_saved");
       queryClient.invalidateQueries({ queryKey: adminKeys.requestUserLimit(variables.userId) });
       invalidateRequestSurfaces(queryClient);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save user limit");
+      toast.error("errors.queries.use_requests.failed_to_save_user_limit", { error: err });
     },
   });
 }

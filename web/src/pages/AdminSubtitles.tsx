@@ -19,10 +19,13 @@ import {
   useAdminDownloadedSubtitles,
 } from "@/hooks/queries/admin/subtitles";
 import { useAdminUsers } from "@/hooks/queries/admin/users";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const PAGE_SIZE_OPTIONS = ["25", "50", "100"] as const;
 
 export default function AdminSubtitles() {
+  useUILanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: users = [] } = useAdminUsers();
   const [page, setPage] = useState(0);
@@ -103,18 +106,25 @@ export default function AdminSubtitles() {
     <div className="page-shell space-y-6 py-4 sm:py-6">
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Subtitles</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_subtitles.subtitles")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Manage stored subtitle files across the library — user uploads and provider downloads.
+            {tr(
+              "pages.admin_subtitles.manage_stored_subtitle_files_across_the_library_user_uploads_and",
+            )}
           </p>
         </div>
       </div>
 
       <div className="surface-panel-subtle grid gap-4 rounded-2xl px-4 py-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatBlock label="Total stored" value={total} />
-        <StatBlock label="User uploads" value={uploads} />
-        <StatBlock label="Provider downloads" value={providerDownloads} />
-        <StatBlock label="Languages on page" value={languageCount} />
+        <StatBlock label={tr("pages.admin_subtitles.total_stored")} value={total} />
+        <StatBlock label={tr("pages.admin_subtitles.user_uploads")} value={uploads} />
+        <StatBlock
+          label={tr("pages.admin_subtitles.provider_downloads")}
+          value={providerDownloads}
+        />
+        <StatBlock label={tr("pages.admin_subtitles.languages_on_page")} value={languageCount} />
       </div>
 
       <AdminSubtitlesFilters
@@ -141,7 +151,8 @@ export default function AdminSubtitles() {
       {total > 0 && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-muted-foreground text-sm">
-            Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of {total}
+            {tr("pages.admin_subtitles.showing")} {page * pageSize + 1}–
+            {Math.min((page + 1) * pageSize, total)} {tr("pages.admin_subtitles.of")} {total}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Select
@@ -157,7 +168,7 @@ export default function AdminSubtitles() {
               <SelectContent>
                 {PAGE_SIZE_OPTIONS.map((size) => (
                   <SelectItem key={size} value={size}>
-                    {size} / page
+                    {size} {tr("pages.admin_subtitles.page")}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -168,10 +179,11 @@ export default function AdminSubtitles() {
               disabled={!canPrev}
               onClick={() => setPage((p) => p - 1)}
             >
-              Previous
+              {tr("common.actions.previous")}
             </Button>
             <span className="text-muted-foreground px-1 text-sm">
-              Page {page + 1} of {pageCount}
+              {tr("pages.admin_subtitles.page_fb06270f")} {page + 1}{" "}
+              {tr("pages.admin_subtitles.of")} {pageCount}
             </span>
             <Button
               type="button"
@@ -179,7 +191,7 @@ export default function AdminSubtitles() {
               disabled={!canNext}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next
+              {tr("common.actions.next")}
             </Button>
           </div>
         </div>
@@ -189,6 +201,7 @@ export default function AdminSubtitles() {
 }
 
 function StatBlock({ label, value }: { label: string; value: number }) {
+  useUILanguage();
   return (
     <div className="space-y-1">
       <div className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">

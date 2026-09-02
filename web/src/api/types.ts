@@ -3541,6 +3541,10 @@ export interface PluginConfigSchema {
 export interface ConnectionCheckResponse {
   success: boolean;
   message: string;
+  translation_key?: string;
+  error?: string;
+  params?: ApiErrorParams;
+  plugin_id?: string;
 }
 
 export interface AdminSettingsConnectionCheckRequest {
@@ -4835,9 +4839,15 @@ export interface IPUserEntry {
 }
 
 // API Error
+export type ApiErrorParam = string | number | boolean | null;
+export type ApiErrorParams = Record<string, ApiErrorParam>;
+
 export interface ApiError {
   error: string;
   message: string;
+  params?: ApiErrorParams;
+  plugin_id?: string;
+  translation_key?: string;
   retry_after_seconds?: number;
   unmatched_roots?: string[];
   active_job_id?: string;

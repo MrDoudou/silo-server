@@ -4,6 +4,8 @@ import type { EpisodeListItem } from "@/api/types";
 import CardOverlays from "@/components/overlays/CardOverlays";
 import { useOverlayPrefs } from "@/hooks/useOverlayPrefs";
 import { overlayDataFromEpisodeListItem } from "@/lib/overlays";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface EpisodeRowProps {
   episode: EpisodeListItem;
@@ -13,6 +15,7 @@ interface EpisodeRowProps {
 }
 
 export default function EpisodeRow({ episode, rating, watched, progress }: EpisodeRowProps) {
+  useUILanguage();
   const { prefs: overlayPrefs } = useOverlayPrefs();
   const watchedState = watched ?? episode.user_data?.played ?? false;
   const derivedProgress =
@@ -32,10 +35,11 @@ export default function EpisodeRow({ episode, rating, watched, progress }: Episo
 
   return (
     <ViewTransitionLink
-      to={`/item/${episode.content_id}`}
-      className={`group hover:bg-accent/60 flex items-center gap-4 rounded-lg px-3.5 py-3 transition-colors duration-150 ${
-        hasProgress ? "bg-accent/5" : ""
-      }`}
+      to={"/item/" + episode.content_id}
+      className={
+        "group hover:bg-accent/60 flex items-center gap-4 rounded-lg px-3.5 py-3 transition-colors duration-150 " +
+        (hasProgress ? "bg-accent/5" : "")
+      }
     >
       {/* Episode number */}
       <div className="text-muted-foreground/50 w-7 shrink-0 text-center text-sm font-semibold">
@@ -47,7 +51,12 @@ export default function EpisodeRow({ episode, rating, watched, progress }: Episo
         {episode.still_url ? (
           <img
             src={episode.still_url}
-            alt={episode.title || `Episode ${episode.episode_number}`}
+            alt={
+              episode.title ||
+              tr("components.episode_row.episode_episode_number", {
+                episode_number: episode.episode_number,
+              })
+            }
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             loading="lazy"
             decoding="async"
@@ -82,7 +91,10 @@ export default function EpisodeRow({ episode, rating, watched, progress }: Episo
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-2">
           <span className="text-foreground truncate text-sm font-semibold">
-            {episode.title || `Episode ${episode.episode_number}`}
+            {episode.title ||
+              tr("components.episode_row.episode_episode_number", {
+                episode_number: episode.episode_number,
+              })}
           </span>
           {watchedState && (
             <svg
@@ -100,8 +112,15 @@ export default function EpisodeRow({ episode, rating, watched, progress }: Episo
         </div>
         <div className="text-muted-foreground text-xs">
           {episode.air_date && <span>{episode.air_date}</span>}
-          {episode.air_date && episode.runtime > 0 && <span className="mx-1.5">&middot;</span>}
-          {episode.runtime > 0 && <span>{episode.runtime}m</span>}
+          {episode.air_date && episode.runtime > 0 && (
+            <span className="mx-1.5">{tr("components.episode_row.middot")}</span>
+          )}
+          {episode.runtime > 0 && (
+            <span>
+              {episode.runtime}
+              {tr("components.episode_row.m")}
+            </span>
+          )}
         </div>
       </div>
 

@@ -1,6 +1,8 @@
 import ViewTransitionLink from "@/components/ViewTransitionLink";
 import type { CrewMember } from "@/api/types";
 import { buildPersonCatalogHref } from "@/pages/catalogSearchParams";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface HeroCrewLineProps {
   crew: CrewMember[];
@@ -14,6 +16,7 @@ interface CrewPerson {
 }
 
 function CrewNames({ people }: { people: CrewPerson[] }) {
+  useUILanguage();
   return (
     <>
       {people.map((p, i) => (
@@ -40,6 +43,7 @@ export default function HeroCrewLine({
   genres,
   jobLabel = "Directed by",
 }: HeroCrewLineProps) {
+  useUILanguage();
   const directors = crew
     .filter((c) => c.job === "Director")
     .map((c): CrewPerson => ({ name: c.name, personId: c.person_id }))
@@ -68,12 +72,16 @@ export default function HeroCrewLine({
     <div className="text-muted-foreground text-[13px]">
       {hasAuthors && (
         <>
-          <span className="text-muted-foreground/60">By </span>
+          <span className="text-muted-foreground/60">
+            {tr("pages.item_detail.components.hero_crew_line.by")}{" "}
+          </span>
           <CrewNames people={authors} />
         </>
       )}
       {hasAuthors && (hasDirectors || hasWriters || hasGenres) && (
-        <span className="text-muted-foreground/40 mx-2">&middot;</span>
+        <span className="text-muted-foreground/40 mx-2">
+          {tr("pages.item_detail.components.hero_crew_line.middot")}
+        </span>
       )}
       {hasDirectors && (
         <>
@@ -82,23 +90,31 @@ export default function HeroCrewLine({
         </>
       )}
       {hasDirectors && hasWriters && (
-        <span className="text-muted-foreground/40 mx-2">&middot;</span>
+        <span className="text-muted-foreground/40 mx-2">
+          {tr("pages.item_detail.components.hero_crew_line.middot")}
+        </span>
       )}
       {hasWriters && (
         <>
-          <span className="text-muted-foreground/60">Written by </span>
+          <span className="text-muted-foreground/60">
+            {tr("pages.item_detail.components.hero_crew_line.written_by")}{" "}
+          </span>
           <CrewNames people={writers} />
         </>
       )}
       {(hasDirectors || hasWriters) && hasGenres && (
-        <span className="text-muted-foreground/40 mx-2">&middot;</span>
+        <span className="text-muted-foreground/40 mx-2">
+          {tr("pages.item_detail.components.hero_crew_line.middot")}
+        </span>
       )}
       {hasGenres &&
         genres.map((g, i) => (
           <span key={g}>
             <span className="text-foreground/60">{g}</span>
             {i < genres.length - 1 && (
-              <span className="text-muted-foreground/40 mx-1.5">&middot;</span>
+              <span className="text-muted-foreground/40 mx-1.5">
+                {tr("pages.item_detail.components.hero_crew_line.middot")}
+              </span>
             )}
           </span>
         ))}

@@ -5,6 +5,8 @@ import RecipeGalleryModal from "@/components/RecipeGallery/RecipeGalleryModal";
 import RecipeConfigDrawer from "@/components/RecipeGallery/RecipeConfigDrawer";
 import { api } from "@/api/client";
 import type { GalleryPreset, RecipeDefinition } from "@/lib/recipes";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ProfileSection {
   id: string;
@@ -88,6 +90,7 @@ function rawToWire(o: RawOverride) {
 }
 
 export default function ProfileCustomizeHome() {
+  useUILanguage();
   const [sections, setSections] = useState<ProfileSection[]>([]);
   const [rawOverrides, setRawOverrides] = useState<RawOverride[]>([]);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -211,18 +214,20 @@ export default function ProfileCustomizeHome() {
     <div className="relative mx-auto max-w-3xl p-6">
       <PageBack />
       <div className="mt-10 flex items-center justify-between border-b border-white/10 pb-3 sm:mt-12">
-        <h1 className="text-base font-semibold">Customize home</h1>
+        <h1 className="text-base font-semibold">
+          {tr("pages.profile_customize_home.customize_home")}
+        </h1>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setGalleryOpen(true)}
             className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white"
           >
-            + Add from Gallery
+            {tr("pages.profile_customize_home.add_from_gallery")}
           </button>
           {allowCustom && (
             <button type="button" className="rounded border border-white/15 px-3 py-1.5 text-sm">
-              + Build Custom
+              {tr("pages.profile_customize_home.build_custom")}
             </button>
           )}
         </div>
@@ -230,7 +235,7 @@ export default function ProfileCustomizeHome() {
 
       <div className="my-3 flex justify-end">
         <button type="button" onClick={reset} className="text-xs underline opacity-65">
-          ↻ Reset to server defaults
+          {tr("pages.profile_customize_home.reset_to_server_defaults")}
         </button>
       </div>
 

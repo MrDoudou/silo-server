@@ -32,6 +32,8 @@ import { LANGUAGES } from "@/player/utils/languageNames";
 import { LIBRARY_TYPES } from "./libraryTypes";
 import { contentLevelLabel } from "./useLibraryForm";
 import type { LevelChainItem, LibraryFormController } from "./useLibraryForm";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function SettingCard({
   htmlFor,
@@ -46,6 +48,8 @@ function SettingCard({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="border-border bg-surface rounded-xl border p-3.5">
       <div className="flex items-start justify-between gap-4">
@@ -67,25 +71,29 @@ export function GeneralFields({
   form: LibraryFormController;
   posterSlot?: ReactNode;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="space-y-5">
       <div className="space-y-1.5">
-        <Label htmlFor="library-name">Name</Label>
+        <Label htmlFor="library-name">
+          {tr("components.admin.libraries.library_form_sections.name")}
+        </Label>
         <Input
           id="library-name"
           value={form.name}
           onChange={(e) => form.setName(e.target.value)}
-          placeholder="e.g. Movies"
+          placeholder={tr("components.admin.libraries.library_form_sections.e_g_movies")}
           aria-invalid={form.errors.name ? true : undefined}
         />
         {form.errors.name ? <p className="text-destructive text-xs">{form.errors.name}</p> : null}
       </div>
       <div className="space-y-1.5">
-        <Label>Type</Label>
+        <Label>{tr("components.admin.libraries.library_form_sections.type")}</Label>
         <div
           className="grid grid-cols-3 gap-2 sm:grid-cols-5"
           role="radiogroup"
-          aria-label="Library type"
+          aria-label={tr("components.admin.libraries.library_form_sections.library_type")}
         >
           {LIBRARY_TYPES.map(({ value, label, icon: Icon }) => {
             const selected = form.type === value;
@@ -113,14 +121,18 @@ export function GeneralFields({
         </div>
         {form.library && form.type !== form.library.type ? (
           <p className="text-warning text-xs">
-            Changing the type of an existing library may require a full rescan to rematch items.
+            {tr(
+              "components.admin.libraries.library_form_sections.changing_the_type_of_an_existing_library_may_require_a",
+            )}
           </p>
         ) : null}
       </div>
       <SettingCard
         htmlFor="library-enabled-switch"
-        title="Enabled"
-        description="Disabled libraries are hidden from browsing and skipped by scans."
+        title={tr("components.admin.libraries.library_form_sections.enabled")}
+        description={tr(
+          "components.admin.libraries.library_form_sections.disabled_libraries_are_hidden_from_browsing_and_skipped_by_scans",
+        )}
       >
         <Switch
           id="library-enabled-switch"
@@ -134,6 +146,8 @@ export function GeneralFields({
 }
 
 export function FolderFields({ form }: { form: LibraryFormController }) {
+  useUILanguage();
+  useUILanguage();
   const [browserOpen, setBrowserOpen] = useState(false);
 
   return (
@@ -145,7 +159,7 @@ export function FolderFields({ form }: { form: LibraryFormController }) {
             <PathAutocompleteInput
               value={path}
               onValueChange={(value) => form.updatePath(i, value)}
-              placeholder="/mnt/media/movies"
+              placeholder={tr("components.admin.libraries.library_form_sections.mnt_media_movies")}
               aria-invalid={form.errors.paths ? true : undefined}
             />
             {form.paths.length > 1 && (
@@ -155,7 +169,7 @@ export function FolderFields({ form }: { form: LibraryFormController }) {
                 size="icon"
                 className="text-muted-foreground hover:text-destructive size-9 shrink-0"
                 onClick={() => form.removePath(i)}
-                title="Remove folder"
+                title={tr("components.admin.libraries.library_form_sections.remove_folder")}
               >
                 <Trash2 className="size-3.5" />
               </Button>
@@ -166,10 +180,12 @@ export function FolderFields({ form }: { form: LibraryFormController }) {
       {form.errors.paths ? <p className="text-destructive text-xs">{form.errors.paths}</p> : null}
       <div className="flex gap-1.5">
         <Button type="button" variant="outline" size="sm" onClick={() => setBrowserOpen(true)}>
-          <FolderSearch className="mr-1 size-3.5" /> Browse
+          <FolderSearch className="mr-1 size-3.5" />{" "}
+          {tr("components.admin.libraries.library_form_sections.browse")}
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={form.addPath}>
-          <Plus className="mr-1 size-3.5" /> Add Path
+          <Plus className="mr-1 size-3.5" />{" "}
+          {tr("components.admin.libraries.library_form_sections.add_path")}
         </Button>
       </div>
       <FolderBrowser
@@ -196,6 +212,8 @@ function ProviderLevelSection({
   onReorder: (items: LevelChainItem[]) => void;
   onToggleEnabled: (index: number) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const [collapsed, setCollapsed] = useState(false);
 
   const moveItem = (index: number, direction: -1 | 1) => {
@@ -268,10 +286,12 @@ function ProviderLevelSection({
 }
 
 export function MetadataFields({ form }: { form: LibraryFormController }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="space-y-5">
       <div className="space-y-1.5">
-        <Label>Metadata Language</Label>
+        <Label>{tr("components.admin.libraries.library_form_sections.metadata_language")}</Label>
         <Select value={form.metadataLanguage} onValueChange={form.setMetadataLanguage}>
           <SelectTrigger className="w-full sm:w-64">
             <SelectValue />
@@ -285,16 +305,20 @@ export function MetadataFields({ form }: { form: LibraryFormController }) {
           </SelectContent>
         </Select>
         <p className="text-muted-foreground text-xs">
-          Preferred language for titles, summaries, and artwork fetched from providers.
+          {tr(
+            "components.admin.libraries.library_form_sections.preferred_language_for_titles_summaries_and_artwork_fetched_from_providers",
+          )}
         </p>
       </div>
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-0.5">
-          <Label htmlFor="auto-translate-metadata">Auto-translate descriptions</Label>
+          <Label htmlFor="auto-translate-metadata">
+            {tr("components.admin.libraries.library_form_sections.auto_translate_descriptions")}
+          </Label>
           <p className="text-muted-foreground text-xs">
-            When providers have no translation for this library&apos;s language, translate
-            descriptions with AI after each refresh. Requires AI description translation in Admin
-            Settings → AI.
+            {tr(
+              "components.admin.libraries.library_form_sections.when_providers_have_no_translation_for_this_library_s_language",
+            )}
           </p>
         </div>
         <Switch
@@ -304,15 +328,18 @@ export function MetadataFields({ form }: { form: LibraryFormController }) {
         />
       </div>
       <div className="space-y-1.5">
-        <Label>Trailer &amp; extras types</Label>
+        <Label>{tr("components.admin.libraries.library_form_sections.trailer_extras_types")}</Label>
         <p className="text-muted-foreground text-xs">
-          Video types fetched from metadata providers during refresh. Uncheck everything to disable
-          remote trailers for this library.
+          {tr(
+            "components.admin.libraries.library_form_sections.video_types_fetched_from_metadata_providers_during_refresh_uncheck_everything",
+          )}
         </p>
         <div
           className="grid grid-cols-1 gap-1.5 sm:grid-cols-2"
           role="group"
-          aria-label="Trailer and extras types"
+          aria-label={tr(
+            "components.admin.libraries.library_form_sections.trailer_and_extras_types",
+          )}
         >
           {PROVIDER_TRAILER_KINDS.map((kind) => {
             const checked = form.trailerKinds.includes(kind);
@@ -341,15 +368,16 @@ export function MetadataFields({ form }: { form: LibraryFormController }) {
       </div>
       {form.contentLevels.length > 0 && (
         <div className="space-y-1.5">
-          <Label>Provider Priority</Label>
+          <Label>{tr("components.admin.libraries.library_form_sections.provider_priority")}</Label>
           <p className="text-muted-foreground mb-3 text-xs">
-            Providers are asked in order from top to bottom. Uncheck a provider to skip it for that
-            level.
+            {tr(
+              "components.admin.libraries.library_form_sections.providers_are_asked_in_order_from_top_to_bottom_uncheck",
+            )}
           </p>
           {form.chainLoading ? (
             <div className="border-border bg-surface text-muted-foreground flex items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-xs">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Loading providers…
+              {tr("components.admin.libraries.library_form_sections.loading_providers")}
             </div>
           ) : form.hasMetadataProviders ? (
             form.contentLevels.map((level) => (
@@ -363,8 +391,9 @@ export function MetadataFields({ form }: { form: LibraryFormController }) {
             ))
           ) : (
             <p className="border-border bg-surface text-muted-foreground rounded-xl border border-dashed p-4 text-center text-xs">
-              No metadata provider plugins are installed. Install one under Admin → Plugins to fetch
-              artwork and descriptions.
+              {tr(
+                "components.admin.libraries.library_form_sections.no_metadata_provider_plugins_are_installed_install_one_under_admin",
+              )}
             </p>
           )}
         </div>
@@ -380,16 +409,22 @@ export function AdvancedFields({
   form: LibraryFormController;
   chapterThumbnailsSupported: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="space-y-3">
       <SettingCard
         htmlFor="chapter-thumbnails-switch"
-        title="Generate chapter thumbnails"
-        description="Stores chapter preview images in the configured public asset S3 bucket. Chapter markers and chapter menus still work without thumbnails."
+        title={tr("components.admin.libraries.library_form_sections.generate_chapter_thumbnails")}
+        description={tr(
+          "components.admin.libraries.library_form_sections.stores_chapter_preview_images_in_the_configured_public_asset_s3",
+        )}
         footer={
           !chapterThumbnailsSupported ? (
             <p className="text-warning text-xs">
-              Public asset S3 storage is required before this can be enabled.
+              {tr(
+                "components.admin.libraries.library_form_sections.public_asset_s3_storage_is_required_before_this_can_be",
+              )}
             </p>
           ) : null
         }
@@ -403,8 +438,10 @@ export function AdvancedFields({
       </SettingCard>
       <SettingCard
         htmlFor="intro-detection-switch"
-        title="Detect intro markers"
-        description="Runs background audio analysis for episodes in this library. Embedded intro chapters are used when available."
+        title={tr("components.admin.libraries.library_form_sections.detect_intro_markers")}
+        description={tr(
+          "components.admin.libraries.library_form_sections.runs_background_audio_analysis_for_episodes_in_this_library_embedded",
+        )}
       >
         <Switch
           id="intro-detection-switch"

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { buildQueryCatalogHref } from "@/pages/catalogSearchParams";
 import { Search, X } from "lucide-react";
 import type { FormEvent } from "react";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const SEARCH_NAVIGATION_DEBOUNCE_MS = 200;
 
@@ -22,6 +24,7 @@ export default function SearchBar({
   prominent = false,
   buildSearchHref = buildQueryCatalogHref,
 }: SearchBarProps) {
+  useUILanguage();
   const [query, setQuery] = useState(initialQuery);
   const navigate = useViewTransitionNavigate();
   const navigateWithoutTransition = useNavigate();
@@ -104,7 +107,7 @@ export default function SearchBar({
         <Search className="text-muted-foreground absolute top-4 left-4 h-5 w-5" />
         <Input
           ref={inputRef}
-          placeholder="Search movies, series..."
+          placeholder={tr("components.search_bar.search_movies_series")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="search-paint-surface h-14 rounded-[1.4rem] border pr-10 pl-12 text-base shadow-none"
@@ -113,7 +116,7 @@ export default function SearchBar({
           <button
             type="button"
             onClick={handleClear}
-            aria-label="Clear search"
+            aria-label={tr("components.search_bar.clear_search")}
             className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2 p-1"
           >
             <X className="h-4 w-4" />
@@ -128,7 +131,7 @@ export default function SearchBar({
       <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
       <Input
         ref={inputRef}
-        placeholder="Search..."
+        placeholder={tr("components.search_bar.search")}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="pl-9"

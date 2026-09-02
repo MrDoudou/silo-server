@@ -51,6 +51,8 @@ import { cn } from "@/lib/utils";
 import { FieldGroup } from "./FieldGroup";
 import { SaveBar } from "./SaveBar";
 import { SETTINGS_CONTROL_WIDTH, SettingField, SettingFieldRow } from "./SettingField";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp";
 const FAVICON_ACCEPT =
@@ -99,6 +101,8 @@ const BUILT_IN_OVERLAY_DEFAULTS = serializeOverlayPrefs(buildDefaultPrefs());
 const KEYS = [...THEME_KEYS, ...OVERLAY_KEYS];
 
 export default function AppearanceSettings() {
+  useUILanguage();
+  useUILanguage();
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
   const branding = useBranding();
   const restartKeys = useRestartKeys();
@@ -218,25 +222,36 @@ export default function AppearanceSettings() {
 
   const allRestart = (keys: string[]) => keys.every((key) => restartKeys.has(key));
 
-  if (form.isLoading) return <div>Loading...</div>;
+  if (form.isLoading) return <div>{tr("pages.admin_settings.appearance_settings.loading")}</div>;
 
   return (
     <div className="flex h-full flex-col">
-      <SettingsPageHeader title="Appearance" className="mb-8" />
+      <SettingsPageHeader
+        title={tr("pages.admin_settings.appearance_settings.appearance")}
+        className="mb-8"
+      />
 
       <div className="flex-1 space-y-5">
-        <FieldGroup label="Logos and icons">
+        <FieldGroup label={tr("pages.admin_settings.appearance_settings.logos_and_icons")}>
           {!assetStorageAvailable && (
             <div className="mt-3 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               <p className="text-muted-foreground text-[13px] leading-relaxed">
                 {s3Configured ? (
-                  <>Restart the server to finish enabling image uploads.</>
+                  <>
+                    {tr(
+                      "pages.admin_settings.appearance_settings.restart_the_server_to_finish_enabling_image_uploads",
+                    )}
+                  </>
                 ) : (
                   <>
-                    Image uploads need a public S3 bucket, set in{" "}
-                    <span className="text-foreground font-medium">Storage &amp; Database</span>{" "}
-                    settings.
+                    {tr(
+                      "pages.admin_settings.appearance_settings.image_uploads_need_a_public_s3_bucket_set_in",
+                    )}{" "}
+                    <span className="text-foreground font-medium">
+                      {tr("pages.admin_settings.appearance_settings.storage_database")}
+                    </span>{" "}
+                    {tr("pages.admin_settings.appearance_settings.settings")}
                   </>
                 )}
               </p>
@@ -245,8 +260,10 @@ export default function AppearanceSettings() {
 
           <div className="space-y-2 py-3.5">
             <BrandingAssetField
-              label="Logo (wordmark)"
-              description="Shown in the expanded sidebar."
+              label={tr("pages.admin_settings.appearance_settings.logo_wordmark")}
+              description={tr(
+                "pages.admin_settings.appearance_settings.shown_in_the_expanded_sidebar",
+              )}
               kind="wordmark"
               currentUrl={branding.wordmarkUrl}
               accept={IMAGE_ACCEPT}
@@ -254,8 +271,10 @@ export default function AppearanceSettings() {
               preview="wide"
             />
             <BrandingAssetField
-              label="Logo (wordmark, light themes)"
-              description="Optional. Shown on light themes; falls back to the main logo."
+              label={tr("pages.admin_settings.appearance_settings.logo_wordmark_light_themes")}
+              description={tr(
+                "pages.admin_settings.appearance_settings.optional_shown_on_light_themes_falls_back_to_the_main",
+              )}
               kind="wordmark_light"
               currentUrl={branding.wordmarkLightUrl}
               fallbackUrl={branding.wordmarkUrl ?? BRANDING_ASSET_SPECS.wordmark.defaultUrl}
@@ -265,8 +284,10 @@ export default function AppearanceSettings() {
               previewBg="light"
             />
             <BrandingAssetField
-              label="Logo (icon)"
-              description="Shown in the collapsed sidebar and the installed app."
+              label={tr("pages.admin_settings.appearance_settings.logo_icon")}
+              description={tr(
+                "pages.admin_settings.appearance_settings.shown_in_the_collapsed_sidebar_and_the_installed_app",
+              )}
               kind="mark"
               currentUrl={branding.markUrl}
               accept={IMAGE_ACCEPT}
@@ -274,8 +295,10 @@ export default function AppearanceSettings() {
               preview="square"
             />
             <BrandingAssetField
-              label="Logo (icon, light themes)"
-              description="Optional. Shown on light themes; falls back to the main icon."
+              label={tr("pages.admin_settings.appearance_settings.logo_icon_light_themes")}
+              description={tr(
+                "pages.admin_settings.appearance_settings.optional_shown_on_light_themes_falls_back_to_the_main_853f8d37",
+              )}
               kind="mark_light"
               currentUrl={branding.markLightUrl}
               fallbackUrl={branding.markUrl ?? BRANDING_ASSET_SPECS.mark.defaultUrl}
@@ -285,8 +308,8 @@ export default function AppearanceSettings() {
               previewBg="light"
             />
             <BrandingAssetField
-              label="Favicon"
-              description="Shown in the browser tab."
+              label={tr("pages.admin_settings.appearance_settings.favicon")}
+              description={tr("pages.admin_settings.appearance_settings.shown_in_the_browser_tab")}
               kind="favicon"
               currentUrl={branding.faviconUrl}
               accept={FAVICON_ACCEPT}
@@ -294,8 +317,10 @@ export default function AppearanceSettings() {
               preview="square"
             />
             <BrandingAssetField
-              label="Login background"
-              description="Shown on the login and signup pages."
+              label={tr("pages.admin_settings.appearance_settings.login_background")}
+              description={tr(
+                "pages.admin_settings.appearance_settings.shown_on_the_login_and_signup_pages",
+              )}
               kind="login_bg"
               currentUrl={branding.loginBgUrl}
               accept={IMAGE_ACCEPT}
@@ -305,10 +330,15 @@ export default function AppearanceSettings() {
           </div>
         </FieldGroup>
 
-        <FieldGroup label="Colors and theme" restartAll={allRestart(THEME_KEYS)}>
+        <FieldGroup
+          label={tr("pages.admin_settings.appearance_settings.colors_and_theme")}
+          restartAll={allRestart(THEME_KEYS)}
+        >
           <SettingFieldRow
-            label="Accent color"
-            description="Recolors buttons, focus outlines, and the sidebar."
+            label={tr("pages.admin_settings.appearance_settings.accent_color")}
+            description={tr(
+              "pages.admin_settings.appearance_settings.recolors_buttons_focus_outlines_and_the_sidebar",
+            )}
           >
             <div className="flex flex-wrap items-center justify-end gap-2 sm:max-w-[300px]">
               {/* Exactly one control in this row is always marked selected:
@@ -318,9 +348,9 @@ export default function AppearanceSettings() {
               <button
                 type="button"
                 onClick={clearAccent}
-                aria-label="Use theme default accent"
+                aria-label={tr("pages.admin_settings.appearance_settings.use_theme_default_accent")}
                 aria-pressed={!accentColor}
-                title="Theme default"
+                title={tr("pages.admin_settings.appearance_settings.theme_default")}
                 className={cn(
                   "bg-muted text-muted-foreground relative grid h-8 w-8 place-items-center rounded-full border transition-transform hover:scale-110",
                   !accentColor
@@ -337,7 +367,9 @@ export default function AppearanceSettings() {
                     key={hex}
                     type="button"
                     onClick={() => applyAccent(hex)}
-                    aria-label={`Use accent ${hex}`}
+                    aria-label={tr("pages.admin_settings.appearance_settings.use_accent_hex", {
+                      hex: hex,
+                    })}
                     aria-pressed={selected}
                     className={cn(
                       "relative h-8 w-8 rounded-full border transition-transform hover:scale-110",
@@ -363,20 +395,22 @@ export default function AppearanceSettings() {
               >
                 <input
                   type="color"
-                  aria-label="Custom accent color"
+                  aria-label={tr("pages.admin_settings.appearance_settings.custom_accent_color")}
                   value={accentColor || "#4f46e5"}
                   onChange={(e) => applyAccent(e.target.value)}
                   className="h-5 w-5 cursor-pointer border-0 bg-transparent p-0"
                 />
-                Custom
+                {tr("pages.admin_settings.appearance_settings.custom")}
                 {customAccentActive && <Check className="h-3.5 w-3.5" />}
               </label>
             </div>
           </SettingFieldRow>
 
           <SettingFieldRow
-            label="Default theme"
-            description="Used until someone picks their own theme."
+            label={tr("pages.admin_settings.appearance_settings.default_theme")}
+            description={tr(
+              "pages.admin_settings.appearance_settings.used_until_someone_picks_their_own_theme",
+            )}
           >
             <div className="flex flex-wrap justify-end gap-2 sm:max-w-[320px]">
               <button
@@ -389,7 +423,7 @@ export default function AppearanceSettings() {
                     : "border-border hover:bg-muted/30",
                 )}
               >
-                No default
+                {tr("pages.admin_settings.appearance_settings.no_default")}
               </button>
               {THEME_IDS.map((id) => (
                 <button
@@ -421,9 +455,13 @@ export default function AppearanceSettings() {
           <AdvancedSection id="appearance.theme" count={3} forceOpen={themeAdvancedDirty}>
             <div className="space-y-3 py-3.5">
               <div className="space-y-1">
-                <Label className="text-sm font-medium">Individual colors and fonts</Label>
+                <Label className="text-sm font-medium">
+                  {tr("pages.admin_settings.appearance_settings.individual_colors_and_fonts")}
+                </Label>
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Applied on top of the chosen theme.
+                  {tr(
+                    "pages.admin_settings.appearance_settings.applied_on_top_of_the_chosen_theme",
+                  )}
                 </p>
               </div>
               <ThemePreviewCard vars={vars} />
@@ -435,7 +473,7 @@ export default function AppearanceSettings() {
                     className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
                   >
                     <RotateCcw className="h-3 w-3" />
-                    Reset all
+                    {tr("pages.admin_settings.appearance_settings.reset_all")}
                   </button>
                 </div>
               )}
@@ -444,19 +482,25 @@ export default function AppearanceSettings() {
 
             <div className="space-y-2 py-3.5">
               <div className="space-y-1">
-                <Label className="text-sm font-medium">Custom CSS</Label>
+                <Label className="text-sm font-medium">
+                  {tr("pages.admin_settings.appearance_settings.custom_css")}
+                </Label>
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Applied to every page after the theme.
+                  {tr(
+                    "pages.admin_settings.appearance_settings.applied_to_every_page_after_the_theme",
+                  )}
                 </p>
               </div>
               <RawCssEditor value={rawCss} onChange={handleCssChange} />
             </div>
 
             <SettingField
-              label="Community theme list"
+              label={tr("pages.admin_settings.appearance_settings.community_theme_list")}
               type="text"
-              hint="https://example.com/themes.json"
-              description="Address of a JSON list of community themes."
+              hint={tr("pages.admin_settings.appearance_settings.https_example_com_themes_json")}
+              description={tr(
+                "pages.admin_settings.appearance_settings.address_of_a_json_list_of_community_themes",
+              )}
               value={form.getValue(CATALOG_URL_KEY)}
               onChange={(v) => form.setValue(CATALOG_URL_KEY, v)}
               restartRequired={restartKeys.has(CATALOG_URL_KEY)}
@@ -465,7 +509,7 @@ export default function AppearanceSettings() {
         </FieldGroup>
 
         <FieldGroup
-          label="Card overlays"
+          label={tr("pages.admin_settings.appearance_settings.card_overlays")}
           restartAll={allRestart(OVERLAY_KEYS)}
           actions={
             <button
@@ -475,13 +519,15 @@ export default function AppearanceSettings() {
               className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40"
             >
               <RotateCcw className="h-3 w-3" aria-hidden="true" />
-              Restore defaults
+              {tr("pages.admin_settings.appearance_settings.restore_defaults")}
             </button>
           }
         >
           <SettingField
-            label="Show badges on poster art"
-            description="Off hides badges for everyone."
+            label={tr("pages.admin_settings.appearance_settings.show_badges_on_poster_art")}
+            description={tr(
+              "pages.admin_settings.appearance_settings.off_hides_badges_for_everyone",
+            )}
             type="toggle"
             value={form.getValue(OVERLAYS_ENABLED_KEY) || "true"}
             onChange={(v) => form.setValue(OVERLAYS_ENABLED_KEY, v)}
@@ -496,14 +542,19 @@ export default function AppearanceSettings() {
             className={overlaysEnabled ? undefined : "pointer-events-none opacity-50"}
           >
             <SettingFieldRow
-              label="Badge style"
-              description="Default for people who have not chosen their own."
+              label={tr("pages.admin_settings.appearance_settings.badge_style")}
+              description={tr(
+                "pages.admin_settings.appearance_settings.default_for_people_who_have_not_chosen_their_own",
+              )}
             >
               <Select
                 value={overlayPrefs.preset}
                 onValueChange={(v) => setOverlayPrefs({ ...overlayPrefs, preset: v as PresetId })}
               >
-                <SelectTrigger className={SETTINGS_CONTROL_WIDTH} aria-label="Badge style">
+                <SelectTrigger
+                  className={SETTINGS_CONTROL_WIDTH}
+                  aria-label={tr("pages.admin_settings.appearance_settings.badge_style")}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -518,7 +569,7 @@ export default function AppearanceSettings() {
             <div className="border-border/70 bg-foreground/[0.02] mb-4 rounded-xl border p-3">
               <div className="flex items-center justify-between gap-3 px-1">
                 <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
-                  Preview
+                  {tr("pages.admin_settings.appearance_settings.preview")}
                 </span>
                 <OverlayPreviewVariantToggle value={previewVariant} onChange={setPreviewVariant} />
               </div>
@@ -563,7 +614,10 @@ export default function AppearanceSettings() {
                             >
                               <SelectTrigger
                                 className="w-[130px]"
-                                aria-label={`${def.label} corner`}
+                                aria-label={tr(
+                                  "pages.admin_settings.appearance_settings.label_corner",
+                                  { label: def.label },
+                                )}
                               >
                                 <SelectValue />
                               </SelectTrigger>
@@ -577,7 +631,10 @@ export default function AppearanceSettings() {
                             </Select>
                             <Switch
                               checked={config.enabled}
-                              aria-label={`Show ${def.label}`}
+                              aria-label={tr(
+                                "pages.admin_settings.appearance_settings.show_label",
+                                { label: def.label },
+                              )}
                               onCheckedChange={(checked) =>
                                 updateOverlayItem(def.id, { enabled: checked })
                               }
@@ -597,9 +654,11 @@ export default function AppearanceSettings() {
       <ConfirmDialog
         open={confirmRestoreOverlaysOpen}
         onOpenChange={setConfirmRestoreOverlaysOpen}
-        title="Restore badge defaults"
-        description="Replace the server-wide badge defaults with Silo's built-in configuration. The badge on/off switch is left alone, and nothing is written until you save."
-        confirmLabel="Restore"
+        title={tr("pages.admin_settings.appearance_settings.restore_badge_defaults")}
+        description={tr(
+          "pages.admin_settings.appearance_settings.replace_the_server_wide_badge_defaults_with_silo_s_built",
+        )}
+        confirmLabel={tr("pages.admin_settings.appearance_settings.restore")}
         variant="destructive"
         onConfirm={restoreOverlayDefaults}
       />

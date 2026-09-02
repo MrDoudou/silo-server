@@ -12,6 +12,8 @@ import { sortSubtitlesBySource } from "../utils/subtitleSort";
 import { getSubtitleFormatLabel, isSubtitleFormatLabel } from "../utils/subtitleCodecs";
 import { isTranslatableSource } from "./subtitleTranslateRequest";
 import { PlayerMenuSurface } from "./PlayerMenuSurface";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SubtitleMenuProps {
   tracks: PlayerSubtitleInfo[];
@@ -31,9 +33,9 @@ const DELAY_STEP_MS = 100;
 const DELAY_MAX_MS = 10_000;
 
 const SOURCE_LABELS: Record<string, string> = {
-  external: "External",
-  embedded: "Embedded",
-  downloaded: "Downloaded",
+  external: "player.components.subtitle_menu.external",
+  embedded: "player.components.subtitle_menu.embedded",
+  downloaded: "player.components.subtitle_menu.downloaded",
 };
 
 function formatDelay(ms: number): string {
@@ -55,6 +57,7 @@ export function SubtitleMenu({
   getSubtitleStartPosition,
   audioTracks,
 }: SubtitleMenuProps) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [translateOpen, setTranslateOpen] = useState(false);
@@ -171,7 +174,11 @@ export function SubtitleMenu({
         className="player-utility-btn"
         data-active={activeIndex !== null ? "true" : "false"}
         onClick={() => setOpen((v) => !v)}
-        aria-label={activeIndex !== null ? "Disable captions" : "Enable captions"}
+        aria-label={
+          activeIndex !== null
+            ? tr("player.components.subtitle_menu.disable_captions")
+            : tr("player.components.subtitle_menu.enable_captions")
+        }
         aria-expanded={open}
         aria-haspopup="menu"
       >
@@ -195,22 +202,26 @@ export function SubtitleMenu({
               }}
               role="menuitem"
               type="button"
-              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-                activeIndex === null ? "bg-white/5 text-white" : "text-white/70"
-              }`}
+              className={
+                "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+                (activeIndex === null ? "bg-white/5 text-white" : "text-white/70")
+              }
               onClick={() => handleSelect(null)}
             >
               <span className="w-4 shrink-0 text-center text-xs">
                 {activeIndex === null ? "✓" : ""}
               </span>
-              Off
+              {tr("player.components.subtitle_menu.off")}
             </button>
           </div>
           <div className="max-h-[60vh] overflow-y-auto py-1">
             {sortedTracks.map((track) => {
               const isActive = track.index === activeIndex;
               const languageName = getLanguageName(track.language);
-              const sourceLabel = SOURCE_LABELS[track.source ?? "embedded"] ?? "Embedded";
+              const sourceLabel = tr(
+                SOURCE_LABELS[track.source ?? "embedded"] ??
+                  "player.components.subtitle_menu.embedded",
+              );
               const formatLabel = getSubtitleFormatLabel(track.codec);
               const hasDetail =
                 track.label &&
@@ -227,9 +238,10 @@ export function SubtitleMenu({
                   }}
                   role="menuitem"
                   type="button"
-                  className={`flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-                    isActive ? "bg-white/5 text-white" : "text-white/70"
-                  }`}
+                  className={
+                    "flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+                    (isActive ? "bg-white/5 text-white" : "text-white/70")
+                  }
                   onClick={() => handleSelect(track.index)}
                 >
                   <span className="mt-0.5 w-4 shrink-0 text-center text-xs">
@@ -264,14 +276,21 @@ export function SubtitleMenu({
           </div>
           <div className="shrink-0 border-t border-white/10 px-3 py-2">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs tracking-wide text-white/50 uppercase">Delay</span>
+              <span className="text-xs tracking-wide text-white/50 uppercase">
+                {tr("player.components.subtitle_menu.delay")}
+              </span>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={() => nudgeDelay(-DELAY_STEP_MS)}
                   disabled={delayDisabled || delayMs <= -DELAY_MAX_MS}
-                  aria-label={`Subtitle delay ${DELAY_STEP_MS}ms earlier`}
+                  aria-label={tr(
+                    "player.components.subtitle_menu.subtitle_delay_delay_step_ms_ms_earlier",
+                    {
+                      DELAY_STEP_MS: DELAY_STEP_MS,
+                    },
+                  )}
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
@@ -283,7 +302,12 @@ export function SubtitleMenu({
                   className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={() => nudgeDelay(DELAY_STEP_MS)}
                   disabled={delayDisabled || delayMs >= DELAY_MAX_MS}
-                  aria-label={`Subtitle delay ${DELAY_STEP_MS}ms later`}
+                  aria-label={tr(
+                    "player.components.subtitle_menu.subtitle_delay_delay_step_ms_ms_later",
+                    {
+                      DELAY_STEP_MS: DELAY_STEP_MS,
+                    },
+                  )}
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
@@ -292,9 +316,9 @@ export function SubtitleMenu({
                   className="ml-1 rounded px-2 py-1 text-xs text-white/60 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={resetDelay}
                   disabled={delayDisabled || delayMs === 0}
-                  aria-label="Reset subtitle delay"
+                  aria-label={tr("player.components.subtitle_menu.reset_subtitle_delay")}
                 >
-                  Reset
+                  {tr("common.actions.reset")}
                 </button>
               </div>
             </div>
@@ -313,7 +337,7 @@ export function SubtitleMenu({
                   setOpen(false);
                 }}
               >
-                Search Online…
+                {tr("player.components.subtitle_menu.search_online")}
               </button>
             )}
             {mediaFileId &&
@@ -333,7 +357,7 @@ export function SubtitleMenu({
                   }}
                 >
                   <Languages className="h-3.5 w-3.5 text-white/50" />
-                  Translate with AI…
+                  {tr("player.components.subtitle_menu.translate_with_ai")}
                 </button>
               )}
             <button
@@ -349,7 +373,7 @@ export function SubtitleMenu({
               }}
             >
               <SlidersHorizontal className="h-3.5 w-3.5 text-white/50" />
-              Appearance…
+              {tr("player.components.subtitle_menu.appearance")}
             </button>
           </div>
         </PlayerMenuSurface>

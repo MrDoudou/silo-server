@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { Link } from "react-router";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import type {
   AutoscanDeliveryMode,
   AutoscanScanSourceDescriptor,
@@ -98,6 +98,8 @@ import {
   needsDeliveryChoice,
 } from "./sourceDescriptor";
 import { formatRelativeTime as formatRelativeTimeBase } from "@/lib/date";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -280,6 +282,7 @@ function RewriteEditor({
   onSave: (rewrites?: AutoscanPathRewrite[]) => void;
   isSaving: boolean;
 }) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const [rewriteError, setRewriteError] = useState<string | null>(null);
@@ -345,7 +348,9 @@ function RewriteEditor({
         (r.from.trim().length === 0 && r.to.trim().length > 0),
     );
     if (hasIncomplete) {
-      setRewriteError("Each rewrite must have both a 'from' and a 'to' path.");
+      setRewriteError(
+        tr("pages.admin.autoscan.sources_panel.each_rewrite_must_have_both_a_from_and_a_to"),
+      );
       return;
     }
     setRewriteError(null);
@@ -368,7 +373,9 @@ function RewriteEditor({
         ) : (
           <ChevronRight className="text-muted-foreground size-3.5 shrink-0" />
         )}
-        <span className="text-sm font-medium">Path rewrites</span>
+        <span className="text-sm font-medium">
+          {tr("pages.admin.autoscan.sources_panel.path_rewrites")}
+        </span>
         {rewrites.length > 0 && (
           <Badge variant="secondary" className="text-xs">
             {rewrites.length}
@@ -377,33 +384,48 @@ function RewriteEditor({
       </button>
 
       {open && (
-        <div id={panelId} className="space-y-3 px-3 pb-3" role="region" aria-label="Path rewrites">
+        <div
+          id={panelId}
+          className="space-y-3 px-3 pb-3"
+          role="region"
+          aria-label={tr("pages.admin.autoscan.sources_panel.path_rewrites")}
+        >
           {rewrites.length === 0 ? (
             <p className="text-muted-foreground text-xs">
-              No path rewrites. Map remote paths (from the scan source) to local library paths.
+              {tr(
+                "pages.admin.autoscan.sources_panel.no_path_rewrites_map_remote_paths_from_the_scan_source",
+              )}
             </p>
           ) : (
             <div className="space-y-2">
               {rewrites.map((rewrite, index) => (
                 <div key={index} className="flex flex-col gap-2 sm:flex-row sm:items-end">
                   <div className="min-w-0 flex-1 space-y-1">
-                    <Label className="text-muted-foreground text-xs">From</Label>
+                    <Label className="text-muted-foreground text-xs">
+                      {tr("pages.admin.autoscan.sources_panel.from")}
+                    </Label>
                     <Input
                       value={rewrite.from}
                       onChange={(e) => updateRewrite(index, { from: e.target.value })}
-                      placeholder="/remote/media"
+                      placeholder={tr("pages.admin.autoscan.sources_panel.remote_media")}
                       className="h-8 text-sm"
-                      aria-label={`Rewrite ${index + 1} from path`}
+                      aria-label={tr("pages.admin.autoscan.sources_panel.rewrite_value_from_path", {
+                        value: index + 1,
+                      })}
                     />
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
-                    <Label className="text-muted-foreground text-xs">To</Label>
+                    <Label className="text-muted-foreground text-xs">
+                      {tr("pages.admin.autoscan.sources_panel.to")}
+                    </Label>
                     <Input
                       value={rewrite.to}
                       onChange={(e) => updateRewrite(index, { to: e.target.value })}
-                      placeholder="/media"
+                      placeholder={tr("pages.admin.autoscan.sources_panel.media")}
                       className="h-8 text-sm"
-                      aria-label={`Rewrite ${index + 1} to path`}
+                      aria-label={tr("pages.admin.autoscan.sources_panel.rewrite_value_to_path", {
+                        value: index + 1,
+                      })}
                     />
                   </div>
                   <Button
@@ -411,7 +433,9 @@ function RewriteEditor({
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => removeRewrite(index)}
-                    aria-label={`Remove rewrite ${index + 1}`}
+                    aria-label={tr("pages.admin.autoscan.sources_panel.remove_rewrite_value", {
+                      value: index + 1,
+                    })}
                     className="shrink-0 self-end sm:mb-0.5"
                   >
                     <X className="size-3.5" />
@@ -426,7 +450,7 @@ function RewriteEditor({
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={addRewrite}>
               <Plus className="size-3.5" />
-              Add rewrite
+              {tr("pages.admin.autoscan.sources_panel.add_rewrite")}
             </Button>
             <Button
               type="button"
@@ -436,15 +460,19 @@ function RewriteEditor({
               onClick={handleSync}
               title={
                 hasConnection
-                  ? "Fetch root-folder mappings from the connected server"
-                  : "Bind a connection first"
+                  ? tr(
+                      "pages.admin.autoscan.sources_panel.fetch_root_folder_mappings_from_the_connected_server",
+                    )
+                  : tr("pages.admin.autoscan.sources_panel.bind_a_connection_first")
               }
             >
-              <RefreshCw className={`size-3.5 ${suggest.isPending ? "animate-spin" : ""}`} />
-              {suggest.isPending ? "Syncing…" : "Sync from server"}
+              <RefreshCw className={"size-3.5 " + (suggest.isPending ? "animate-spin" : "")} />
+              {suggest.isPending
+                ? tr("pages.admin.autoscan.sources_panel.syncing")
+                : tr("pages.admin.autoscan.sources_panel.sync_from_server")}
             </Button>
             <Button type="button" size="sm" disabled={isSaving} onClick={handleSave}>
-              Save rewrites
+              {tr("pages.admin.autoscan.sources_panel.save_rewrites")}
             </Button>
           </div>
 
@@ -453,12 +481,16 @@ function RewriteEditor({
             <div
               className="border-border space-y-4 rounded-md border p-3"
               role="region"
-              aria-label="Rewrite suggestions"
+              aria-label={tr("pages.admin.autoscan.sources_panel.rewrite_suggestions")}
             >
               <div className="space-y-2">
-                <p className="text-sm font-medium">Proposed</p>
+                <p className="text-sm font-medium">
+                  {tr("pages.admin.autoscan.sources_panel.proposed")}
+                </p>
                 {preview.proposed.length === 0 ? (
-                  <p className="text-muted-foreground text-xs">No proposed rewrites.</p>
+                  <p className="text-muted-foreground text-xs">
+                    {tr("pages.admin.autoscan.sources_panel.no_proposed_rewrites")}
+                  </p>
                 ) : (
                   preview.proposed.map((proposal) => (
                     <label key={proposal.from} className="flex items-center gap-2 text-sm">
@@ -472,11 +504,13 @@ function RewriteEditor({
                       </span>
                       {proposal.match_depth >= 2 ? (
                         <Badge variant="secondary" className="text-xs">
-                          {`${proposal.match_depth} segments`}
+                          {tr("pages.admin.autoscan.sources_panel.match_depth_segments", {
+                            match_depth: proposal.match_depth,
+                          })}
                         </Badge>
                       ) : (
                         <Badge variant="destructive" className="text-xs">
-                          1 segment — weak
+                          {tr("pages.admin.autoscan.sources_panel.value_1_segment_weak")}
                         </Badge>
                       )}
                     </label>
@@ -486,31 +520,37 @@ function RewriteEditor({
 
               {preview.unmatched.length > 0 && (
                 <CollapsibleList
-                  title={`No Silo match (${preview.unmatched.length})`}
+                  title={tr("pages.admin.autoscan.sources_panel.no_silo_match_length", {
+                    length: preview.unmatched.length,
+                  })}
                   items={preview.unmatched}
                 />
               )}
 
               {preview.ambiguous.length > 0 && (
                 <CollapsibleList
-                  title={`Ambiguous (${preview.ambiguous.length})`}
+                  title={tr("pages.admin.autoscan.sources_panel.ambiguous_length", {
+                    length: preview.ambiguous.length,
+                  })}
                   items={preview.ambiguous.map((a) => `${a.root} → ${a.candidates.join(", ")}`)}
                 />
               )}
 
               {preview.covered.length > 0 && (
                 <CollapsibleList
-                  title={`Already mapped (${preview.covered.length})`}
+                  title={tr("pages.admin.autoscan.sources_panel.already_mapped_length", {
+                    length: preview.covered.length,
+                  })}
                   items={preview.covered}
                 />
               )}
 
               <div className="flex flex-wrap items-center gap-2">
                 <Button type="button" size="sm" disabled={isSaving} onClick={applySelected}>
-                  Apply selected
+                  {tr("pages.admin.autoscan.sources_panel.apply_selected")}
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => setPreview(null)}>
-                  Cancel
+                  {tr("common.actions.cancel")}
                 </Button>
               </div>
             </div>
@@ -523,6 +563,7 @@ function RewriteEditor({
 
 /** Collapsed list section used inside the sync-from-arr preview. */
 function CollapsibleList({ title, items }: { title: string; items: string[] }) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const panelId = useId();
   return (
@@ -569,6 +610,7 @@ function WebhookEndpointSection({
   onProviderChange: (next: AutoscanWebhookProvider) => void;
   isSaving: boolean;
 }) {
+  useUILanguage();
   const createWebhook = useCreateAutoscanWebhook();
   const rotateWebhook = useRotateAutoscanWebhook();
   const [rotateOpen, setRotateOpen] = useState(false);
@@ -579,16 +621,18 @@ function WebhookEndpointSection({
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("Webhook URL copied");
+      toast.success("feedback.admin.autoscan.sources_panel.webhook_url_copied");
     } catch {
-      toast.error("Could not copy — select the URL manually");
+      toast.error("errors.admin.autoscan.sources_panel.could_not_copy_select_the_url_manually");
     }
   }
 
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-muted-foreground text-xs">Webhook URL</Label>
+        <Label className="text-muted-foreground text-xs">
+          {tr("pages.admin.autoscan.sources_panel.webhook_url")}
+        </Label>
         {source.webhook_configured ? (
           <>
             <div className="flex items-center gap-1.5">
@@ -596,7 +640,7 @@ function WebhookEndpointSection({
                 readOnly
                 value={url || `…${source.webhook_secret_suffix ?? ""} (URL unavailable)`}
                 className="h-8 font-mono text-xs"
-                aria-label="Webhook delivery URL"
+                aria-label={tr("pages.admin.autoscan.sources_panel.webhook_delivery_url")}
                 onFocus={(e) => e.currentTarget.select()}
               />
               <Button
@@ -605,7 +649,7 @@ function WebhookEndpointSection({
                 size="icon-sm"
                 onClick={copyURL}
                 disabled={!url}
-                aria-label="Copy webhook URL"
+                aria-label={tr("pages.admin.autoscan.sources_panel.copy_webhook_url")}
               >
                 <Copy className="size-3.5" />
               </Button>
@@ -615,17 +659,20 @@ function WebhookEndpointSection({
                 size="icon-sm"
                 onClick={() => setRotateOpen(true)}
                 disabled={rotateWebhook.isPending}
-                aria-label="Rotate webhook URL"
-                title="Replace the URL — the old one stops working immediately"
+                aria-label={tr("pages.admin.autoscan.sources_panel.rotate_webhook_url")}
+                title={tr(
+                  "pages.admin.autoscan.sources_panel.replace_the_url_the_old_one_stops_working_immediately",
+                )}
               >
                 <RefreshCw
-                  className={`size-3.5 ${rotateWebhook.isPending ? "animate-spin" : ""}`}
+                  className={"size-3.5 " + (rotateWebhook.isPending ? "animate-spin" : "")}
                 />
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Paste into Sonarr/Radarr → Settings → Connect → Webhook (On Import, On Rename, On File
-              Delete).
+              {tr(
+                "pages.admin.autoscan.sources_panel.paste_into_sonarr_radarr_settings_connect_webhook_on_import_on",
+              )}
             </p>
           </>
         ) : (
@@ -638,33 +685,46 @@ function WebhookEndpointSection({
               onClick={() => createWebhook.mutate(source.id)}
             >
               <Webhook className="size-3.5" />
-              {createWebhook.isPending ? "Generating…" : "Generate webhook URL"}
+              {createWebhook.isPending
+                ? tr("pages.admin.autoscan.sources_panel.generating")
+                : tr("pages.admin.autoscan.sources_panel.generate_webhook_url")}
             </Button>
             <p className="text-muted-foreground text-xs">
-              Creates the URL Sonarr/Radarr will POST import, rename, and delete events to.
+              {tr(
+                "pages.admin.autoscan.sources_panel.creates_the_url_sonarr_radarr_will_post_import_rename_and",
+              )}
             </p>
           </div>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-muted-foreground text-xs">Provider</Label>
+        <Label className="text-muted-foreground text-xs">
+          {tr("pages.admin.autoscan.sources_panel.provider")}
+        </Label>
         <Select
           value={provider}
           onValueChange={(v) => onProviderChange(v as AutoscanWebhookProvider)}
           disabled={isSaving}
         >
-          <SelectTrigger className="w-[140px]" aria-label="Webhook payload provider">
+          <SelectTrigger
+            className="w-[140px]"
+            aria-label={tr("pages.admin.autoscan.sources_panel.webhook_payload_provider")}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="auto">Auto</SelectItem>
-            <SelectItem value="sonarr">Sonarr</SelectItem>
-            <SelectItem value="radarr">Radarr</SelectItem>
+            <SelectItem value="auto">{tr("pages.admin.autoscan.sources_panel.auto")}</SelectItem>
+            <SelectItem value="sonarr">
+              {tr("pages.admin.autoscan.sources_panel.sonarr")}
+            </SelectItem>
+            <SelectItem value="radarr">
+              {tr("pages.admin.autoscan.sources_panel.radarr")}
+            </SelectItem>
           </SelectContent>
         </Select>
         <p className="text-muted-foreground text-xs">
-          Auto infers Sonarr vs Radarr from each payload.
+          {tr("pages.admin.autoscan.sources_panel.auto_infers_sonarr_vs_radarr_from_each_payload")}
         </p>
       </div>
 
@@ -672,21 +732,24 @@ function WebhookEndpointSection({
       <AlertDialog open={rotateOpen} onOpenChange={setRotateOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Rotate webhook URL?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {tr("pages.admin.autoscan.sources_panel.rotate_webhook_url_fd4816d7")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The current URL stops working immediately. Sonarr/Radarr keep sending to the old URL
-              until you paste the new one into their webhook settings.
+              {tr(
+                "pages.admin.autoscan.sources_panel.the_current_url_stops_working_immediately_sonarr_radarr_keep_sending",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 rotateWebhook.mutate(source.id);
                 setRotateOpen(false);
               }}
             >
-              Rotate
+              {tr("pages.admin.autoscan.sources_panel.rotate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -738,6 +801,7 @@ function SourceRow({
   onDelete: (source: AutoscanSource) => void;
   layout?: "table" | "card";
 }) {
+  useUILanguage();
   const update = useUpdateAutoscanSource();
   const libraries = useAdminLibraries();
   const [edit, setEdit] = useState<RowEdit>(() => sourceToRowEdit(source, descriptor));
@@ -908,19 +972,23 @@ function SourceRow({
   // was the most common "I set it up and nothing happened" report.
   const targets = sourceTargets(source, descriptor, libraries.data ?? []);
   const targetSummary = libraries.isLoading ? null : targets.unknown ? (
-    <p className="text-muted-foreground text-xs">Targets determined at scan time</p>
+    <p className="text-muted-foreground text-xs">
+      {tr("pages.admin.autoscan.sources_panel.targets_determined_at_scan_time")}
+    </p>
   ) : targets.unresolvable ? (
     <p className="text-destructive flex items-center gap-1 text-xs">
       <AlertTriangle className="size-3 shrink-0" />
-      No paths configured — this source can&apos;t match anything yet.
+      {tr(
+        "pages.admin.autoscan.sources_panel.no_paths_configured_this_source_can_t_match_anything_yet",
+      )}
     </p>
   ) : targets.libraries.length === 0 ? (
     <p className="text-xs text-amber-500">
-      Paths don&apos;t match any library root — scans won&apos;t be enqueued.
+      {tr("pages.admin.autoscan.sources_panel.paths_don_t_match_any_library_root_scans_won_t")}
     </p>
   ) : (
     <p className="text-muted-foreground flex flex-wrap items-center gap-1 text-xs">
-      <span>Feeds</span>
+      <span>{tr("pages.admin.autoscan.sources_panel.feeds")}</span>
       {targets.libraries.map((library) => (
         <Badge key={library.id} variant="outline" className="text-xs font-normal">
           {library.name}
@@ -937,7 +1005,7 @@ function SourceRow({
           {isWebhook && (
             <Badge variant="secondary" className="shrink-0 text-xs">
               <Webhook className="size-3" />
-              Webhook
+              {tr("pages.admin.autoscan.sources_panel.webhook")}
             </Badge>
           )}
         </p>
@@ -946,8 +1014,10 @@ function SourceRow({
       </div>
       <Input
         value={edit.label}
-        placeholder="Custom label (optional)"
-        aria-label={`Custom label for ${resolvedLabel.name}`}
+        placeholder={tr("pages.admin.autoscan.sources_panel.custom_label_optional")}
+        aria-label={tr("pages.admin.autoscan.sources_panel.custom_label_for_name", {
+          name: resolvedLabel.name,
+        })}
         className="h-7 text-xs"
         onChange={(e) => setEdit((ed) => ({ ...ed, label: e.target.value }))}
         onBlur={handleLabelBlur}
@@ -959,7 +1029,9 @@ function SourceRow({
     <div className="flex max-w-full min-w-0 items-start gap-1.5 overflow-hidden text-sm">
       <AlertTriangle className="text-destructive size-4 shrink-0" />
       <div className="min-w-0 space-y-0.5">
-        <p className="text-destructive leading-none font-medium">Error</p>
+        <p className="text-destructive leading-none font-medium">
+          {tr("pages.admin.autoscan.sources_panel.error")}
+        </p>
         <p className={statusMessageClass} title={statusErrorMessage}>
           {statusErrorMessage}
         </p>
@@ -969,7 +1041,7 @@ function SourceRow({
     <div className="flex max-w-full min-w-0 items-center gap-1.5 overflow-hidden text-sm">
       <CheckCircle2 className="size-4 shrink-0 text-green-500" />
       <div className="min-w-0 space-y-0.5">
-        <p className="leading-none font-medium">OK</p>
+        <p className="leading-none font-medium">{tr("pages.admin.autoscan.sources_panel.ok")}</p>
         <p className="text-muted-foreground flex items-center gap-1 text-xs">
           <Clock className="size-3" />
           {formatRelativeTime(statusTimestamp)}
@@ -978,7 +1050,9 @@ function SourceRow({
     </div>
   ) : (
     <span className="text-muted-foreground text-sm">
-      {isWebhook ? "No deliveries yet" : "Not run yet"}
+      {isWebhook
+        ? tr("pages.admin.autoscan.sources_panel.no_deliveries_yet")
+        : tr("pages.admin.autoscan.sources_panel.not_run_yet")}
     </span>
   );
 
@@ -992,21 +1066,29 @@ function SourceRow({
 
   const connectionControl = isWebhook ? (
     <span className="text-muted-foreground text-xs">
-      Not needed — Sonarr/Radarr deliver directly
+      {tr("pages.admin.autoscan.sources_panel.not_needed_sonarr_radarr_deliver_directly")}
     </span>
   ) : !needsConnectionStep(descriptor, source.delivery_mode) ? (
-    <span className="text-muted-foreground text-xs">Not needed — reads locally</span>
+    <span className="text-muted-foreground text-xs">
+      {tr("pages.admin.autoscan.sources_panel.not_needed_reads_locally")}
+    </span>
   ) : source.connection_id === null && !edit.connectionId ? (
     <div className="flex max-w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
       <Select value="__none__" onValueChange={handleConnectionChange}>
         <SelectTrigger
           className={connectionSelectClass}
-          aria-label={`Connection for ${resolvedLabel.name}`}
+          aria-label={tr("pages.admin.autoscan.sources_panel.connection_for_name", {
+            name: resolvedLabel.name,
+          })}
         >
-          <SelectValue placeholder="No connection" />
+          <SelectValue placeholder={tr("pages.admin.autoscan.sources_panel.no_connection")} />
         </SelectTrigger>
         <SelectContent>
-          {!rowConnectionRequired && <SelectItem value="__none__">— No connection —</SelectItem>}
+          {!rowConnectionRequired && (
+            <SelectItem value="__none__">
+              {tr("pages.admin.autoscan.sources_panel.no_connection_9f71720b")}
+            </SelectItem>
+          )}
           {rowEligibleConnections.map((c) => (
             <SelectItem key={c.id} value={c.id}>
               {c.name}
@@ -1022,19 +1104,27 @@ function SourceRow({
             : "text-muted-foreground w-fit shrink-0"
         }
       >
-        {rowConnectionRequired ? "Connection required" : "No connection"}
+        {rowConnectionRequired
+          ? tr("pages.admin.autoscan.sources_panel.connection_required")
+          : tr("pages.admin.autoscan.sources_panel.no_connection")}
       </Badge>
     </div>
   ) : (
     <Select value={edit.connectionId || "__none__"} onValueChange={handleConnectionChange}>
       <SelectTrigger
         className={connectionSelectClass}
-        aria-label={`Connection for ${resolvedLabel.name}`}
+        aria-label={tr("pages.admin.autoscan.sources_panel.connection_for_name", {
+          name: resolvedLabel.name,
+        })}
       >
-        <SelectValue placeholder="No connection" />
+        <SelectValue placeholder={tr("pages.admin.autoscan.sources_panel.no_connection")} />
       </SelectTrigger>
       <SelectContent>
-        {!rowConnectionRequired && <SelectItem value="__none__">— No connection —</SelectItem>}
+        {!rowConnectionRequired && (
+          <SelectItem value="__none__">
+            {tr("pages.admin.autoscan.sources_panel.no_connection_9f71720b")}
+          </SelectItem>
+        )}
         {rowEligibleConnections.map((c) => (
           <SelectItem key={c.id} value={c.id}>
             {c.name}
@@ -1092,7 +1182,7 @@ function SourceRow({
         values={edit.sourceConfig}
         onChange={(next) => setEdit((ed) => ({ ...ed, sourceConfig: next, dirty: true }))}
         onValidityChange={handleRowConfigValidity}
-        idPrefix={`source-config-${source.id}`}
+        idPrefix={"source-config-" + source.id}
       />
       <Button
         type="button"
@@ -1101,7 +1191,9 @@ function SourceRow({
         disabled={update.isPending || !edit.configValid}
         onClick={() => handleSourceConfigSave()}
       >
-        {update.isPending ? "Saving…" : "Save configuration"}
+        {update.isPending
+          ? tr("pages.admin.autoscan.sources_panel.saving")
+          : tr("pages.admin.autoscan.sources_panel.save_configuration")}
       </Button>
     </div>
   ) : null;
@@ -1126,20 +1218,26 @@ function SourceRow({
       <div className="flex items-center gap-2">
         <Input
           className="w-24"
-          placeholder="Default"
+          placeholder={tr("pages.admin.autoscan.sources_panel.default")}
           value={edit.intervalStr}
           aria-invalid={intervalError}
-          aria-label={`Poll interval seconds for ${resolvedLabel.name}`}
+          aria-label={tr("pages.admin.autoscan.sources_panel.poll_interval_seconds_for_name", {
+            name: resolvedLabel.name,
+          })}
           onChange={(e) => {
             setIntervalError(false);
             setEdit((ed) => ({ ...ed, intervalStr: e.target.value }));
           }}
           onBlur={handleIntervalBlur}
         />
-        <span className="text-muted-foreground text-xs">sec</span>
+        <span className="text-muted-foreground text-xs">
+          {tr("pages.admin.autoscan.sources_panel.sec")}
+        </span>
       </div>
       {intervalError && (
-        <p className="text-destructive mt-1 text-xs">Must be a positive integer.</p>
+        <p className="text-destructive mt-1 text-xs">
+          {tr("pages.admin.autoscan.sources_panel.must_be_a_positive_integer")}
+        </p>
       )}
       <p className="text-muted-foreground mt-1 text-xs">{intervalHelp}</p>
       {rewriteEditor}
@@ -1155,7 +1253,9 @@ function SourceRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`Delete source ${resolvedLabel.name}`}
+            aria-label={tr("pages.admin.autoscan.sources_panel.delete_source_name", {
+              name: resolvedLabel.name,
+            })}
             onClick={() => onDelete(source)}
             className="shrink-0"
           >
@@ -1166,36 +1266,48 @@ function SourceRow({
         <div className="mt-4 grid min-w-0 gap-4">
           {!isWebhook && (
             <div className="grid min-w-0 gap-1.5">
-              <Label className="text-muted-foreground text-xs">Connection</Label>
+              <Label className="text-muted-foreground text-xs">
+                {tr("pages.admin.autoscan.sources_panel.connection")}
+              </Label>
               {connectionControl}
             </div>
           )}
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border px-3 py-2">
             <div className="min-w-0">
-              <p className="text-sm font-medium">Enabled</p>
+              <p className="text-sm font-medium">
+                {tr("pages.admin.autoscan.sources_panel.enabled")}
+              </p>
               <p className="text-muted-foreground text-xs break-words">
-                {isWebhook ? "Accept webhook deliveries" : "Poll this source for changes"}
+                {isWebhook
+                  ? tr("pages.admin.autoscan.sources_panel.accept_webhook_deliveries")
+                  : tr("pages.admin.autoscan.sources_panel.poll_this_source_for_changes")}
               </p>
             </div>
             <Switch
               checked={source.enabled}
               onCheckedChange={handleToggleEnabled}
               disabled={update.isPending}
-              aria-label={`${resolvedLabel.name} enabled`}
+              aria-label={tr("pages.admin.autoscan.sources_panel.name_enabled", {
+                name: resolvedLabel.name,
+              })}
             />
           </div>
 
           <div className="grid min-w-0 gap-1.5">
             <Label className="text-muted-foreground text-xs">
-              {isWebhook ? "Last delivery" : "Last run"}
+              {isWebhook
+                ? tr("pages.admin.autoscan.sources_panel.last_delivery")
+                : tr("pages.admin.autoscan.sources_panel.last_run")}
             </Label>
             <div className="min-w-0 overflow-hidden rounded-md border px-3 py-2">{statusNode}</div>
           </div>
 
           <div className="grid min-w-0 gap-1.5">
             <Label className="text-muted-foreground text-xs">
-              {isWebhook ? "Webhook & settings" : "Interval & settings"}
+              {isWebhook
+                ? tr("pages.admin.autoscan.sources_panel.webhook_settings")
+                : tr("pages.admin.autoscan.sources_panel.interval_settings")}
             </Label>
             {intervalSettings}
           </div>
@@ -1221,7 +1333,9 @@ function SourceRow({
           checked={source.enabled}
           onCheckedChange={handleToggleEnabled}
           disabled={update.isPending}
-          aria-label={`${resolvedLabel.name} enabled`}
+          aria-label={tr("pages.admin.autoscan.sources_panel.name_enabled", {
+            name: resolvedLabel.name,
+          })}
         />
       </TableCell>
 
@@ -1233,7 +1347,9 @@ function SourceRow({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label={`Delete source ${resolvedLabel.name}`}
+          aria-label={tr("pages.admin.autoscan.sources_panel.delete_source_name", {
+            name: resolvedLabel.name,
+          })}
           onClick={() => onDelete(source)}
         >
           <Trash2 className="text-destructive" />
@@ -1284,13 +1400,24 @@ function pluginKey(pluginId: string, capabilityId: string): string {
 /** Human wording for a delivery mode, used on the choice cards. */
 const DELIVERY_MODE_COPY: Record<AutoscanDeliveryMode, { title: string; description: string }> = {
   webhook: {
-    title: "The service tells Silo",
-    description:
-      "Instant. Paste one URL into the service's webhook settings. No credentials stored here.",
+    get title() {
+      return tr("pages.admin.autoscan.sources_panel.the_service_tells_silo");
+    },
+    get description() {
+      return tr(
+        "pages.admin.autoscan.sources_panel.instant_paste_one_url_into_the_service_s_webhook_settings",
+      );
+    },
   },
   poll: {
-    title: "Silo checks the service",
-    description: "Silo asks on a schedule. Works without changing anything upstream.",
+    get title() {
+      return tr("pages.admin.autoscan.sources_panel.silo_checks_the_service");
+    },
+    get description() {
+      return tr(
+        "pages.admin.autoscan.sources_panel.silo_asks_on_a_schedule_works_without_changing_anything_upstream",
+      );
+    },
   },
 };
 
@@ -1303,6 +1430,7 @@ function AddSourceDialog({
   onOpenChange: (open: boolean) => void;
   connectionOptions: Array<{ id: string; name: string; kind: string }>;
 }) {
+  useUILanguage();
   const available = useAvailableScanSources();
   const createSource = useCreateAutoscanSource();
   const createWebhook = useCreateAutoscanWebhook();
@@ -1344,11 +1472,20 @@ function AddSourceDialog({
   // fewer questions than a pollable arr, so the trail is built from what this
   // descriptor actually asks rather than being a fixed 1-2-3.
   const stepLabels = [
-    "What changes?",
-    ...(showDeliveryChoice ? ["How do we hear about it?"] : []),
-    ...(showConnection ? ["Which server?"] : []),
-    ...(isWebhookFlow ? ["Match paths", "Connect it"] : []),
-    ...(hasConfigForm && !isWebhookFlow ? ["Set it up"] : []),
+    tr("pages.admin.autoscan.sources_panel.what_changes"),
+    ...(showDeliveryChoice
+      ? [tr("pages.admin.autoscan.sources_panel.how_do_we_hear_about_it")]
+      : []),
+    ...(showConnection ? [tr("pages.admin.autoscan.sources_panel.which_server")] : []),
+    ...(isWebhookFlow
+      ? [
+          tr("pages.admin.autoscan.sources_panel.match_paths"),
+          tr("pages.admin.autoscan.sources_panel.connect_it"),
+        ]
+      : []),
+    ...(hasConfigForm && !isWebhookFlow
+      ? [tr("pages.admin.autoscan.sources_panel.set_it_up")]
+      : []),
   ];
 
   // Highlight the first question the operator has not answered yet. Steps after
@@ -1469,12 +1606,18 @@ function AddSourceDialog({
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {createdWebhookSource ? "Almost done — connect your service" : "Add scan source"}
+            {createdWebhookSource
+              ? tr("pages.admin.autoscan.sources_panel.almost_done_connect_your_service")
+              : tr("pages.admin.autoscan.sources_panel.add_scan_source")}
           </DialogTitle>
           <DialogDescription>
             {createdWebhookSource
-              ? "The source is created and listening. Paste this into your download manager to finish."
-              : "Pick what you want Silo to watch. Each source only asks for what it actually needs."}
+              ? tr(
+                  "pages.admin.autoscan.sources_panel.the_source_is_created_and_listening_paste_this_into_your",
+                )
+              : tr(
+                  "pages.admin.autoscan.sources_panel.pick_what_you_want_silo_to_watch_each_source_only",
+                )}
           </DialogDescription>
         </DialogHeader>
 
@@ -1490,11 +1633,12 @@ function AddSourceDialog({
               <div className="border-destructive/30 bg-destructive/10 space-y-3 rounded-md border p-3">
                 <p className="text-destructive flex items-center gap-1.5 text-sm font-medium">
                   <AlertTriangle className="size-4 shrink-0" />
-                  Couldn&apos;t generate the webhook URL
+                  {tr("pages.admin.autoscan.sources_panel.couldn_t_generate_the_webhook_url")}
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  The source was created, but has no endpoint yet — it can&apos;t receive anything
-                  until one exists.
+                  {tr(
+                    "pages.admin.autoscan.sources_panel.the_source_was_created_but_has_no_endpoint_yet_it",
+                  )}
                 </p>
                 <Button
                   type="button"
@@ -1508,27 +1652,33 @@ function AddSourceDialog({
                   }
                 >
                   <RefreshCw />
-                  {createWebhook.isPending ? "Retrying…" : "Try again"}
+                  {createWebhook.isPending
+                    ? tr("pages.admin.autoscan.sources_panel.retrying")
+                    : tr("pages.admin.autoscan.sources_panel.try_again")}
                 </Button>
               </div>
             )}
           </div>
         ) : available.isLoading ? (
-          <p className="text-muted-foreground py-4 text-sm">Loading available sources…</p>
+          <p className="text-muted-foreground py-4 text-sm">
+            {tr("pages.admin.autoscan.sources_panel.loading_available_sources")}
+          </p>
         ) : plugins.length === 0 ? (
           <p className="text-muted-foreground py-4 text-sm">
-            No scan-source plugins installed. Install one from the{" "}
+            {tr(
+              "pages.admin.autoscan.sources_panel.no_scan_source_plugins_installed_install_one_from_the",
+            )}{" "}
             <Link to="/admin/plugins" className="text-primary underline-offset-4 hover:underline">
-              Plugins page
+              {tr("pages.admin.autoscan.sources_panel.plugins_page")}
             </Link>{" "}
-            to add sources here.
+            {tr("pages.admin.autoscan.sources_panel.to_add_sources_here")}
           </p>
         ) : (
           <div className="space-y-4">
             <StepTrail steps={stepLabels} currentIndex={currentStepIndex} />
 
             <div className="space-y-2">
-              <Label>What should Silo watch?</Label>
+              <Label>{tr("pages.admin.autoscan.sources_panel.what_should_silo_watch")}</Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {plugins.map((p) => {
                   const key = pluginKey(p.plugin_id, p.capability_id);
@@ -1556,7 +1706,9 @@ function AddSourceDialog({
 
             {showDeliveryChoice && (
               <div className="space-y-2">
-                <Label>How should Silo hear about changes?</Label>
+                <Label>
+                  {tr("pages.admin.autoscan.sources_panel.how_should_silo_hear_about_changes")}
+                </Label>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {descriptor.delivery_modes.map((mode) => {
                     const copy = DELIVERY_MODE_COPY[mode];
@@ -1602,23 +1754,31 @@ function AddSourceDialog({
 
             {showInterval && (
               <div className="space-y-1.5">
-                <Label htmlFor="add-source-interval">Check interval (seconds)</Label>
+                <Label htmlFor="add-source-interval">
+                  {tr("pages.admin.autoscan.sources_panel.check_interval_seconds")}
+                </Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="add-source-interval"
                     className="w-32"
-                    placeholder="Default"
+                    placeholder={tr("pages.admin.autoscan.sources_panel.default")}
                     value={form.intervalStr}
                     aria-invalid={intervalInvalid}
                     onChange={(e) => setForm((f) => ({ ...f, intervalStr: e.target.value }))}
                   />
-                  <span className="text-muted-foreground text-sm">sec</span>
+                  <span className="text-muted-foreground text-sm">
+                    {tr("pages.admin.autoscan.sources_panel.sec")}
+                  </span>
                 </div>
                 {intervalInvalid && (
-                  <p className="text-destructive text-xs">Must be a positive integer.</p>
+                  <p className="text-destructive text-xs">
+                    {tr("pages.admin.autoscan.sources_panel.must_be_a_positive_integer")}
+                  </p>
                 )}
                 <p className="text-muted-foreground text-xs">
-                  Optional — leave blank to use the global default.
+                  {tr(
+                    "pages.admin.autoscan.sources_panel.optional_leave_blank_to_use_the_global_default",
+                  )}
                 </p>
               </div>
             )}
@@ -1639,15 +1799,19 @@ function AddSourceDialog({
           {createdWebhookSource ? (
             // The source already exists at this point, so there is nothing to
             // cancel — only an acknowledgement that the URL has been copied.
-            <Button onClick={close}>Done</Button>
+            <Button onClick={close}>{tr("common.actions.done")}</Button>
           ) : (
             <>
               <Button variant="outline" onClick={close} disabled={isCreating}>
-                Cancel
+                {tr("common.actions.cancel")}
               </Button>
               {plugins.length > 0 && (
                 <Button onClick={handleSubmit} disabled={!canSubmit}>
-                  {isCreating ? "Adding…" : isWebhookFlow ? "Create and continue" : "Add source"}
+                  {isCreating
+                    ? tr("pages.admin.autoscan.sources_panel.adding")
+                    : isWebhookFlow
+                      ? tr("pages.admin.autoscan.sources_panel.create_and_continue")
+                      : tr("pages.admin.autoscan.sources_panel.add_source")}
                 </Button>
               )}
             </>
@@ -1663,6 +1827,7 @@ function AddSourceDialog({
 // ---------------------------------------------------------------------------
 
 export default function SourcesPanel() {
+  useUILanguage();
   const sources = useAutoscanSources();
   const connections = useAutoscanConnections();
   const settings = useAutoscanSettings();
@@ -1705,11 +1870,11 @@ export default function SourcesPanel() {
   const header = (
     <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-muted-foreground text-xs">
-        Scan-source plugins are installed from the{" "}
+        {tr("pages.admin.autoscan.sources_panel.scan_source_plugins_are_installed_from_the")}{" "}
         <Link to="/admin/plugins" className="text-primary underline-offset-4 hover:underline">
-          Plugins page
+          {tr("pages.admin.autoscan.sources_panel.plugins_page")}
         </Link>
-        . Add a source for each thing you want to watch.
+        {tr("pages.admin.autoscan.sources_panel.add_a_source_for_each_thing_you_want_to_watch")}
       </p>
       <Button
         variant="outline"
@@ -1718,7 +1883,7 @@ export default function SourcesPanel() {
         onClick={() => setAddOpen(true)}
       >
         <Plus />
-        Add source
+        {tr("pages.admin.autoscan.sources_panel.add_source")}
       </Button>
     </div>
   );
@@ -1732,13 +1897,19 @@ export default function SourcesPanel() {
   );
 
   if (sources.isLoading) {
-    return <p className="text-muted-foreground py-4 text-sm">Loading sources…</p>;
+    return (
+      <p className="text-muted-foreground py-4 text-sm">
+        {tr("pages.admin.autoscan.sources_panel.loading_sources")}
+      </p>
+    );
   }
 
   if (sources.isError) {
     return (
       <p className="text-destructive py-4 text-sm">
-        Failed to load scan sources. Please reload the page.
+        {tr(
+          "pages.admin.autoscan.sources_panel.failed_to_load_scan_sources_please_reload_the_page",
+        )}
       </p>
     );
   }
@@ -1751,8 +1922,13 @@ export default function SourcesPanel() {
         {header}
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="text-muted-foreground text-sm">
-            No scan sources yet. Click <span className="font-medium">Add source</span> to create one
-            from an installed scan-source plugin.
+            {tr("pages.admin.autoscan.sources_panel.no_scan_sources_yet_click")}{" "}
+            <span className="font-medium">
+              {tr("pages.admin.autoscan.sources_panel.add_source")}
+            </span>{" "}
+            {tr(
+              "pages.admin.autoscan.sources_panel.to_create_one_from_an_installed_scan_source_plugin",
+            )}
           </p>
         </div>
         {addDialog}
@@ -1783,11 +1959,11 @@ export default function SourcesPanel() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Source</TableHead>
-              <TableHead>Connection</TableHead>
-              <TableHead>Interval &amp; settings</TableHead>
-              <TableHead>Enabled</TableHead>
-              <TableHead>Last run</TableHead>
+              <TableHead>{tr("pages.admin.autoscan.sources_panel.source")}</TableHead>
+              <TableHead>{tr("pages.admin.autoscan.sources_panel.connection")}</TableHead>
+              <TableHead>{tr("pages.admin.autoscan.sources_panel.interval_settings")}</TableHead>
+              <TableHead>{tr("pages.admin.autoscan.sources_panel.enabled")}</TableHead>
+              <TableHead>{tr("pages.admin.autoscan.sources_panel.last_run")}</TableHead>
               <TableHead className="w-0" />
             </TableRow>
           </TableHeader>
@@ -1815,17 +1991,21 @@ export default function SourcesPanel() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete source?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {tr("pages.admin.autoscan.sources_panel.delete_source")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;
+              {tr("pages.admin.autoscan.sources_panel.ldquo")}
               {deleteTarget
                 ? resolveSourceName(deleteTarget, connectionOptions, pluginDisplayNames)
                 : ""}
-              &rdquo; will be permanently removed. This cannot be undone.
+              {tr(
+                "pages.admin.autoscan.sources_panel.rdquo_will_be_permanently_removed_this_cannot_be_undone",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={() => {
@@ -1835,7 +2015,7 @@ export default function SourcesPanel() {
                 }
               }}
             >
-              Delete
+              {tr("common.actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

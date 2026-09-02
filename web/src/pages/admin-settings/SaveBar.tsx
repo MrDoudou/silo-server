@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import "@/styles/admin-settings.css";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SaveBarProps {
   dirtyCount: number;
@@ -20,6 +22,7 @@ function plural(count: number, word: string) {
  * every admin page.
  */
 export function SaveBar({ dirtyCount, onSave, onDiscard, isSaving }: SaveBarProps) {
+  useUILanguage();
   if (dirtyCount <= 0) return null;
 
   return (
@@ -47,7 +50,7 @@ export function SaveBar({ dirtyCount, onSave, onDiscard, isSaving }: SaveBarProp
           </span>
           <span className="flex shrink-0 items-center gap-1.5">
             <Button variant="ghost" size="sm" className="rounded-full" onClick={onDiscard}>
-              Discard
+              {tr("pages.admin_settings.save_bar.discard")}
             </Button>
             <Button
               size="sm"
@@ -55,7 +58,7 @@ export function SaveBar({ dirtyCount, onSave, onDiscard, isSaving }: SaveBarProp
               disabled={isSaving}
               className="rounded-full bg-[var(--settings-accent)] text-[#15151a] hover:bg-[var(--settings-accent)] hover:brightness-110"
             >
-              {isSaving ? "Saving..." : "Save"}
+              {isSaving ? tr("pages.admin_settings.save_bar.saving") : tr("common.actions.save")}
             </Button>
           </span>
         </div>

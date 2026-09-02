@@ -1,6 +1,8 @@
 import { ApiClientError } from "@/api/client";
 import type { PolicyCompileIssue } from "@/api/types";
 
+import { tr } from "@/i18n/translate";
+
 export function formatPolicyDate(value?: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString();
@@ -77,5 +79,7 @@ export function compileIssuesFromError(error: unknown): PolicyCompileIssue[] {
 }
 
 export function messageFromError(error: unknown, fallback: string) {
-  return error instanceof Error && error.message ? error.message : fallback;
+  return error instanceof Error && error.message
+    ? tr.error("errors.common.request_failed", error)
+    : tr.remote({ message: fallback });
 }

@@ -8,6 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles, RefreshCw } from "lucide-react";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { carouselCardWidthClasses } from "@/lib/uiCustomization";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function buildSectionHref(row: DiscoverRow): string | undefined {
   if (!row.section_kind) return undefined;
@@ -28,6 +30,7 @@ function TasteProfileCard({
     | undefined;
   isLoading: boolean;
 }) {
+  useUILanguage();
   if (isLoading) {
     return (
       <div className="glass-subtle space-y-3 rounded-xl p-5">
@@ -46,10 +49,13 @@ function TasteProfileCard({
   return (
     <div className="glass-subtle space-y-4 rounded-xl p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Your Taste Profile</h2>
+        <h2 className="text-base font-semibold">
+          {tr("pages.recommendations.your_taste_profile")}
+        </h2>
         {totalSignals > 0 && (
           <span className="text-muted-foreground text-xs">
-            {totalSignals} signal{totalSignals !== 1 ? "s" : ""}
+            {totalSignals} {tr("pages.recommendations.signal")}
+            {totalSignals !== 1 ? tr("pages.recommendations.s") : ""}
           </span>
         )}
       </div>
@@ -57,7 +63,7 @@ function TasteProfileCard({
       {profile.top_genres.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Top Genres
+            {tr("pages.recommendations.top_genres")}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {profile.top_genres.map((genre) => (
@@ -75,7 +81,7 @@ function TasteProfileCard({
       {profile.favorite_directors.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Favorite Directors
+            {tr("pages.recommendations.favorite_directors")}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {profile.favorite_directors.map((director) => (
@@ -94,13 +100,16 @@ function TasteProfileCard({
 }
 
 function DiscoverEmptyState() {
+  useUILanguage();
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
       <Sparkles className="text-muted-foreground/50 h-10 w-10" />
       <div className="space-y-1">
-        <p className="text-sm font-medium">Not enough data yet</p>
+        <p className="text-sm font-medium">{tr("pages.recommendations.not_enough_data_yet")}</p>
         <p className="text-muted-foreground max-w-sm text-xs">
-          Watch and rate more content to unlock personalized recommendations.
+          {tr(
+            "pages.recommendations.watch_and_rate_more_content_to_unlock_personalized_recommendations",
+          )}
         </p>
       </div>
     </div>
@@ -108,21 +117,25 @@ function DiscoverEmptyState() {
 }
 
 function DiscoverErrorState({ onRetry }: { onRetry: () => void }) {
+  useUILanguage();
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-      <p className="text-muted-foreground text-sm">Failed to load recommendations.</p>
+      <p className="text-muted-foreground text-sm">
+        {tr("pages.recommendations.failed_to_load_recommendations")}
+      </p>
       <button
         onClick={onRetry}
         className="text-primary hover:text-primary/80 inline-flex items-center gap-2 text-sm font-medium"
       >
         <RefreshCw className="h-4 w-4" />
-        Retry
+        {tr("common.actions.retry")}
       </button>
     </div>
   );
 }
 
 function DiscoverSkeletons({ posterWidthClasses }: { posterWidthClasses: string }) {
+  useUILanguage();
   return (
     <div className="space-y-10 pt-2">
       {Array.from({ length: 4 }).map((_, i) => (
@@ -146,7 +159,8 @@ function DiscoverSkeletons({ posterWidthClasses }: { posterWidthClasses: string 
 }
 
 export default function Recommendations() {
-  useDocumentTitle("Recommendations");
+  useUILanguage();
+  useDocumentTitle(tr("pages.recommendations.recommendations"));
 
   const tasteProfileQuery = useTasteProfile();
   const { data, isLoading, isError, refetch } = useDiscover();
@@ -163,10 +177,12 @@ export default function Recommendations() {
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">
-              Recommendations
+              {tr("pages.recommendations.recommendations")}
             </h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              Personalized picks based on your viewing history and ratings.
+              {tr(
+                "pages.recommendations.personalized_picks_based_on_your_viewing_history_and_ratings",
+              )}
             </p>
           </div>
           <TasteProfileCard

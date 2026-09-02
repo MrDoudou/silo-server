@@ -92,7 +92,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminAutoscan from "@/pages/AdminAutoscan";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { getLibraryRefreshLibraryID } from "@/lib/adminJobs";
 import {
   compareActiveScans,
@@ -122,6 +123,8 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { formatJobProgress } from "@/components/adminCatalogMaintenanceFormatters";
 import { formatDateTime } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Keep toast lifetime and delayed state cleanup coordinated so visible feedback
 // disappears before state is cleared.
@@ -140,6 +143,7 @@ const LIBRARY_TABS = ["libraries", "autoscan"] as const;
 type LibraryTab = (typeof LIBRARY_TABS)[number];
 
 export default function AdminLibraries() {
+  useUILanguage();
   useEventChannel("scans");
   // Autoscan used to be its own sidebar page even though it only ever
   // configured how these libraries get scanned; it is a tab here now, and
@@ -295,9 +299,15 @@ export default function AdminLibraries() {
           [libraryId]: result,
         }));
         if (result.healthy) {
-          toast.success(formatMountCheckMessage(result), { duration: MOUNT_CHECK_FEEDBACK_MS });
+          toast.success("feedback.admin_libraries.reported_message", {
+            values: { message: formatMountCheckMessage(result) },
+            duration: MOUNT_CHECK_FEEDBACK_MS,
+          });
         } else {
-          toast.error(formatMountCheckMessage(result), { duration: MOUNT_CHECK_FEEDBACK_MS });
+          toast.error("errors.admin_libraries.reported_message", {
+            values: { message: formatMountCheckMessage(result) },
+            duration: MOUNT_CHECK_FEEDBACK_MS,
+          });
         }
         const existingTimeout = mountCheckClearTimeoutsRef.current[libraryId];
         if (existingTimeout) {
@@ -318,7 +328,7 @@ export default function AdminLibraries() {
   }
 
   if (isLoading && activeTab === "libraries")
-    return <div className="p-8">Loading libraries...</div>;
+    return <div className="p-8">{tr("pages.admin_libraries.loading_libraries")}</div>;
 
   return (
     <div className="space-y-6">
@@ -327,9 +337,11 @@ export default function AdminLibraries() {
         onOpenChange={(open) => {
           if (!open) setConfirmDeleteLib(null);
         }}
-        title="Delete library"
-        description={`Delete library "${confirmDeleteLib?.name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
+        title={tr("pages.admin_libraries.delete_library")}
+        description={tr("pages.admin_libraries.delete_library_name_this_action_cannot_be_undone", {
+          name: confirmDeleteLib?.name,
+        })}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         onConfirm={() => {
           if (confirmDeleteLib) deleteMutation.mutate(confirmDeleteLib.id);
@@ -341,9 +353,11 @@ export default function AdminLibraries() {
         onOpenChange={(open) => {
           if (!open) setConfirmEmptyRootLib(null);
         }}
-        title="Confirm empty root cleanup"
-        description={`On the next scan of "${confirmEmptyRootLib?.name}", remove items from roots that are reachable but still empty? Unreachable roots remain protected.`}
-        confirmLabel="Confirm"
+        title={tr("pages.admin_libraries.confirm_empty_root_cleanup")}
+        description={tr("pages.admin_libraries.on_the_next_scan_of_name_remove_items_from_roots", {
+          name: confirmEmptyRootLib?.name,
+        })}
+        confirmLabel={tr("common.actions.confirm")}
         variant="destructive"
         onConfirm={() => {
           if (confirmEmptyRootLib) confirmEmptyRootCleanupMutation.mutate(confirmEmptyRootLib.id);
@@ -352,9 +366,13 @@ export default function AdminLibraries() {
       />
       <div className="page-header">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Libraries</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_libraries.libraries")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Manage library roots and scans. Catalog import/export now lives under Maintenance.
+            {tr(
+              "pages.admin_libraries.manage_library_roots_and_scans_catalog_import_export_now_lives",
+            )}
           </p>
         </div>
         <div className={cn("flex gap-2", activeTab !== "libraries" && "hidden")}>
@@ -374,12 +392,12 @@ export default function AdminLibraries() {
             disabled={scanAllMutation.isPending}
           >
             <ScanLine className="h-3.5 w-3.5" />
-            Scan All Libraries
+            {tr("pages.admin_libraries.scan_all_libraries")}
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link to="/admin/maintenance">
               <Wrench className="mr-1 h-4 w-4" />
-              Catalog Maintenance
+              {tr("pages.admin_libraries.catalog_maintenance")}
             </Link>
           </Button>
           <Button
@@ -389,7 +407,7 @@ export default function AdminLibraries() {
               setDialogOpen(true);
             }}
           >
-            <Plus className="mr-1 h-4 w-4" /> Add Library
+            <Plus className="mr-1 h-4 w-4" /> {tr("pages.admin_libraries.add_library")}
           </Button>
           <LibraryEditorDialog
             open={dialogOpen}
@@ -409,8 +427,8 @@ export default function AdminLibraries() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
         <TabsList variant="line" className="border-border w-full justify-start border-b">
-          <TabsTrigger value="libraries">Libraries</TabsTrigger>
-          <TabsTrigger value="autoscan">Autoscan</TabsTrigger>
+          <TabsTrigger value="libraries">{tr("pages.admin_libraries.libraries")}</TabsTrigger>
+          <TabsTrigger value="autoscan">{tr("pages.admin_libraries.autoscan")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="libraries" className="space-y-6">
@@ -426,12 +444,14 @@ export default function AdminLibraries() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10" />
-                    <TableHead>Name</TableHead>
-                    <TableHead>Paths</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Scanned</TableHead>
-                    <TableHead className="w-[15rem]">Actions</TableHead>
+                    <TableHead>{tr("pages.admin_libraries.name")}</TableHead>
+                    <TableHead>{tr("pages.admin_libraries.paths")}</TableHead>
+                    <TableHead>{tr("pages.admin_libraries.type")}</TableHead>
+                    <TableHead>{tr("pages.admin_libraries.status")}</TableHead>
+                    <TableHead>{tr("pages.admin_libraries.last_scanned")}</TableHead>
+                    <TableHead className="w-[15rem]">
+                      {tr("pages.admin_libraries.actions")}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <SortableContext
@@ -477,7 +497,7 @@ export default function AdminLibraries() {
                                     setDialogOpen(true);
                                   }}
                                 >
-                                  {lib.paths.length} folders
+                                  {lib.paths.length} {tr("pages.admin_libraries.folders")}
                                 </button>
                               )}
                             </TableCell>
@@ -487,19 +507,29 @@ export default function AdminLibraries() {
                             <TableCell>
                               <div className="flex flex-col gap-1">
                                 <Badge variant={lib.enabled ? "outline" : "destructive"}>
-                                  {lib.enabled ? "Enabled" : "Disabled"}
+                                  {lib.enabled
+                                    ? tr("pages.admin_libraries.enabled")
+                                    : tr("pages.admin_libraries.disabled")}
                                 </Badge>
                                 {runningLibraryScans > 0 ? (
-                                  <Badge variant="secondary">{runningLibraryScans} running</Badge>
+                                  <Badge variant="secondary">
+                                    {runningLibraryScans} {tr("pages.admin_libraries.running")}
+                                  </Badge>
                                 ) : null}
                                 {queuedLibraryScans > 0 ? (
-                                  <Badge variant="secondary">{queuedLibraryScans} queued</Badge>
+                                  <Badge variant="secondary">
+                                    {queuedLibraryScans} {tr("pages.admin_libraries.queued")}
+                                  </Badge>
                                 ) : null}
                                 {lib.scan_warning_code === "empty_root" ? (
-                                  <Badge variant="destructive">Empty root guarded</Badge>
+                                  <Badge variant="destructive">
+                                    {tr("pages.admin_libraries.empty_root_guarded")}
+                                  </Badge>
                                 ) : null}
                                 {lib.scan_warning_code === "dead_root" ? (
-                                  <Badge variant="destructive">Root unreachable</Badge>
+                                  <Badge variant="destructive">
+                                    {tr("pages.admin_libraries.root_unreachable")}
+                                  </Badge>
                                 ) : null}
                               </div>
                             </TableCell>
@@ -508,11 +538,12 @@ export default function AdminLibraries() {
                                 <div>
                                   {lib.last_scanned_at
                                     ? formatDateTime(lib.last_scanned_at)
-                                    : "Never"}
+                                    : tr("pages.admin_libraries.never")}
                                 </div>
                                 {lib.scan_warning_at ? (
                                   <div className="text-destructive text-[11px]">
-                                    Warning: {formatDateTime(lib.scan_warning_at)}
+                                    {tr("pages.admin_libraries.warning")}{" "}
+                                    {formatDateTime(lib.scan_warning_at)}
                                   </div>
                                 ) : null}
                               </div>
@@ -528,13 +559,13 @@ export default function AdminLibraries() {
                                   )}
                                   title={
                                     activeLibraryScans.length > 0
-                                      ? "Stop Library Scans"
-                                      : "Scan Library"
+                                      ? tr("pages.admin_libraries.stop_library_scans")
+                                      : tr("pages.admin_libraries.scan_library")
                                   }
                                   aria-label={
                                     activeLibraryScans.length > 0
-                                      ? "Stop Library Scans"
-                                      : "Scan Library"
+                                      ? tr("pages.admin_libraries.stop_library_scans")
+                                      : tr("pages.admin_libraries.scan_library")
                                   }
                                   disabled={
                                     activeLibraryScans.length > 0
@@ -553,7 +584,7 @@ export default function AdminLibraries() {
                                     <Square className="h-3 w-3 fill-current" />
                                   ) : (
                                     <RefreshCw
-                                      className={`h-3 w-3 ${isScanning ? "animate-spin" : ""}`}
+                                      className={"h-3 w-3 " + (isScanning ? "animate-spin" : "")}
                                     />
                                   )}
                                 </Button>
@@ -562,10 +593,14 @@ export default function AdminLibraries() {
                                   size="icon"
                                   className={cn("h-7 w-7", activeRefreshJob && "text-destructive")}
                                   title={
-                                    activeRefreshJob ? "Stop Metadata Refresh" : "Rescan Metadata"
+                                    activeRefreshJob
+                                      ? tr("pages.admin_libraries.stop_metadata_refresh")
+                                      : tr("pages.admin_libraries.rescan_metadata")
                                   }
                                   aria-label={
-                                    activeRefreshJob ? "Stop Metadata Refresh" : "Rescan Metadata"
+                                    activeRefreshJob
+                                      ? tr("pages.admin_libraries.stop_metadata_refresh")
+                                      : tr("pages.admin_libraries.rescan_metadata")
                                   }
                                   disabled={
                                     activeRefreshJob ? isCancellingRefreshJob : isRefreshStarting
@@ -591,12 +626,12 @@ export default function AdminLibraries() {
                                   title={
                                     mountCheck
                                       ? formatMountCheckMessage(mountCheck)
-                                      : "Verify Mounts"
+                                      : tr("pages.admin_libraries.verify_mounts")
                                   }
                                   aria-label={
                                     mountCheck
                                       ? formatMountCheckMessage(mountCheck)
-                                      : "Verify Mounts"
+                                      : tr("pages.admin_libraries.verify_mounts")
                                   }
                                   disabled={isCheckingMount}
                                   onClick={() => handleMountCheck(lib.id)}
@@ -610,7 +645,9 @@ export default function AdminLibraries() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
-                                  aria-label={`Edit ${lib.name}`}
+                                  aria-label={tr("pages.admin_libraries.edit_name", {
+                                    name: lib.name,
+                                  })}
                                   onClick={() => {
                                     setEditingLib(lib);
                                     setDialogOpen(true);
@@ -622,7 +659,9 @@ export default function AdminLibraries() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
-                                  aria-label={`Delete ${lib.name}`}
+                                  aria-label={tr("pages.admin_libraries.delete_name", {
+                                    name: lib.name,
+                                  })}
                                   onClick={() => handleDelete(lib)}
                                 >
                                   <Trash2 className="h-3 w-3" aria-hidden="true" />
@@ -633,7 +672,9 @@ export default function AdminLibraries() {
                                     variant="ghost"
                                     size="icon"
                                     className="text-destructive h-7 w-7"
-                                    title="Confirm cleanup for missing or empty roots"
+                                    title={tr(
+                                      "pages.admin_libraries.confirm_cleanup_for_missing_or_empty_roots",
+                                    )}
                                     disabled={
                                       confirmEmptyRootCleanupMutation.isPending &&
                                       confirmEmptyRootCleanupMutation.variables === lib.id
@@ -679,7 +720,7 @@ export default function AdminLibraries() {
                         const isCheckingMount =
                           mountCheckMutation.isPending && mountCheckMutation.variables === lib.id;
                         return (
-                          <TableRow key={`${lib.id}-warning`}>
+                          <TableRow key={lib.id + "-warning"}>
                             <TableCell colSpan={7} className="bg-destructive/5 text-sm">
                               <div className="flex flex-col gap-2 py-1">
                                 <div className="text-destructive font-medium">
@@ -700,7 +741,7 @@ export default function AdminLibraries() {
                                     title={
                                       mountCheck
                                         ? formatMountCheckMessage(mountCheck)
-                                        : "Check mount"
+                                        : tr("pages.admin_libraries.check_mount")
                                     }
                                     disabled={isCheckingMount}
                                     onClick={() => handleMountCheck(lib.id)}
@@ -710,13 +751,15 @@ export default function AdminLibraries() {
                                       pending={isCheckingMount}
                                       result={mountCheck}
                                     />
-                                    Check Mount
+                                    {tr("pages.admin_libraries.check_mount_0542f960")}
                                   </Button>
                                   {lib.scan_warning_code === "dead_root" ? (
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      title="Confirm cleanup for missing or empty roots"
+                                      title={tr(
+                                        "pages.admin_libraries.confirm_cleanup_for_missing_or_empty_roots",
+                                      )}
                                       disabled={
                                         confirmEmptyRootCleanupMutation.isPending &&
                                         confirmEmptyRootCleanupMutation.variables === lib.id
@@ -724,7 +767,7 @@ export default function AdminLibraries() {
                                       onClick={() => handleConfirmEmptyRootCleanup(lib)}
                                     >
                                       <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                      Confirm Cleanup
+                                      {tr("pages.admin_libraries.confirm_cleanup")}
                                     </Button>
                                   ) : null}
                                 </div>
@@ -749,7 +792,9 @@ export default function AdminLibraries() {
                       <TableCell className="text-muted-foreground font-mono text-xs">
                         {activeLibrary.paths.length === 1
                           ? activeLibrary.paths[0]
-                          : `${activeLibrary.paths.length} folders`}
+                          : tr("pages.admin_libraries.length_folders", {
+                              length: activeLibrary.paths.length,
+                            })}
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{activeLibrary.type}</Badge>
@@ -794,6 +839,7 @@ function ScanQueuePopover({
   cancellingLibraryID: number | null;
   onCancel: (libraryID: number) => void;
 }) {
+  useUILanguage();
   const totalRunning = groups.reduce((sum, group) => sum + group.runningCount, 0);
   const totalQueued = groups.reduce((sum, group) => sum + group.queuedCount, 0);
   const totalScans = totalRunning + totalQueued;
@@ -807,7 +853,10 @@ function ScanQueuePopover({
             <span className="bg-success relative inline-flex h-2 w-2 rounded-full" />
           </span>
           <span className="tabular-nums">
-            {totalScans} {totalScans === 1 ? "scan" : "scans"}
+            {totalScans}{" "}
+            {totalScans === 1
+              ? tr("pages.admin_libraries.scan")
+              : tr("pages.admin_libraries.scans")}
           </span>
         </Button>
       </PopoverTrigger>
@@ -823,20 +872,24 @@ function ScanQueuePopover({
               className="text-primary h-3.5 w-3.5 animate-spin"
               style={{ animationDuration: "3s" }}
             />
-            <span className="text-sm font-semibold">Scan Queue</span>
+            <span className="text-sm font-semibold">{tr("pages.admin_libraries.scan_queue")}</span>
           </div>
           <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
             {totalRunning > 0 && (
               <>
                 <span className="bg-success inline-block h-1.5 w-1.5 rounded-full" />
-                <span className="tabular-nums">{totalRunning} running</span>
+                <span className="tabular-nums">
+                  {totalRunning} {tr("pages.admin_libraries.running")}
+                </span>
               </>
             )}
             {totalRunning > 0 && totalQueued > 0 && <span className="text-border">·</span>}
             {totalQueued > 0 && (
               <>
                 <span className="bg-muted-foreground/40 inline-block h-1.5 w-1.5 rounded-full" />
-                <span className="tabular-nums">{totalQueued} queued</span>
+                <span className="tabular-nums">
+                  {totalQueued} {tr("pages.admin_libraries.queued")}
+                </span>
               </>
             )}
           </div>
@@ -894,6 +947,7 @@ function ScanQueueGroup({
   cancelling: boolean;
   onCancel: (libraryID: number) => void;
 }) {
+  useUILanguage();
   const { expanded, setExpanded, visibleScans, hiddenCount, collapsible } = useCollapsedScans(
     group.scans,
   );
@@ -914,7 +968,7 @@ function ScanQueueGroup({
           onClick={() => onCancel(group.libraryID)}
         >
           <Square className="h-2.5 w-2.5" />
-          Cancel
+          {tr("common.actions.cancel")}
         </Button>
       </div>
 
@@ -964,7 +1018,7 @@ function ScanQueueGroup({
               <span className="shrink-0">
                 {scan.status === "running"
                   ? formatActiveScanTime(scan.started_at, "Started")
-                  : "Waiting for capacity"}
+                  : tr("pages.admin_libraries.waiting_for_capacity")}
               </span>
             </div>
             {formatActiveScanProgress(scan) && (
@@ -983,11 +1037,14 @@ function ScanQueueGroup({
         >
           {expanded ? (
             <>
-              Show less <ChevronUp className="h-3 w-3" />
+              {tr("pages.admin_libraries.show_less")} <ChevronUp className="h-3 w-3" />
             </>
           ) : (
             <>
-              + {hiddenCount} more{hiddenCount <= group.queuedCount ? " queued" : ""}{" "}
+              + {hiddenCount} {tr("pages.admin_libraries.more")}
+              {hiddenCount <= group.queuedCount
+                ? tr("pages.admin_libraries.queued_7fe445b6")
+                : ""}{" "}
               <ChevronDown className="h-3 w-3" />
             </>
           )}
@@ -1005,6 +1062,7 @@ function getLibraryScanGroupName(library: Library | null, libraryID: number) {
 }
 
 function SortableLibraryRow({ id, children }: { id: number; children: React.ReactNode }) {
+  useUILanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
@@ -1020,7 +1078,7 @@ function SortableLibraryRow({ id, children }: { id: number; children: React.Reac
       <TableCell className="w-10">
         <button
           type="button"
-          aria-label="Drag to reorder"
+          aria-label={tr("pages.admin_libraries.drag_to_reorder")}
           className="hover:bg-surface-hover cursor-grab touch-none rounded-md p-1 transition-colors"
           {...attributes}
           {...listeners}
@@ -1050,6 +1108,7 @@ function LibraryActiveWorkRow({
   onCancelJob: (jobID: string) => void;
   onCancelScans: (libraryID: number) => void;
 }) {
+  useUILanguage();
   return (
     <TableRow className="hover:bg-transparent">
       <TableCell colSpan={7} className="bg-muted/20 px-4 py-2">
@@ -1058,15 +1117,19 @@ function LibraryActiveWorkRow({
             <div className="flex min-w-0 items-start gap-1.5">
               <StopTaskButton
                 disabled={cancellingJobID === activeRefreshJob.id}
-                label="Cancel metadata refresh"
+                label={tr("pages.admin_libraries.cancel_metadata_refresh")}
                 onClick={() => onCancelJob(activeRefreshJob.id)}
               />
               <DatabaseBackup className="mt-0.5 h-3 w-3 shrink-0" />
               <div className="min-w-0 flex-1 space-y-0.5">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="text-foreground/80 font-medium">Metadata</span>
+                  <span className="text-foreground/80 font-medium">
+                    {tr("pages.admin_libraries.metadata")}
+                  </span>
                   <span className="truncate">
-                    {activeRefreshJob.message || "Metadata refresh queued"}
+                    {activeRefreshJob.message
+                      ? tr.remote({ message: activeRefreshJob.message })
+                      : tr("pages.admin_libraries.metadata_refresh_queued")}
                   </span>
                 </div>
                 <div className="text-muted-foreground/80 truncate text-[10px]">
@@ -1100,6 +1163,7 @@ function LibraryScanTasks({
   libraryID: number;
   onCancelScans: (libraryID: number) => void;
 }) {
+  useUILanguage();
   const { expanded, setExpanded, visibleScans, collapsible } = useCollapsedScans(scans);
   const runningCount = scans.filter((scan) => scan.status === "running").length;
   const queuedCount = scans.length - runningCount;
@@ -1109,18 +1173,24 @@ function LibraryScanTasks({
       <div className="flex min-w-0 items-center gap-1.5">
         <StopTaskButton
           disabled={cancelling}
-          label="Cancel library scans"
+          label={tr("pages.admin_libraries.cancel_library_scans")}
           onClick={() => onCancelScans(libraryID)}
         />
         <RefreshCw
           className={cn("h-3 w-3 shrink-0", runningCount > 0 && "animate-spin")}
           style={{ animationDuration: "2s" }}
         />
-        <span className="text-foreground/80 font-medium">Scan</span>
+        <span className="text-foreground/80 font-medium">
+          {tr("pages.admin_libraries.scan_28cba55d")}
+        </span>
         <span className="tabular-nums">
-          {runningCount > 0 ? `${runningCount} running` : null}
+          {runningCount > 0
+            ? tr("pages.admin_libraries.running_count_running", { runningCount: runningCount })
+            : null}
           {runningCount > 0 && queuedCount > 0 ? " · " : null}
-          {queuedCount > 0 ? `${queuedCount} queued` : null}
+          {queuedCount > 0
+            ? tr("pages.admin_libraries.queued_count_queued", { queuedCount: queuedCount })
+            : null}
         </span>
         {collapsible ? (
           <button
@@ -1130,11 +1200,12 @@ function LibraryScanTasks({
           >
             {expanded ? (
               <>
-                Show less <ChevronUp className="h-3 w-3" />
+                {tr("pages.admin_libraries.show_less")} <ChevronUp className="h-3 w-3" />
               </>
             ) : (
               <>
-                Show all {scans.length} <ChevronDown className="h-3 w-3" />
+                {tr("pages.admin_libraries.show_all")} {scans.length}{" "}
+                <ChevronDown className="h-3 w-3" />
               </>
             )}
           </button>
@@ -1155,6 +1226,7 @@ function LibraryScanTasks({
 }
 
 function CompactScanRow({ scan }: { scan: ScanRun }) {
+  useUILanguage();
   const progress = scan.status === "running" ? formatActiveScanProgress(scan) : "";
 
   return (
@@ -1193,6 +1265,7 @@ function StopTaskButton({
   label: string;
   onClick: () => void;
 }) {
+  useUILanguage();
   return (
     <button
       type="button"
@@ -1232,10 +1305,15 @@ function formatMountCheckMessage(result: LibraryMountCheckResponse) {
   const failingRoots = result.roots.filter((root) => !root.reachable);
   const firstFailure = failingRoots[0];
   if (!result.healthy && firstFailure) {
-    const detail = firstFailure.error_message ? ` (${firstFailure.error_message})` : "";
-    return `${result.summary}: ${firstFailure.path}${detail}`;
+    return tr("feedback.admin_libraries.summary_path_detail", {
+      summary: tr.remote({ message: result.summary }),
+      path: firstFailure.path,
+      detail: firstFailure.error_message
+        ? ` (${tr.remote({ message: firstFailure.error_message })})`
+        : "",
+    });
   }
-  return result.summary;
+  return tr.remote({ message: result.summary });
 }
 
 /* ─── Pagination helper ─────────────────────────────────────────── */
@@ -1291,11 +1369,14 @@ function PaginationBar({
   next: () => void;
   last: () => void;
 }) {
+  useUILanguage();
   if (total <= PAGE_SIZE) return null;
   return (
     <div className="border-border/40 flex items-center justify-between border-t px-1 pt-3">
       <span className="text-muted-foreground text-xs tracking-tight tabular-nums">
-        {rangeStart}&ndash;{rangeEnd} of {total}
+        {rangeStart}
+        {tr("pages.admin_libraries.ndash")}
+        {rangeEnd} {tr("pages.admin_libraries.of")} {total}
       </span>
       <div className="flex items-center gap-0.5">
         <Button
@@ -1304,7 +1385,7 @@ function PaginationBar({
           className="h-7 w-7"
           disabled={!canPrev}
           onClick={first}
-          title="First page"
+          title={tr("pages.admin_libraries.first_page")}
         >
           <ChevronsLeft className="h-3.5 w-3.5" />
         </Button>
@@ -1314,7 +1395,7 @@ function PaginationBar({
           className="h-7 w-7"
           disabled={!canPrev}
           onClick={prev}
-          title="Previous page"
+          title={tr("pages.admin_libraries.previous_page")}
         >
           <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
@@ -1324,7 +1405,7 @@ function PaginationBar({
           className="h-7 w-7"
           disabled={!canNext}
           onClick={next}
-          title="Next page"
+          title={tr("pages.admin_libraries.next_page")}
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </Button>
@@ -1334,7 +1415,7 @@ function PaginationBar({
           className="h-7 w-7"
           disabled={!canNext}
           onClick={last}
-          title="Last page"
+          title={tr("pages.admin_libraries.last_page")}
         >
           <ChevronsRight className="h-3.5 w-3.5" />
         </Button>
@@ -1362,6 +1443,7 @@ function SortableHead<K extends string>({
   children: React.ReactNode;
   className?: string;
 }) {
+  useUILanguage();
   const active = field === activeField;
   return (
     <TableHead className={cn("select-none", className)}>
@@ -1407,6 +1489,7 @@ function useSort<K extends string>(defaultField: K, defaultDir: SortDir = "desc"
 /* ─── Skipped Roots (Troubleshooting) ───────────────────────────── */
 
 function AmbiguousRootsSection({ libraries }: { libraries: Library[] }) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const [selectedLibraryId, setSelectedLibraryId] = useState<number | undefined>(libraries[0]?.id);
   const [search, setSearch] = useState("");
@@ -1433,8 +1516,10 @@ function AmbiguousRootsSection({ libraries }: { libraries: Library[] }) {
 
   return (
     <CollapsibleDiagnosticsSection
-      title="Ambiguous Roots"
-      description="Scanner roots that stay visible but do not enter unattended metadata matching."
+      title={tr("pages.admin_libraries.ambiguous_roots")}
+      description={tr(
+        "pages.admin_libraries.scanner_roots_that_stay_visible_but_do_not_enter_unattended",
+      )}
       count={roots.length}
       icon={<FolderOpen className="h-4 w-4 text-amber-500" />}
       open={open}
@@ -1451,7 +1536,7 @@ function AmbiguousRootsSection({ libraries }: { libraries: Library[] }) {
           }}
         >
           <SelectTrigger className="h-8 w-full text-xs sm:w-[220px]">
-            <SelectValue placeholder="Select library" />
+            <SelectValue placeholder={tr("pages.admin_libraries.select_library")} />
           </SelectTrigger>
           <SelectContent>
             {libraries.map((library) => (
@@ -1464,7 +1549,7 @@ function AmbiguousRootsSection({ libraries }: { libraries: Library[] }) {
         <div className="relative flex-1">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2" />
           <Input
-            placeholder="Filter by path, title, or sample file..."
+            placeholder={tr("pages.admin_libraries.filter_by_path_title_or_sample_file")}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -1479,18 +1564,18 @@ function AmbiguousRootsSection({ libraries }: { libraries: Library[] }) {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Root</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Confidence</TableHead>
-              <TableHead className="text-right">Files</TableHead>
-              <TableHead className="w-[120px]">Actions</TableHead>
+              <TableHead>{tr("pages.admin_libraries.root")}</TableHead>
+              <TableHead>{tr("pages.admin_libraries.type")}</TableHead>
+              <TableHead>{tr("pages.admin_libraries.confidence")}</TableHead>
+              <TableHead className="text-right">{tr("pages.admin_libraries.files")}</TableHead>
+              <TableHead className="w-[120px]">{tr("pages.admin_libraries.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredRoots.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-muted-foreground text-center text-sm">
-                  No ambiguous roots for this library.
+                  {tr("pages.admin_libraries.no_ambiguous_roots_for_this_library")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -1512,7 +1597,9 @@ function AmbiguousRootsSection({ libraries }: { libraries: Library[] }) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{root.inferred_type || "unknown"}</Badge>
+                    <Badge variant="outline">
+                      {root.inferred_type || tr("pages.admin_libraries.unknown")}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">{root.type_confidence}</Badge>
@@ -1528,7 +1615,7 @@ function AmbiguousRootsSection({ libraries }: { libraries: Library[] }) {
                         className="h-7 text-xs"
                         onClick={() => setEditingRoot(root)}
                       >
-                        Override
+                        {tr("pages.admin_libraries.override")}
                       </Button>
                       {root.content_id ? (
                         <Button
@@ -1536,9 +1623,13 @@ function AmbiguousRootsSection({ libraries }: { libraries: Library[] }) {
                           size="sm"
                           className="h-7 text-xs"
                           asChild
-                          title="Open the matched item; use its Split Versions action to separate wrongly merged files"
+                          title={tr(
+                            "pages.admin_libraries.open_the_matched_item_use_its_split_versions_action_to",
+                          )}
                         >
-                          <Link to={`/item/${encodeURIComponent(root.content_id)}`}>Resolve</Link>
+                          <Link to={"/item/" + encodeURIComponent(root.content_id)}>
+                            {tr("pages.admin_libraries.resolve")}
+                          </Link>
                         </Button>
                       ) : null}
                     </div>
@@ -1594,6 +1685,7 @@ function RootOverrideDialog({
   root: LibraryRoot;
   onOpenChange: (open: boolean) => void;
 }) {
+  useUILanguage();
   const upsertOverride = useUpsertLibraryRootOverride();
   const deleteOverride = useDeleteLibraryRootOverride();
   const [forcedType, setForcedType] = useState(
@@ -1624,70 +1716,71 @@ function RootOverrideDialog({
     <Dialog open={true} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Root Override</DialogTitle>
+          <DialogTitle>{tr("pages.admin_libraries.root_override")}</DialogTitle>
           <DialogDescription>
-            Force the inferred identity for <code>{root.root_path}</code>.
+            {tr("pages.admin_libraries.force_the_inferred_identity_for")}{" "}
+            <code>{root.root_path}</code>.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Type</Label>
+              <Label>{tr("pages.admin_libraries.type")}</Label>
               <Select
                 value={forcedType || "auto"}
                 onValueChange={(value) => setForcedType(value === "auto" ? "" : value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Auto" />
+                  <SelectValue placeholder={tr("pages.admin_libraries.auto")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="movie">Movie</SelectItem>
-                  <SelectItem value="series">Series</SelectItem>
+                  <SelectItem value="auto">{tr("pages.admin_libraries.auto")}</SelectItem>
+                  <SelectItem value="movie">{tr("pages.admin_libraries.movie")}</SelectItem>
+                  <SelectItem value="series">{tr("pages.admin_libraries.series")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Year</Label>
+              <Label>{tr("pages.admin_libraries.year")}</Label>
               <Input
                 value={forcedYear}
                 onChange={(e) => setForcedYear(e.target.value)}
-                placeholder="2024"
+                placeholder={tr("pages.admin_libraries.value_2024")}
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Title</Label>
+            <Label>{tr("pages.admin_libraries.title")}</Label>
             <Input
               value={forcedTitle}
               onChange={(e) => setForcedTitle(e.target.value)}
-              placeholder="Forced title"
+              placeholder={tr("pages.admin_libraries.forced_title")}
             />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label>TMDB ID</Label>
+              <Label>{tr("pages.admin_libraries.tmdb_id")}</Label>
               <Input value={forcedTmdbID} onChange={(e) => setForcedTmdbID(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>IMDb ID</Label>
+              <Label>{tr("pages.admin_libraries.imdb_id")}</Label>
               <Input value={forcedImdbID} onChange={(e) => setForcedImdbID(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>TVDB ID</Label>
+              <Label>{tr("pages.admin_libraries.tvdb_id")}</Label>
               <Input value={forcedTvdbID} onChange={(e) => setForcedTvdbID(e.target.value)} />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Note</Label>
+            <Label>{tr("pages.admin_libraries.note")}</Label>
             <Input
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Why this override exists"
+              placeholder={tr("pages.admin_libraries.why_this_override_exists")}
             />
           </div>
 
@@ -1702,7 +1795,7 @@ function RootOverrideDialog({
                 );
               }}
             >
-              Remove Override
+              {tr("pages.admin_libraries.remove_override")}
             </Button>
             <Button
               onClick={() => {
@@ -1724,7 +1817,7 @@ function RootOverrideDialog({
               }}
               disabled={upsertOverride.isPending}
             >
-              Save Override
+              {tr("pages.admin_libraries.save_override")}
             </Button>
           </div>
         </div>
@@ -1736,6 +1829,7 @@ function RootOverrideDialog({
 type SkippedSortField = "root_path" | "library" | "reason" | "first_seen" | "last_seen";
 
 function SkippedRootsSection({ skippedRoots }: { skippedRoots: LibrarySkippedRoot[] }) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -1776,8 +1870,10 @@ function SkippedRootsSection({ skippedRoots }: { skippedRoots: LibrarySkippedRoo
 
   return (
     <CollapsibleDiagnosticsSection
-      title="Troubleshooting"
-      description="Roots where the inferred canonical folder lacks embedded provider IDs."
+      title={tr("pages.admin_libraries.troubleshooting")}
+      description={tr(
+        "pages.admin_libraries.roots_where_the_inferred_canonical_folder_lacks_embedded_provider_ids",
+      )}
       count={skippedRoots.length}
       icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
       open={open}
@@ -1786,7 +1882,7 @@ function SkippedRootsSection({ skippedRoots }: { skippedRoots: LibrarySkippedRoo
       <div className="relative mb-2">
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2" />
         <Input
-          placeholder="Filter by path, library, or reason..."
+          placeholder={tr("pages.admin_libraries.filter_by_path_library_or_reason")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -1805,7 +1901,7 @@ function SkippedRootsSection({ skippedRoots }: { skippedRoots: LibrarySkippedRoo
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                Item
+                {tr("pages.admin_libraries.item")}
               </SortableHead>
               <SortableHead
                 field="library"
@@ -1813,7 +1909,7 @@ function SkippedRootsSection({ skippedRoots }: { skippedRoots: LibrarySkippedRoo
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                Library
+                {tr("pages.admin_libraries.library")}
               </SortableHead>
               <SortableHead
                 field="reason"
@@ -1821,16 +1917,16 @@ function SkippedRootsSection({ skippedRoots }: { skippedRoots: LibrarySkippedRoo
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                Reason
+                {tr("pages.admin_libraries.reason")}
               </SortableHead>
-              <TableHead className="text-right">Files</TableHead>
+              <TableHead className="text-right">{tr("pages.admin_libraries.files")}</TableHead>
               <SortableHead
                 field="first_seen"
                 activeField={sortField}
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                First seen
+                {tr("pages.admin_libraries.first_seen")}
               </SortableHead>
               <SortableHead
                 field="last_seen"
@@ -1838,7 +1934,7 @@ function SkippedRootsSection({ skippedRoots }: { skippedRoots: LibrarySkippedRoo
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                Last seen
+                {tr("pages.admin_libraries.last_seen")}
               </SortableHead>
             </TableRow>
           </TableHeader>
@@ -1888,17 +1984,23 @@ function SkippedRootsSection({ skippedRoots }: { skippedRoots: LibrarySkippedRoo
                     <TableRow className="hover:bg-transparent">
                       <TableCell colSpan={6} className="bg-muted/30 border-b px-4 py-3">
                         <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
-                          <span className="text-muted-foreground font-medium">Root path</span>
+                          <span className="text-muted-foreground font-medium">
+                            {tr("pages.admin_libraries.root_path")}
+                          </span>
                           <code className="font-mono break-all select-all">{root.root_path}</code>
                           {root.sample_file_path && (
                             <>
-                              <span className="text-muted-foreground font-medium">Sample file</span>
+                              <span className="text-muted-foreground font-medium">
+                                {tr("pages.admin_libraries.sample_file")}
+                              </span>
                               <code className="font-mono break-all select-all">
                                 {root.sample_file_path}
                               </code>
                             </>
                           )}
-                          <span className="text-muted-foreground font-medium">Files affected</span>
+                          <span className="text-muted-foreground font-medium">
+                            {tr("pages.admin_libraries.files_affected")}
+                          </span>
                           <span>{root.file_count}</span>
                         </div>
                       </TableCell>
@@ -1918,6 +2020,7 @@ function SkippedRootsSection({ skippedRoots }: { skippedRoots: LibrarySkippedRoo
 /* ─── Unmatched Items ──────────────────────────────────────────── */
 
 function UnmatchedItemsSection() {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
@@ -1938,8 +2041,10 @@ function UnmatchedItemsSection() {
 
   return (
     <CollapsibleDiagnosticsSection
-      title="Unmatched Items"
-      description="Items that could not be matched to any metadata provider."
+      title={tr("pages.admin_libraries.unmatched_items")}
+      description={tr(
+        "pages.admin_libraries.items_that_could_not_be_matched_to_any_metadata_provider",
+      )}
       count={total}
       icon={<Search className="h-4 w-4 text-amber-500" />}
       open={open}
@@ -1948,7 +2053,9 @@ function UnmatchedItemsSection() {
       <div className="relative mb-2">
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2" />
         <Input
-          placeholder="Search all unmatched items by title, library, or type..."
+          placeholder={tr(
+            "pages.admin_libraries.search_all_unmatched_items_by_title_library_or_type",
+          )}
           value={search}
           onChange={(e) => {
             // Search is server-side and spans the whole table; jump back to
@@ -1963,18 +2070,18 @@ function UnmatchedItemsSection() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Title</TableHead>
-              <TableHead>Library</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead>{tr("pages.admin_libraries.title")}</TableHead>
+              <TableHead>{tr("pages.admin_libraries.library")}</TableHead>
+              <TableHead>{tr("pages.admin_libraries.type")}</TableHead>
+              <TableHead>{tr("pages.admin_libraries.status")}</TableHead>
+              <TableHead className="w-[100px]">{tr("pages.admin_libraries.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-muted-foreground text-center text-sm">
-                  No unmatched items match your search.
+                  {tr("pages.admin_libraries.no_unmatched_items_match_your_search")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -1982,7 +2089,7 @@ function UnmatchedItemsSection() {
                 <TableRow key={u.content_id}>
                   <TableCell className="font-medium">
                     <Link
-                      to={`/item/${u.content_id}`}
+                      to={"/item/" + u.content_id}
                       className="hover:text-primary underline-offset-2 hover:underline"
                     >
                       {u.title}
@@ -2006,7 +2113,7 @@ function UnmatchedItemsSection() {
                       onClick={() => setMatchItem(u)}
                     >
                       <Search className="h-3 w-3" />
-                      Match
+                      {tr("pages.admin_libraries.match")}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -2052,6 +2159,7 @@ function UnmatchedItemsSection() {
 type StaleSortField = "title" | "year" | "library" | "provider" | "first_seen" | "last_seen";
 
 function StaleIDsSection({ staleIDs }: { staleIDs: StaleMediaID[] }) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [matchItem, setMatchItem] = useState<StaleMediaID | null>(null);
@@ -2095,8 +2203,10 @@ function StaleIDsSection({ staleIDs }: { staleIDs: StaleMediaID[] }) {
 
   return (
     <CollapsibleDiagnosticsSection
-      title="Stale External IDs"
-      description="Provider IDs no longer resolve; metadata refresh will fail until re-matched."
+      title={tr("pages.admin_libraries.stale_external_ids")}
+      description={tr(
+        "pages.admin_libraries.provider_ids_no_longer_resolve_metadata_refresh_will_fail_until",
+      )}
       count={staleIDs.length}
       icon={<Unlink className="h-4 w-4 text-red-400" />}
       iconClassName="bg-red-500/10"
@@ -2106,7 +2216,7 @@ function StaleIDsSection({ staleIDs }: { staleIDs: StaleMediaID[] }) {
       <div className="relative mb-2">
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2" />
         <Input
-          placeholder="Filter by title, provider, or ID..."
+          placeholder={tr("pages.admin_libraries.filter_by_title_provider_or_id")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -2125,7 +2235,7 @@ function StaleIDsSection({ staleIDs }: { staleIDs: StaleMediaID[] }) {
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                Title
+                {tr("pages.admin_libraries.title")}
               </SortableHead>
               <SortableHead
                 field="year"
@@ -2133,7 +2243,7 @@ function StaleIDsSection({ staleIDs }: { staleIDs: StaleMediaID[] }) {
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                Year
+                {tr("pages.admin_libraries.year")}
               </SortableHead>
               <SortableHead
                 field="library"
@@ -2141,7 +2251,7 @@ function StaleIDsSection({ staleIDs }: { staleIDs: StaleMediaID[] }) {
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                Library
+                {tr("pages.admin_libraries.library")}
               </SortableHead>
               <SortableHead
                 field="provider"
@@ -2149,16 +2259,16 @@ function StaleIDsSection({ staleIDs }: { staleIDs: StaleMediaID[] }) {
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                Provider
+                {tr("pages.admin_libraries.provider")}
               </SortableHead>
-              <TableHead>Provider ID</TableHead>
+              <TableHead>{tr("pages.admin_libraries.provider_id")}</TableHead>
               <SortableHead
                 field="first_seen"
                 activeField={sortField}
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                First seen
+                {tr("pages.admin_libraries.first_seen")}
               </SortableHead>
               <SortableHead
                 field="last_seen"
@@ -2166,9 +2276,9 @@ function StaleIDsSection({ staleIDs }: { staleIDs: StaleMediaID[] }) {
                 activeDir={sortDir}
                 onSort={toggle}
               >
-                Last seen
+                {tr("pages.admin_libraries.last_seen")}
               </SortableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead className="w-[100px]">{tr("pages.admin_libraries.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -2195,7 +2305,7 @@ function StaleIDsSection({ staleIDs }: { staleIDs: StaleMediaID[] }) {
                     onClick={() => setMatchItem(s)}
                   >
                     <Search className="h-3 w-3" />
-                    Match
+                    {tr("pages.admin_libraries.match")}
                   </Button>
                 </TableCell>
               </TableRow>

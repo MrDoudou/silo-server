@@ -10,6 +10,8 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { BulkSelectionCheckbox } from "@/components/BulkSelectionCheckbox";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface EditableSectionViewModel {
   id: string;
@@ -59,6 +61,7 @@ export function SectionSummaryBadges({
   showVisibility?: boolean;
   showEnabled?: boolean;
 }) {
+  useUILanguage();
   const queryDefinition = queryDefinitionFromSectionConfig(section.config);
   const collectionId =
     typeof section.config?.library_collection_id === "string"
@@ -74,13 +77,23 @@ export function SectionSummaryBadges({
     <div className="flex flex-wrap gap-1">
       <Badge variant="secondary">{recipeLabel(catalog, section.sectionType)}</Badge>
       {resumeLabel ? <Badge variant="outline">{resumeLabel}</Badge> : null}
-      {queryDefinition.media_scope === "movie" ? <Badge variant="outline">Movies</Badge> : null}
-      {queryDefinition.media_scope === "series" ? <Badge variant="outline">Series</Badge> : null}
-      {queryDefinition.media_scope === "episode" ? <Badge variant="outline">Episodes</Badge> : null}
-      {queryDefinition.media_scope === "audiobook" ? (
-        <Badge variant="outline">Audiobooks</Badge>
+      {queryDefinition.media_scope === "movie" ? (
+        <Badge variant="outline">{tr("components.sections.editable_section_rows.movies")}</Badge>
       ) : null}
-      {queryDefinition.media_scope === "ebook" ? <Badge variant="outline">Ebooks</Badge> : null}
+      {queryDefinition.media_scope === "series" ? (
+        <Badge variant="outline">{tr("components.sections.editable_section_rows.series")}</Badge>
+      ) : null}
+      {queryDefinition.media_scope === "episode" ? (
+        <Badge variant="outline">{tr("components.sections.editable_section_rows.episodes")}</Badge>
+      ) : null}
+      {queryDefinition.media_scope === "audiobook" ? (
+        <Badge variant="outline">
+          {tr("components.sections.editable_section_rows.audiobooks")}
+        </Badge>
+      ) : null}
+      {queryDefinition.media_scope === "ebook" ? (
+        <Badge variant="outline">{tr("components.sections.editable_section_rows.ebooks")}</Badge>
+      ) : null}
       {libraries
         ? queryDefinition.library_ids.map((libraryId) => {
             const library = libraries.find((entry) => entry.id === libraryId);
@@ -92,15 +105,21 @@ export function SectionSummaryBadges({
           })
         : null}
       {collectionLabel ? <Badge variant="outline">{collectionLabel}</Badge> : null}
-      {section.featured ? <Badge variant="default">Featured</Badge> : null}
+      {section.featured ? (
+        <Badge variant="default">{tr("components.sections.editable_section_rows.featured")}</Badge>
+      ) : null}
       {showVisibility ? (
         <Badge variant={section.hidden ? "secondary" : "outline"}>
-          {section.hidden ? "Hidden" : "Visible"}
+          {section.hidden
+            ? tr("components.sections.editable_section_rows.hidden")
+            : tr("components.sections.editable_section_rows.visible")}
         </Badge>
       ) : null}
       {showEnabled ? (
         <Badge variant={section.enabled ? "default" : "secondary"}>
-          {section.enabled ? "On" : "Off"}
+          {section.enabled
+            ? tr("components.sections.editable_section_rows.on")
+            : tr("components.sections.editable_section_rows.off")}
         </Badge>
       ) : null}
     </div>
@@ -114,6 +133,7 @@ export function SectionDragOverlay({
   section: EditableSectionViewModel;
   catalog?: RecipeCatalogResponse;
 }) {
+  useUILanguage();
   return (
     <div className="surface-panel flex items-center gap-2 rounded-xl border-0 px-3 py-2 shadow-lg">
       <GripVertical className="text-muted-foreground h-4 w-4" />
@@ -148,6 +168,7 @@ export function SortableSectionTableRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  useUILanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: section.id,
     disabled: !canReorder,
@@ -172,7 +193,9 @@ export function SortableSectionTableRow({
           <button
             type="button"
             className="cursor-grab touch-none"
-            aria-label={`Drag ${section.title}`}
+            aria-label={tr("components.sections.editable_section_rows.drag_title", {
+              title: section.title,
+            })}
             {...attributes}
             {...listeners}
           >
@@ -197,7 +220,9 @@ export function SortableSectionTableRow({
       </TableCell>
       <TableCell>
         <Badge variant={section.enabled ? "default" : "secondary"}>
-          {section.enabled ? "On" : "Off"}
+          {section.enabled
+            ? tr("components.sections.editable_section_rows.on")
+            : tr("components.sections.editable_section_rows.off")}
         </Badge>
       </TableCell>
       <TableCell>
@@ -236,6 +261,7 @@ export function SortableSectionCardRow({
   onDelete: () => void;
   actions?: ReactNode;
 }) {
+  useUILanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: section.id,
   });
@@ -253,7 +279,9 @@ export function SortableSectionCardRow({
     >
       <button
         type="button"
-        aria-label={`Drag ${section.title}`}
+        aria-label={tr("components.sections.editable_section_rows.drag_title", {
+          title: section.title,
+        })}
         className="hover:bg-surface-hover mt-0.5 cursor-grab touch-none rounded-md p-1 transition-colors"
         disabled={disabled}
         {...attributes}
@@ -263,7 +291,10 @@ export function SortableSectionCardRow({
       </button>
       <button
         type="button"
-        aria-label={`${section.hidden ? "Show" : "Hide"} ${section.title}`}
+        aria-label={tr("components.sections.editable_section_rows.value_title", {
+          value: section.hidden ? "Show" : "Hide",
+          title: section.title,
+        })}
         aria-pressed={!section.hidden}
         className="hover:bg-surface-hover mt-0.5 rounded-md p-1 transition-colors"
         disabled={disabled}
@@ -278,14 +309,17 @@ export function SortableSectionCardRow({
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`font-medium ${section.hidden ? "text-muted-foreground line-through" : ""}`}
+            className={
+              "font-medium " + (section.hidden ? "text-muted-foreground line-through" : "")
+            }
           >
             {section.title}
           </span>
           <SectionSummaryBadges section={section} catalog={catalog} showVisibility />
         </div>
         <div className="text-muted-foreground text-[13px]">
-          {sectionTypeLabel(section.sectionType)} . {section.itemLimit} items
+          {sectionTypeLabel(section.sectionType)} . {section.itemLimit}{" "}
+          {tr("components.sections.editable_section_rows.items")}
         </div>
       </div>
       {actions}
@@ -293,7 +327,9 @@ export function SortableSectionCardRow({
         variant="ghost"
         size="sm"
         className="h-8 w-8 p-0"
-        aria-label={`Edit ${section.title}`}
+        aria-label={tr("components.sections.editable_section_rows.edit_title", {
+          title: section.title,
+        })}
         disabled={disabled}
         onClick={onEdit}
       >
@@ -303,7 +339,9 @@ export function SortableSectionCardRow({
         variant="ghost"
         size="sm"
         className="text-destructive hover:bg-destructive/10 hover:text-destructive h-8 w-8 p-0"
-        aria-label={`Delete ${section.title}`}
+        aria-label={tr("components.sections.editable_section_rows.delete_title", {
+          title: section.title,
+        })}
         disabled={disabled}
         onClick={onDelete}
       >

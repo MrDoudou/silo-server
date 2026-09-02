@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { useGroupRestartAll } from "./FieldGroup";
 import "@/styles/admin-settings.css";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SelectOption {
   value: string;
@@ -44,6 +46,7 @@ export function SettingFieldStatus({
   tone?: "ok" | "warn" | "muted";
   children: ReactNode;
 }) {
+  useUILanguage();
   const Icon = tone === "warn" ? TriangleAlert : tone === "ok" ? Check : null;
   return (
     <span
@@ -110,6 +113,7 @@ export function SettingFieldRow({
   className,
   children,
 }: SettingFieldRowProps) {
+  useUILanguage();
   // A group that already says "Changes apply after a restart" does not need the
   // same fact repeated on every row inside it.
   const groupSaysRestart = useGroupRestartAll();
@@ -127,7 +131,7 @@ export function SettingFieldRow({
           {dirty ? (
             <span
               className="size-1.5 shrink-0 rounded-full bg-[var(--settings-accent)]"
-              title="Unsaved change"
+              title={tr("pages.admin_settings.setting_field.unsaved_change")}
             />
           ) : null}
           <Label htmlFor={htmlFor} className="text-sm font-medium">
@@ -216,6 +220,7 @@ export function SettingField({
   restartRequired,
   className,
 }: SettingFieldProps) {
+  useUILanguage();
   const controlId = useId();
   const hintId = useId();
 
@@ -281,7 +286,11 @@ export function SettingField({
       <Input
         id={controlId}
         type="password"
-        placeholder={sensitiveConfigured ? "configured" : (hint ?? "Not configured")}
+        placeholder={
+          sensitiveConfigured
+            ? tr("pages.admin_settings.setting_field.configured")
+            : (hint ?? tr("pages.admin_settings.setting_field.not_configured"))
+        }
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}

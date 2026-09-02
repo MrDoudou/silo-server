@@ -32,6 +32,8 @@ import {
   SettingFieldRow,
   SettingFieldStatus,
 } from "./SettingField";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Sign-in lifetimes and proxy trust go through the batched settings endpoint.
 // Rate limits do not: they live behind /admin/rate-limits/config and the batch
@@ -76,19 +78,19 @@ const DEFAULT_CONFIG: RateLimitConfig = {
 };
 
 const TIER_LABELS: Record<string, string> = {
-  standard: "Standard API keys",
-  elevated: "Elevated API keys",
+  standard: "pages.admin_settings.security_access_settings.standard_api_keys",
+  elevated: "pages.admin_settings.security_access_settings.elevated_api_keys",
 };
 
 const AUTH_ENDPOINT_LABELS: Record<string, string> = {
-  login: "Sign in",
-  signup: "Sign up",
-  setup: "First-run setup",
-  password_change: "Change password",
-  device_start: "TV sign-in: start",
-  device_lookup: "TV sign-in: code lookup",
-  device_poll: "TV sign-in: waiting for approval",
-  autoscan_webhook: "Autoscan webhook",
+  login: "pages.admin_settings.security_access_settings.sign_in",
+  signup: "pages.admin_settings.security_access_settings.sign_up",
+  setup: "pages.admin_settings.security_access_settings.first_run_setup",
+  password_change: "pages.admin_settings.security_access_settings.change_password",
+  device_start: "pages.admin_settings.security_access_settings.tv_sign_in_start",
+  device_lookup: "pages.admin_settings.security_access_settings.tv_sign_in_code_lookup",
+  device_poll: "pages.admin_settings.security_access_settings.tv_sign_in_waiting_for_approval",
+  autoscan_webhook: "pages.admin_settings.security_access_settings.autoscan_webhook",
 };
 
 interface RateLimitField {
@@ -108,6 +110,8 @@ function RateBox({
   field: RateLimitField;
   disabled: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <span className="flex flex-col items-end gap-1">
       <Label htmlFor={id} className="text-muted-foreground text-[11px] font-normal">
@@ -146,27 +150,31 @@ function RateTriadRow({
   burst: RateLimitField;
   disabled?: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   const baseId = useId();
 
   return (
-    <SettingFieldRow label={label} htmlFor={`${baseId}-rpm`} description={description}>
+    <SettingFieldRow label={label} htmlFor={baseId + "-rpm"} description={description}>
       <div className="flex flex-wrap items-end justify-end gap-2.5">
         {perSecond && (
           <RateBox
-            id={`${baseId}-rps`}
+            id={baseId + "-rps"}
             caption="Per second"
             field={perSecond}
             disabled={disabled}
           />
         )}
-        <RateBox id={`${baseId}-rpm`} caption="Per minute" field={perMinute} disabled={disabled} />
-        <RateBox id={`${baseId}-burst`} caption="Burst" field={burst} disabled={disabled} />
+        <RateBox id={baseId + "-rpm"} caption="Per minute" field={perMinute} disabled={disabled} />
+        <RateBox id={baseId + "-burst"} caption="Burst" field={burst} disabled={disabled} />
       </div>
     </SettingFieldRow>
   );
 }
 
 export default function SecurityAccessSettings() {
+  useUILanguage();
+  useUILanguage();
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
   const restartKeys = useRestartKeys();
   const allRestart = (keys: string[]) => keys.every((key) => restartKeys.has(key));
@@ -306,7 +314,11 @@ export default function SecurityAccessSettings() {
 
   if (form.isLoading || rateLimitsLoading)
     return (
-      <div className="space-y-6" role="status" aria-label="Loading settings">
+      <div
+        className="space-y-6"
+        role="status"
+        aria-label={tr("pages.admin_settings.security_access_settings.loading_settings")}
+      >
         <Skeleton className="h-8 w-48" />
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
@@ -316,7 +328,9 @@ export default function SecurityAccessSettings() {
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-        <span className="sr-only">Loading settings</span>
+        <span className="sr-only">
+          {tr("pages.admin_settings.security_access_settings.loading_settings")}
+        </span>
       </div>
     );
 
@@ -324,37 +338,56 @@ export default function SecurityAccessSettings() {
 
   return (
     <div className="flex h-full flex-col">
-      <SettingsPageHeader title="Security & Access" className="mb-8" />
+      <SettingsPageHeader
+        title={tr("pages.admin_settings.security_access_settings.security_access")}
+        className="mb-8"
+      />
 
       <div className="flex-1 space-y-5">
-        <FieldGroup label="Sign-in sessions" restartAll={allRestart(SESSION_KEYS)}>
+        <FieldGroup
+          label={tr("pages.admin_settings.security_access_settings.sign_in_sessions")}
+          restartAll={allRestart(SESSION_KEYS)}
+        >
           <SettingField
-            label="Access token expiry"
+            label={tr("pages.admin_settings.security_access_settings.access_token_expiry")}
             type="duration"
-            description="How long before an app silently renews, e.g. 30m."
+            description={tr(
+              "pages.admin_settings.security_access_settings.how_long_before_an_app_silently_renews_e_g_30m",
+            )}
             value={form.getValue("auth.access_token_expiry")}
             onChange={(v) => form.setValue("auth.access_token_expiry", v)}
             restartRequired={restartKeys.has("auth.access_token_expiry")}
           />
           <SettingField
-            label="Refresh token expiry"
+            label={tr("pages.admin_settings.security_access_settings.refresh_token_expiry")}
             type="duration"
-            description="How long someone stays signed in, e.g. 30d."
+            description={tr(
+              "pages.admin_settings.security_access_settings.how_long_someone_stays_signed_in_e_g_30d",
+            )}
             value={form.getValue("auth.refresh_token_expiry")}
             onChange={(v) => form.setValue("auth.refresh_token_expiry", v)}
             restartRequired={restartKeys.has("auth.refresh_token_expiry")}
           />
         </FieldGroup>
 
-        <FieldGroup label="Network" restartAll={allRestart(NETWORK_KEYS)}>
+        <FieldGroup
+          label={tr("pages.admin_settings.security_access_settings.network")}
+          restartAll={allRestart(NETWORK_KEYS)}
+        >
           <SettingField
-            label="Trusted proxies"
+            label={tr("pages.admin_settings.security_access_settings.trusted_proxies")}
             description={
               trustedProxiesManaged
-                ? "Managed by SILO_TRUSTED_PROXIES."
-                : "Comma-separated proxy ranges; empty keeps the private defaults."
+                ? tr(
+                    "pages.admin_settings.security_access_settings.managed_by_silo_trusted_proxies",
+                  )
+                : tr(
+                    "pages.admin_settings.security_access_settings.comma_separated_proxy_ranges_empty_keeps_the_private_defaults",
+                  )
             }
-            hint="172.16.0.0/12, 203.0.113.7/32"
+            hint={tr(
+              "pages.admin_settings.security_access_settings.value_172_16_0_0_12_203_0_113_7",
+            )}
             value={form.getValue("clientip.trusted_proxies")}
             onChange={(v) => form.setValue("clientip.trusted_proxies", v)}
             disabled={trustedProxiesManaged}
@@ -362,9 +395,9 @@ export default function SecurityAccessSettings() {
           />
         </FieldGroup>
 
-        <FieldGroup label="Rate limiting">
+        <FieldGroup label={tr("pages.admin_settings.security_access_settings.rate_limiting")}>
           <SettingField
-            label="Enable rate limiting"
+            label={tr("pages.admin_settings.security_access_settings.enable_rate_limiting")}
             type="toggle"
             value={config.enabled ? "true" : "false"}
             onChange={(v) => updateConfigState((prev) => ({ ...prev, enabled: v === "true" }))}
@@ -372,8 +405,9 @@ export default function SecurityAccessSettings() {
             status={
               limiterInactive ? (
                 <SettingFieldStatus tone="warn">
-                  Enabled, but no limiter is running in this process — it may have failed to start.
-                  Check the server logs.
+                  {tr(
+                    "pages.admin_settings.security_access_settings.enabled_but_no_limiter_is_running_in_this_process_it",
+                  )}
                 </SettingFieldStatus>
               ) : undefined
             }
@@ -385,19 +419,29 @@ export default function SecurityAccessSettings() {
             forceOpen={advancedDirty}
           >
             <SettingFieldRow
-              label="Where counters are kept"
+              label={tr("pages.admin_settings.security_access_settings.where_counters_are_kept")}
               htmlFor="rate-limit-backend"
               description={
                 redisSelectable
-                  ? "Redis shares counters across servers, after a restart."
-                  : "Redis shares counters across servers, after a restart. Configure Redis under Storage & Database first."
+                  ? tr(
+                      "pages.admin_settings.security_access_settings.redis_shares_counters_across_servers_after_a_restart",
+                    )
+                  : tr(
+                      "pages.admin_settings.security_access_settings.redis_shares_counters_across_servers_after_a_restart_configure_redis",
+                    )
               }
               status={
                 runningBackendDiffers ? (
                   <SettingFieldStatus tone="warn">
-                    The running limiter is using {backendNoun(runningBackend)} counters, not the
-                    saved {backendNoun(savedBackend)} backend. If a restart does not fix it, check
-                    that the saved backend is reachable.
+                    {tr(
+                      "pages.admin_settings.security_access_settings.the_running_limiter_is_using",
+                    )}{" "}
+                    {backendNoun(runningBackend)}{" "}
+                    {tr("pages.admin_settings.security_access_settings.counters_not_the_saved")}{" "}
+                    {backendNoun(savedBackend)}{" "}
+                    {tr(
+                      "pages.admin_settings.security_access_settings.backend_if_a_restart_does_not_fix_it_check_that",
+                    )}
                   </SettingFieldStatus>
                 ) : undefined
               }
@@ -413,18 +457,22 @@ export default function SecurityAccessSettings() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="memory">This server only</SelectItem>
+                  <SelectItem value="memory">
+                    {tr("pages.admin_settings.security_access_settings.this_server_only")}
+                  </SelectItem>
                   <SelectItem value="redis" disabled={!redisSelectable}>
-                    Shared via Redis
+                    {tr("pages.admin_settings.security_access_settings.shared_via_redis")}
                   </SelectItem>
                 </SelectContent>
               </Select>
             </SettingFieldRow>
 
             <SettingFieldRow
-              label="Whole-server limit"
+              label={tr("pages.admin_settings.security_access_settings.whole_server_limit")}
               htmlFor="global-rps"
-              description="Ceiling across every rate-limited route."
+              description={tr(
+                "pages.admin_settings.security_access_settings.ceiling_across_every_rate_limited_route",
+              )}
               // The row's unit slot rather than a span beside the input: the
               // triad rows below have no unit, and an inline one here would
               // push this box off the column they share.
@@ -446,8 +494,10 @@ export default function SecurityAccessSettings() {
             </SettingFieldRow>
 
             <RateTriadRow
-              label="Per client address"
-              description="Budget one IP address gets."
+              label={tr("pages.admin_settings.security_access_settings.per_client_address")}
+              description={tr(
+                "pages.admin_settings.security_access_settings.budget_one_ip_address_gets",
+              )}
               disabled={savingRateLimits}
               perSecond={{
                 value: config.ip_requests_per_second,
@@ -474,7 +524,7 @@ export default function SecurityAccessSettings() {
               return (
                 <RateTriadRow
                   key={tier}
-                  label={TIER_LABELS[tier]!}
+                  label={tr(TIER_LABELS[tier]!)}
                   disabled={savingRateLimits}
                   perSecond={{
                     value: tierConfig.requests_per_second,
@@ -496,13 +546,15 @@ export default function SecurityAccessSettings() {
               );
             })}
 
-            <SettingsSubheading>Sign-in and webhook endpoints</SettingsSubheading>
+            <SettingsSubheading>
+              {tr("pages.admin_settings.security_access_settings.sign_in_and_webhook_endpoints")}
+            </SettingsSubheading>
             {Object.keys(AUTH_ENDPOINT_LABELS).map((endpoint) => {
               const epConfig = config.auth_endpoints[endpoint] ?? DEFAULT_AUTH_ENDPOINT;
               return (
                 <RateTriadRow
                   key={endpoint}
-                  label={AUTH_ENDPOINT_LABELS[endpoint]!}
+                  label={tr(AUTH_ENDPOINT_LABELS[endpoint]!)}
                   disabled={savingRateLimits}
                   perMinute={{
                     value: epConfig.requests_per_minute,

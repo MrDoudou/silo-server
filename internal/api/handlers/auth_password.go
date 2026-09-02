@@ -89,9 +89,21 @@ func (h *AuthHandler) HandleChangePassword(w http.ResponseWriter, r *http.Reques
 	case errors.Is(err, auth.ErrCurrentPasswordInvalid):
 		writeError(w, http.StatusBadRequest, "invalid_current_password", "Current password is incorrect")
 	case errors.Is(err, auth.ErrPasswordTooShort):
-		writeError(w, http.StatusBadRequest, "weak_password", "Password must be at least 8 characters")
+		writeErrorWithParams(
+			w,
+			http.StatusBadRequest,
+			"weak_password",
+			"Password must be at least 8 characters",
+			map[string]any{"min_length": auth.MinimumPasswordLength},
+		)
 	case errors.Is(err, auth.ErrPasswordTooLong):
-		writeError(w, http.StatusBadRequest, "password_too_long", "Password must be at most 72 bytes")
+		writeErrorWithParams(
+			w,
+			http.StatusBadRequest,
+			"password_too_long",
+			"Password must be at most 72 bytes",
+			map[string]any{"max_bytes": auth.MaximumPasswordBytes},
+		)
 	case errors.Is(err, auth.ErrPasswordLoginDisabled):
 		writeError(w, http.StatusConflict, "password_login_disabled", "This account does not use local password sign-in")
 	default:

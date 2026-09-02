@@ -13,6 +13,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { adminKeys } from "@/hooks/queries/keys";
 import { usePageActivity } from "@/hooks/usePageActivity";
 import { buildAdminCommandNavSections } from "@/lib/adminNavigation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Query prefixes the dashboard's stats/sessions/libraries/users refetch does
 // not already cover. Widgets fetch these themselves, so Refresh only has to
@@ -35,6 +37,7 @@ const DASHBOARD_AUTO_REFRESH_MS = 60_000;
 const RELATIVE_UPDATED_LABEL_TICK_MS = 30_000;
 
 export default function AdminDashboard() {
+  useUILanguage();
   const queryClient = useQueryClient();
   const statsQuery = useAdminStats();
   const sessionsQuery = useAdminSessions();
@@ -202,16 +205,20 @@ export default function AdminDashboard() {
       {/* Page header */}
       <div className="page-header">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3.25rem)]">Dashboard</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3.25rem)]">
+            {tr("pages.admin_dashboard.dashboard")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Live sessions, content health, and server activity in one view.
+            {tr(
+              "pages.admin_dashboard.live_sessions_content_health_and_server_activity_in_one_view",
+            )}
           </p>
         </div>
         <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
           <div className="grid gap-2 sm:flex sm:items-center">
             {lastUpdatedLabel && (
               <span className="text-muted-foreground text-xs sm:whitespace-nowrap">
-                Updated {lastUpdatedLabel}
+                {tr("pages.admin_dashboard.updated")} {lastUpdatedLabel}
               </span>
             )}
             <Button
@@ -225,9 +232,11 @@ export default function AdminDashboard() {
               aria-busy={isManualRefreshPending}
             >
               <RefreshCw
-                className={`h-3.5 w-3.5 ${isManualRefreshPending ? "animate-spin" : ""}`}
+                className={"h-3.5 w-3.5 " + (isManualRefreshPending ? "animate-spin" : "")}
               />
-              {isManualRefreshPending ? "Refreshing..." : "Refresh"}
+              {isManualRefreshPending
+                ? tr("pages.admin_dashboard.refreshing")
+                : tr("common.actions.refresh")}
             </Button>
             <Button
               variant="outline"
@@ -237,7 +246,9 @@ export default function AdminDashboard() {
               aria-pressed={layout.isCustomizing}
             >
               <LayoutDashboard className="h-3.5 w-3.5" />
-              {layout.isCustomizing ? "Done" : "Customize"}
+              {layout.isCustomizing
+                ? tr("common.actions.done")
+                : tr("pages.admin_dashboard.customize")}
             </Button>
           </div>
           <Button
@@ -252,7 +263,7 @@ export default function AdminDashboard() {
             disabled={scanAll.isPending || libraries.length === 0}
           >
             <ScanLine className="h-3.5 w-3.5" />
-            Scan All Libraries
+            {tr("pages.admin_dashboard.scan_all_libraries")}
           </Button>
         </div>
       </div>
@@ -266,17 +277,17 @@ export default function AdminDashboard() {
             onClick={() => setIsAddPanelOpen(true)}
           >
             <Plus className="h-3.5 w-3.5" />
-            Add widget
+            {tr("pages.admin_dashboard.add_widget")}
           </Button>
           <span className="text-muted-foreground text-xs">
-            Drag a widget to move it · drag its corner to resize · × removes it
+            {tr("pages.admin_dashboard.drag_a_widget_to_move_it_drag_its_corner_to")}
           </span>
           <button
             type="button"
             className="text-muted-foreground hover:text-foreground focus-visible:ring-ring ml-auto cursor-pointer text-xs underline-offset-2 transition-colors hover:underline focus-visible:ring-2 focus-visible:outline-none"
             onClick={() => layout.resetLayout()}
           >
-            Reset to default layout
+            {tr("pages.admin_dashboard.reset_to_default_layout")}
           </button>
         </div>
       )}

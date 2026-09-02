@@ -19,6 +19,8 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { decodeThumbhash } from "@/lib/thumbhash";
 import { preferredDateLocale } from "@/lib/datetime";
 import ViewTransitionLink from "@/components/ViewTransitionLink";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function formatNotificationTime(value: string): string {
   const date = new Date(value);
@@ -109,6 +111,7 @@ function NotificationRow({
   notification: AppNotification;
   onMarkRead: (id: string) => void;
 }) {
+  useUILanguage();
   const unread = !notification.read_at;
   const thumbhashUrl = notification.poster_thumbhash
     ? decodeThumbhash(notification.poster_thumbhash)
@@ -148,10 +151,10 @@ function NotificationRow({
             <span
               className="h-2 w-2 shrink-0 rounded-full"
               style={{ background: "var(--primary)" }}
-              aria-label="Unread"
+              aria-label={tr("pages.notifications.unread")}
             />
           )}
-          <span className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"}`}>
+          <span className={"truncate text-sm " + (unread ? "font-semibold" : "font-medium")}>
             {notificationTitle(notification)}
           </span>
           <span className="text-muted-foreground ml-auto shrink-0 text-xs">
@@ -183,15 +186,16 @@ function NotificationRow({
         <ViewTransitionLink
           to={detailHref}
           onClick={() => unread && onMarkRead(notification.id)}
-          className={`hover:bg-muted/60 flex items-start gap-3 rounded-xl px-3 py-3 transition-colors ${
-            unread ? "bg-muted/30" : ""
-          }`}
+          className={
+            "hover:bg-muted/60 flex items-start gap-3 rounded-xl px-3 py-3 transition-colors " +
+            (unread ? "bg-muted/30" : "")
+          }
         >
           {body}
         </ViewTransitionLink>
       ) : (
         <div
-          className={`flex items-start gap-3 rounded-xl px-3 py-3 ${unread ? "bg-muted/30" : ""}`}
+          className={"flex items-start gap-3 rounded-xl px-3 py-3 " + (unread ? "bg-muted/30" : "")}
         >
           {body}
         </div>
@@ -201,7 +205,7 @@ function NotificationRow({
           variant="ghost"
           size="icon"
           className="absolute right-2 bottom-2 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
-          title="Mark as read"
+          title={tr("pages.notifications.mark_as_read")}
           onClick={(event) => {
             event.preventDefault();
             onMarkRead(notification.id);
@@ -215,6 +219,7 @@ function NotificationRow({
 }
 
 function NotificationPreferencesPopover() {
+  useUILanguage();
   const { data: prefs, isLoading, refetch } = useNotificationPreferences();
   const updatePrefs = useUpdateNotificationPreferences();
 
@@ -230,28 +235,28 @@ function NotificationPreferencesPopover() {
   }> = [
     {
       key: "enabled",
-      label: "Notifications",
-      description: "Master switch for this profile",
+      label: tr("pages.notifications.notifications"),
+      description: tr("pages.notifications.master_switch_for_this_profile"),
     },
     {
       key: "notify_favorites",
-      label: "Favorites",
-      description: "New episodes of favorited series",
+      label: tr("pages.notifications.favorites"),
+      description: tr("pages.notifications.new_episodes_of_favorited_series"),
     },
     {
       key: "notify_watchlist",
-      label: "Watchlist",
-      description: "New episodes of watchlisted series",
+      label: tr("pages.notifications.watchlist"),
+      description: tr("pages.notifications.new_episodes_of_watchlisted_series"),
     },
     {
       key: "notify_continue_watching",
-      label: "Continue Watching",
-      description: "Series you are actively watching",
+      label: tr("pages.notifications.continue_watching"),
+      description: tr("pages.notifications.series_you_are_actively_watching"),
     },
     {
       key: "notify_next_up",
-      label: "Next Up",
-      description: "The next episode after your progress",
+      label: tr("pages.notifications.next_up"),
+      description: tr("pages.notifications.the_next_episode_after_your_progress"),
     },
   ];
 
@@ -260,7 +265,7 @@ function NotificationPreferencesPopover() {
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm">
           <Settings2 className="mr-1.5 h-4 w-4" />
-          Preferences
+          {tr("pages.notifications.preferences")}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-4">
@@ -272,9 +277,11 @@ function NotificationPreferencesPopover() {
           </div>
         ) : !prefs ? (
           <div className="space-y-3">
-            <p className="text-muted-foreground text-sm">Couldn’t load preferences.</p>
+            <p className="text-muted-foreground text-sm">
+              {tr("pages.notifications.couldn_t_load_preferences")}
+            </p>
             <Button size="sm" variant="outline" onClick={() => void refetch()}>
-              Retry
+              {tr("common.actions.retry")}
             </Button>
           </div>
         ) : (
@@ -283,9 +290,10 @@ function NotificationPreferencesPopover() {
               <Fragment key={toggle.key}>
                 {index === 1 && <Separator />}
                 <div
-                  className={`flex items-center justify-between gap-3 transition-opacity ${
-                    index > 0 && !prefs.enabled ? "opacity-50" : ""
-                  }`}
+                  className={
+                    "flex items-center justify-between gap-3 transition-opacity " +
+                    (index > 0 && !prefs.enabled ? "opacity-50" : "")
+                  }
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-medium">{toggle.label}</div>
@@ -307,7 +315,8 @@ function NotificationPreferencesPopover() {
 }
 
 export default function Notifications() {
-  useDocumentTitle("Notifications");
+  useUILanguage();
+  useDocumentTitle(tr("pages.notifications.notifications"));
   const [statusFilter, setStatusFilter] = useState<"all" | "unread">("all");
   const list = useNotifications(statusFilter);
   const { data: unreadCount } = useUnreadNotificationCount();
@@ -321,7 +330,7 @@ export default function Notifications() {
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <h1 className="flex items-center gap-2.5 text-2xl font-semibold">
           <Bell className="h-6 w-6" />
-          Notifications
+          {tr("pages.notifications.notifications")}
         </h1>
         <div className="ml-auto flex items-center gap-2">
           {(unreadCount ?? 0) > 0 && (
@@ -332,7 +341,7 @@ export default function Notifications() {
               disabled={markAllRead.isPending}
             >
               <CheckCheck className="mr-1.5 h-4 w-4" />
-              Mark all read
+              {tr("pages.notifications.mark_all_read")}
             </Button>
           )}
           <NotificationPreferencesPopover />
@@ -347,7 +356,11 @@ export default function Notifications() {
             size="sm"
             onClick={() => setStatusFilter(status)}
           >
-            {status === "all" ? "All" : `Unread${unreadCount ? ` (${unreadCount})` : ""}`}
+            {status === "all"
+              ? tr("pages.notifications.all")
+              : tr("pages.notifications.unread_value", {
+                  value: unreadCount ? ` (${unreadCount})` : "",
+                })}
           </Button>
         ))}
       </div>
@@ -362,11 +375,12 @@ export default function Notifications() {
         <div className="text-muted-foreground flex flex-col items-center gap-3 py-20 text-center">
           <BellOff className="h-10 w-10 opacity-50" />
           <div className="text-sm">
-            {statusFilter === "unread" ? "No unread notifications" : "No notifications yet"}
+            {statusFilter === "unread"
+              ? tr("pages.notifications.no_unread_notifications")
+              : tr("pages.notifications.no_notifications_yet")}
           </div>
           <div className="max-w-sm text-xs">
-            You will be notified here when new episodes arrive for series you favorite, watchlist,
-            or are watching.
+            {tr("pages.notifications.you_will_be_notified_here_when_new_episodes_arrive_for")}
           </div>
         </div>
       ) : (
@@ -388,7 +402,7 @@ export default function Notifications() {
                 disabled={list.isFetchingNextPage}
               >
                 {list.isFetchingNextPage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Load more
+                {tr("pages.notifications.load_more")}
               </Button>
             </div>
           )}

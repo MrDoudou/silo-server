@@ -15,6 +15,8 @@ import {
 } from "./protocol-v3";
 import type { PlayerAudioTrack, PlayerFileVersion, PlayerVideoTrack, QualityOption } from "./types";
 
+import { tr } from "@/i18n/translate";
+
 export interface RuntimePlaybackStats {
   playerWidth?: number;
   playerHeight?: number;
@@ -60,97 +62,99 @@ export function buildPlaybackInfoSections({
 
   return [
     {
-      title: "Player",
+      title: tr("player.playback_info.player"),
       rows: [
-        { label: "Player", value: "HTML Video Player" },
-        { label: "Play method", value: formatDelivery(plan.delivery) },
-        { label: "Protocol", value: formatProtocol(streamUrl) },
-        { label: "Stream type", value: formatStreamType(plan) },
-        ...(requestedSource ? [{ label: "Auto-switched from", value: requestedSource }] : []),
+        { label: tr("player.playback_info.player"), value: "HTML Video Player" },
+        { label: tr("player.playback_info.play_method"), value: formatDelivery(plan.delivery) },
+        { label: tr("player.playback_info.protocol"), value: formatProtocol(streamUrl) },
+        { label: tr("player.playback_info.stream_type"), value: formatStreamType(plan) },
+        ...(requestedSource
+          ? [{ label: tr("player.playback_info.auto_switched_from"), value: requestedSource }]
+          : []),
       ],
     },
     {
-      title: "Video Info",
+      title: tr("player.playback_info.video_info"),
       rows: [
         {
-          label: "Player dimensions",
+          label: tr("player.playback_info.player_dimensions"),
           value: formatDimensions(runtimeStats.playerWidth, runtimeStats.playerHeight),
         },
         {
-          label: "Video resolution",
+          label: tr("player.playback_info.video_resolution"),
           value: formatDimensions(runtimeStats.videoWidth, runtimeStats.videoHeight),
         },
         {
-          label: "Dropped frames",
+          label: tr("player.playback_info.dropped_frames"),
           value: formatFrameCount(runtimeStats.droppedFrames),
         },
         {
-          label: "Corrupted frames",
+          label: tr("player.playback_info.corrupted_frames"),
           value: formatFrameCount(runtimeStats.corruptedFrames),
         },
       ],
     },
     {
-      title: "Playback Stream Info",
+      title: tr("player.playback_info.playback_stream_info"),
       rows: [
         {
-          label: "Video codec",
+          label: tr("player.playback_info.video_codec"),
           value: formatDeliveredVideoCodec(plan),
         },
         {
-          label: "Audio codec",
+          label: tr("player.playback_info.audio_codec"),
           value: formatDeliveredAudioCodec(plan),
         },
       ],
     },
     {
-      title: "Current Source File",
+      title: tr("player.playback_info.current_source_file"),
       rows: [
         {
-          label: "Container",
+          label: tr("player.playback_info.container"),
           value: displayValue(currentSourceVersion?.container),
         },
         {
-          label: "Size",
+          label: tr("player.playback_info.size"),
           value: formatFileSize(currentSourceVersion?.file_size, {
             iecUnits: true,
             fallback: "—",
           }),
         },
         {
-          label: "Bitrate",
+          label: tr("player.playback_info.bitrate"),
           value: formatMbpsFromKbps(currentSourceVersion?.bitrate),
         },
         {
-          label: "Video codec",
+          label: tr("player.playback_info.video_codec"),
           value: formatOriginalVideoCodec(currentSourceVersion, videoTrack),
         },
         {
-          label: "Video bitrate",
+          label: tr("player.playback_info.video_bitrate"),
           value: formatMbpsFromKbps(videoTrack?.bitrate),
         },
         {
-          label: "Video range type",
+          label: tr("player.playback_info.video_range_type"),
           value: formatVideoRangeType(currentSourceVersion, videoTrack),
         },
         {
-          label: "Color range",
+          label: tr("player.playback_info.color_range"),
           value: formatColorRange(videoTrack?.color_range),
         },
         {
-          label: "Audio codec",
+          label: tr("player.playback_info.audio_codec"),
           value: formatOriginalAudioCodec(currentSourceVersion, audioTrack),
         },
         {
-          label: "Audio bitrate",
+          label: tr("player.playback_info.audio_bitrate"),
           value: formatBitrate(audioTrack?.bitrate, "—"),
         },
         {
-          label: "Audio channels",
+          label: tr("player.playback_info.audio_channels"),
           value: formatAudioChannels(currentSourceVersion, audioTrack),
         },
         {
-          label: "Audio sample rate",
+          label: tr("player.playback_info.audio_sample_rate"),
           value: formatSampleRate(audioTrack?.sample_rate, "—"),
         },
       ],
@@ -184,7 +188,14 @@ export function qualityOptionsFromPlanV3(plan: PlanV3): QualityOption[] {
   }
 
   return [
-    { id: "auto", label: "Auto", sublabel: "", resolution: "", bitrateKbps: 0, isOriginal: false },
+    {
+      id: "auto",
+      label: tr("player.playback_info.auto"),
+      sublabel: "",
+      resolution: "",
+      bitrateKbps: 0,
+      isOriginal: false,
+    },
     ...rungs,
   ];
 }

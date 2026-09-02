@@ -11,7 +11,7 @@ import type {
   SubtitleProviderTestResponse,
 } from "@/api/types";
 import { adminKeys } from "../keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 const ADMIN_STALE_TIME = 30_000;
 
@@ -48,11 +48,11 @@ export function useAdminUpdateDownloadedSubtitle() {
         body: JSON.stringify(patch),
       }),
     onSuccess: () => {
-      toast.success("Subtitle updated");
+      toast.success("feedback.queries.admin.subtitles.subtitle_updated");
       queryClient.invalidateQueries({ queryKey: ["admin", "downloadedSubtitles"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update subtitle");
+      toast.error("errors.queries.admin.subtitles.failed_to_update_subtitle", { error: err });
     },
   });
 }
@@ -65,11 +65,11 @@ export function useAdminDeleteDownloadedSubtitle() {
         method: "DELETE",
       }),
     onSuccess: () => {
-      toast.success("Subtitle deleted");
+      toast.success("feedback.queries.admin.subtitles.subtitle_deleted");
       queryClient.invalidateQueries({ queryKey: ["admin", "downloadedSubtitles"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete subtitle");
+      toast.error("errors.queries.admin.subtitles.failed_to_delete_subtitle", { error: err });
     },
   });
 }
@@ -103,13 +103,15 @@ export function useUpdateSubtitleProvider() {
         body: JSON.stringify(config),
       }),
     onSuccess: async () => {
-      toast.success("Provider settings saved");
+      toast.success("feedback.queries.admin.subtitles.provider_settings_saved");
       await queryClient.invalidateQueries({
         queryKey: adminKeys.subtitleProviders(),
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save provider settings");
+      toast.error("errors.queries.admin.subtitles.failed_to_save_provider_settings", {
+        error: err,
+      });
     },
   });
 }

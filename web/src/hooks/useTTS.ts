@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export type TTSState = "idle" | "speaking" | "paused";
 
@@ -11,6 +13,7 @@ export interface TTSOptions {
 }
 
 export function useTTS() {
+  useUILanguage();
   const [state, setState] = useState<TTSState>("idle");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const currentUtter = useRef<SpeechSynthesisUtterance | null>(null);
@@ -107,7 +110,7 @@ export function useTTS() {
       };
 
       setState("speaking");
-      installMediaSession({ title: "Read aloud" }, { pause, resume, stop });
+      installMediaSession({ title: tr("hooks.use_tts.read_aloud") }, { pause, resume, stop });
       speakNext();
     },
     [cancelSpeech, pause, resume, stop],
@@ -131,7 +134,9 @@ function installMediaSession(
 ) {
   if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
   navigator.mediaSession.metadata = new window.MediaMetadata({
-    title: meta.title ?? "Read aloud",
+    get title() {
+      return meta.title ?? tr("hooks.use_tts.read_aloud");
+    },
   });
   navigator.mediaSession.playbackState = "playing";
   navigator.mediaSession.setActionHandler("play", handlers.resume);

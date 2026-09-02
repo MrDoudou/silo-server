@@ -5,6 +5,8 @@ import type { ItemExtra } from "@/api/types";
 import { useWatchPlaybackController } from "@/playback/watchPlaybackContext";
 import { extraKindGroupLabel } from "@/lib/extraKinds";
 import { formatClock } from "@/lib/markers";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ExtrasSectionProps {
   extras: ItemExtra[];
@@ -16,6 +18,7 @@ interface ExtrasSectionProps {
  * first-class watch target.
  */
 export default function ExtrasSection({ extras }: ExtrasSectionProps) {
+  useUILanguage();
   const location = useLocation();
   const playbackController = useWatchPlaybackController();
   const currentHref = `${location.pathname}${location.search}`;
@@ -45,7 +48,9 @@ export default function ExtrasSection({ extras }: ExtrasSectionProps) {
 
   return (
     <div>
-      <h2 className="mb-5 text-xl font-semibold tracking-tight">Extras</h2>
+      <h2 className="mb-5 text-xl font-semibold tracking-tight">
+        {tr("pages.item_detail.components.extras_section.extras")}
+      </h2>
       <div className="space-y-6">
         {groups.map(([kind, groupExtras]) => (
           <div key={kind}>
@@ -67,6 +72,7 @@ export default function ExtrasSection({ extras }: ExtrasSectionProps) {
 }
 
 function ExtraCard({ extra, onPlay }: { extra: ItemExtra; onPlay: () => void }) {
+  useUILanguage();
   const title = extra.title || extraKindGroupLabel(extra.kind);
 
   return (

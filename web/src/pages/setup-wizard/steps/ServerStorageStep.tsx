@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertCircle, CheckCircle2, ChevronRight, Download } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import {
   useCheckAdminSettingsConnection,
   useInstallJellyfinCompatWeb,
@@ -25,8 +25,11 @@ import {
 } from "@/hooks/queries/admin/settings";
 import { hasPinnedJellyfinWebInstalled } from "@/lib/jellyfinCompat";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
+
 import { SettingField } from "@/pages/admin-settings/SettingField";
 import { useWizardContext } from "../WizardContext";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const SERVER_KEYS = [
   "redis.url",
@@ -84,6 +87,7 @@ function Section({
   description?: string;
   children: React.ReactNode;
 }) {
+  useUILanguage();
   return (
     <div className="border-foreground/[0.07] bg-foreground/[0.03] space-y-4 rounded-xl border px-4 py-4">
       <div>
@@ -108,6 +112,7 @@ function StorageBlock({
   onToggle: () => void;
   children: React.ReactNode;
 }) {
+  useUILanguage();
   return (
     <div className="border-foreground/[0.07] bg-foreground/[0.03] rounded-xl border px-4 py-4">
       <button
@@ -116,7 +121,9 @@ function StorageBlock({
         className="text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-left transition-colors"
       >
         <ChevronRight
-          className={`h-3.5 w-3.5 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
+          className={
+            "h-3.5 w-3.5 transition-transform duration-200 " + (expanded ? "rotate-90" : "")
+          }
         />
         <span className="text-[11px] font-semibold tracking-[0.1em] uppercase">{title}</span>
       </button>
@@ -129,13 +136,21 @@ function StorageBlock({
 }
 
 function KeyPrefixField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  useUILanguage();
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">Key Prefix</Label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="silo/dev" />
+      <Label className="text-xs">
+        {tr("pages.setup_wizard.steps.server_storage_step.key_prefix")}
+      </Label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={tr("pages.setup_wizard.steps.server_storage_step.silo_dev")}
+      />
       <p className="text-muted-foreground/70 text-xs">
-        Optional. Stores all Silo objects under this folder inside the bucket. Leave blank to use
-        the bucket root.
+        {tr(
+          "pages.setup_wizard.steps.server_storage_step.optional_stores_all_silo_objects_under_this_folder_inside_the",
+        )}
       </p>
     </div>
   );
@@ -150,6 +165,7 @@ function statusLabel(value?: string): string {
 }
 
 export function ServerStorageStep() {
+  useUILanguage();
   const { markDone } = useWizardContext();
   const form = useSettingsForm({ keys: useMemo(() => ALL_KEYS, []) });
   const redisConnectionCheck = useCheckAdminSettingsConnection();
@@ -191,7 +207,7 @@ export function ServerStorageStep() {
     try {
       if (form.dirtyCount > 0) {
         await form.save();
-        toast.success("Server settings saved");
+        toast.success("feedback.setup_wizard.steps.server_storage_step.server_settings_saved");
       }
       if (shouldInstallJellyfinWeb) {
         const version = form.getValue("jellyfin_compat.web_version").trim();
@@ -199,7 +215,7 @@ export function ServerStorageStep() {
       }
       markDone("server");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save server settings");
+      toast.error("errors.setup.server_settings_save_failed", { error: err });
     } finally {
       setSubmitting(false);
     }
@@ -220,7 +236,7 @@ export function ServerStorageStep() {
     } catch (error) {
       setRedisConnectionResult({
         success: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error("errors.setup.connection_check_failed", error),
       });
     }
   }
@@ -236,7 +252,7 @@ export function ServerStorageStep() {
     } catch (error) {
       setPublicS3ConnectionResult({
         success: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error("errors.setup.connection_check_failed", error),
       });
     }
   }
@@ -252,7 +268,7 @@ export function ServerStorageStep() {
     } catch (error) {
       setPrivateS3ConnectionResult({
         success: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error("errors.setup.connection_check_failed", error),
       });
     }
   }
@@ -285,13 +301,18 @@ export function ServerStorageStep() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <Section label="Redis" description="Required for multi-node deployments.">
+      <Section
+        label={tr("pages.setup_wizard.steps.server_storage_step.redis")}
+        description={tr(
+          "pages.setup_wizard.steps.server_storage_step.required_for_multi_node_deployments",
+        )}
+      >
         <Input
           id="setup-redis-url"
           type="password"
           value={form.getValue("redis.url")}
           onChange={(e) => form.setValue("redis.url", e.target.value)}
-          placeholder="redis://localhost:6379"
+          placeholder={tr("pages.setup_wizard.steps.server_storage_step.redis_localhost_6379")}
         />
         <ConnectionCheckAction
           onClick={handleRedisCheck}
@@ -301,35 +322,37 @@ export function ServerStorageStep() {
         />
       </Section>
 
-      <Section label="Playback">
+      <Section label={tr("pages.setup_wizard.steps.server_storage_step.playback")}>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="setup-ffmpeg-path" className="text-xs">
-              FFmpeg path
+              {tr("pages.setup_wizard.steps.server_storage_step.ffmpeg_path")}
             </Label>
             <Input
               id="setup-ffmpeg-path"
               value={form.getValue("playback.ffmpeg_path")}
               onChange={(e) => form.setValue("playback.ffmpeg_path", e.target.value)}
-              placeholder="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+              placeholder={tr(
+                "pages.setup_wizard.steps.server_storage_step.usr_lib_jellyfin_ffmpeg_ffmpeg",
+              )}
             />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="setup-transcode-dir" className="text-xs">
-              Transcode directory
+              {tr("pages.setup_wizard.steps.server_storage_step.transcode_directory")}
             </Label>
             <Input
               id="setup-transcode-dir"
               value={form.getValue("playback.transcode_dir")}
               onChange={(e) => form.setValue("playback.transcode_dir", e.target.value)}
-              placeholder="/tmp/silo-transcode"
+              placeholder={tr("pages.setup_wizard.steps.server_storage_step.tmp_silo_transcode")}
             />
           </div>
         </div>
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="setup-hw-accel" className="text-xs">
-              Hardware accel
+              {tr("pages.setup_wizard.steps.server_storage_step.hardware_accel")}
             </Label>
             <Select
               value={form.getValue("playback.hw_accel") || "auto"}
@@ -339,12 +362,24 @@ export function ServerStorageStep() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Auto</SelectItem>
-                <SelectItem value="vaapi">VAAPI</SelectItem>
-                <SelectItem value="nvenc">NVENC</SelectItem>
-                <SelectItem value="videotoolbox">VideoToolbox (macOS)</SelectItem>
-                <SelectItem value="qsv">QSV</SelectItem>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="auto">
+                  {tr("pages.setup_wizard.steps.server_storage_step.auto")}
+                </SelectItem>
+                <SelectItem value="vaapi">
+                  {tr("pages.setup_wizard.steps.server_storage_step.vaapi")}
+                </SelectItem>
+                <SelectItem value="nvenc">
+                  {tr("pages.setup_wizard.steps.server_storage_step.nvenc")}
+                </SelectItem>
+                <SelectItem value="videotoolbox">
+                  {tr("pages.setup_wizard.steps.server_storage_step.video_toolbox_mac_os")}
+                </SelectItem>
+                <SelectItem value="qsv">
+                  {tr("pages.setup_wizard.steps.server_storage_step.qsv")}
+                </SelectItem>
+                <SelectItem value="none">
+                  {tr("pages.setup_wizard.steps.server_storage_step.none")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -357,28 +392,37 @@ export function ServerStorageStep() {
               }
             />
             <Label htmlFor="setup-transcode-enabled" className="text-xs">
-              Transcoding
+              {tr("pages.setup_wizard.steps.server_storage_step.transcoding")}
             </Label>
           </div>
         </div>
       </Section>
 
       <Section
-        label="Jellyfin-compatible app support"
-        description="For VidHub, Findroid, Infuse, and other Jellyfin clients."
+        label={tr("pages.setup_wizard.steps.server_storage_step.jellyfin_compatible_app_support")}
+        description={tr(
+          "pages.setup_wizard.steps.server_storage_step.for_vid_hub_findroid_infuse_and_other_jellyfin_clients",
+        )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="border-foreground/[0.06] bg-background/40 rounded-lg border px-3 py-3">
-            <p className="text-xs font-medium">API layer</p>
+            <p className="text-xs font-medium">
+              {tr("pages.setup_wizard.steps.server_storage_step.api_layer")}
+            </p>
             <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-              Lets Jellyfin-compatible apps discover Silo, sign in, browse libraries, fetch
-              metadata, and start playback through Silo's compatibility API.
+              {tr(
+                "pages.setup_wizard.steps.server_storage_step.lets_jellyfin_compatible_apps_discover_silo_sign_in_browse_libraries",
+              )}
             </p>
           </div>
           <div className="border-foreground/[0.06] bg-background/40 rounded-lg border px-3 py-3">
-            <p className="text-xs font-medium">Web UI layer</p>
+            <p className="text-xs font-medium">
+              {tr("pages.setup_wizard.steps.server_storage_step.web_ui_layer")}
+            </p>
             <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-              Downloads and builds Jellyfin Web assets for clients that expect Jellyfin's web route.
+              {tr(
+                "pages.setup_wizard.steps.server_storage_step.downloads_and_builds_jellyfin_web_assets_for_clients_that_expect",
+              )}
             </p>
           </div>
         </div>
@@ -392,30 +436,30 @@ export function ServerStorageStep() {
             }}
           />
           <Label htmlFor="setup-jellyfin-enabled" className="text-xs">
-            Enable Jellyfin-compatible API
+            {tr("pages.setup_wizard.steps.server_storage_step.enable_jellyfin_compatible_api")}
           </Label>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="setup-jellyfin-url" className="text-xs">
-              Public URL
+              {tr("pages.setup_wizard.steps.server_storage_step.public_url")}
             </Label>
             <Input
               id="setup-jellyfin-url"
               value={form.getValue("jellyfin_compat.public_url")}
               onChange={(e) => form.setValue("jellyfin_compat.public_url", e.target.value)}
-              placeholder="http://your-server:8096"
+              placeholder={tr("pages.setup_wizard.steps.server_storage_step.http_your_server_8096")}
             />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="setup-jellyfin-name" className="text-xs">
-              Server name
+              {tr("pages.setup_wizard.steps.server_storage_step.server_name")}
             </Label>
             <Input
               id="setup-jellyfin-name"
               value={form.getValue("jellyfin_compat.server_name")}
               onChange={(e) => form.setValue("jellyfin_compat.server_name", e.target.value)}
-              placeholder="Silo"
+              placeholder={tr("pages.setup_wizard.steps.server_storage_step.silo")}
             />
           </div>
         </div>
@@ -423,51 +467,79 @@ export function ServerStorageStep() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="setup-jellyfin-web-version" className="text-xs">
-                Pinned Web version
+                {tr("pages.setup_wizard.steps.server_storage_step.pinned_web_version")}
               </Label>
               <Input
                 id="setup-jellyfin-web-version"
                 value={form.getValue("jellyfin_compat.web_version")}
                 onChange={(e) => form.setValue("jellyfin_compat.web_version", e.target.value)}
-                placeholder="Auto-select compatible release"
+                placeholder={tr(
+                  "pages.setup_wizard.steps.server_storage_step.auto_select_compatible_release",
+                )}
               />
               <p className="text-muted-foreground/70 text-xs">
-                Optional. Leave blank to use the latest compatible released Jellyfin Web patch.
+                {tr(
+                  "pages.setup_wizard.steps.server_storage_step.optional_leave_blank_to_use_the_latest_compatible_released_jellyfin",
+                )}
               </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="setup-jellyfin-web-install-dir" className="text-xs">
-                Web install directory
+                {tr("pages.setup_wizard.steps.server_storage_step.web_install_directory")}
               </Label>
               <Input
                 id="setup-jellyfin-web-install-dir"
                 value={form.getValue("jellyfin_compat.web_install_dir")}
                 onChange={(e) => form.setValue("jellyfin_compat.web_install_dir", e.target.value)}
-                placeholder="Use Silo managed directory"
+                placeholder={tr(
+                  "pages.setup_wizard.steps.server_storage_step.use_silo_managed_directory",
+                )}
               />
               <p className="text-muted-foreground/70 text-xs">
-                Optional. Defaults to{" "}
-                <span className="font-mono">/var/lib/silo/compat/jellyfin-web</span>.
+                {tr("pages.setup_wizard.steps.server_storage_step.optional_defaults_to")}{" "}
+                <span className="font-mono">
+                  {tr(
+                    "pages.setup_wizard.steps.server_storage_step.var_lib_silo_compat_jellyfin_web",
+                  )}
+                </span>
+                .
               </p>
             </div>
           </div>
 
           <div className="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Web UI status</span>
+              <span className="text-muted-foreground">
+                {tr("pages.setup_wizard.steps.server_storage_step.web_ui_status")}
+              </span>
               <span>{statusLabel(jellyfinStatus?.web_state)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Pinned version</span>
-              <span>{jellyfinStatus?.pinned_version || "Not set"}</span>
+              <span className="text-muted-foreground">
+                {tr("pages.setup_wizard.steps.server_storage_step.pinned_version")}
+              </span>
+              <span>
+                {jellyfinStatus?.pinned_version ||
+                  tr("pages.setup_wizard.steps.server_storage_step.not_set")}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Installed version</span>
-              <span>{jellyfinStatus?.installed_version || "Not installed"}</span>
+              <span className="text-muted-foreground">
+                {tr("pages.setup_wizard.steps.server_storage_step.installed_version")}
+              </span>
+              <span>
+                {jellyfinStatus?.installed_version ||
+                  tr("pages.setup_wizard.steps.server_storage_step.not_installed")}
+              </span>
             </div>
             <div className="space-y-0.5 sm:col-span-2">
-              <span className="text-muted-foreground">Install path</span>
-              <div className="truncate font-mono">{jellyfinStatus?.install_path || "Not set"}</div>
+              <span className="text-muted-foreground">
+                {tr("pages.setup_wizard.steps.server_storage_step.install_path")}
+              </span>
+              <div className="truncate font-mono">
+                {jellyfinStatus?.install_path ||
+                  tr("pages.setup_wizard.steps.server_storage_step.not_set")}
+              </div>
             </div>
           </div>
 
@@ -482,7 +554,7 @@ export function ServerStorageStep() {
             <div className="border-border/70 bg-muted/30 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs">
               <CheckCircle2 className="text-muted-foreground mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
               <span className="text-muted-foreground leading-relaxed">
-                Jellyfin Web install is running.
+                {tr("pages.setup_wizard.steps.server_storage_step.jellyfin_web_install_is_running")}
               </span>
             </div>
           )}
@@ -507,39 +579,45 @@ export function ServerStorageStep() {
                   <Download className="mr-2 h-4 w-4" />
                 )}
                 {jellyfinWebInstallRequested
-                  ? "Web UI will be installed"
+                  ? tr("pages.setup_wizard.steps.server_storage_step.web_ui_will_be_installed")
                   : jellyfinStatus?.web_state === "update_available"
-                    ? "Update Web UI"
+                    ? tr("pages.setup_wizard.steps.server_storage_step.update_web_ui")
                     : jellyfinOperationRunning || installJellyfinWeb.isPending
-                      ? "Web UI Busy"
-                      : "Install Web UI"}
+                      ? tr("pages.setup_wizard.steps.server_storage_step.web_ui_busy")
+                      : tr("pages.setup_wizard.steps.server_storage_step.install_web_ui")}
               </Button>
             )}
             {pinnedJellyfinWebInstalled && (
               <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Pinned Web UI version installed
+                {tr("pages.setup_wizard.steps.server_storage_step.pinned_web_ui_version_installed")}
               </span>
             )}
             {jellyfinStatus?.license_present && jellyfinStatus?.provenance_present && (
               <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                License and provenance files found
+                {tr(
+                  "pages.setup_wizard.steps.server_storage_step.license_and_provenance_files_found",
+                )}
               </span>
             )}
             {!jellyfinAPIEnabled && !pinnedJellyfinWebInstalled && (
               <span className="text-muted-foreground text-xs">
-                Enable the Jellyfin-compatible API before installing Web UI.
+                {tr(
+                  "pages.setup_wizard.steps.server_storage_step.enable_the_jellyfin_compatible_api_before_installing_web_ui",
+                )}
               </span>
             )}
             {jellyfinSettingsDirty && !jellyfinWebInstallRequested && (
               <span className="text-muted-foreground text-xs">
-                Pending Jellyfin settings will be saved when you continue.
+                {tr(
+                  "pages.setup_wizard.steps.server_storage_step.pending_jellyfin_settings_will_be_saved_when_you_continue",
+                )}
               </span>
             )}
             {jellyfinMissingPrerequisites.length > 0 && (
               <span className="text-muted-foreground text-xs">
-                Missing installer prerequisites:{" "}
+                {tr("pages.setup_wizard.steps.server_storage_step.missing_installer_prerequisites")}{" "}
                 {jellyfinMissingPrerequisites.map((item) => item.command).join(", ")}
               </span>
             )}
@@ -548,25 +626,32 @@ export function ServerStorageStep() {
       </Section>
 
       <StorageBlock
-        title="Public Assets Storage (S3)"
+        title={tr("pages.setup_wizard.steps.server_storage_step.public_assets_storage_s3")}
         expanded={publicExpanded}
         onToggle={() => setPublicExpanded((value) => !value)}
       >
         <p className="text-muted-foreground/80 text-xs leading-relaxed">
-          Stores client-facing assets such as artwork, chapter thumbnails, and subtitle files.
-          Private bucket + presigned URLs is fully supported. A public bucket is optional.
+          {tr(
+            "pages.setup_wizard.steps.server_storage_step.stores_client_facing_assets_such_as_artwork_chapter_thumbnails_and",
+          )}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label className="text-xs">Endpoint</Label>
+            <Label className="text-xs">
+              {tr("pages.setup_wizard.steps.server_storage_step.endpoint")}
+            </Label>
             <Input
               value={form.getValue("s3.public_endpoint")}
               onChange={(e) => form.setValue("s3.public_endpoint", e.target.value)}
-              placeholder="https://s3.amazonaws.com"
+              placeholder={tr(
+                "pages.setup_wizard.steps.server_storage_step.https_s3_amazonaws_com",
+              )}
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Bucket</Label>
+            <Label className="text-xs">
+              {tr("pages.setup_wizard.steps.server_storage_step.bucket")}
+            </Label>
             <Input
               value={form.getValue("s3.public_bucket")}
               onChange={(e) => form.setValue("s3.public_bucket", e.target.value)}
@@ -579,14 +664,14 @@ export function ServerStorageStep() {
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <SettingField
-            label="Access Key"
+            label={tr("pages.setup_wizard.steps.server_storage_step.access_key")}
             type="password"
             value={form.getValue("s3.public_access_key")}
             onChange={(v) => form.setValue("s3.public_access_key", v)}
             sensitiveConfigured={form.sensitiveConfigured.includes("s3.public_access_key")}
           />
           <SettingField
-            label="Secret Key"
+            label={tr("pages.setup_wizard.steps.server_storage_step.secret_key")}
             type="password"
             value={form.getValue("s3.public_secret_key")}
             onChange={(v) => form.setValue("s3.public_secret_key", v)}
@@ -595,22 +680,33 @@ export function ServerStorageStep() {
         </div>
         <div className="border-foreground/[0.06] border-t pt-3">
           <SettingField
-            label="URL Auth Method"
+            label={tr("pages.setup_wizard.steps.server_storage_step.url_auth_method")}
             type="select"
             value={publicURLAuth}
             onChange={(v) => form.setValue("s3.public_url_auth", v)}
             options={[
-              { value: "presigned", label: "S3 Presigned URLs (Recommended)" },
-              { value: "public", label: "Public (no auth)" },
-              { value: "cloudflare_token", label: "Cloudflare Token Auth" },
+              {
+                value: "presigned",
+                label: tr(
+                  "pages.setup_wizard.steps.server_storage_step.s3_presigned_urls_recommended",
+                ),
+              },
+              {
+                value: "public",
+                label: tr("pages.setup_wizard.steps.server_storage_step.public_no_auth"),
+              },
+              {
+                value: "cloudflare_token",
+                label: tr("pages.setup_wizard.steps.server_storage_step.cloudflare_token_auth"),
+              },
             ]}
           />
           {publicURLAuth !== "presigned" && (
             <SettingField
-              label="Read Endpoint"
+              label={tr("pages.setup_wizard.steps.server_storage_step.read_endpoint")}
               value={form.getValue("s3.public_read_endpoint")}
               onChange={(v) => form.setValue("s3.public_read_endpoint", v)}
-              hint="https://cdn.example.com"
+              hint={tr("pages.setup_wizard.steps.server_storage_step.https_cdn_example_com")}
             />
           )}
         </div>
@@ -623,24 +719,32 @@ export function ServerStorageStep() {
       </StorageBlock>
 
       <StorageBlock
-        title="Private Internal Storage (S3)"
+        title={tr("pages.setup_wizard.steps.server_storage_step.private_internal_storage_s3")}
         expanded={privateExpanded}
         onToggle={() => setPrivateExpanded((value) => !value)}
       >
         <p className="text-muted-foreground/80 text-xs leading-relaxed">
-          Stores non-public Silo objects such as imports, exports, and internal artifacts.
+          {tr(
+            "pages.setup_wizard.steps.server_storage_step.stores_non_public_silo_objects_such_as_imports_exports_and",
+          )}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label className="text-xs">Endpoint</Label>
+            <Label className="text-xs">
+              {tr("pages.setup_wizard.steps.server_storage_step.endpoint")}
+            </Label>
             <Input
               value={form.getValue("s3.private_endpoint")}
               onChange={(e) => form.setValue("s3.private_endpoint", e.target.value)}
-              placeholder="https://s3.amazonaws.com"
+              placeholder={tr(
+                "pages.setup_wizard.steps.server_storage_step.https_s3_amazonaws_com",
+              )}
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Bucket</Label>
+            <Label className="text-xs">
+              {tr("pages.setup_wizard.steps.server_storage_step.bucket")}
+            </Label>
             <Input
               value={form.getValue("s3.private_bucket")}
               onChange={(e) => form.setValue("s3.private_bucket", e.target.value)}
@@ -653,14 +757,14 @@ export function ServerStorageStep() {
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <SettingField
-            label="Access Key"
+            label={tr("pages.setup_wizard.steps.server_storage_step.access_key")}
             type="password"
             value={form.getValue("s3.private_access_key")}
             onChange={(v) => form.setValue("s3.private_access_key", v)}
             sensitiveConfigured={form.sensitiveConfigured.includes("s3.private_access_key")}
           />
           <SettingField
-            label="Secret Key"
+            label={tr("pages.setup_wizard.steps.server_storage_step.secret_key")}
             type="password"
             value={form.getValue("s3.private_secret_key")}
             onChange={(v) => form.setValue("s3.private_secret_key", v)}
@@ -679,11 +783,12 @@ export function ServerStorageStep() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.1em] uppercase">
-              Store Artwork In Your Bucket
+              {tr("pages.setup_wizard.steps.server_storage_step.store_artwork_in_your_bucket")}
             </p>
             <p className="text-muted-foreground/70 mt-0.5 text-xs">
-              Copies posters and backdrops from metadata providers into your public S3 bucket
-              instead of proxying external URLs.
+              {tr(
+                "pages.setup_wizard.steps.server_storage_step.copies_posters_and_backdrops_from_metadata_providers_into_your_public",
+              )}
             </p>
           </div>
           <Switch
@@ -697,7 +802,9 @@ export function ServerStorageStep() {
 
       <div className="flex gap-3 pt-4">
         <Button type="submit" disabled={submitting || form.isSaving}>
-          {submitting || form.isSaving ? "Saving..." : "Save & continue"}
+          {submitting || form.isSaving
+            ? tr("pages.setup_wizard.steps.server_storage_step.saving")
+            : tr("pages.setup_wizard.steps.server_storage_step.save_continue")}
         </Button>
         <Button
           type="button"
@@ -705,7 +812,7 @@ export function ServerStorageStep() {
           onClick={handleSkip}
           disabled={submitting || form.isSaving}
         >
-          Skip
+          {tr("common.actions.skip")}
         </Button>
       </div>
     </form>

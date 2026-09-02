@@ -8,6 +8,8 @@ import {
   formatLanguageName,
 } from "@/pages/ItemDetail/components/versionFormatUtils";
 import { PlayerMenuSurface } from "./PlayerMenuSurface";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface AudioTrackMenuProps {
   tracks: PlayerAudioTrack[];
@@ -62,6 +64,7 @@ export function AudioTrackMenu({
   onOpenChange,
   hideTrigger = false,
 }: AudioTrackMenuProps) {
+  useUILanguage();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpen = useCallback(
@@ -140,9 +143,9 @@ export function AudioTrackMenu({
       {!hideTrigger && (
         <button
           type="button"
-          className={`player-utility-btn ${disabled ? "cursor-default opacity-40" : ""}`}
+          className={"player-utility-btn " + (disabled ? "cursor-default opacity-40" : "")}
           onClick={disabled ? undefined : () => setOpen((v) => !v)}
-          aria-label="Audio tracks"
+          aria-label={tr("player.components.audio_track_menu.audio_tracks")}
           aria-expanded={open}
           aria-disabled={disabled}
           aria-haspopup="menu"
@@ -158,7 +161,7 @@ export function AudioTrackMenu({
           onKeyDown={handleMenuKeyDown}
         >
           <div className="px-3 py-1.5 text-xs font-medium tracking-wide text-white/50 uppercase">
-            Audio
+            {tr("player.components.audio_track_menu.audio")}
           </div>
           {tracks.map((track, index) => {
             const descriptor = describeTrack(track, index);
@@ -171,9 +174,10 @@ export function AudioTrackMenu({
                 }}
                 role="menuitem"
                 type="button"
-                className={`flex w-full items-start gap-2 px-3 py-2 text-left transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-                  isActive ? "text-blue-400" : "text-white/85"
-                }`}
+                className={
+                  "flex w-full items-start gap-2 px-3 py-2 text-left transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+                  (isActive ? "text-blue-400" : "text-white/85")
+                }
                 onClick={() => handleSelect(index)}
               >
                 <span className="mt-[3px] w-4 shrink-0 text-center text-sm leading-none">
@@ -186,7 +190,11 @@ export function AudioTrackMenu({
                     {descriptor.channelsLabel && (
                       <TrackBadge>{descriptor.channelsLabel}</TrackBadge>
                     )}
-                    {descriptor.isDefault && <TrackBadge variant="outline">Default</TrackBadge>}
+                    {descriptor.isDefault && (
+                      <TrackBadge variant="outline">
+                        {tr("player.components.audio_track_menu.default")}
+                      </TrackBadge>
+                    )}
                   </span>
                   {descriptor.meta && (
                     <span className="truncate text-[11px] leading-snug text-white/55">
@@ -213,6 +221,7 @@ function TrackBadge({
   children: React.ReactNode;
   variant?: "solid" | "outline";
 }) {
+  useUILanguage();
   const base =
     "inline-flex items-center rounded px-1.5 py-[1px] text-[9.5px] font-semibold tracking-wide whitespace-nowrap uppercase leading-4";
   const skin =

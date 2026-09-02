@@ -70,7 +70,10 @@ import {
   endWatchTogetherRoom,
   setWatchTogetherGuestControl,
 } from "@/lib/watchTogetherActions";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 let hlsJSModule: Promise<typeof HlsType> | null = null;
 
@@ -294,6 +297,7 @@ export function VideoPlayer({
   watchTogetherRoomId,
   watchTogetherConnection,
 }: VideoPlayerProps) {
+  useUILanguage();
   const playerConfig = usePlayerConfig();
   const isDetached = displayMode !== "foreground";
 
@@ -408,11 +412,14 @@ export function VideoPlayer({
       {
         index: LIVE_SUBTITLE_INDEX,
         language: liveTranslation.language,
-        label: liveTranslation.label || "AI translation",
+        get label() {
+          return liveTranslation.label || tr("player.components.video_player.ai_translation");
+        },
         source: "downloaded" as const,
         codec: "srt",
         url: "",
         live: true,
+        burn_in_only: false,
       },
     ];
   }, [subtitleUrls, liveTranslation]);
@@ -459,7 +466,7 @@ export function VideoPlayer({
         message: "HLS playback exhausted its startup recovery budget.",
       })
     ) {
-      setError("Playback failed. The media could not be loaded.");
+      setError(tr("player.components.video_player.playback_failed_the_media_could_not_be_loaded"));
     }
   }, [reportCurrentPlanFailure]);
 
@@ -548,7 +555,7 @@ export function VideoPlayer({
 
   const showWatchTogetherNotice = useCallback((message: string, tone: "info" | "warning") => {
     setNotice({
-      title: "Watch Party",
+      title: tr("player.components.video_player.watch_party"),
       message,
       tone,
     });
@@ -668,8 +675,12 @@ export function VideoPlayer({
       }
       compatibilityFallbackKeyRef.current = fallbackKey;
       setNotice({
-        title: "Compatibility mode",
-        message: "Firefox stalled on the original stream. Retrying with encoded video.",
+        title: tr("player.components.video_player.compatibility_mode"),
+        get message() {
+          return tr(
+            "player.components.video_player.firefox_stalled_on_the_original_stream_retrying_with_encoded_video",
+          );
+        },
         tone: "info",
       });
       reportCurrentPlanFailure({
@@ -704,8 +715,12 @@ export function VideoPlayer({
     compatibilityFallbackKeyRef.current = fallbackKey;
     setError(null);
     setNotice({
-      title: "Compatibility mode",
-      message: "Firefox rejected the original stream. Retrying with encoded video.",
+      title: tr("player.components.video_player.compatibility_mode"),
+      get message() {
+        return tr(
+          "player.components.video_player.firefox_rejected_the_original_stream_retrying_with_encoded_video",
+        );
+      },
       tone: "warning",
     });
     reportCurrentPlanFailure({
@@ -1154,11 +1169,15 @@ export function VideoPlayer({
           // subtitles off.
           const restore = preTranslationSubtitleIndexRef.current;
           setActiveSubtitleIndex((idx) => (idx === LIVE_SUBTITLE_INDEX ? restore : idx));
-          toast.error(
-            event.payload.message
-              ? `Translation failed: ${event.payload.message}`
-              : "Subtitle translation failed",
-          );
+          toast.error("errors.player.components.video_player.reported_message", {
+            values: {
+              message: event.payload.message
+                ? tr("feedback.player.components.video_player.translation_failed_message", {
+                    message: tr.remote({ message: event.payload.message }),
+                  })
+                : "Subtitle translation failed",
+            },
+          });
           break;
         }
         default:
@@ -1605,7 +1624,7 @@ export function VideoPlayer({
                       message: "HLS media recovery failed after three attempts.",
                     })
                   ) {
-                    setError("Playback failed. Please try again.");
+                    setError(tr("player.components.video_player.playback_failed_please_try_again"));
                   }
                   hls?.destroy();
                   hlsRef.current = null;
@@ -1619,7 +1638,7 @@ export function VideoPlayer({
                     message: `HLS reported an unrecoverable ${data.type} error.`,
                   })
                 ) {
-                  setError("Playback failed. Please try again.");
+                  setError(tr("player.components.video_player.playback_failed_please_try_again"));
                 }
                 hls?.destroy();
                 hlsRef.current = null;
@@ -1646,7 +1665,9 @@ export function VideoPlayer({
                 message: "The browser rejected the planned HLS transport.",
               })
             ) {
-              setError("HLS playback is not supported in this browser.");
+              setError(
+                tr("player.components.video_player.hls_playback_is_not_supported_in_this_browser"),
+              );
             }
           }
         } catch (error) {
@@ -1658,7 +1679,7 @@ export function VideoPlayer({
                 error instanceof Error ? error.message : "Failed to initialize HLS playback.",
             })
           ) {
-            setError("Failed to load video player.");
+            setError(tr("player.components.video_player.failed_to_load_video_player"));
           }
         }
       } else {
@@ -1791,7 +1812,7 @@ export function VideoPlayer({
       if (video.error) {
         const message = video.error.message || "Unknown media element error";
         if (!reportCurrentPlanFailure({ classification: "decoder_error", message })) {
-          setError(`Playback error: ${message}`);
+          setError(tr("player.components.video_player.playback_error_value1", { value1: message }));
         }
       }
     };
@@ -2179,8 +2200,13 @@ export function VideoPlayer({
       subtitleSelectionWasManualRef.current = true;
       setActiveSubtitleIndex(plan.selected_tracks.subtitle?.index ?? null);
       requestedSubtitleTrackChangeRef.current = null;
-      toast.error(replanErrorTitle ?? "That subtitle track can't be used", {
-        description: replanError,
+      toast.error("errors.player.components.video_player.reported_message", {
+        values: {
+          message: replanErrorTitle
+            ? tr.remote({ message: replanErrorTitle })
+            : tr("player.playback_errors.that_subtitle_track_can_t_be_used"),
+        },
+        resolvedDescription: tr.remote({ message: replanError }),
       });
     }
   }, [plan.selected_tracks.subtitle?.index, replanError, replanErrorTitle, replanning]);
@@ -2562,27 +2588,56 @@ export function VideoPlayer({
         }
         case "display_message":
           setNotice({
-            title: readStringPayload(command.payload, "title") ?? "Playback notice",
-            message:
-              readStringPayload(command.payload, "message") ?? "A server message was received.",
+            get title() {
+              const title = readStringPayload(command.payload, "title");
+              return title
+                ? tr.remote({ message: title })
+                : tr("player.components.video_player.playback_notice");
+            },
+            get message() {
+              const message = readStringPayload(command.payload, "message");
+              return message
+                ? tr.remote({ message: message })
+                : tr("player.components.video_player.a_server_message_was_received");
+            },
             tone: "info",
           });
           return;
         case "server_restarting":
           setNotice({
-            title: readStringPayload(command.payload, "title") ?? "Server restarting",
-            message:
-              readStringPayload(command.payload, "message") ??
-              "Playback may end shortly while the server restarts.",
+            get title() {
+              const title = readStringPayload(command.payload, "title");
+              return title
+                ? tr.remote({ message: title })
+                : tr("player.components.video_player.server_restarting");
+            },
+            get message() {
+              const message = readStringPayload(command.payload, "message");
+              return message
+                ? tr.remote({ message: message })
+                : tr(
+                    "player.components.video_player.playback_may_end_shortly_while_the_server_restarts",
+                  );
+            },
             tone: "warning",
           });
           return;
         case "server_shutting_down":
           setNotice({
-            title: readStringPayload(command.payload, "title") ?? "Server shutting down",
-            message:
-              readStringPayload(command.payload, "message") ??
-              "Playback may end shortly while the server shuts down.",
+            get title() {
+              const title = readStringPayload(command.payload, "title");
+              return title
+                ? tr.remote({ message: title })
+                : tr("player.components.video_player.server_shutting_down");
+            },
+            get message() {
+              const message = readStringPayload(command.payload, "message");
+              return message
+                ? tr.remote({ message: message })
+                : tr(
+                    "player.components.video_player.playback_may_end_shortly_while_the_server_shuts_down",
+                  );
+            },
             tone: "warning",
           });
           return;
@@ -2614,10 +2669,17 @@ export function VideoPlayer({
             const message = readStringPayload(command.payload, "message");
             if (message) {
               setNotice({
-                title:
-                  readStringPayload(command.payload, "title") ??
-                  (command.name === "terminate" ? "Playback ended" : "Playback stopping"),
-                message,
+                get title() {
+                  const title = readStringPayload(command.payload, "title");
+                  return title
+                    ? tr.remote({ message: title })
+                    : tr(
+                        command.name === "terminate"
+                          ? "player.components.video_player.playback_ended"
+                          : "player.components.video_player.playback_stopping",
+                      );
+                },
+                message: tr.remote({ message: message }),
                 tone: "warning",
               });
             }
@@ -2740,17 +2802,18 @@ export function VideoPlayer({
       {/* Back button + media info */}
       {!isDetached && (
         <div
-          className={`absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-50 flex items-center gap-3 transition-opacity duration-300 ${
-            controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
-          }`}
+          className={
+            "absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-50 flex items-center gap-3 transition-opacity duration-300 " +
+            (controlsVisible ? "opacity-100" : "pointer-events-none opacity-0")
+          }
         >
           <button
             onClick={() => {
               void handleMinimize();
             }}
             disabled={isLeaving}
-            aria-label="Minimize player"
-            title="Minimize player"
+            aria-label={tr("player.components.video_player.minimize_player")}
+            title={tr("player.components.video_player.minimize_player")}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
             type="button"
           >
@@ -2792,7 +2855,7 @@ export function VideoPlayer({
               <path d="M18 6 6 18" />
               <path d="m6 6 12 12" />
             </svg>
-            Exit
+            {tr("player.components.video_player.exit")}
           </button>
           {/* Title + episode info have moved to the bottom HUD in the
               redesigned player — the top-left chrome now carries only the
@@ -2804,17 +2867,20 @@ export function VideoPlayer({
               <>
                 <span>
                   {seriesContext.seriesTitle ?? title}
-                  {year ? ` (${year})` : ""}
+                  {year ? tr("player.components.video_player.year", { year: year }) : ""}
                 </span>
                 <span>
-                  S{seriesContext.currentSeason}:E{seriesContext.currentEpisode}
-                  {title ? ` · ${title}` : ""}
+                  {tr("player.components.video_player.s")}
+                  {seriesContext.currentSeason}
+                  {tr("player.components.video_player.e")}
+                  {seriesContext.currentEpisode}
+                  {title ? tr("player.components.video_player.title", { title: title }) : ""}
                 </span>
               </>
             ) : (
               <span>
                 {title}
-                {year ? ` (${year})` : ""}
+                {year ? tr("player.components.video_player.year", { year: year }) : ""}
               </span>
             )}
           </div>
@@ -2836,11 +2902,11 @@ export function VideoPlayer({
       {!isDetached && (awaitingFirstFrame || !isPlayerReady) && !error && (
         <div
           role="status"
-          aria-label="Loading video"
+          aria-label={tr("player.components.video_player.loading_video")}
           className="absolute inset-0 z-40 flex items-center justify-center bg-black"
         >
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-          <span className="sr-only">Loading video</span>
+          <span className="sr-only">{tr("player.components.video_player.loading_video")}</span>
         </div>
       )}
 
@@ -2848,14 +2914,16 @@ export function VideoPlayer({
       {!isDetached && roomSyncWaiting && !awaitingFirstFrame && isPlayerReady && (
         <div
           role="status"
-          aria-label="Syncing playback"
+          aria-label={tr("player.components.video_player.syncing_playback")}
           className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-6"
         >
           <div className="rounded-[8px] border border-white/15 bg-black/70 px-5 py-4 text-center text-white shadow-2xl backdrop-blur">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-            <div className="mt-3 text-sm font-medium">Syncing playback</div>
+            <div className="mt-3 text-sm font-medium">
+              {tr("player.components.video_player.syncing_playback")}
+            </div>
             <div className="mt-1 text-xs text-white/70">
-              Buffering and syncing all users before resuming.
+              {tr("player.components.video_player.buffering_and_syncing_all_users_before_resuming")}
             </div>
           </div>
         </div>
@@ -2865,11 +2933,11 @@ export function VideoPlayer({
       {!isDetached && buffering && !roomSyncWaiting && !awaitingFirstFrame && isPlayerReady && (
         <div
           role="status"
-          aria-label="Buffering"
+          aria-label={tr("player.components.video_player.buffering")}
           className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center"
         >
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-          <span className="sr-only">Buffering</span>
+          <span className="sr-only">{tr("player.components.video_player.buffering")}</span>
         </div>
       )}
 
@@ -2890,7 +2958,7 @@ export function VideoPlayer({
               type="button"
               className="rounded bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20"
             >
-              Go Back
+              {tr("player.components.video_player.go_back")}
             </button>
           </div>
         </div>
@@ -2949,7 +3017,12 @@ export function VideoPlayer({
           focusOnMount={focusIntroPromptOnMount}
         />
       )}
-      {!isDetached && showRecapSkip && <IntroSkipButton onSkip={skipRecap} label="Skip Recap" />}
+      {!isDetached && showRecapSkip && (
+        <IntroSkipButton
+          onSkip={skipRecap}
+          label={tr("player.components.video_player.skip_recap")}
+        />
+      )}
 
       {/* Marker editor */}
       {!isDetached && markerEditor.editing && (
@@ -2971,7 +3044,9 @@ export function VideoPlayer({
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
           <div className="flex items-center gap-3 rounded-lg bg-black/80 px-4 py-3 text-sm text-white shadow-lg">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            Preparing {liveTranslation?.label || "translated"} subtitles…
+            {tr("player.components.video_player.preparing")}{" "}
+            {liveTranslation?.label || tr("player.components.video_player.translated")}{" "}
+            {tr("player.components.video_player.subtitles")}
           </div>
         </div>
       )}

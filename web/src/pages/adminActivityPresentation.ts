@@ -1,6 +1,8 @@
 import type { AdminSession } from "@/api/types";
 import { formatCodecLabel } from "@/lib/mediaFormat";
 
+import { tr } from "@/i18n/translate";
+
 export function formatDecisionLabel(decision?: string): string {
   switch (decision) {
     case "direct":
@@ -116,29 +118,39 @@ export interface ActivityMethodMeta {
 // popover cannot drift apart.
 const ACTIVITY_METHOD_META: Record<string, ActivityMethodMeta> = {
   direct: {
-    label: "Direct Play",
+    get label() {
+      return tr("pages.admin_activity_presentation.direct_play");
+    },
     swatchClass: "bg-success",
     badgeClass: "bg-success/10 text-success border-success/15",
   },
   remux: {
-    label: "Remux",
+    get label() {
+      return tr("pages.admin_activity_presentation.remux");
+    },
     swatchClass: "bg-info",
     badgeClass: "bg-info/10 text-info border-info/15",
   },
   transcode: {
-    label: "Transcode",
+    get label() {
+      return tr("pages.admin_activity_presentation.transcode");
+    },
     swatchClass: "bg-warning",
     badgeClass: "bg-warning/10 text-warning border-warning/15",
   },
   audio: {
-    label: "Audio Transcode",
+    get label() {
+      return tr("pages.admin_activity_presentation.audio_transcode");
+    },
     swatchClass: "bg-destructive",
     badgeClass: "bg-destructive/10 text-destructive border-destructive/15",
   },
 };
 
 const UNKNOWN_ACTIVITY_METHOD_META: ActivityMethodMeta = {
-  label: "Unknown",
+  get label() {
+    return tr("pages.admin_activity_presentation.unknown");
+  },
   swatchClass: "bg-muted-foreground",
   badgeClass: "bg-surface text-muted-foreground border-border",
 };
@@ -230,7 +242,7 @@ export function formatTranscodeModeSummary(session: AdminSession): string | null
 /** Labels for a confirmed HDR-to-SDR executor in compact and detailed views. */
 export interface ToneMapSummary {
   badge: "HW Tone map" | "SW Tone map";
-  detail: "Hardware" | "Software";
+  detail: string;
   mode: "hardware" | "software";
 }
 
@@ -243,9 +255,21 @@ export function formatToneMapSummary(session: AdminSession): ToneMapSummary | nu
 
   switch (session.tone_map_mode?.trim().toLowerCase()) {
     case "hardware":
-      return { badge: "HW Tone map", detail: "Hardware", mode: "hardware" };
+      return {
+        badge: "HW Tone map",
+        get detail() {
+          return tr("pages.admin_activity_presentation.hardware");
+        },
+        mode: "hardware",
+      };
     case "software":
-      return { badge: "SW Tone map", detail: "Software", mode: "software" };
+      return {
+        badge: "SW Tone map",
+        get detail() {
+          return tr("pages.admin_activity_presentation.software");
+        },
+        mode: "software",
+      };
     default:
       return null;
   }
@@ -290,7 +314,7 @@ export function getSessionClientLabelFull(session: AdminSession): string {
 export interface ActivityRouteNode {
   key: string;
   kind: "transcode" | "proxy" | "server" | "legacy";
-  label: "Transcode" | "Proxy" | "Server" | "Node";
+  label: string;
   name: string;
 }
 
@@ -312,9 +336,19 @@ function namedRouteNode(
 function reportingServerRouteNode(session: AdminSession): ActivityRouteNode {
   const reportedName = session.reporting_node?.trim();
   if (!reportedName || reportedName.toLowerCase() === "local") {
-    return { key: "server:local", kind: "server", label: "Server", name: "Local server" };
+    return {
+      key: "server:local",
+      kind: "server",
+      label: tr("pages.admin_activity_presentation.server"),
+      name: "Local server",
+    };
   }
-  return { key: `server:${reportedName}`, kind: "server", label: "Server", name: reportedName };
+  return {
+    key: `server:${reportedName}`,
+    kind: "server",
+    label: tr("pages.admin_activity_presentation.server"),
+    name: reportedName,
+  };
 }
 
 /**
@@ -331,7 +365,14 @@ export function getSessionRouteNodes(session: AdminSession): ActivityRouteNode[]
     const reportedName = session.node_display_name?.trim() || session.reporting_node?.trim();
     const name =
       !reportedName || reportedName.toLowerCase() === "local" ? "Local server" : reportedName;
-    return [{ key: `legacy:${name}`, kind: "legacy", label: "Node", name }];
+    return [
+      {
+        key: `legacy:${name}`,
+        kind: "legacy",
+        label: tr("pages.admin_activity_presentation.node"),
+        name,
+      },
+    ];
   }
 
   const nodes: ActivityRouteNode[] = [];

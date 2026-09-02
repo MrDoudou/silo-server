@@ -4,6 +4,8 @@ import { useCatalogItemDetail } from "@/hooks/queries/catalogRead";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { carouselCardWidthClasses } from "@/lib/uiCustomization";
 import CardPlayOverlay from "@/components/CardPlayOverlay";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const MAX_MORE_LIKE_THIS_ITEMS = 12;
 
@@ -18,6 +20,7 @@ interface RecommendationItemCardProps {
 }
 
 function RecommendationItemCard({ itemId, showCaption }: RecommendationItemCardProps) {
+  useUILanguage();
   const { data: item } = useCatalogItemDetail(itemId);
   if (!item) {
     return <div className="bg-surface aspect-[2/3] animate-pulse rounded-lg" />;
@@ -25,7 +28,7 @@ function RecommendationItemCard({ itemId, showCaption }: RecommendationItemCardP
   return (
     <div className="group/card">
       <div className="group/media relative">
-        <ViewTransitionLink to={`/item/${encodeURIComponent(itemId)}`} className="group block">
+        <ViewTransitionLink to={"/item/" + encodeURIComponent(itemId)} className="group block">
           <div className="aspect-[2/3] overflow-hidden rounded-lg">
             {item.poster_url ? (
               <img
@@ -52,7 +55,7 @@ function RecommendationItemCard({ itemId, showCaption }: RecommendationItemCardP
       </div>
       {showCaption ? (
         <ViewTransitionLink
-          to={`/item/${encodeURIComponent(itemId)}`}
+          to={"/item/" + encodeURIComponent(itemId)}
           className="mt-1.5 block truncate text-sm font-medium hover:underline"
         >
           {item.title}
@@ -63,12 +66,13 @@ function RecommendationItemCard({ itemId, showCaption }: RecommendationItemCardP
 }
 
 export default function RecommendationGrid({ items, maxItems = 12 }: RecommendationGridProps) {
+  useUILanguage();
   const { cardPresentation } = useUICustomization();
   const itemLimit = Math.max(0, Math.min(maxItems, MAX_MORE_LIKE_THIS_ITEMS));
   const posterWidthClasses = carouselCardWidthClasses(cardPresentation.poster_size);
 
   return (
-    <MediaCarousel title="More Like This" edgePadding={false}>
+    <MediaCarousel title={tr("components.recommendation_grid.more_like_this")} edgePadding={false}>
       {items.slice(0, itemLimit).map((si) => (
         <div key={si.media_item_id} className={posterWidthClasses}>
           <RecommendationItemCard

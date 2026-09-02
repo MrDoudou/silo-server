@@ -1,5 +1,7 @@
 import type { ScanRun } from "@/api/types";
 
+import { tr } from "@/i18n/translate";
+
 export function compareActiveScans(left: ScanRun, right: ScanRun) {
   const leftRank = left.status === "running" ? 0 : 1;
   const rightRank = right.status === "running" ? 0 : 1;
@@ -16,11 +18,11 @@ export function compareActiveScans(left: ScanRun, right: ScanRun) {
 export function formatActiveScanMode(scan: Pick<ScanRun, "mode">) {
   switch (scan.mode) {
     case "library":
-      return "Full library scan";
+      return tr("lib.scan_runs.full_library_scan");
     case "subtree":
-      return "Subtree scan";
+      return tr("lib.scan_runs.subtree_scan");
     case "file":
-      return "Single file scan";
+      return tr("lib.scan_runs.single_file_scan");
     default:
       return scan.mode;
   }
@@ -90,7 +92,14 @@ export function formatActiveScanProgress(scan: ScanRun) {
       0,
       Math.min(100, Math.round((result.files_processed / result.total_files) * 100)),
     );
-    return `${result.message ?? "Processing files"} · ${result.files_processed.toLocaleString()} / ${result.total_files.toLocaleString()} (${percent}%)`;
+    return tr("lib.scan_runs.message_processed_total_percent", {
+      message: result.message
+        ? tr.remote({ message: result.message })
+        : tr("lib.scan_runs.processing_files"),
+      processed: result.files_processed.toLocaleString(),
+      total: result.total_files.toLocaleString(),
+      percent,
+    });
   }
-  return result.message ?? "";
+  return result.message ? tr.remote({ message: result.message }) : "";
 }

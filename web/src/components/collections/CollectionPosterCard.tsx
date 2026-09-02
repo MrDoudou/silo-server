@@ -8,6 +8,8 @@ import {
   buildUserCollectionCatalogHref,
 } from "@/pages/catalogSearchParams";
 import { useUICustomization } from "@/hooks/useUICustomization";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // Shared poster card for both the per-library Collections tab and the
 // aggregated "Server collections" section on the home Collections tab. Library
@@ -21,6 +23,7 @@ export function CollectionPosterCard({
   kind: "regular" | "user_collections";
   libraryId: number;
 }) {
+  useUILanguage();
   const { loaded, onLoad } = useImageLoaded(collection.poster_url);
   const navigate = useViewTransitionNavigate();
   const { togglePin, isPinned, canToggle } = useToggleSidebarPin();
@@ -40,9 +43,10 @@ export function CollectionPosterCard({
             <img
               src={collection.poster_url}
               alt={collection.title}
-              className={`h-full w-full object-cover transition duration-300 group-hover/card:scale-[1.05] ${
-                loaded ? "opacity-100" : "opacity-0"
-              }`}
+              className={
+                "h-full w-full object-cover transition duration-300 group-hover/card:scale-[1.05] " +
+                (loaded ? "opacity-100" : "opacity-0")
+              }
               loading="lazy"
               onLoad={onLoad}
             />
@@ -60,7 +64,9 @@ export function CollectionPosterCard({
           <div className="px-0.5 pt-2.5">
             <div className="truncate text-[13px] font-semibold">{collection.title}</div>
             {cardPresentation.caption === "title_metadata" && isUserCollection ? (
-              <div className="text-muted-foreground text-xs">User collection</div>
+              <div className="text-muted-foreground text-xs">
+                {tr("components.collections.collection_poster_card.user_collection")}
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -77,12 +83,17 @@ export function CollectionPosterCard({
               label: collection.title,
             });
           }}
-          className={`absolute top-2 left-2 rounded-lg p-1.5 backdrop-blur-sm transition-all ${
-            pinned
+          className={
+            "absolute top-2 left-2 rounded-lg p-1.5 backdrop-blur-sm transition-all " +
+            (pinned
               ? "bg-primary/90 text-primary-foreground"
-              : "bg-background/50 text-foreground opacity-0 group-hover/card:opacity-100"
-          }`}
-          title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+              : "bg-background/50 text-foreground opacity-0 group-hover/card:opacity-100")
+          }
+          title={
+            pinned
+              ? tr("components.collections.collection_poster_card.unpin_from_sidebar")
+              : tr("components.collections.collection_poster_card.pin_to_sidebar")
+          }
         >
           {pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
         </button>

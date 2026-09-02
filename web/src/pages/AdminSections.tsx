@@ -41,7 +41,8 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { buildSectionReorderEntries } from "./adminSectionOrder";
 import SectionEditorDrawer from "@/components/sections/SectionEditorDrawer";
 import {
@@ -63,6 +64,8 @@ import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-ki
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { LibraryCollection } from "@/api/types";
 import { updateCheckboxSelection } from "@/lib/checkboxSelection";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function formatCollectionOptionLabel(
   collection: { title: string; library_id: number },
@@ -81,13 +84,14 @@ function LibraryPicker({
   value: number | null;
   onChange: (libraryId: number) => void;
 }) {
+  useUILanguage();
   return (
     <Select
       value={value ? String(value) : undefined}
       onValueChange={(next) => onChange(Number(next))}
     >
       <SelectTrigger className="w-[220px]">
-        <SelectValue placeholder="Choose library" />
+        <SelectValue placeholder={tr("pages.admin_sections.choose_library")} />
       </SelectTrigger>
       <SelectContent>
         {libraries.map((library) => (
@@ -162,6 +166,7 @@ function findDefaultTraktLibrary(libraries: Library[], mediaType: string): numbe
 }
 
 export default function AdminSections() {
+  useUILanguage();
   const [scope, setScope] = useState("home");
   const { data: librariesData } = useAdminLibraries();
   const librariesList = useMemo(() => librariesData ?? [], [librariesData]);
@@ -415,7 +420,9 @@ export default function AdminSections() {
           config: { ...config, library_collection_id: collection.id },
         });
       }
-      toast.success(`Created ${libraryIDs.length} section${libraryIDs.length === 1 ? "" : "s"}`);
+      toast.success("feedback.admin_sections.sections_created_count", {
+        values: { count: libraryIDs.length },
+      });
       return;
     }
 
@@ -429,7 +436,9 @@ export default function AdminSections() {
       enabled: payload.enabled,
       config,
     });
-    toast.success(`Created ${result.created} section${result.created === 1 ? "" : "s"}`);
+    toast.success("feedback.admin_sections.sections_created_count", {
+      values: { count: result.created },
+    });
   }
 
   async function createSectionFromGallery(payload: AddPayload) {
@@ -466,7 +475,7 @@ export default function AdminSections() {
     await createFromGalleryMutation.mutateAsync(data);
   }
 
-  if (isLoading) return <div className="p-4">Loading sections...</div>;
+  if (isLoading) return <div className="p-4">{tr("pages.admin_sections.loading_sections")}</div>;
 
   return (
     <div
@@ -479,9 +488,12 @@ export default function AdminSections() {
         onOpenChange={(open) => {
           if (!open) setConfirmDeleteSection(null);
         }}
-        title="Delete section"
-        description={`Delete section "${confirmDeleteSection?.title}"? Silo will also try to remove any section-managed collection that is no longer referenced. This action cannot be undone.`}
-        confirmLabel="Delete"
+        title={tr("pages.admin_sections.delete_section")}
+        description={tr(
+          "pages.admin_sections.delete_section_title_silo_will_also_try_to_remove_any",
+          { title: confirmDeleteSection?.title },
+        )}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         onConfirm={() => {
           if (confirmDeleteSection) deleteMutation.mutate(confirmDeleteSection.id);
@@ -491,18 +503,18 @@ export default function AdminSections() {
       <ConfirmDialog
         open={confirmDeleteSelected}
         onOpenChange={setConfirmDeleteSelected}
-        title="Delete selected sections"
+        title={tr("pages.admin_sections.delete_selected_sections")}
         description={deleteSelectedDescription}
-        confirmLabel="Delete selected"
+        confirmLabel={tr("pages.admin_sections.delete_selected")}
         variant="destructive"
         onConfirm={handleDeleteSelectedSections}
       />
       <ConfirmDialog
         open={confirmDeleteAll}
         onOpenChange={setConfirmDeleteAll}
-        title="Delete all sections"
+        title={tr("pages.admin_sections.delete_all_sections")}
         description={deleteAllDescription}
-        confirmLabel="Delete all"
+        confirmLabel={tr("pages.admin_sections.delete_all")}
         variant="destructive"
         onConfirm={handleDeleteAllSections}
       />
@@ -515,12 +527,17 @@ export default function AdminSections() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Restore Default Sections</DialogTitle>
+            <DialogTitle>{tr("pages.admin_sections.restore_default_sections")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
-              This will replace all {scope === "home" ? "home" : "library"} sections with the
-              defaults. Any custom sections will be removed.
+              {tr("pages.admin_sections.this_will_replace_all")}{" "}
+              {scope === "home"
+                ? tr("pages.admin_sections.home")
+                : tr("pages.admin_sections.library")}{" "}
+              {tr(
+                "pages.admin_sections.sections_with_the_defaults_any_custom_sections_will_be_removed",
+              )}
             </p>
             <div className="flex items-center gap-2">
               <Switch
@@ -530,7 +547,7 @@ export default function AdminSections() {
                 onCheckedChange={(checked) => setResetProfiles(checked === true)}
               />
               <Label htmlFor="resetProfiles" className="text-sm font-normal">
-                Also reset all user customizations for this scope
+                {tr("pages.admin_sections.also_reset_all_user_customizations_for_this_scope")}
               </Label>
             </div>
             <div className="flex justify-end gap-2">
@@ -541,7 +558,7 @@ export default function AdminSections() {
                   setResetProfiles(false);
                 }}
               >
-                Cancel
+                {tr("common.actions.cancel")}
               </Button>
               <Button
                 variant="destructive"
@@ -555,18 +572,18 @@ export default function AdminSections() {
                     },
                     {
                       onSuccess: () => {
-                        toast.success("Sections restored to defaults");
+                        toast.success("feedback.admin_sections.sections_restored_to_defaults");
                         setConfirmRestoreOpen(false);
                         setResetProfiles(false);
                       },
                       onError: () => {
-                        toast.error("Failed to restore defaults");
+                        toast.error("errors.admin_sections.failed_to_restore_defaults");
                       },
                     },
                   );
                 }}
               >
-                Restore Defaults
+                {tr("pages.admin_sections.restore_defaults")}
               </Button>
             </div>
           </div>
@@ -574,7 +591,9 @@ export default function AdminSections() {
       </Dialog>
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Sections</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_sections.sections")}
+          </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -583,7 +602,7 @@ export default function AdminSections() {
             disabled={!canManageCurrentScope || restoreDefaultsMutation.isPending}
             onClick={() => setConfirmRestoreOpen(true)}
           >
-            <RotateCcw className="mr-1 h-4 w-4" /> Restore Defaults
+            <RotateCcw className="mr-1 h-4 w-4" /> {tr("pages.admin_sections.restore_defaults")}
           </Button>
           <Button
             size="sm"
@@ -591,7 +610,7 @@ export default function AdminSections() {
             disabled={!canManageCurrentScope}
             onClick={() => setGalleryOpen(true)}
           >
-            <Plus className="mr-1 h-4 w-4" /> Add from Gallery
+            <Plus className="mr-1 h-4 w-4" /> {tr("pages.admin_sections.add_from_gallery")}
           </Button>
           <Button
             size="sm"
@@ -601,13 +620,15 @@ export default function AdminSections() {
               setDialogOpen(true);
             }}
           >
-            <Plus className="mr-1 h-4 w-4" /> Add Section
+            <Plus className="mr-1 h-4 w-4" /> {tr("pages.admin_sections.add_section")}
           </Button>
           {selectedSections.length > 0 ? (
             <>
-              <Badge variant="secondary">{selectedSections.length} selected</Badge>
+              <Badge variant="secondary">
+                {selectedSections.length} {tr("pages.admin_sections.selected")}
+              </Badge>
               <Button size="sm" variant="ghost" onClick={clearSectionSelection}>
-                Clear
+                {tr("pages.admin_sections.clear")}
               </Button>
               <Button
                 size="sm"
@@ -615,7 +636,8 @@ export default function AdminSections() {
                 disabled={deleteSectionsMutation.isPending || !canManageCurrentScope}
                 onClick={() => setConfirmDeleteSelected(true)}
               >
-                <Trash2 data-icon="inline-start" /> Delete Selected
+                <Trash2 data-icon="inline-start" />{" "}
+                {tr("pages.admin_sections.delete_selected_76bf56ab")}
               </Button>
             </>
           ) : null}
@@ -635,7 +657,11 @@ export default function AdminSections() {
               ) : (
                 <Trash2 className="mr-1 h-4 w-4" />
               )}
-              {deleteSectionsMutation.isPending ? `${deleteProgressLabel}…` : "Delete All"}
+              {deleteSectionsMutation.isPending
+                ? tr("pages.admin_sections.delete_progress_label", {
+                    deleteProgressLabel: deleteProgressLabel,
+                  })
+                : tr("pages.admin_sections.delete_all_97f32d67")}
             </Button>
           ) : null}
         </div>
@@ -643,14 +669,14 @@ export default function AdminSections() {
 
       <Tabs value={scope} onValueChange={handleScopeChange}>
         <TabsList>
-          <TabsTrigger value="home">Home</TabsTrigger>
-          <TabsTrigger value="library">Library</TabsTrigger>
+          <TabsTrigger value="home">{tr("pages.admin_sections.home_70f8bb9a")}</TabsTrigger>
+          <TabsTrigger value="library">{tr("pages.admin_sections.library_b8100f5b")}</TabsTrigger>
         </TabsList>
       </Tabs>
 
       {!isHomeScope && (
         <div className="flex items-center gap-3">
-          <Label>Library</Label>
+          <Label>{tr("pages.admin_sections.library_b8100f5b")}</Label>
           {librariesList.length > 0 ? (
             <LibraryPicker
               libraries={librariesList}
@@ -659,7 +685,7 @@ export default function AdminSections() {
             />
           ) : (
             <p className="text-muted-foreground text-sm">
-              Create a library before configuring Library sections.
+              {tr("pages.admin_sections.create_a_library_before_configuring_library_sections")}
             </p>
           )}
         </div>
@@ -667,7 +693,7 @@ export default function AdminSections() {
 
       {canDrag && (
         <p className="text-muted-foreground text-sm">
-          Drag and drop sections to change their order.
+          {tr("pages.admin_sections.drag_and_drop_sections_to_change_their_order")}
         </p>
       )}
 
@@ -683,15 +709,15 @@ export default function AdminSections() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">
-                  <span className="sr-only">Select</span>
+                  <span className="sr-only">{tr("pages.admin_sections.select")}</span>
                 </TableHead>
                 <TableHead className="w-8"></TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="w-20">Items</TableHead>
-                <TableHead className="w-20">Featured</TableHead>
-                <TableHead className="w-20">Enabled</TableHead>
-                <TableHead className="w-24">Actions</TableHead>
+                <TableHead>{tr("pages.admin_sections.title")}</TableHead>
+                <TableHead>{tr("pages.admin_sections.type")}</TableHead>
+                <TableHead className="w-20">{tr("pages.admin_sections.items")}</TableHead>
+                <TableHead className="w-20">{tr("pages.admin_sections.featured")}</TableHead>
+                <TableHead className="w-20">{tr("pages.admin_sections.enabled")}</TableHead>
+                <TableHead className="w-24">{tr("pages.admin_sections.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <SortableContext
@@ -708,7 +734,9 @@ export default function AdminSections() {
                     collectionLabels={collectionLabels}
                     catalog={recipeCatalog}
                     selected={selectedSectionIds.has(section.id)}
-                    selectionLabel={`Select ${section.title} ${sectionScopeLabel} section`}
+                    selectionLabel={
+                      "Select " + section.title + " " + sectionScopeLabel + " section"
+                    }
                     onSelectionChange={(checked, extendRange) =>
                       updateSectionSelection(section.id, checked, extendRange)
                     }
@@ -719,7 +747,8 @@ export default function AdminSections() {
                 {orderedSections.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
-                      No sections configured for {scope} scope.
+                      {tr("pages.admin_sections.no_sections_configured_for")} {scope}{" "}
+                      {tr("pages.admin_sections.scope")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -762,7 +791,7 @@ export default function AdminSections() {
                   setEditingSection(null);
                 },
                 onError: (error) => {
-                  toast.error(error instanceof Error ? error.message : "Failed to update section");
+                  toast.error("errors.admin_sections.failed_to_update_section", { error: error });
                 },
               },
             );
@@ -773,7 +802,7 @@ export default function AdminSections() {
                 setEditingSection(null);
               },
               onError: (error) => {
-                toast.error(error instanceof Error ? error.message : "Failed to create section");
+                toast.error("errors.admin_sections.failed_to_create_section", { error: error });
               },
             });
           }
@@ -804,7 +833,7 @@ export default function AdminSections() {
                 await createSectionFromGallery(payload);
                 setPickedRecipe(null);
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Failed to create section");
+                toast.error("errors.admin_sections.failed_to_create_section", { error: error });
                 throw error;
               }
             }}

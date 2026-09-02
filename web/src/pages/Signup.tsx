@@ -13,9 +13,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useServerBranding } from "@/hooks/useServerBranding";
 import { AuthBackground } from "@/components/auth/AuthBackground";
 import { sanitizeAuthRedirect } from "@/lib/authRedirect";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function Signup() {
+  useUILanguage();
   const [searchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -54,7 +57,7 @@ export default function Signup() {
               {serverName}
             </CardTitle>
             <CardDescription className="mt-2 text-sm leading-6">
-              Public signups are currently closed.
+              {tr("pages.signup.public_signups_are_currently_closed")}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -65,7 +68,7 @@ export default function Signup() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
+      toast.error("errors.auth.passwords_do_not_match");
       return;
     }
     setSubmitting(true);
@@ -89,7 +92,7 @@ export default function Signup() {
       }
       navigate("/profiles");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Signup failed");
+      toast.error("errors.auth.signup_failed", { error: err });
     } finally {
       setSubmitting(false);
     }
@@ -102,13 +105,13 @@ export default function Signup() {
         <CardHeader>
           <CardTitle className="text-3xl font-extrabold tracking-[-0.04em]">{serverName}</CardTitle>
           <CardDescription className="mt-2 text-sm leading-6">
-            Create a new account to get started.
+            {tr("pages.signup.create_a_new_account_to_get_started")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="signup-username">Username</Label>
+              <Label htmlFor="signup-username">{tr("pages.signup.username")}</Label>
               <Input
                 id="signup-username"
                 value={username}
@@ -119,7 +122,7 @@ export default function Signup() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signup-email">Email</Label>
+              <Label htmlFor="signup-email">{tr("pages.signup.email")}</Label>
               <Input
                 id="signup-email"
                 type="email"
@@ -130,8 +133,10 @@ export default function Signup() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signup-password">Password</Label>
-              <p className="text-muted-foreground text-xs">At least 8 characters</p>
+              <Label htmlFor="signup-password">{tr("pages.signup.password")}</Label>
+              <p className="text-muted-foreground text-xs">
+                {tr("pages.signup.at_least_8_characters")}
+              </p>
               <PasswordInput
                 id="signup-password"
                 value={password}
@@ -141,7 +146,7 @@ export default function Signup() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signup-confirm-password">Confirm password</Label>
+              <Label htmlFor="signup-confirm-password">{tr("pages.signup.confirm_password")}</Label>
               <PasswordInput
                 id="signup-confirm-password"
                 value={confirmPassword}
@@ -150,32 +155,34 @@ export default function Signup() {
                 required
               />
               {confirmPassword && password !== confirmPassword && (
-                <p className="text-destructive text-xs">Passwords do not match</p>
+                <p className="text-destructive text-xs">
+                  {tr("pages.signup.passwords_do_not_match")}
+                </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signup-invite-code">Invite code</Label>
+              <Label htmlFor="signup-invite-code">{tr("pages.signup.invite_code")}</Label>
               <Input
                 id="signup-invite-code"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="Enter your invite code"
+                placeholder={tr("pages.signup.enter_your_invite_code")}
                 required
               />
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Creating account..." : "Create account"}
+              {submitting ? tr("pages.signup.creating_account") : tr("pages.signup.create_account")}
             </Button>
           </form>
           <p className="text-muted-foreground mt-4 text-center text-sm">
-            Already have an account?{" "}
+            {tr("pages.signup.already_have_an_account")}{" "}
             <Link
               to={
                 redirectTarget ? `/login?redirect=${encodeURIComponent(redirectTarget)}` : "/login"
               }
               className="text-foreground underline hover:no-underline"
             >
-              Sign in
+              {tr("pages.signup.sign_in")}
             </Link>
           </p>
         </CardContent>

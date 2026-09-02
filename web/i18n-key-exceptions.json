@@ -1,0 +1,179 @@
+{
+  "dynamicKeys": [
+    {
+      "pattern": "components.admin_job_history.*",
+      "source": "web/src/components/AdminJobHistory.tsx",
+      "reason": "Job type keys are selected through the job-type label map."
+    },
+    {
+      "pattern": "common.language.*",
+      "source": "web/src/components/LanguageMenu.tsx",
+      "reason": "Language names are selected from the supported-language map."
+    },
+    {
+      "pattern": "components.library_header.*",
+      "source": "web/src/components/LibraryHeader.tsx",
+      "reason": "Tab keys are selected from the active library tab map."
+    },
+    {
+      "pattern": "components.recipe_gallery.recipe_gallery_modal.*",
+      "source": "web/src/components/RecipeGallery/RecipeGalleryModal.tsx",
+      "reason": "Recipe categories select their label key from a finite map."
+    },
+    {
+      "pattern": "components.split_item_dialog.*",
+      "source": "web/src/components/SplitItemDialog.tsx",
+      "reason": "History modes select their label key from a finite map."
+    },
+    {
+      "pattern": "components.watch_tonight_card.*",
+      "source": "web/src/components/WatchTonightCard.tsx",
+      "reason": "Recommendation sources select their badge key from a finite map."
+    },
+    {
+      "pattern": "components.admin.dashboard.range.*",
+      "source": "web/src/components/admin/dashboard/range.ts",
+      "reason": "Dashboard ranges select label keys from finite maps."
+    },
+    {
+      "pattern": "components.admin.dashboard.registry.*",
+      "source": "web/src/components/admin/dashboard/range.ts",
+      "reason": "The range title formatter receives a widget title key from the dashboard registry."
+    },
+    {
+      "pattern": "components.admin.dashboard.widgets.playback_activity_series.*",
+      "source": "web/src/components/admin/dashboard/widgets/PlaybackActivityWidget.tsx",
+      "reason": "Chart series keys are selected by their fixed series order."
+    },
+    {
+      "pattern": "components.admin.device_overrides.*",
+      "source": "web/src/components/admin/deviceOverrides.tsx",
+      "reason": "Platform kinds select their label key from a finite map."
+    },
+    {
+      "pattern": "components.sections.section_editor_drawer.*",
+      "source": "web/src/components/sections/SectionEditorDrawer.tsx",
+      "reason": "Section categories select known keys and preserve unknown extension values."
+    },
+    {
+      "pattern": "components.settings.device_list.*",
+      "source": "web/src/components/settings/DeviceList.tsx",
+      "reason": "Device groups carry a key, while profile groups carry a user-provided name."
+    },
+    {
+      "pattern": "components.settings.provider_tile.*",
+      "source": "web/src/components/settings/ProviderTile.tsx",
+      "reason": "Provider states select their label key from a finite map."
+    },
+    {
+      "pattern": "components.watchtogether.connection_status_dot.*",
+      "source": "web/src/components/watchtogether/ConnectionStatusDot.tsx",
+      "reason": "Connection states select their label key from a finite map."
+    },
+    {
+      "pattern": "components.watchtonight.swipe_card.*",
+      "source": "web/src/components/watchtonight/SwipeCard.tsx",
+      "reason": "Recommendation sources select their badge key from a finite map."
+    },
+    {
+      "pattern": "hooks.admin.use_settings_overview.*",
+      "source": "web/src/hooks/admin/useSettingsOverview.ts",
+      "reason": "Known hardware and search providers select keys while extension values fall back to server text."
+    },
+    {
+      "pattern": "lib.document_title.*",
+      "source": "web/src/lib/documentTitle.ts",
+      "reason": "Route segments select document-title keys from finite maps."
+    },
+    {
+      "pattern": "lib.extra_kinds.*",
+      "source": "web/src/lib/extraKinds.ts",
+      "reason": "Media extra kinds select singular and plural keys from finite maps."
+    },
+    {
+      "pattern": "lib.settings_contract.library_default",
+      "source": "web/src/lib/languageOptions.ts",
+      "reason": "Nullable language settings store the context-specific unset key in the settings contract."
+    },
+    {
+      "pattern": "lib.settings_contract.no_preference",
+      "source": "web/src/lib/languageOptions.ts",
+      "reason": "Nullable language settings store the context-specific unset key in the settings contract."
+    },
+    {
+      "pattern": "lib.settings_contract.none",
+      "source": "web/src/lib/languageOptions.ts",
+      "reason": "Nullable language settings store the context-specific unset key in the settings contract."
+    },
+    {
+      "pattern": "lib.language_options.unset",
+      "source": "web/src/lib/languageOptions.ts",
+      "reason": "The generic unset key is the defensive fallback for future nullable language settings."
+    },
+    {
+      "pattern": "lib.query_sort_options.*",
+      "source": "web/src/lib/querySortOptions.ts",
+      "reason": "Book-specific sort labels are selected from a finite override map."
+    },
+    {
+      "pattern": "pages.admin_collection_editor.*",
+      "source": "web/src/pages/AdminCollectionEditor.tsx",
+      "reason": "Collection source types select title keys from a finite map."
+    },
+    {
+      "pattern": "pages.admin_task_detail.*",
+      "source": "web/src/pages/AdminTaskDetail.tsx",
+      "reason": "Refresh reasons select known keys and preserve unknown task values."
+    },
+    {
+      "pattern": "pages.admin_tasks.*",
+      "source": "web/src/pages/AdminTasks.tsx",
+      "reason": "Task categories and refresh reasons select keys from finite maps."
+    },
+    {
+      "pattern": "pages.collections.*",
+      "source": "web/src/pages/Collections.tsx",
+      "reason": "Collection types select known label keys and preserve extension values."
+    },
+    {
+      "pattern": "pages.library_browse.*",
+      "source": "web/src/pages/LibraryBrowse.tsx",
+      "reason": "Audiobook browse axes select their key from a finite map."
+    },
+    {
+      "pattern": "pages.setup_wizard.*",
+      "source": "web/src/pages/SetupWizard.tsx",
+      "reason": "Wizard steps select title and description keys from finite maps."
+    },
+    {
+      "pattern": "pages.admin_policy.policy_editor_panel.*",
+      "source": "web/src/pages/admin-policy/PolicyEditorPanel.tsx",
+      "reason": "Policy lifecycle steps select keys from a fixed ordered list."
+    },
+    {
+      "pattern": "pages.admin_settings.compatibility_proxies_settings.*",
+      "source": "web/src/pages/admin-settings/CompatibilityProxiesSettings.tsx",
+      "reason": "Known compatibility states select keys while extension states fall back to their value."
+    },
+    {
+      "pattern": "pages.admin_settings.security_access_settings.*",
+      "source": "web/src/pages/admin-settings/SecurityAccessSettings.tsx",
+      "reason": "Security tiers and endpoints select keys from finite maps."
+    },
+    {
+      "pattern": "pages.settings.interface_settings.*",
+      "source": "web/src/pages/settings/InterfaceSettings.tsx",
+      "reason": "Built-in navigation destinations select keys while custom destinations keep their label."
+    },
+    {
+      "pattern": "pages.settings.webhook_sync_settings.*",
+      "source": "web/src/pages/settings/WebhookSyncSettings.tsx",
+      "reason": "Known event attributes select keys while provider extensions keep their value."
+    },
+    {
+      "pattern": "player.components.subtitle_menu.*",
+      "source": "web/src/player/components/SubtitleMenu.tsx",
+      "reason": "Subtitle sources select known keys and preserve provider extension values."
+    }
+  ]
+}

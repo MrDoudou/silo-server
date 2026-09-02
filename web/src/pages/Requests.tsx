@@ -36,6 +36,8 @@ import {
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
 import { formatRequestStatus, requestInputFromMediaResult } from "@/lib/mediaRequests";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type MineBucketKey = "motion" | "completed" | "issues";
 type RequestTab = "discover" | "yours";
@@ -49,17 +51,23 @@ const REQUEST_TABS = ["discover", "yours"] as const;
 const MINE_BUCKET_META: Record<MineBucketKey, { title: string; eyebrow: string; accent: string }> =
   {
     motion: {
-      title: "In motion",
+      get title() {
+        return tr("pages.requests.in_motion");
+      },
       eyebrow: "On their way",
       accent: "text-amber-200/90",
     },
     completed: {
-      title: "Landed in your library",
+      get title() {
+        return tr("pages.requests.landed_in_your_library");
+      },
       eyebrow: "Ready to watch",
       accent: "text-emerald-200/90",
     },
     issues: {
-      title: "Needs attention",
+      get title() {
+        return tr("pages.requests.needs_attention");
+      },
       eyebrow: "Hit a snag",
       accent: "text-red-200/90",
     },
@@ -68,27 +76,37 @@ const MINE_BUCKET_META: Record<MineBucketKey, { title: string; eyebrow: string; 
 const REQUEST_PROGRESS_GUIDE: Array<StatusGuideItem & { status: MediaRequestStatus }> = [
   {
     status: "pending",
-    description: "Waiting for an admin to approve the request.",
+    get description() {
+      return tr("pages.requests.waiting_for_an_admin_to_approve_the_request");
+    },
     tone: "bg-amber-500/15 text-amber-100 ring-amber-400/40",
   },
   {
     status: "approved",
-    description: "Approved, but not yet sent to the download automation.",
+    get description() {
+      return tr("pages.requests.approved_but_not_yet_sent_to_the_download_automation");
+    },
     tone: "bg-emerald-500/15 text-emerald-100 ring-emerald-400/40",
   },
   {
     status: "queued",
-    description: "Sent to the request automation and waiting for download/import activity.",
+    get description() {
+      return tr("pages.requests.sent_to_the_request_automation_and_waiting_for_download_import");
+    },
     tone: "bg-sky-500/15 text-sky-100 ring-sky-400/40",
   },
   {
     status: "downloading",
-    description: "Downloading or importing now.",
+    get description() {
+      return tr("pages.requests.downloading_or_importing_now");
+    },
     tone: "bg-sky-500/20 text-sky-100 ring-sky-400/50",
   },
   {
     status: "completed",
-    description: "In your Silo library and ready to watch.",
+    get description() {
+      return tr("pages.requests.in_your_silo_library_and_ready_to_watch");
+    },
     tone: "bg-emerald-500/20 text-emerald-100 ring-emerald-400/40",
   },
 ];
@@ -101,27 +119,39 @@ const REQUEST_ISSUE_GUIDE: Array<
 > = [
   {
     outcome: "declined",
-    label: "Declined",
-    description: "An admin declined the request.",
+    get label() {
+      return tr("pages.requests.declined");
+    },
+    get description() {
+      return tr("pages.requests.an_admin_declined_the_request");
+    },
     tone: "bg-zinc-700/60 text-zinc-200 ring-zinc-500/40",
   },
   {
     outcome: "cancelled",
-    label: "Cancelled",
-    description: "The request was cancelled before completion.",
+    get label() {
+      return tr("pages.requests.cancelled");
+    },
+    get description() {
+      return tr("pages.requests.the_request_was_cancelled_before_completion");
+    },
     tone: "bg-zinc-700/60 text-zinc-200 ring-zinc-500/40",
   },
   {
     outcome: "failed",
-    label: "Failed",
-    description:
-      "Silo or the external request automation hit an error. If details are available, they appear on the request card.",
+    get label() {
+      return tr("pages.requests.failed");
+    },
+    get description() {
+      return tr("pages.requests.silo_or_the_external_request_automation_hit_an_error_if");
+    },
     tone: "bg-red-500/15 text-red-100 ring-red-400/40",
   },
 ];
 
 export default function Requests() {
-  useDocumentTitle("Requests");
+  useUILanguage();
+  useDocumentTitle(tr("pages.requests.requests"));
 
   const [searchParams, setSearchParams] = useSearchParams();
   const submittedQuery = (searchParams.get("q") ?? "").trim();
@@ -259,10 +289,10 @@ export default function Requests() {
         <div className="px-4 sm:px-6 lg:px-10 xl:px-12">
           <TabsList variant="line" className="border-border w-full justify-start border-b">
             <TabsTrigger value="discover" className="px-3 text-[13px]">
-              Discover
+              {tr("pages.requests.discover")}
             </TabsTrigger>
             <TabsTrigger value="yours" className="px-3 text-[13px]">
-              Yours
+              {tr("pages.requests.yours")}
               {totalMine > 0 && (
                 <span className="bg-muted/80 text-muted-foreground ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums">
                   {totalMine}
@@ -292,8 +322,8 @@ export default function Requests() {
             <DiscoveryCarouselSkeleton />
           ) : discovery.isError ? (
             <EmptyPanel
-              title="Discovery is offline"
-              detail="TMDB couldn't be reached. Try the search bar above, or refresh in a moment."
+              title={tr("pages.requests.discovery_is_offline")}
+              detail={tr("pages.requests.tmdb_couldn_t_be_reached_try_the_search_bar_above")}
             />
           ) : (
             <div className="space-y-10">
@@ -308,7 +338,7 @@ export default function Requests() {
               ))}
               <BrandCarousel
                 kind="studio"
-                title="Studios"
+                title={tr("pages.requests.studios")}
                 cards={studios.data}
                 isLoading={studios.isLoading}
                 isError={studios.isError}
@@ -316,7 +346,7 @@ export default function Requests() {
               />
               <BrandCarousel
                 kind="network"
-                title="Networks"
+                title={tr("pages.requests.networks")}
                 cards={networks.data}
                 isLoading={networks.isLoading}
                 isError={networks.isError}
@@ -324,7 +354,7 @@ export default function Requests() {
               />
               <BrandCarousel
                 kind="genre"
-                title="Genres"
+                title={tr("pages.requests.genres")}
                 cards={genres.data}
                 isLoading={genres.isLoading}
                 isError={genres.isError}
@@ -339,8 +369,8 @@ export default function Requests() {
             <DiscoveryCarouselSkeleton />
           ) : mine.isError ? (
             <EmptyPanel
-              title="Couldn't load your requests"
-              detail="Refresh in a moment, or check back later."
+              title={tr("pages.requests.couldn_t_load_your_requests")}
+              detail={tr("pages.requests.refresh_in_a_moment_or_check_back_later")}
             />
           ) : totalMine === 0 ? (
             <EmptyMineState />
@@ -364,21 +394,23 @@ export default function Requests() {
 }
 
 function RequestStatusGuide() {
+  useUILanguage();
   return (
     <section className="px-4 sm:px-6 lg:px-10 xl:px-12" aria-labelledby="request-status-guide">
       <div className="border-border/60 bg-card/40 rounded-2xl border px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1 lg:w-[220px] lg:shrink-0">
             <h2 id="request-status-guide" className="text-foreground text-sm font-semibold">
-              Status guide
+              {tr("pages.requests.status_guide")}
             </h2>
             <p className="text-muted-foreground text-[13px] leading-5">
-              Statuses update automatically as Silo checks the library and connected request
-              integrations.
+              {tr(
+                "pages.requests.statuses_update_automatically_as_silo_checks_the_library_and_connected",
+              )}
             </p>
           </div>
           <div className="grid min-w-0 flex-1 gap-5 md:grid-cols-2">
-            <StatusGuideGroup title="Request progress">
+            <StatusGuideGroup title={tr("pages.requests.request_progress")}>
               {REQUEST_PROGRESS_GUIDE.map((item) => (
                 <StatusGuideRow
                   key={item.status}
@@ -388,7 +420,7 @@ function RequestStatusGuide() {
                 />
               ))}
             </StatusGuideGroup>
-            <StatusGuideGroup title="Needs attention">
+            <StatusGuideGroup title={tr("pages.requests.needs_attention")}>
               {REQUEST_ISSUE_GUIDE.map((item) => (
                 <StatusGuideRow
                   key={item.outcome}
@@ -406,6 +438,7 @@ function RequestStatusGuide() {
 }
 
 function StatusGuideGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  useUILanguage();
   return (
     <section className="space-y-2">
       <h3 className="text-muted-foreground text-xs font-medium">{title}</h3>
@@ -423,6 +456,7 @@ function StatusGuideRow({
   description: string;
   tone: string;
 }) {
+  useUILanguage();
   return (
     <div className="grid gap-1 sm:grid-cols-[118px_minmax(0,1fr)] sm:items-start sm:gap-3">
       <dt>
@@ -441,21 +475,23 @@ function StatusGuideRow({
 }
 
 function PageHeader() {
+  useUILanguage();
   return (
     <header className="space-y-3">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-amber-300/80" />
         <span className="text-muted-foreground text-[11px] font-semibold tracking-[0.22em] uppercase">
-          Your wishlist
+          {tr("pages.requests.your_wishlist")}
         </span>
       </div>
       <h1 className="font-display text-foreground text-[clamp(1.8rem,3vw,2.6rem)] leading-[1.05] font-bold tracking-tight text-balance">
-        Find something worth waiting for.
+        {tr("pages.requests.find_something_worth_waiting_for")}
       </h1>
       <p className="text-muted-foreground max-w-xl text-sm leading-6">
-        Browse what's trending, search the full TMDB catalog, and watch your requests move from{" "}
-        <span className="text-foreground">pending</span> to{" "}
-        <span className="text-foreground">ready</span>.
+        {tr("pages.requests.browse_what_s_trending_search_the_full_tmdb_catalog_and")}{" "}
+        <span className="text-foreground">{tr("pages.requests.pending")}</span>{" "}
+        {tr("pages.requests.to")}{" "}
+        <span className="text-foreground">{tr("pages.requests.ready")}</span>.
       </p>
     </header>
   );
@@ -478,6 +514,7 @@ function SearchBar({
   onClear: () => void;
   isSearching: boolean;
 }) {
+  useUILanguage();
   return (
     <form
       onSubmit={onSubmit}
@@ -491,9 +528,9 @@ function SearchBar({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All</SelectItem>
-          <SelectItem value="movie">Movies</SelectItem>
-          <SelectItem value="series">Series</SelectItem>
+          <SelectItem value="all">{tr("pages.requests.all")}</SelectItem>
+          <SelectItem value="movie">{tr("pages.requests.movies")}</SelectItem>
+          <SelectItem value="series">{tr("pages.requests.series")}</SelectItem>
         </SelectContent>
       </Select>
       <div className="relative">
@@ -501,7 +538,7 @@ function SearchBar({
         <Input
           value={searchInput}
           onChange={(event) => onSearchInputChange(event.target.value)}
-          placeholder="Search TMDB by title…"
+          placeholder={tr("pages.requests.search_tmdb_by_title")}
           className="border-border/60 bg-background/40 h-10 rounded-xl pr-10 pl-10 text-sm"
         />
         {(searchInput || isSearching) && (
@@ -509,7 +546,7 @@ function SearchBar({
             type="button"
             onClick={onClear}
             className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full transition-colors"
-            aria-label="Clear search"
+            aria-label={tr("pages.requests.clear_search")}
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -520,7 +557,7 @@ function SearchBar({
         disabled={searchInput.trim().length < 2}
         className="h-10 rounded-xl px-5"
       >
-        Search
+        {tr("common.actions.search")}
       </Button>
     </form>
   );
@@ -537,6 +574,7 @@ function DiscoverySectionRow({
   isSubmitting: boolean;
   onRequest: (item: RequestMediaResult) => void;
 }) {
+  useUILanguage();
   const eyebrow = sectionEyebrow(section.key);
   return (
     <section className="space-y-1">
@@ -563,6 +601,7 @@ function DiscoverySectionRow({
 }
 
 function MineBucketRow({ bucket, requests }: { bucket: MineBucketKey; requests: MediaRequest[] }) {
+  useUILanguage();
   const meta = MINE_BUCKET_META[bucket];
   return (
     <section className="space-y-1">
@@ -607,6 +646,7 @@ function SearchResultsView({
   isSubmitting: boolean;
   onRequest: (item: RequestMediaResult) => void;
 }) {
+  useUILanguage();
   const typeLabel =
     mediaType === "series" ? "series" : mediaType === "movie" ? "movies" : "movies and series";
   const filterLabel = mediaType === "series" ? "Series" : mediaType === "movie" ? "Movies" : "All";
@@ -617,7 +657,7 @@ function SearchResultsView({
     <div className="space-y-6 px-4 sm:px-6 lg:px-10 xl:px-12">
       <header className="border-border/50 flex flex-col gap-2 border-b pb-4">
         <span className="text-muted-foreground text-[10px] font-semibold tracking-[0.24em] uppercase">
-          Search results · {filterLabel}
+          {tr("pages.requests.search_results")} {filterLabel}
         </span>
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <h2 className="font-display text-foreground text-[clamp(1.4rem,2.2vw,1.9rem)] leading-[1.1] font-bold tracking-tight">
@@ -636,17 +676,17 @@ function SearchResultsView({
                   {totalPages > 1 ? (
                     <span className="text-muted-foreground/70">
                       {" · "}
-                      Page {page} of {totalPages}
+                      {tr("pages.requests.page")} {page} {tr("pages.requests.of")} {totalPages}
                     </span>
                   ) : null}
                 </>
               ) : (
                 <>
-                  {shown} on this page
+                  {shown} {tr("pages.requests.on_this_page")}
                   {totalPages > 1 ? (
                     <span className="text-muted-foreground/70">
                       {" · "}
-                      Page {page} of {totalPages}
+                      {tr("pages.requests.page")} {page} {tr("pages.requests.of")} {totalPages}
                     </span>
                   ) : null}
                 </>
@@ -658,18 +698,26 @@ function SearchResultsView({
 
       {isError ? (
         <EmptyPanel
-          title="Search failed"
-          detail="TMDB search couldn't be loaded. Try again in a moment."
+          title={tr("pages.requests.search_failed")}
+          detail={tr("pages.requests.tmdb_search_couldn_t_be_loaded_try_again_in_a")}
         />
       ) : isLoading ? (
         <SearchGridSkeleton />
       ) : results.length === 0 ? (
         <EmptyPanel
-          title="Nothing found"
+          title={tr("pages.requests.nothing_found")}
           detail={
             mediaType === "all"
-              ? `No movies or series matched "${query}". Try a different spelling.`
-              : `No ${typeLabel} matched "${query}". Try a different spelling or switch to ${mediaType === "series" ? "Movies" : "Series"}.`
+              ? tr("pages.requests.no_movies_or_series_matched_query_try_a_different_spelling", {
+                  query,
+                })
+              : tr("pages.requests.no_type_label_matched_query_try_a_different_spelling_or", {
+                  typeLabel,
+                  query,
+                  alternativeType: tr(
+                    mediaType === "series" ? "pages.requests.movies" : "pages.requests.series",
+                  ),
+                })
           }
         />
       ) : (
@@ -698,10 +746,12 @@ function SearchResultsView({
                 onClick={() => onPageChange(Math.max(1, page - 1))}
                 disabled={page <= 1 || isLoading}
               >
-                Previous
+                {tr("common.actions.previous")}
               </Button>
               <span className="text-muted-foreground text-xs tabular-nums">
-                Page <span className="text-foreground font-semibold">{page}</span> of {totalPages}
+                {tr("pages.requests.page")}{" "}
+                <span className="text-foreground font-semibold">{page}</span>{" "}
+                {tr("pages.requests.of")} {totalPages}
               </span>
               <Button
                 variant="outline"
@@ -709,7 +759,7 @@ function SearchResultsView({
                 onClick={() => onPageChange(page + 1)}
                 disabled={page >= totalPages || isLoading}
               >
-                Next
+                {tr("common.actions.next")}
               </Button>
             </div>
           )}
@@ -724,28 +774,29 @@ function MineSummary({
 }: {
   counts: { pending: number; inFlight: number; completed: number; issues: number };
 }) {
+  useUILanguage();
   const chips: Array<{ label: string; value: number; tone: string }> = [];
   if (counts.pending > 0)
     chips.push({
-      label: "Pending review",
+      label: tr("pages.requests.pending_review"),
       value: counts.pending,
       tone: "bg-amber-500/15 text-amber-100 ring-amber-400/40",
     });
   if (counts.inFlight > 0)
     chips.push({
-      label: "In motion",
+      label: tr("pages.requests.in_motion"),
       value: counts.inFlight,
       tone: "bg-sky-500/15 text-sky-100 ring-sky-400/40",
     });
   if (counts.completed > 0)
     chips.push({
-      label: "Ready to watch",
+      label: tr("pages.requests.ready_to_watch"),
       value: counts.completed,
       tone: "bg-emerald-500/15 text-emerald-100 ring-emerald-400/40",
     });
   if (counts.issues > 0)
     chips.push({
-      label: "Need attention",
+      label: tr("pages.requests.need_attention"),
       value: counts.issues,
       tone: "bg-red-500/15 text-red-100 ring-red-400/40",
     });
@@ -771,19 +822,22 @@ function MineSummary({
 }
 
 function EmptyMineState() {
+  useUILanguage();
   return (
     <div className="border-border/60 bg-card/40 mx-4 flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed px-6 py-16 text-center sm:mx-6 lg:mx-10 xl:mx-12">
       <Sparkles className="h-6 w-6 text-amber-300/70" />
-      <p className="text-foreground text-base font-semibold">Your wishlist is empty.</p>
+      <p className="text-foreground text-base font-semibold">
+        {tr("pages.requests.your_wishlist_is_empty")}
+      </p>
       <p className="text-muted-foreground max-w-sm text-sm">
-        Browse the Discover tab or search above. The moment you request something, it'll show up
-        here with live status.
+        {tr("pages.requests.browse_the_discover_tab_or_search_above_the_moment_you")}
       </p>
     </div>
   );
 }
 
 function EmptyPanel({ title, detail }: { title: string; detail: string }) {
+  useUILanguage();
   return (
     <div className="border-border/60 bg-card/40 mx-4 flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-6 py-12 text-center sm:mx-6 lg:mx-10 xl:mx-12">
       <p className="text-foreground text-sm font-semibold">{title}</p>
@@ -793,6 +847,7 @@ function EmptyPanel({ title, detail }: { title: string; detail: string }) {
 }
 
 function DiscoveryCarouselSkeleton() {
+  useUILanguage();
   return (
     <div className="space-y-10">
       {Array.from({ length: 3 }).map((_, sectionIndex) => (
@@ -817,6 +872,7 @@ function DiscoveryCarouselSkeleton() {
 }
 
 function SearchGridSkeleton() {
+  useUILanguage();
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
       {Array.from({ length: 16 }).map((_, i) => (

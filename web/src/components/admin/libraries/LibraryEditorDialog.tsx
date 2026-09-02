@@ -20,6 +20,8 @@ import { libraryTypeMeta } from "./libraryTypes";
 import { LibraryPosterSection } from "./LibraryPosterSection";
 import { useLibraryForm } from "./useLibraryForm";
 import type { LibraryFormErrors } from "./useLibraryForm";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type SectionId = "general" | "folders" | "metadata" | "advanced";
 
@@ -32,31 +34,63 @@ const SECTIONS: Array<{
 }> = [
   {
     id: "general",
-    label: "General",
+    get label() {
+      return tr("components.admin.libraries.library_editor_dialog.general");
+    },
     icon: Settings2,
-    title: "General",
-    description: "Name this library and choose the kind of media it holds.",
+    get title() {
+      return tr("components.admin.libraries.library_editor_dialog.general");
+    },
+    get description() {
+      return tr(
+        "components.admin.libraries.library_editor_dialog.name_this_library_and_choose_the_kind_of_media_it",
+      );
+    },
   },
   {
     id: "folders",
-    label: "Folders",
+    get label() {
+      return tr("components.admin.libraries.library_editor_dialog.folders");
+    },
     icon: FolderOpen,
-    title: "Folders",
-    description: "Silo scans these folders for media and watches them for changes.",
+    get title() {
+      return tr("components.admin.libraries.library_editor_dialog.folders");
+    },
+    get description() {
+      return tr(
+        "components.admin.libraries.library_editor_dialog.silo_scans_these_folders_for_media_and_watches_them_for",
+      );
+    },
   },
   {
     id: "metadata",
-    label: "Metadata",
+    get label() {
+      return tr("components.admin.libraries.library_editor_dialog.metadata");
+    },
     icon: Database,
-    title: "Metadata",
-    description: "Control where artwork and descriptions come from, and in which language.",
+    get title() {
+      return tr("components.admin.libraries.library_editor_dialog.metadata");
+    },
+    get description() {
+      return tr(
+        "components.admin.libraries.library_editor_dialog.control_where_artwork_and_descriptions_come_from_and_in_which",
+      );
+    },
   },
   {
     id: "advanced",
-    label: "Advanced",
+    get label() {
+      return tr("components.admin.libraries.library_editor_dialog.advanced");
+    },
     icon: SlidersHorizontal,
-    title: "Advanced",
-    description: "Optional background processing for this library.",
+    get title() {
+      return tr("components.admin.libraries.library_editor_dialog.advanced");
+    },
+    get description() {
+      return tr(
+        "components.admin.libraries.library_editor_dialog.optional_background_processing_for_this_library",
+      );
+    },
   },
 ];
 
@@ -102,6 +136,7 @@ function LibraryEditorBody({
   chapterThumbnailsSupported: boolean;
   onClose: () => void;
 }) {
+  useUILanguage();
   const [section, setSection] = useState<SectionId>("general");
   const form = useLibraryForm({ library, onClose });
 
@@ -128,11 +163,22 @@ function LibraryEditorBody({
             <typeMeta.icon className="size-5" />
           </div>
           <div className="min-w-0 space-y-0.5 text-left">
-            <DialogTitle>{library ? "Edit Library" : "Add Library"}</DialogTitle>
+            <DialogTitle>
+              {library
+                ? tr("components.admin.libraries.library_editor_dialog.edit_library")
+                : tr("components.admin.libraries.library_editor_dialog.add_library")}
+            </DialogTitle>
             <DialogDescription className="truncate text-xs">
               {library
-                ? `Configure how “${library.name}” is scanned and matched.`
-                : "Set up a new library from folders on your server."}
+                ? tr(
+                    "components.admin.libraries.library_editor_dialog.configure_how_name_is_scanned_and_matched",
+                    {
+                      name: library.name,
+                    },
+                  )
+                : tr(
+                    "components.admin.libraries.library_editor_dialog.set_up_a_new_library_from_folders_on_your_server",
+                  )}
             </DialogDescription>
           </div>
         </div>
@@ -208,17 +254,17 @@ function LibraryEditorBody({
         ) : null}
         <DialogClose asChild>
           <Button type="button" variant="ghost">
-            Cancel
+            {tr("common.actions.cancel")}
           </Button>
         </DialogClose>
         <Button type="submit" disabled={form.isPending}>
           {form.isPending
             ? library
-              ? "Saving…"
-              : "Creating…"
+              ? tr("components.admin.libraries.library_editor_dialog.saving")
+              : tr("components.admin.libraries.library_editor_dialog.creating")
             : library
-              ? "Save Changes"
-              : "Create Library"}
+              ? tr("components.admin.libraries.library_editor_dialog.save_changes")
+              : tr("components.admin.libraries.library_editor_dialog.create_library")}
         </Button>
       </div>
     </form>

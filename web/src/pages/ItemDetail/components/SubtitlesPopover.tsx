@@ -23,6 +23,8 @@ import {
   type PrePlaySubtitleCandidate,
 } from "./prePlaySelection";
 import DetailPopover from "./DetailPopover";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SubtitlesPopoverProps {
   version: FileVersion | null;
@@ -48,21 +50,23 @@ function SubtitleFlagBadges({
   hearingImpaired?: boolean;
   isDefault?: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <>
       {forced && (
         <Badge variant="outline" className="px-1.5 py-0 text-[10px] uppercase">
-          Forced
+          {tr("pages.item_detail.components.subtitles_popover.forced")}
         </Badge>
       )}
       {hearingImpaired && (
         <Badge variant="outline" className="px-1.5 py-0 text-[10px] uppercase">
-          HI
+          {tr("pages.item_detail.components.subtitles_popover.hi")}
         </Badge>
       )}
       {isDefault && (
         <Badge variant="outline" className="px-1.5 py-0 text-[10px] uppercase">
-          Default
+          {tr("pages.item_detail.components.subtitles_popover.default")}
         </Badge>
       )}
     </>
@@ -82,6 +86,8 @@ function SelectionRow({
   badges?: ReactNode;
   onSelect?: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const content = (
     <>
       <div className="min-w-0 flex-1">
@@ -105,9 +111,10 @@ function SelectionRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
-        active ? "bg-accent/50" : "hover:bg-accent/30"
-      }`}
+      className={
+        "flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors " +
+        (active ? "bg-accent/50" : "hover:bg-accent/30")
+      }
     >
       {content}
     </button>
@@ -125,6 +132,8 @@ function SubtitleSection({
   activeSelection: PrePlaySubtitleSelection | null;
   onSelectSubtitle?: (selection: PrePlaySubtitleSelection) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   if (rows.length === 0) return null;
 
   return (
@@ -204,6 +213,8 @@ export default function SubtitlesPopover({
   onSelectSubtitleOff,
   onResetSelection,
 }: SubtitlesPopoverProps) {
+  useUILanguage();
+  useUILanguage();
   const [open, setOpen] = useState(false);
   // Downloaded subtitles normally load lazily on open, but when the saved
   // preference points at one, the closed trigger's Auto summary needs them
@@ -277,7 +288,7 @@ export default function SubtitlesPopover({
           className="h-8 max-w-full min-w-0 shrink gap-1.5 rounded-full px-3 text-xs font-medium"
         >
           <Captions className="size-3.5" />
-          Subs
+          {tr("pages.item_detail.components.subtitles_popover.subs")}
           <span className="text-muted-foreground max-w-44 truncate text-[11px] font-normal sm:max-w-64">
             {isInteractive ? activeSummary : candidates.all.length}
           </span>
@@ -290,27 +301,30 @@ export default function SubtitlesPopover({
           <>
             <SelectionRow
               active={selectionMode === "auto" && !overrideCandidate}
-              title="Auto"
+              title={tr("pages.item_detail.components.subtitles_popover.auto")}
               description={
-                overrideCandidate ? "Reset to profile defaults" : (autoCandidate?.summary ?? "Off")
+                overrideCandidate
+                  ? tr("pages.item_detail.components.subtitles_popover.reset_to_profile_defaults")
+                  : (autoCandidate?.summary ??
+                    tr("pages.item_detail.components.subtitles_popover.off"))
               }
               onSelect={onResetSelection}
             />
             <SelectionRow
               active={selectionMode === "off"}
-              title="Off"
+              title={tr("pages.item_detail.components.subtitles_popover.off")}
               onSelect={onSelectSubtitleOff}
             />
           </>
         )}
         <SubtitleSection
-          title="Embedded"
+          title={tr("pages.item_detail.components.subtitles_popover.embedded")}
           rows={candidates.embedded}
           activeSelection={activeListSelection}
           onSelectSubtitle={onSelectSubtitle}
         />
         <SubtitleSection
-          title="External"
+          title={tr("pages.item_detail.components.subtitles_popover.external")}
           rows={candidates.external}
           activeSelection={activeListSelection}
           onSelectSubtitle={onSelectSubtitle}
@@ -318,18 +332,20 @@ export default function SubtitlesPopover({
         {downloadedQuery.isLoading ? (
           <div className="text-muted-foreground flex items-center gap-2 px-3 py-2 text-xs">
             <Loader2 className="size-3 animate-spin" />
-            Loading downloaded...
+            {tr("pages.item_detail.components.subtitles_popover.loading_downloaded")}
           </div>
         ) : (
           <SubtitleSection
-            title="Downloaded"
+            title={tr("pages.item_detail.components.subtitles_popover.downloaded")}
             rows={candidates.downloaded}
             activeSelection={activeListSelection}
             onSelectSubtitle={onSelectSubtitle}
           />
         )}
         {candidates.all.length === 0 && !downloadedQuery.isLoading && (
-          <div className="text-muted-foreground px-3 py-2 text-sm">No subtitles available.</div>
+          <div className="text-muted-foreground px-3 py-2 text-sm">
+            {tr("pages.item_detail.components.subtitles_popover.no_subtitles_available")}
+          </div>
         )}
       </div>
     </DetailPopover>

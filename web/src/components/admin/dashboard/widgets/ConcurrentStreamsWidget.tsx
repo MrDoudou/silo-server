@@ -13,6 +13,8 @@ import { useWidgetRange } from "../widgetChrome";
 import { WidgetRangePicker } from "../WidgetRangePicker";
 import { TimeseriesChartBody } from "./timeseriesChart";
 import { buildTimeseriesPoints } from "./timeseriesSeries";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Concurrent playback sessions over the chosen window, one point per bucket the
@@ -24,6 +26,7 @@ import { buildTimeseriesPoints } from "./timeseriesSeries";
  * minute, so the summit of a spike survives being zoomed out.
  */
 export function ConcurrentStreamsWidget() {
+  useUILanguage();
   const { range } = useWidgetRange();
   const query = useAdminTimeseries(rangeHours(range));
   const points = useMemo(
@@ -37,11 +40,12 @@ export function ConcurrentStreamsWidget() {
     <Card className="h-full">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between gap-2 space-y-0 pb-3">
         <CardTitle className="text-sm font-bold">
-          {rangeTitle("Concurrent streams", range)}
+          {rangeTitle("components.admin.dashboard.registry.concurrent_streams", range)}
         </CardTitle>
         <div className="flex min-w-0 items-center gap-2">
           <span className="text-muted-foreground text-[11px] tabular-nums">
-            Peak {peak.toLocaleString()}
+            {tr("components.admin.dashboard.widgets.concurrent_streams_widget.peak")}{" "}
+            {peak.toLocaleString()}
           </span>
           <WidgetRangePicker />
         </div>
@@ -50,10 +54,19 @@ export function ConcurrentStreamsWidget() {
         <TimeseriesChartBody
           query={query}
           points={points}
-          seriesLabel="Streams"
-          ariaLabel={`Concurrent streams over ${rangePhrase(range)}`}
-          errorMessage="Failed to load stream history."
-          emptyMessage="No stream samples yet"
+          seriesLabel={tr("components.admin.dashboard.widgets.concurrent_streams_widget.streams")}
+          ariaLabel={tr(
+            "components.admin.dashboard.widgets.concurrent_streams_widget.concurrent_streams_over_value1",
+            {
+              value1: rangePhrase(range),
+            },
+          )}
+          errorMessage={tr(
+            "components.admin.dashboard.widgets.concurrent_streams_widget.failed_to_load_stream_history",
+          )}
+          emptyMessage={tr(
+            "components.admin.dashboard.widgets.concurrent_streams_widget.no_stream_samples_yet",
+          )}
           formatTimestamp={(t) => formatRangeTimestamp(range, t, { withTime: true })}
           edgeLabels={rangeEdgeLabels(range)}
           minTickStep={1}

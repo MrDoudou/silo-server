@@ -216,7 +216,7 @@ describe("item query helpers", () => {
     const context = options.onMutate?.(variables);
 
     options.onError?.(new Error("Artwork download failed"), variables, context);
-    expect(mocks.toastError).toHaveBeenCalledWith("Artwork download failed", {
+    expect(mocks.toastError).toHaveBeenCalledWith("Refresh failed", {
       id: "refresh-toast",
     });
   });
@@ -297,7 +297,7 @@ describe("item query helpers", () => {
       user_data: { played: false },
       user_state: { played: false, is_favorite: true, in_watchlist: false },
     });
-    expect(mocks.toastError).toHaveBeenCalledWith("boom");
+    expect(mocks.toastError).toHaveBeenCalledWith("Failed to update watched state");
   });
 
   it("uses read toast copy and refreshes surfaces for ebook watched toggles", async () => {

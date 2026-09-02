@@ -18,6 +18,8 @@ import type { SectionItem } from "@/api/types";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { buildItemHref } from "@/lib/mediaNavigation";
 import CardPlayOverlay from "@/components/CardPlayOverlay";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SectionItemCardProps {
   item: SectionItem;
@@ -32,6 +34,7 @@ export default function SectionItemCard({
   overlayPrefs = null,
   quickActionMode = "none",
 }: SectionItemCardProps) {
+  useUILanguage();
   const { loaded, onLoad } = useImageLoaded(item.poster_url);
   const thumbhashUrl = item.poster_thumbhash ? decodeThumbhash(item.poster_thumbhash) : "";
   const itemHref = buildItemHref({ contentId: item.content_id, libraryId });
@@ -55,9 +58,10 @@ export default function SectionItemCard({
       <div className="group/media relative">
         <ViewTransitionLink to={itemHref} className="block overflow-hidden rounded-xl">
           <div
-            className={`media-card-image relative ${
-              item.type === "audiobook" ? "aspect-square" : "aspect-[2/3]"
-            }`}
+            className={
+              "media-card-image relative " +
+              (item.type === "audiobook" ? "aspect-square" : "aspect-[2/3]")
+            }
             style={
               thumbhashUrl
                 ? {
@@ -72,19 +76,24 @@ export default function SectionItemCard({
               <img
                 src={item.poster_url}
                 alt={item.title}
-                className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+                className={
+                  "h-full w-full object-cover transition-opacity duration-300 " +
+                  (loaded ? "opacity-100" : "opacity-0")
+                }
                 loading="lazy"
                 onLoad={onLoad}
               />
             ) : (
               <div className="text-muted-foreground flex h-full w-full flex-col items-center justify-center gap-1 p-3 text-center text-sm">
-                <span className="line-clamp-3 font-medium">{item.title || "No Poster"}</span>
+                <span className="line-clamp-3 font-medium">
+                  {item.title || tr("components.section_item_card.no_poster")}
+                </span>
               </div>
             )}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/55 to-transparent opacity-90" />
             {item.status === "ambiguous" && (
               <span className="absolute top-2.5 left-2.5 rounded-full border border-amber-500/25 bg-black/40 px-2 py-0.5 text-[10px] leading-none font-semibold tracking-wide text-amber-200 uppercase backdrop-blur-sm">
-                Ambiguous
+                {tr("components.section_item_card.ambiguous")}
               </span>
             )}
             {item.status === "matched" && overlayPrefs && (
@@ -95,9 +104,10 @@ export default function SectionItemCard({
                 {upcomingEvent.badges.map((badge) => (
                   <span
                     key={badge}
-                    className={`rounded-full border px-2 py-0.5 text-[10px] leading-none font-semibold tracking-wide uppercase backdrop-blur-sm ${upcomingBadgeClass(
-                      badge,
-                    )}`}
+                    className={
+                      "rounded-full border px-2 py-0.5 text-[10px] leading-none font-semibold tracking-wide uppercase backdrop-blur-sm " +
+                      upcomingBadgeClass(badge)
+                    }
                   >
                     {upcomingBadgeLabel(badge)}
                   </span>
@@ -172,7 +182,8 @@ export default function SectionItemCard({
               to={itemHref}
               className="text-muted-foreground mt-1 block truncate text-[11px] font-medium tracking-[0.14em] uppercase hover:underline"
             >
-              {item.year ? `${item.year}` : ""} {item.type === "series" ? "Series" : ""}
+              {item.year ? tr("components.section_item_card.year", { year: item.year }) : ""}{" "}
+              {item.type === "series" ? tr("components.section_item_card.series") : ""}
             </ViewTransitionLink>
           ) : null}
         </div>

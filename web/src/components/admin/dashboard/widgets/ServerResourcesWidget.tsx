@@ -6,9 +6,12 @@ import { formatRelativeTime } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { ResourceMetric } from "@/pages/adminNodesPresentation";
 import { describeResourceSample } from "@/pages/adminNodesPresentation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /** CPU, memory, disk, network, and GPU usage on the API host itself. */
 export function ServerResourcesWidget() {
+  useUILanguage();
   const pageActivity = usePageActivity();
   const resourcesQuery = useSystemResources(pageActivity.canPollDashboard);
 
@@ -23,9 +26,14 @@ export function ServerResourcesWidget() {
   return (
     <Card className="h-full">
       <CardHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-sm font-bold">Server resources</CardTitle>
+        <CardTitle className="text-sm font-bold">
+          {tr("components.admin.dashboard.widgets.server_resources_widget.server_resources")}
+        </CardTitle>
         {sampledLabel ? (
-          <span className="text-muted-foreground text-[11px]">Sampled {sampledLabel}</span>
+          <span className="text-muted-foreground text-[11px]">
+            {tr("components.admin.dashboard.widgets.server_resources_widget.sampled")}{" "}
+            {sampledLabel}
+          </span>
         ) : null}
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
@@ -53,6 +61,7 @@ export function ServerResourcesWidget() {
 }
 
 function ResourceMetricBox({ metric }: { metric: ResourceMetric }) {
+  useUILanguage();
   return (
     <div className="border-border/60 rounded-lg border p-3" title={metric.title}>
       <div className="text-muted-foreground text-xs">{metric.label}</div>

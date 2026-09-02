@@ -2,6 +2,8 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { EpisodesResponse, ItemDetail, SeasonsResponse } from "@/api/types";
 import { catalogKeys, ebookKeys, episodeKeys, itemKeys, progressKeys } from "@/hooks/queries/keys";
 
+import { tr } from "@/i18n/translate";
+
 type WatchedStateItem = Pick<
   ItemDetail,
   "content_id" | "type" | "series_id" | "season_number" | "user_data"
@@ -43,12 +45,24 @@ export function getWatchedActionLabel(item: Pick<ItemDetail, "type" | "user_data
 export function getWatchedToastMessage(item: Pick<ItemDetail, "type">, played: boolean): string {
   switch (item.type) {
     case "audiobook":
-      return played ? "Marked as listened" : "Marked as unlistened";
+      return tr(
+        played
+          ? "feedback.item_detail.watched_state.marked_as_listened"
+          : "feedback.item_detail.watched_state.marked_as_unlistened",
+      );
     case "ebook":
     case "manga":
-      return played ? "Marked as read" : "Marked as unread";
+      return tr(
+        played
+          ? "feedback.item_detail.watched_state.marked_as_read"
+          : "feedback.item_detail.watched_state.marked_as_unread",
+      );
     default:
-      return played ? "Marked as watched" : "Marked as unwatched";
+      return tr(
+        played
+          ? "feedback.item_detail.watched_state.marked_as_watched"
+          : "feedback.item_detail.watched_state.marked_as_unwatched",
+      );
   }
 }
 

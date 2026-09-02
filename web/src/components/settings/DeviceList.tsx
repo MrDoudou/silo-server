@@ -10,11 +10,13 @@ import {
 } from "@/components/admin/deviceOverrides";
 import { deviceRecencyGroup, type DeviceRecencyGroup } from "@/hooks/queries/devices";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const GROUP_TITLES: Record<DeviceRecencyGroup, string> = {
-  current: "Using now",
-  week: "This week",
-  earlier: "Earlier",
+  current: "components.settings.device_list.using_now",
+  week: "components.settings.device_list.this_week",
+  earlier: "components.settings.device_list.earlier",
 };
 
 const GROUP_ORDER: DeviceRecencyGroup[] = ["current", "week", "earlier"];
@@ -83,6 +85,7 @@ export function DeviceList({
   ownProfileId,
   now,
 }: DeviceListProps) {
+  useUILanguage();
   const [showDormant, setShowDormant] = useState(false);
   // Counts come from the unfiltered list so a chip keeps showing how many
   // devices it would reveal, rather than collapsing to zero once another chip
@@ -121,14 +124,20 @@ export function DeviceList({
 
   const sections = useMemo(() => {
     if (groupByProfile && !profileFilter) {
-      const byProfile = new Map<string, { title: string; devices: UserDevice[] }>();
+      const byProfile = new Map<
+        string,
+        { title: string; titleIsTranslationKey: boolean; devices: UserDevice[] }
+      >();
       for (const device of filtered) {
         const existing = byProfile.get(device.profile_id);
         if (existing) {
           existing.devices.push(device);
         } else {
           byProfile.set(device.profile_id, {
-            title: device.profile_name || "Other profile",
+            get title() {
+              return device.profile_name || tr("components.settings.device_list.other_profile");
+            },
+            titleIsTranslationKey: false,
             devices: [device],
           });
         }
@@ -138,6 +147,7 @@ export function DeviceList({
 
     return GROUP_ORDER.map((group) => ({
       title: GROUP_TITLES[group],
+      titleIsTranslationKey: true,
       devices: filtered.filter((device) => deviceRecencyGroup(device, now) === group),
     })).filter((section) => section.devices.length > 0);
   }, [filtered, groupByProfile, profileFilter, now]);
@@ -149,8 +159,11 @@ export function DeviceList({
         <Input
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder={`Search ${devices.length} ${devices.length === 1 ? "device" : "devices"}`}
-          aria-label="Search devices"
+          placeholder={tr("components.settings.device_list.search_length_value", {
+            length: devices.length,
+            value: devices.length === 1 ? "device" : "devices",
+          })}
+          aria-label={tr("components.settings.device_list.search_devices")}
           // text-base on mobile: iOS Safari zooms the viewport when a focused
           // input's font is under 16px, and the zoom does not undo itself.
           className="h-11 pl-8 text-base xl:h-9 xl:text-[13px]"
@@ -165,10 +178,10 @@ export function DeviceList({
         <div
           className="flex gap-1.5 overflow-x-auto px-0.5 pt-2 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] xl:flex-wrap xl:gap-1 xl:overflow-visible [&::-webkit-scrollbar]:hidden"
           role="group"
-          aria-label="Filter by profile"
+          aria-label={tr("components.settings.device_list.filter_by_profile")}
         >
           <ProfileChip
-            label="Everyone"
+            label={tr("components.settings.device_list.everyone")}
             count={devices.length}
             active={profileFilter === null}
             onClick={() => onProfileFilterChange(null)}
@@ -190,10 +203,10 @@ export function DeviceList({
       {sections.length === 0 ? (
         <p className="text-muted-foreground px-2 py-6 text-center text-[13px]">
           {devices.length === 0
-            ? "No devices yet."
+            ? tr("components.settings.device_list.no_devices_yet")
             : searching
-              ? "No devices match that search."
-              : "Nothing here. Try showing unused devices."}
+              ? tr("components.settings.device_list.no_devices_match_that_search")
+              : tr("components.settings.device_list.nothing_here_try_showing_unused_devices")}
         </p>
       ) : null}
 
@@ -205,7 +218,7 @@ export function DeviceList({
         {sections.map((section) => (
           <section key={section.title}>
             <h3 className="text-muted-foreground bg-surface sticky top-0 z-10 px-2 pt-3 pb-1 text-[10.5px] font-semibold tracking-[0.09em] uppercase">
-              {section.title}
+              {section.titleIsTranslationKey ? tr(section.title) : section.title}
             </h3>
             <ul>
               {section.devices.map((device) => (
@@ -232,8 +245,11 @@ export function DeviceList({
           className="text-muted-foreground hover:text-foreground mt-1 inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-xl text-[13px] transition-colors xl:min-h-9"
         >
           {showDormant
-            ? "Hide unused devices"
-            : `Show ${dormantCount} unused ${dormantCount === 1 ? "device" : "devices"}`}
+            ? tr("components.settings.device_list.hide_unused_devices")
+            : tr("components.settings.device_list.show_dormant_count_unused_value", {
+                dormantCount: dormantCount,
+                value: dormantCount === 1 ? "device" : "devices",
+              })}
         </button>
       ) : null}
     </div>
@@ -286,6 +302,7 @@ function ProfileChip({
   active: boolean;
   onClick: () => void;
 }) {
+  useUILanguage();
   return (
     <button
       type="button"
@@ -293,7 +310,11 @@ function ProfileChip({
       aria-pressed={active}
       // The visible label and the count are separate elements, so without this
       // a screen reader announces them run together as "Everyone3".
-      aria-label={`${label}, ${count} ${count === 1 ? "device" : "devices"}`}
+      aria-label={tr("components.settings.device_list.label_count_value", {
+        label: label,
+        count: count,
+        value: count === 1 ? "device" : "devices",
+      })}
       className={cn(
         "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium whitespace-nowrap transition-colors xl:min-h-0 xl:px-2.5 xl:py-1 xl:text-[12px]",
         active
@@ -322,6 +343,7 @@ function DeviceRow({
   onSelect: (device: UserDevice) => void;
   now: number;
 }) {
+  useUILanguage();
   const kind = classifyPlatform(device.device_platform);
   return (
     <button
@@ -341,18 +363,18 @@ function DeviceRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium xl:text-[13px]">
-          {device.device_name || "Unknown device"}
+          {device.device_name || tr("components.settings.device_list.unknown_device")}
         </span>
         <span className="text-muted-foreground block truncate text-[12.5px] xl:text-[11.5px]">
           {device.is_current_device
-            ? "This is the device you're on"
+            ? tr("components.settings.device_list.this_is_the_device_you_re_on")
             : lastSeenLabel(device.last_seen_at, now)}
         </span>
       </span>
       {device.is_current_device ? (
         <span
           className="bg-success h-1.5 w-1.5 shrink-0 rounded-full"
-          aria-label="You're on this device"
+          aria-label={tr("components.settings.device_list.you_re_on_this_device")}
         />
       ) : null}
       <ChangedCount count={device.changed_count} />
@@ -363,9 +385,13 @@ function DeviceRow({
 }
 
 function ChangedCount({ count }: { count: number }) {
+  useUILanguage();
   if (count <= 0) {
     return (
-      <span className="text-muted-foreground/50 shrink-0 text-[11px]" aria-label="Nothing changed">
+      <span
+        className="text-muted-foreground/50 shrink-0 text-[11px]"
+        aria-label={tr("components.settings.device_list.nothing_changed")}
+      >
         —
       </span>
     );
@@ -373,7 +399,10 @@ function ChangedCount({ count }: { count: number }) {
   return (
     <span
       className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 text-[11px] font-semibold text-amber-300"
-      aria-label={`${count} ${count === 1 ? "setting" : "settings"} changed here`}
+      aria-label={tr("components.settings.device_list.count_value_changed_here", {
+        count: count,
+        value: count === 1 ? "setting" : "settings",
+      })}
     >
       {count}
     </span>

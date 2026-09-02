@@ -20,6 +20,8 @@ import { isAudiobookLibraryType } from "./libraryPageSearchParams";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { carouselCardWidthClasses } from "@/lib/uiCustomization";
 import { useSectionRefreshSignal } from "./homeSurfaceRefresh";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface LibraryRecommendedProps {
   libraryId: number;
@@ -41,6 +43,7 @@ export default function LibraryRecommended({
   libraryType = "",
   onHeroStateChange,
 }: LibraryRecommendedProps) {
+  useUILanguage();
   const queryClient = useQueryClient();
   const { data, isLoading } = useLibraryLayout(libraryId);
   const { data: sectionRefreshSignal = 0 } = useSectionRefreshSignal();
@@ -250,14 +253,14 @@ function renderHeroSlot(
       <section className="px-4 pt-24 sm:px-6 lg:px-10 xl:px-12">
         <div className="surface-panel flex items-center justify-between rounded-[1.8rem] border-0 px-5 py-6">
           <p className="text-muted-foreground text-sm">
-            The featured section could not be loaded right now.
+            {tr("pages.library_recommended.the_featured_section_could_not_be_loaded_right_now")}
           </p>
           <button
             type="button"
             onClick={() => retrySection(hero.layout.id)}
             className="border-border hover:bg-muted/40 rounded-lg border px-4 py-2 text-sm font-medium"
           >
-            Retry section
+            {tr("pages.library_recommended.retry_section")}
           </button>
         </div>
       </section>
@@ -268,10 +271,11 @@ function renderHeroSlot(
     return null;
   }
 
-  return <Skeleton className={`w-full rounded-none ${HERO_BANNER_SIZE_TALL}`} />;
+  return <Skeleton className={"w-full rounded-none " + HERO_BANNER_SIZE_TALL} />;
 }
 
 function SectionLoadingRow({ title }: { title: string }) {
+  useUILanguage();
   return (
     <MediaCarousel title={title} loading>
       {null}
@@ -280,17 +284,20 @@ function SectionLoadingRow({ title }: { title: string }) {
 }
 
 function SectionErrorRow({ title, onRetry }: { title: string; onRetry: () => void }) {
+  useUILanguage();
   return (
     <section className="space-y-3 px-4 sm:px-6 lg:px-10 xl:px-12">
       <h2 className="text-foreground text-xl font-semibold tracking-tight">{title}</h2>
       <div className="surface-panel flex items-center justify-between rounded-[1.4rem] border-0 px-5 py-4">
-        <p className="text-muted-foreground text-sm">This section could not be loaded right now.</p>
+        <p className="text-muted-foreground text-sm">
+          {tr("pages.library_recommended.this_section_could_not_be_loaded_right_now")}
+        </p>
         <button
           type="button"
           onClick={onRetry}
           className="border-border hover:bg-muted/40 rounded-lg border px-4 py-2 text-sm font-medium"
         >
-          Retry
+          {tr("common.actions.retry")}
         </button>
       </div>
     </section>
@@ -298,6 +305,7 @@ function SectionErrorRow({ title, onRetry }: { title: string; onRetry: () => voi
 }
 
 function PinnedCollections({ libraryId }: { libraryId: number }) {
+  useUILanguage();
   const { pins } = useSidebarPins();
   const pinnedCollections = (pins[String(libraryId)] ?? []).filter(
     (pin) => pin.type === "collection",
@@ -326,6 +334,7 @@ function PinnedCollectionCarousel({
   collectionId: string;
   name: string;
 }) {
+  useUILanguage();
   const { data: items, isLoading } = useLibraryCollectionItems(libraryId, collectionId);
   const { prefs: overlayPrefs, quickActionMode } = useOverlayPrefs();
   const { cardPresentation } = useUICustomization();

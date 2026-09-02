@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback, type RefObject } from "react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { useReportMediaProgress } from "@/hooks/queries/progress";
 import { buildPlayerChapters, nextChapterStart, prevChapterStart } from "@/lib/audiobooks/chapters";
 import type { AudiobookFile } from "@/lib/audiobooks/types";
@@ -32,6 +33,8 @@ import { buildReplanRequestV3, buildStartRequestV3 } from "@/player/playback-ses
 import type { SleepSetting } from "@/player/components/SleepTimerMenu";
 import { smartRewindSeconds } from "./smartRewind";
 import { clampAudiobookRate, getBookRate, setBookRate } from "./useAudiobookPrefs";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const REPORT_INTERVAL_MS = 10_000;
 
@@ -213,6 +216,7 @@ export function useAudiobookPlayback({
   smartRewindEnabled = true,
   onStopRequested,
 }: UseAudiobookPlaybackOptions): AudiobookPlayback {
+  useUILanguage();
   const config = usePlayerConfig();
   // The same probe the video player uses: its audio codecs are already tested
   // against `audio/mp4` as well as `video/mp4`, so an audio-only source is
@@ -364,8 +368,9 @@ export function useAudiobookPlayback({
       if (!plan || !sessionId || !playbackAttemptId || replanInFlightPlanKeyRef.current) return;
       if (failedPlanKeyRef.current === plan.plan_attempt_key) return;
       if (attemptCountRef.current > MAX_ATTEMPT_COUNT_V3) {
-        toast.error("Playback failed", {
-          description: "Audiobook playback failed after repeated recovery attempts.",
+        toast.error("errors.audiobooks.player.use_audiobook_playback.playback_failed", {
+          description:
+            "pages.audiobooks.player.use_audiobook_playback.audiobook_playback_failed_after_repeated_recovery_attempts",
         });
         return;
       }
@@ -431,8 +436,12 @@ export function useAudiobookPlayback({
           const terminal = decision.terminal
             ? describePlanTerminal(decision.terminal)
             : {
-                title: "Playback unavailable",
-                message: "This server could not recover audiobook playback.",
+                title: tr("pages.audiobooks.player.use_audiobook_playback.playback_unavailable"),
+                get message() {
+                  return tr(
+                    "pages.audiobooks.player.use_audiobook_playback.this_server_could_not_recover_audiobook_playback",
+                  );
+                },
               };
           void reportRouteEventV3(config, {
             event: "terminal",
@@ -443,7 +452,10 @@ export function useAudiobookPlayback({
             planAttemptKey: expectedPlanKey,
             ...(decision.terminal ? { fallbackReason: decision.terminal.reason } : {}),
           });
-          toast.error(terminal.title, { description: terminal.message });
+          toast.error("errors.audiobooks.player.use_audiobook_playback.reported_message", {
+            values: { message: tr.remote({ message: terminal.title }) },
+            resolvedDescription: tr.remote({ message: terminal.message }),
+          });
           return;
         }
 
@@ -460,7 +472,10 @@ export function useAudiobookPlayback({
           failedPlanKeyRef.current = null;
         }
         console.error("audiobook playback recovery failed", err);
-        toast.error(err instanceof Error ? err.message : "Failed to recover audiobook playback");
+        toast.error(
+          "errors.audiobooks.player.use_audiobook_playback.failed_to_recover_audiobook_playback",
+          { error: err },
+        );
       } finally {
         if (replanInFlightPlanKeyRef.current === expectedPlanKey) {
           replanInFlightPlanKeyRef.current = null;
@@ -584,8 +599,12 @@ export function useAudiobookPlayback({
           const failure = decision.terminal
             ? describePlanTerminal(decision.terminal)
             : {
-                title: "Playback unavailable",
-                message: "This server is not accepting playback requests right now.",
+                title: tr("pages.audiobooks.player.use_audiobook_playback.playback_unavailable"),
+                get message() {
+                  return tr(
+                    "pages.audiobooks.player.use_audiobook_playback.this_server_is_not_accepting_playback_requests_right_now",
+                  );
+                },
               };
           void reportRouteEventV3(config, {
             event: "terminal",
@@ -593,7 +612,10 @@ export function useAudiobookPlayback({
             ...(decision.session_id ? { sessionId: decision.session_id } : {}),
             ...(decision.terminal ? { fallbackReason: decision.terminal.reason } : {}),
           });
-          toast.error(failure.title, { description: failure.message });
+          toast.error("errors.audiobooks.player.use_audiobook_playback.reported_message", {
+            values: { message: tr.remote({ message: failure.title }) },
+            resolvedDescription: tr.remote({ message: failure.message }),
+          });
         }
         return;
       }
@@ -613,7 +635,10 @@ export function useAudiobookPlayback({
           playbackAttemptId,
           failureClassification: "transport_error",
         });
-        toast.error(err instanceof Error ? err.message : "Failed to start audiobook playback");
+        toast.error(
+          "errors.audiobooks.player.use_audiobook_playback.failed_to_start_audiobook_playback",
+          { error: err },
+        );
       }
     });
 
@@ -936,18 +961,24 @@ export function useAudiobookPlayback({
           return;
         }
         case "display_message":
-          toast.info(
-            readStringPayload(command.payload, "message") ?? "A server message was received.",
-          );
+          toast.info("feedback.audiobooks.player.use_audiobook_playback.reported_message", {
+            values: {
+              message:
+                readStringPayload(command.payload, "message") ?? "A server message was received.",
+            },
+          });
           return;
         case "server_restarting":
         case "server_shutting_down":
-          toast.warning(
-            readStringPayload(command.payload, "message") ??
-              (command.name === "server_restarting"
-                ? "Playback may end shortly while the server restarts."
-                : "Playback may end shortly while the server shuts down."),
-          );
+          toast.warning("feedback.audiobooks.player.use_audiobook_playback.reported_message", {
+            values: {
+              message:
+                readStringPayload(command.payload, "message") ??
+                (command.name === "server_restarting"
+                  ? "Playback may end shortly while the server restarts."
+                  : "Playback may end shortly while the server shuts down."),
+            },
+          });
           return;
         case "stop":
         case "terminate":

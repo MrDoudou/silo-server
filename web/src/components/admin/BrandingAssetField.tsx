@@ -8,6 +8,8 @@ import {
   type BrandingAssetKind,
 } from "@/hooks/queries/admin/branding";
 import { BRANDING_ASSET_SPECS } from "./brandingAssetSpecs";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface BrandingAssetFieldProps {
   label: string;
@@ -45,6 +47,7 @@ export function BrandingAssetField({
   previewBg,
   fallbackUrl,
 }: BrandingAssetFieldProps) {
+  useUILanguage();
   const inputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadBrandingAsset();
   const remove = useDeleteBrandingAsset();
@@ -78,7 +81,7 @@ export function BrandingAssetField({
           {shownUrl ? (
             <img
               src={shownUrl}
-              alt={`${label} preview`}
+              alt={tr("components.admin.branding_asset_field.label_preview", { label: label })}
               className={cn("h-full w-full object-contain", showingDefault && "opacity-40")}
             />
           ) : (
@@ -123,14 +126,16 @@ export function BrandingAssetField({
           ) : (
             <Upload className="h-3.5 w-3.5" />
           )}
-          {currentUrl ? "Replace" : "Upload"}
+          {currentUrl
+            ? tr("components.admin.branding_asset_field.replace")
+            : tr("common.actions.upload")}
         </button>
         {currentUrl && (
           <button
             type="button"
             onClick={() => remove.mutate({ kind })}
             disabled={busy}
-            aria-label={`Remove ${label}`}
+            aria-label={tr("components.admin.branding_asset_field.remove_label", { label: label })}
             className="text-muted-foreground hover:text-destructive inline-flex items-center rounded-lg border border-transparent p-1.5 transition-colors disabled:opacity-50"
           >
             {remove.isPending ? (

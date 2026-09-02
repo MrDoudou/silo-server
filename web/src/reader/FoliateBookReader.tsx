@@ -6,6 +6,9 @@ import type { FileVersion } from "@/api/types";
 import { ebookKeys } from "@/hooks/queries/keys";
 import type { EbookReaderAnnotation } from "@/reader/ebookReaderApi";
 import { DocumentLoader, type BookDoc, type TOCItem } from "@/reader/readest/libs/document";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 type FoliateViewElement = HTMLElement & {
   open: (book: BookDoc) => Promise<void>;
@@ -516,6 +519,7 @@ const FoliateBookReader = forwardRef<FoliateBookReaderHandle, FoliateBookReaderP
     },
     ref,
   ) {
+    useUILanguage();
     const queryClient = useQueryClient();
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<FoliateViewElement | null>(null);
@@ -880,7 +884,7 @@ const FoliateBookReader = forwardRef<FoliateBookReaderHandle, FoliateBookReaderP
             disposeOpenArtifacts();
             return;
           }
-          setError(err instanceof Error ? err.message : "Unable to open ebook");
+          setError(tr.error("errors.reader.foliate_book_reader.unable_to_open_ebook", err));
           setLoading(false);
         }
       }
@@ -925,7 +929,7 @@ const FoliateBookReader = forwardRef<FoliateBookReaderHandle, FoliateBookReaderP
         <div ref={containerRef} className="h-full w-full" />
         {loading && !error && (
           <div className="absolute inset-0 flex items-center justify-center bg-white text-sm text-neutral-500">
-            Loading reader...
+            {tr("reader.foliate_book_reader.loading_reader")}
           </div>
         )}
         {error && (

@@ -10,6 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [25, 50, 100];
 
@@ -41,6 +43,7 @@ export function TablePagination({
   isFetching = false,
   className,
 }: TablePaginationProps) {
+  useUILanguage();
   if (total <= 0) return null;
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -64,13 +67,15 @@ export function TablePagination({
     >
       <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
         <span className={cn("transition-opacity", isFetching && "opacity-60")}>
-          Showing <span className="text-foreground font-medium tabular-nums">{from}</span>–
-          <span className="text-foreground font-medium tabular-nums">{to}</span> of{" "}
+          {tr("components.ui.pagination.showing")}{" "}
+          <span className="text-foreground font-medium tabular-nums">{from}</span>–
+          <span className="text-foreground font-medium tabular-nums">{to}</span>{" "}
+          {tr("components.ui.pagination.of")}{" "}
           <span className="text-foreground font-medium tabular-nums">{total}</span> {noun}
         </span>
         {onPageSizeChange ? (
           <label className="flex items-center gap-2">
-            <span className="hidden sm:inline">Rows</span>
+            <span className="hidden sm:inline">{tr("components.ui.pagination.rows")}</span>
             <Select
               value={String(pageSize)}
               onValueChange={(value) => onPageSizeChange(Number(value))}
@@ -91,13 +96,16 @@ export function TablePagination({
       </div>
 
       {pageCount > 1 ? (
-        <nav aria-label="Pagination" className="flex items-center gap-1">
+        <nav
+          aria-label={tr("components.ui.pagination.pagination")}
+          className="flex items-center gap-1"
+        >
           <Button
             variant="outline"
             size="icon-sm"
             onClick={() => goTo(0)}
             disabled={safePage === 0}
-            aria-label="First page"
+            aria-label={tr("components.ui.pagination.first_page")}
           >
             <ChevronsLeft />
           </Button>
@@ -106,7 +114,7 @@ export function TablePagination({
             size="icon-sm"
             onClick={() => goTo(safePage - 1)}
             disabled={safePage === 0}
-            aria-label="Previous page"
+            aria-label={tr("components.ui.pagination.previous_page")}
           >
             <ChevronLeft />
           </Button>
@@ -116,7 +124,7 @@ export function TablePagination({
             {window.map((entry, index) =>
               entry === "ellipsis" ? (
                 <span
-                  key={`ellipsis-${index}`}
+                  key={"ellipsis-" + index}
                   className="text-muted-foreground/60 px-1 text-sm select-none"
                   aria-hidden="true"
                 >
@@ -129,7 +137,7 @@ export function TablePagination({
                   size="icon-sm"
                   className="tabular-nums"
                   onClick={() => goTo(entry)}
-                  aria-label={`Page ${entry + 1}`}
+                  aria-label={tr("components.ui.pagination.page_value", { value: entry + 1 })}
                   aria-current={entry === safePage ? "page" : undefined}
                 >
                   {entry + 1}
@@ -146,7 +154,7 @@ export function TablePagination({
             size="icon-sm"
             onClick={() => goTo(safePage + 1)}
             disabled={safePage >= pageCount - 1}
-            aria-label="Next page"
+            aria-label={tr("components.ui.pagination.next_page")}
           >
             <ChevronRight />
           </Button>
@@ -155,7 +163,7 @@ export function TablePagination({
             size="icon-sm"
             onClick={() => goTo(pageCount - 1)}
             disabled={safePage >= pageCount - 1}
-            aria-label="Last page"
+            aria-label={tr("components.ui.pagination.last_page")}
           >
             <ChevronsRight />
           </Button>

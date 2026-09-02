@@ -13,6 +13,8 @@ import { usePrefetchCatalogItemDetail } from "@/hooks/queries/catalogRead";
 import { useDwellPrefetch } from "@/hooks/useDwellPrefetch";
 import { useOverlayPrefs } from "@/hooks/useOverlayPrefs";
 import type { CardQuickActionMode } from "@/lib/cardQuickActions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface EpisodeCarouselProps {
   episodes: EpisodeListItem[];
@@ -25,6 +27,7 @@ export default function EpisodeCarousel({
   currentEpisodeNumber,
   episodeLinkState,
 }: EpisodeCarouselProps) {
+  useUILanguage();
   const currentEpisodeIndex = episodes.findIndex(
     (episode) => episode.episode_number === currentEpisodeNumber,
   );
@@ -51,7 +54,7 @@ export default function EpisodeCarousel({
             type="button"
             onClick={scrollPrev}
             className="from-background/90 absolute top-0 bottom-0 left-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-r to-transparent opacity-0 transition-opacity duration-200 group-hover/carousel:opacity-100 focus-visible:opacity-100"
-            aria-label="Scroll left"
+            aria-label={tr("pages.item_detail.components.episode_carousel.scroll_left")}
           >
             <ChevronLeft className="text-foreground h-6 w-6" />
           </button>
@@ -77,7 +80,7 @@ export default function EpisodeCarousel({
             type="button"
             onClick={scrollNext}
             className="from-background/90 absolute top-0 right-0 bottom-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-l to-transparent opacity-0 transition-opacity duration-200 group-hover/carousel:opacity-100 focus-visible:opacity-100"
-            aria-label="Scroll right"
+            aria-label={tr("pages.item_detail.components.episode_carousel.scroll_right")}
           >
             <ChevronRight className="text-foreground h-6 w-6" />
           </button>
@@ -100,6 +103,7 @@ function EpisodeCarouselCard({
   quickActionMode: CardQuickActionMode;
   onPrefetch: () => void;
 }) {
+  useUILanguage();
   const cardRef = useRef<HTMLDivElement>(null);
   const prefetchHandlers = useDwellPrefetch(onPrefetch);
   const thumbhashUrl = ep.still_thumbhash ? decodeThumbhash(ep.still_thumbhash) : "";
@@ -126,7 +130,7 @@ function EpisodeCarouselCard({
       >
         <div className="relative">
           <ViewTransitionLink
-            to={`/item/${ep.content_id}`}
+            to={"/item/" + ep.content_id}
             state={episodeLinkState}
             aria-current={isCurrent ? "page" : undefined}
             className="block"
@@ -163,7 +167,7 @@ function EpisodeCarouselCard({
                     <span className="bg-primary-foreground absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" />
                     <span className="bg-primary-foreground relative inline-flex size-1.5 rounded-full" />
                   </span>
-                  Now Viewing
+                  {tr("pages.item_detail.components.episode_carousel.now_viewing")}
                 </div>
               )}
               {progress != null && (
@@ -190,13 +194,15 @@ function EpisodeCarouselCard({
           />
         </div>
         <ViewTransitionLink
-          to={`/item/${ep.content_id}`}
+          to={"/item/" + ep.content_id}
           state={episodeLinkState}
           aria-current={isCurrent ? "page" : undefined}
           className="block"
         >
           <div className="text-muted-foreground/70 mt-2 flex items-center gap-2 text-xs">
-            <span>Episode {ep.episode_number}</span>
+            <span>
+              {tr("pages.item_detail.components.episode_carousel.episode")} {ep.episode_number}
+            </span>
             {ep.user_data?.played && <WatchedCheckIndicator className="ml-auto" />}
           </div>
           <p
@@ -205,7 +211,12 @@ function EpisodeCarouselCard({
           >
             {episodeTitle}
           </p>
-          {ep.runtime > 0 && <p className="text-muted-foreground/70 text-xs">{ep.runtime}m</p>}
+          {ep.runtime > 0 && (
+            <p className="text-muted-foreground/70 text-xs">
+              {ep.runtime}
+              {tr("pages.item_detail.components.episode_carousel.m")}
+            </p>
+          )}
         </ViewTransitionLink>
       </div>
     </li>

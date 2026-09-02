@@ -2,8 +2,11 @@ import { useId } from "react";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function AccessibilitySettings() {
+  useUILanguage();
   const { textScale, setTextScale, textWeight, setTextWeight, highContrast, setHighContrast } =
     useTheme();
 
@@ -13,16 +16,20 @@ export default function AccessibilitySettings() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Accessibility</h2>
+      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        {tr("pages.settings.accessibility_settings.accessibility")}
+      </h2>
 
       <SettingsGroup
-        title="Readability"
-        description="Increase text size, strengthen type weight, and raise contrast for clearer reading."
+        title={tr("pages.settings.accessibility_settings.readability")}
+        description={tr(
+          "pages.settings.accessibility_settings.increase_text_size_strengthen_type_weight_and_raise_contrast_for",
+        )}
       >
         <div className="space-y-4">
           <div className="space-y-2">
             <p id={textSizeLabelId} className="text-sm font-medium">
-              Text size
+              {tr("pages.settings.accessibility_settings.text_size")}
             </p>
             <div
               role="radiogroup"
@@ -30,9 +37,18 @@ export default function AccessibilitySettings() {
               className="flex flex-wrap gap-2"
             >
               {[
-                { value: "default" as const, label: "Default" },
-                { value: "large" as const, label: "Large" },
-                { value: "x-large" as const, label: "Extra Large" },
+                {
+                  value: "default" as const,
+                  label: tr("pages.settings.accessibility_settings.default"),
+                },
+                {
+                  value: "large" as const,
+                  label: tr("pages.settings.accessibility_settings.large"),
+                },
+                {
+                  value: "x-large" as const,
+                  label: tr("pages.settings.accessibility_settings.extra_large"),
+                },
               ].map((option) => (
                 <Button
                   key={option.value}
@@ -50,7 +66,7 @@ export default function AccessibilitySettings() {
 
           <div className="space-y-2">
             <p id={textWeightLabelId} className="text-sm font-medium">
-              Text weight
+              {tr("pages.settings.accessibility_settings.text_weight")}
             </p>
             <div
               role="radiogroup"
@@ -58,8 +74,14 @@ export default function AccessibilitySettings() {
               className="flex flex-wrap gap-2"
             >
               {[
-                { value: "default" as const, label: "Default" },
-                { value: "strong" as const, label: "Bolder" },
+                {
+                  value: "default" as const,
+                  label: tr("pages.settings.accessibility_settings.default"),
+                },
+                {
+                  value: "strong" as const,
+                  label: tr("pages.settings.accessibility_settings.bolder"),
+                },
               ].map((option) => (
                 <Button
                   key={option.value}
@@ -77,7 +99,7 @@ export default function AccessibilitySettings() {
 
           <div className="space-y-2">
             <p id={contrastLabelId} className="text-sm font-medium">
-              Contrast
+              {tr("pages.settings.accessibility_settings.contrast")}
             </p>
             <div
               role="radiogroup"
@@ -91,7 +113,7 @@ export default function AccessibilitySettings() {
                 size="sm"
                 onClick={() => setHighContrast(false)}
               >
-                Standard
+                {tr("pages.settings.accessibility_settings.standard")}
               </Button>
               <Button
                 role="radio"
@@ -100,7 +122,7 @@ export default function AccessibilitySettings() {
                 size="sm"
                 onClick={() => setHighContrast(true)}
               >
-                High Contrast
+                {tr("pages.settings.accessibility_settings.high_contrast")}
               </Button>
             </div>
           </div>
@@ -108,17 +130,26 @@ export default function AccessibilitySettings() {
       </SettingsGroup>
 
       <SettingsGroup
-        title="Preview"
-        description="See how text looks with your current readability settings."
+        title={tr("pages.settings.accessibility_settings.preview")}
+        description={tr(
+          "pages.settings.accessibility_settings.see_how_text_looks_with_your_current_readability_settings",
+        )}
       >
         <div className="border-border/50 space-y-2 rounded-lg border p-4">
-          <p className="text-lg font-semibold">The quick brown fox jumps over the lazy dog</p>
+          <p className="text-lg font-semibold">
+            {tr(
+              "pages.settings.accessibility_settings.the_quick_brown_fox_jumps_over_the_lazy_dog",
+            )}
+          </p>
           <p className="text-muted-foreground text-sm">
-            This sample paragraph reflects your current text size, weight, and contrast preferences.
-            Adjustments take effect across the entire interface.
+            {tr(
+              "pages.settings.accessibility_settings.this_sample_paragraph_reflects_your_current_text_size_weight_and",
+            )}
           </p>
           <p className="text-muted-foreground/70 text-xs">
-            Secondary text &middot; Metadata &middot; Captions
+            {tr(
+              "pages.settings.accessibility_settings.secondary_text_middot_metadata_middot_captions",
+            )}
           </p>
         </div>
       </SettingsGroup>

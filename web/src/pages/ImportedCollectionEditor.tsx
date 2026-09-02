@@ -56,6 +56,8 @@ import { CollectionLibraryPicker } from "@/pages/adminCollectionsShared";
 
 import { isCollectionReadOnly } from "./userCollectionsShared";
 import { formatDate as formatPreferredDate } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type ImportedType = Extract<UserCollectionType, "mdblist" | "tmdb" | "trakt">;
 
@@ -72,7 +74,9 @@ interface SourceTheme {
 
 const SOURCE_THEMES: Record<ImportedType, SourceTheme> = {
   tmdb: {
-    label: "TMDB",
+    get label() {
+      return tr("pages.imported_collection_editor.tmdb");
+    },
     tagline: "The Movie Database",
     accent: "#22d3ee",
     haloFrom: "rgba(56,189,248,0.32)",
@@ -80,7 +84,9 @@ const SOURCE_THEMES: Record<ImportedType, SourceTheme> = {
     initials: "Tm",
   },
   trakt: {
-    label: "Trakt",
+    get label() {
+      return tr("pages.imported_collection_editor.trakt");
+    },
     tagline: "Trakt.tv",
     accent: "#fb7185",
     haloFrom: "rgba(244,63,94,0.30)",
@@ -88,7 +94,9 @@ const SOURCE_THEMES: Record<ImportedType, SourceTheme> = {
     initials: "Tk",
   },
   mdblist: {
-    label: "MDBList",
+    get label() {
+      return tr("pages.imported_collection_editor.mdblist");
+    },
     tagline: "mdblist.com",
     accent: "#fbbf24",
     haloFrom: "rgba(251,191,36,0.32)",
@@ -103,6 +111,7 @@ interface ImportedCollectionEditorProps {
 }
 
 export function ImportedCollectionEditor({ collection, onClose }: ImportedCollectionEditorProps) {
+  useUILanguage();
   const importedType = collection.collection_type as ImportedType;
   const theme = SOURCE_THEMES[importedType];
 
@@ -282,9 +291,14 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title="Delete collection"
-        description={`Delete collection "${collection.name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
+        title={tr("pages.imported_collection_editor.delete_collection")}
+        description={tr(
+          "pages.imported_collection_editor.delete_collection_name_this_action_cannot_be_undone",
+          {
+            name: collection.name,
+          },
+        )}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         onConfirm={handleDelete}
       />
@@ -303,11 +317,15 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
         <div className="surface-panel divide-y divide-[color-mix(in_srgb,var(--border)_55%,transparent)] rounded-[1.5rem]">
           <FormSection
             number="01"
-            title="Display"
-            description="Rename, describe, and scope which libraries this collection's items resolve into."
+            title={tr("pages.imported_collection_editor.display")}
+            description={tr(
+              "pages.imported_collection_editor.rename_describe_and_scope_which_libraries_this_collection_s_items",
+            )}
           >
             <div className="space-y-2">
-              <FieldLabel htmlFor="imported-collection-name">Name</FieldLabel>
+              <FieldLabel htmlFor="imported-collection-name">
+                {tr("pages.imported_collection_editor.name")}
+              </FieldLabel>
               <Input
                 id="imported-collection-name"
                 value={name}
@@ -319,25 +337,32 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
             </div>
 
             <div className="space-y-2">
-              <FieldLabel htmlFor="imported-collection-description">Description</FieldLabel>
+              <FieldLabel htmlFor="imported-collection-description">
+                {tr("pages.imported_collection_editor.description")}
+              </FieldLabel>
               <textarea
                 id="imported-collection-description"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 rows={3}
                 disabled={readOnly}
-                placeholder="A short blurb shown alongside the collection."
+                placeholder={tr(
+                  "pages.imported_collection_editor.a_short_blurb_shown_alongside_the_collection",
+                )}
                 className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[88px] w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-60"
               />
               <p className="text-muted-foreground text-xs leading-relaxed">
-                Imported with the collection on first sync. Edits stick — future syncs won't
-                overwrite this.
+                {tr(
+                  "pages.imported_collection_editor.imported_with_the_collection_on_first_sync_edits_stick_future",
+                )}
               </p>
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
-                <FieldLabel htmlFor="imported-collection-watch-filter">Watch state</FieldLabel>
+                <FieldLabel htmlFor="imported-collection-watch-filter">
+                  {tr("pages.imported_collection_editor.watch_state")}
+                </FieldLabel>
                 <Select
                   value={watchFilter}
                   onValueChange={(next) => setWatchFilter(next as UserCollectionWatchFilter)}
@@ -356,7 +381,9 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
                 </Select>
               </div>
               <div className="space-y-2">
-                <FieldLabel htmlFor="imported-collection-media-filter">Content</FieldLabel>
+                <FieldLabel htmlFor="imported-collection-media-filter">
+                  {tr("pages.imported_collection_editor.content")}
+                </FieldLabel>
                 <Select
                   value={mediaFilter}
                   onValueChange={(next) => setMediaFilter(next as UserCollectionMediaFilter)}
@@ -385,12 +412,13 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
               />
             </div>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Uses the active profile&rsquo;s watched state. Shared profiles may see different
-              results.
+              {tr(
+                "pages.imported_collection_editor.uses_the_active_profile_rsquo_s_watched_state_shared_profiles",
+              )}
             </p>
 
             <div className="space-y-2">
-              <FieldLabel>Libraries</FieldLabel>
+              <FieldLabel>{tr("pages.imported_collection_editor.libraries")}</FieldLabel>
               <CollectionLibraryPicker
                 libraries={builderLibraries}
                 value={libraryIds}
@@ -398,20 +426,25 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
                 eligibility={eligibility}
               />
               <p className="text-muted-foreground text-xs leading-relaxed">
-                Items resolve only inside libraries you select. Leave empty to span every library
-                you can see.
+                {tr(
+                  "pages.imported_collection_editor.items_resolve_only_inside_libraries_you_select_leave_empty_to",
+                )}
               </p>
             </div>
           </FormSection>
 
           <FormSection
             number="02"
-            title="Source"
-            description="Where this collection pulls its items from and how often."
+            title={tr("pages.imported_collection_editor.source")}
+            description={tr(
+              "pages.imported_collection_editor.where_this_collection_pulls_its_items_from_and_how_often",
+            )}
           >
             <div className="space-y-2">
               <FieldLabel htmlFor="imported-collection-source-url">
-                {isMDBList ? "Source URL" : `${theme.label} preset`}
+                {isMDBList
+                  ? tr("pages.imported_collection_editor.source_url")
+                  : tr("pages.imported_collection_editor.label_preset", { label: theme.label })}
               </FieldLabel>
               {isMDBList ? (
                 <>
@@ -419,17 +452,25 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
                     id="imported-collection-source-url"
                     value={sourceUrlInput}
                     onChange={(event) => setSourceUrlInput(event.target.value)}
-                    placeholder="https://mdblist.com/lists/user/slug"
+                    placeholder={tr(
+                      "pages.imported_collection_editor.https_mdblist_com_lists_user_slug",
+                    )}
                     disabled={readOnly}
                     className="h-11 font-mono text-[0.85rem]"
                   />
                   {sourceUrlInvalid ? (
-                    <p className="text-destructive text-xs">A list URL is required.</p>
+                    <p className="text-destructive text-xs">
+                      {tr("pages.imported_collection_editor.a_list_url_is_required")}
+                    </p>
                   ) : (
                     <p className="text-muted-foreground text-xs leading-relaxed">
-                      The MDBList JSON URL the next sync will pull from. Trailing
-                      <code className="bg-muted/40 mx-1 rounded px-1 py-px text-[10px]">/json</code>
-                      is added automatically.
+                      {tr(
+                        "pages.imported_collection_editor.the_mdblist_json_url_the_next_sync_will_pull_from",
+                      )}
+                      <code className="bg-muted/40 mx-1 rounded px-1 py-px text-[10px]">
+                        {tr("pages.imported_collection_editor.json")}
+                      </code>
+                      {tr("pages.imported_collection_editor.is_added_automatically")}
                     </p>
                   )}
                 </>
@@ -440,7 +481,9 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
 
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
-                <FieldLabel htmlFor="imported-collection-max-items">Max items</FieldLabel>
+                <FieldLabel htmlFor="imported-collection-max-items">
+                  {tr("pages.imported_collection_editor.max_items")}
+                </FieldLabel>
                 <Input
                   id="imported-collection-max-items"
                   type="number"
@@ -449,24 +492,30 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
                   step={1}
                   value={maxItemsInput}
                   onChange={(event) => setMaxItemsInput(event.target.value)}
-                  placeholder="Unlimited"
+                  placeholder={tr("pages.imported_collection_editor.unlimited")}
                   disabled={readOnly}
                   className="h-11 tabular-nums"
                 />
                 {maxItemsInvalid ? (
-                  <p className="text-destructive text-xs">Enter a whole number, or leave empty.</p>
+                  <p className="text-destructive text-xs">
+                    {tr("pages.imported_collection_editor.enter_a_whole_number_or_leave_empty")}
+                  </p>
                 ) : (
                   <p className="text-muted-foreground text-xs leading-relaxed">
-                    Cap how many items the source contributes per sync. Leave empty for no cap.
+                    {tr(
+                      "pages.imported_collection_editor.cap_how_many_items_the_source_contributes_per_sync_leave",
+                    )}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <FieldLabel>Sync schedule</FieldLabel>
+                <FieldLabel>{tr("pages.imported_collection_editor.sync_schedule")}</FieldLabel>
                 <ScheduleReadout schedule={collection.sync_schedule} />
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Set when imported. Recreate the collection from a {theme.label} template to change
-                  it.
+                  {tr(
+                    "pages.imported_collection_editor.set_when_imported_recreate_the_collection_from_a",
+                  )}{" "}
+                  {theme.label} {tr("pages.imported_collection_editor.template_to_change_it")}
                 </p>
               </div>
             </div>
@@ -474,8 +523,10 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
 
           <FormSection
             number="03"
-            title="Sharing"
-            description="Decide which profiles on this account can browse the collection."
+            title={tr("pages.imported_collection_editor.sharing")}
+            description={tr(
+              "pages.imported_collection_editor.decide_which_profiles_on_this_account_can_browse_the_collection",
+            )}
           >
             <CollectionAccessEditor
               value={{ is_shared: isShared, allowed_profile_ids: allowedProfileIds }}
@@ -491,12 +542,16 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
 
           <FormSection
             number="04"
-            title="Library visibility"
-            description="Pin this collection to your library's Collections tab. Only you see it — personal collections are private to your user."
+            title={tr("pages.imported_collection_editor.library_visibility")}
+            description={tr(
+              "pages.imported_collection_editor.pin_this_collection_to_your_library_s_collections_tab_only",
+            )}
           >
             <ToggleRow
-              title="Show in my library Collections tab"
-              description="Appears in the Collections tab of the libraries you scope this to."
+              title={tr("pages.imported_collection_editor.show_in_my_library_collections_tab")}
+              description={tr(
+                "pages.imported_collection_editor.appears_in_the_collections_tab_of_the_libraries_you_scope",
+              )}
               checked={includeOnServer}
               onCheckedChange={setIncludeOnServer}
               disabled={readOnly}
@@ -506,11 +561,13 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
           {!readOnly ? (
             <FormSection
               number="05"
-              title="Poster"
-              description="Override the default card with a custom poster. Upload an image or paste an image URL."
+              title={tr("pages.imported_collection_editor.poster")}
+              description={tr(
+                "pages.imported_collection_editor.override_the_default_card_with_a_custom_poster_upload_an",
+              )}
             >
               <ImageUploadField
-                label="Poster"
+                label={tr("pages.imported_collection_editor.poster")}
                 currentUrl={collection.poster_url}
                 file={posterFile}
                 onFileChange={setPosterFile}
@@ -546,7 +603,7 @@ export function ImportedCollectionEditor({ collection, onClose }: ImportedCollec
           disabled={readOnly || deleteMutation.isPending}
         >
           <Trash2 className="h-3.5 w-3.5" />
-          Delete this collection
+          {tr("pages.imported_collection_editor.delete_this_collection")}
         </Button>
       </div>
 
@@ -579,6 +636,7 @@ function SourceBanner({
   onSyncNow: () => void;
   readOnly: boolean;
 }) {
+  useUILanguage();
   const last = formatLastSync(collection);
   return (
     <section
@@ -627,13 +685,15 @@ function SourceBanner({
                 <span className="text-foreground/85 text-sm font-medium">{sourcePresetLabel}</span>
                 {readOnly ? (
                   <span className="text-muted-foreground border-border/70 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-[0.16em] uppercase">
-                    <Lock className="h-3 w-3" /> Read-only
+                    <Lock className="h-3 w-3" /> {tr("pages.imported_collection_editor.read_only")}
                   </span>
                 ) : null}
               </div>
               <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
-                Synced from {theme.tagline} — items, posters, and ordering are managed by the
-                source.
+                {tr("pages.imported_collection_editor.synced_from")} {theme.tagline}{" "}
+                {tr(
+                  "pages.imported_collection_editor.items_posters_and_ordering_are_managed_by_the_source",
+                )}
               </p>
               <SyncPulse status={collection.last_sync_status} text={last} accent={theme.accent} />
             </div>
@@ -644,7 +704,7 @@ function SourceBanner({
               <Button asChild variant="outline" size="sm" className="gap-1.5">
                 <a href={sourceUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-3.5 w-3.5" />
-                  Open source
+                  {tr("pages.imported_collection_editor.open_source")}
                 </a>
               </Button>
             ) : null}
@@ -659,8 +719,10 @@ function SourceBanner({
                 color: "#0b0b0c",
               }}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-              {isSyncing ? "Syncing..." : "Sync now"}
+              <RefreshCw className={"h-3.5 w-3.5 " + (isSyncing ? "animate-spin" : "")} />
+              {isSyncing
+                ? tr("pages.imported_collection_editor.syncing")
+                : tr("pages.imported_collection_editor.sync_now")}
             </Button>
           </div>
         </div>
@@ -670,6 +732,7 @@ function SourceBanner({
 }
 
 function BrandMark({ theme }: { theme: SourceTheme }) {
+  useUILanguage();
   return (
     <div className="relative h-16 w-16 shrink-0 sm:h-[72px] sm:w-[72px]">
       <div
@@ -701,6 +764,7 @@ function SyncPulse({
   text: string;
   accent: string;
 }) {
+  useUILanguage();
   const dotColor = statusDotColor(status, accent);
   const isRunning = status === "running";
   return (
@@ -745,6 +809,7 @@ function FormSection({
   description: string;
   children: ReactNode;
 }) {
+  useUILanguage();
   return (
     <section className="grid gap-6 px-6 py-7 sm:px-8 sm:py-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-10">
       <div className="space-y-1.5">
@@ -760,6 +825,7 @@ function FormSection({
 }
 
 function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) {
+  useUILanguage();
   return (
     <Label
       htmlFor={htmlFor}
@@ -783,11 +849,13 @@ function ToggleRow({
   onCheckedChange: (next: boolean) => void;
   disabled?: boolean;
 }) {
+  useUILanguage();
   return (
     <label
-      className={`group bg-background/40 hover:border-border/80 flex items-center justify-between gap-4 rounded-xl border border-[color-mix(in_srgb,var(--border)_55%,transparent)] px-4 py-3.5 transition-colors ${
-        disabled ? "opacity-60" : "cursor-pointer"
-      }`}
+      className={
+        "group bg-background/40 hover:border-border/80 flex items-center justify-between gap-4 rounded-xl border border-[color-mix(in_srgb,var(--border)_55%,transparent)] px-4 py-3.5 transition-colors " +
+        (disabled ? "opacity-60" : "cursor-pointer")
+      }
     >
       <div className="min-w-0 pr-2">
         <p className="text-sm font-medium">{title}</p>
@@ -809,6 +877,7 @@ function SourceSpecSheet({
   sourceUrl: string | null;
   sourcePresetLabel: string;
 }) {
+  useUILanguage();
   const itemCount = collection.item_count != null ? collection.item_count.toLocaleString() : "—";
   return (
     <div
@@ -831,19 +900,23 @@ function SourceSpecSheet({
               className="inline-block h-1.5 w-1.5 rounded-full"
               style={{ backgroundColor: theme.accent }}
             />
-            Source details
+            {tr("pages.imported_collection_editor.source_details")}
           </h4>
         </div>
         <p className="text-muted-foreground mt-1 text-xs">
-          Captured when the collection was imported.
+          {tr("pages.imported_collection_editor.captured_when_the_collection_was_imported")}
         </p>
 
         <div className="mt-4 divide-y divide-[color-mix(in_srgb,var(--border)_45%,transparent)]">
-          <SpecRow icon={Hash} label={`${theme.label} preset`} value={sourcePresetLabel} />
+          <SpecRow
+            icon={Hash}
+            label={tr("pages.imported_collection_editor.label_preset", { label: theme.label })}
+            value={sourcePresetLabel}
+          />
           {sourceUrl ? (
             <SpecRow
               icon={Link2}
-              label="URL"
+              label={tr("pages.imported_collection_editor.url")}
               value={
                 <a
                   href={sourceUrl}
@@ -857,11 +930,19 @@ function SourceSpecSheet({
               }
             />
           ) : null}
-          <SpecRow icon={Hash} label="Items" value={itemCount} />
+          <SpecRow
+            icon={Hash}
+            label={tr("pages.imported_collection_editor.items")}
+            value={itemCount}
+          />
           {collection.last_sync_message ? (
             <SpecRow
               icon={CalendarClock}
-              label={collection.last_sync_status === "failed" ? "Last error" : "Last note"}
+              label={
+                collection.last_sync_status === "failed"
+                  ? tr("pages.imported_collection_editor.last_error")
+                  : tr("pages.imported_collection_editor.last_note")
+              }
               value={
                 <span
                   className={
@@ -877,7 +958,7 @@ function SourceSpecSheet({
           ) : null}
           <SpecRow
             icon={Clock}
-            label="Created"
+            label={tr("pages.imported_collection_editor.created")}
             value={formatAbsoluteDate(collection.created_at) ?? "—"}
           />
         </div>
@@ -895,6 +976,7 @@ function PresetReadout({
   url: string | null;
   themeLabel: string;
 }) {
+  useUILanguage();
   return (
     <div className="border-border/60 bg-muted/20 flex items-center justify-between gap-3 rounded-md border px-3 py-2.5">
       <div className="min-w-0">
@@ -912,6 +994,7 @@ function PresetReadout({
 }
 
 function ScheduleReadout({ schedule }: { schedule?: string }) {
+  useUILanguage();
   return (
     <div className="border-border/60 bg-muted/20 flex items-center justify-between gap-3 rounded-md border px-3 py-2.5">
       <div className="inline-flex items-center gap-2">
@@ -920,7 +1003,7 @@ function ScheduleReadout({ schedule }: { schedule?: string }) {
       </div>
       <span className="text-muted-foreground inline-flex items-center gap-1 text-[10px] font-semibold tracking-[0.16em] uppercase">
         <Lock className="h-3 w-3" />
-        Locked
+        {tr("pages.imported_collection_editor.locked")}
       </span>
     </div>
   );
@@ -949,6 +1032,7 @@ function SpecRow({
   label: string;
   value: ReactNode;
 }) {
+  useUILanguage();
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
       <span className="text-muted-foreground inline-flex items-center gap-2 text-[11px] font-medium tracking-wide">
@@ -975,20 +1059,25 @@ function SaveDock({
   onDiscard: () => void;
   onCancel: () => void;
 }) {
+  useUILanguage();
   return (
     <div
       aria-hidden={!visible}
-      className={`pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4 transition-all duration-300 ${
-        visible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-6 opacity-0"
-      }`}
+      className={
+        "pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4 transition-all duration-300 " +
+        (visible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-6 opacity-0")
+      }
     >
       <div className="bg-background/85 border-border/80 pointer-events-auto flex items-center gap-3 rounded-full border px-3.5 py-2 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.55)] backdrop-blur-xl">
         <div className="flex items-center gap-2 pr-1 pl-1.5">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-300/90" />
           <span className="text-foreground/85 text-xs font-medium">
             {saveBlocked
-              ? "Fix errors above"
-              : `${dirtyCount} unsaved ${dirtyCount === 1 ? "change" : "changes"}`}
+              ? tr("pages.imported_collection_editor.fix_errors_above")
+              : tr("pages.imported_collection_editor.dirty_count_unsaved_value", {
+                  dirtyCount: dirtyCount,
+                  value: dirtyCount === 1 ? "change" : "changes",
+                })}
           </span>
         </div>
         <div className="bg-border/70 h-5 w-px" aria-hidden />
@@ -1000,7 +1089,7 @@ function SaveDock({
           onClick={onCancel}
           disabled={isSaving}
         >
-          Cancel
+          {tr("common.actions.cancel")}
         </Button>
         <Button
           type="button"
@@ -1010,7 +1099,7 @@ function SaveDock({
           onClick={onDiscard}
           disabled={isSaving}
         >
-          Discard
+          {tr("pages.imported_collection_editor.discard")}
         </Button>
         <Button
           type="submit"
@@ -1018,7 +1107,9 @@ function SaveDock({
           className="h-8 px-4 text-xs font-semibold"
           disabled={isSaving || saveBlocked}
         >
-          {isSaving ? "Saving..." : "Save changes"}
+          {isSaving
+            ? tr("pages.imported_collection_editor.saving")
+            : tr("pages.imported_collection_editor.save_changes")}
         </Button>
       </div>
     </div>

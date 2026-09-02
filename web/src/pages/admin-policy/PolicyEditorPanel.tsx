@@ -1,6 +1,6 @@
 import { Check, CheckCircle2, Play, Save, ShieldCheck } from "lucide-react";
 import { memo, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import type {
   PolicyCompileIssue,
@@ -36,6 +36,8 @@ import { PolicySimulatePanel } from "./PolicySimulatePanel";
 import { PolicyVersionHistory } from "./PolicyVersionHistory";
 import { compileIssuesFromError, defaultPolicySource, messageFromError } from "./policyPageUtils";
 import { PolicyStatusPill, policyDocumentStatus, policyDomainMeta } from "./policyPresentation";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface PolicyEditorPanelProps {
   documentId?: number;
@@ -83,7 +85,12 @@ interface ActivationTarget {
 
 type LifecycleStep = "validate" | "save" | "activate" | "live";
 
-const LIFECYCLE_LABELS = ["Draft", "Validated", "Saved", "Live"] as const;
+const LIFECYCLE_LABELS = [
+  "pages.admin_policy.policy_editor_panel.draft",
+  "pages.admin_policy.policy_editor_panel.validated",
+  "pages.admin_policy.policy_editor_panel.saved",
+  "pages.admin_policy.policy_editor_panel.live",
+] as const;
 
 function lifecycleProgress(step: LifecycleStep) {
   // Index of the first label that is NOT yet reached.
@@ -100,9 +107,13 @@ function lifecycleProgress(step: LifecycleStep) {
 }
 
 function LifecycleRail({ step, liveVersion }: { step: LifecycleStep; liveVersion?: number }) {
+  useUILanguage();
   const reached = lifecycleProgress(step);
   return (
-    <ol aria-label="Policy lifecycle" className="flex flex-wrap items-center gap-1.5">
+    <ol
+      aria-label={tr("pages.admin_policy.policy_editor_panel.policy_lifecycle")}
+      className="flex flex-wrap items-center gap-1.5"
+    >
       {LIFECYCLE_LABELS.map((label, index) => {
         const done = index < reached;
         const current = index === reached;
@@ -123,9 +134,13 @@ function LifecycleRail({ step, liveVersion }: { step: LifecycleStep; liveVersion
               )}
             >
               {done && <Check aria-hidden className="size-3" />}
-              {label === "Live" && liveVersion !== undefined && step === "live"
-                ? `Live · v${liveVersion}`
-                : label}
+              {label === "pages.admin_policy.policy_editor_panel.live" &&
+              liveVersion !== undefined &&
+              step === "live"
+                ? tr("pages.admin_policy.policy_editor_panel.live_v_live_version", {
+                    liveVersion: liveVersion,
+                  })
+                : tr(label)}
             </span>
           </li>
         );
@@ -150,6 +165,7 @@ function seedKey(document: PolicyDocument, seedVersion: PolicyVersion | undefine
 }
 
 export function PolicyEditorPanel({ documentId, domains }: PolicyEditorPanelProps) {
+  useUILanguage();
   const documentQuery = usePolicyDocument(documentId);
   const versionsQuery = usePolicyVersions(documentId);
   const document = documentQuery.data;
@@ -178,19 +194,23 @@ export function PolicyEditorPanel({ documentId, domains }: PolicyEditorPanelProp
   if (!documentId) {
     return (
       <div className="surface-panel-subtle text-muted-foreground rounded-2xl p-6 text-sm">
-        Select an override to edit its Rego source.
+        {tr("pages.admin_policy.policy_editor_panel.select_an_override_to_edit_its_rego_source")}
       </div>
     );
   }
 
   if (documentQuery.isLoading || waitingForSeedSource) {
-    return <p className="text-muted-foreground text-sm">Loading policy document...</p>;
+    return (
+      <p className="text-muted-foreground text-sm">
+        {tr("pages.admin_policy.policy_editor_panel.loading_policy_document")}
+      </p>
+    );
   }
 
   if (!document) {
     return (
       <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border px-3 py-2 text-sm">
-        Policy document could not be loaded.
+        {tr("pages.admin_policy.policy_editor_panel.policy_document_could_not_be_loaded")}
       </div>
     );
   }
@@ -260,6 +280,7 @@ const PolicyEditorState = memo(function PolicyEditorState({
   onStateChange,
   newerSeed,
 }: PolicyEditorStateProps) {
+  useUILanguage();
   const [draft, setDraft] = useState(initialSource);
   const [comment, setComment] = useState("");
   const [issues, setIssues] = useState<PolicyCompileIssue[]>([]);
@@ -311,7 +332,11 @@ const PolicyEditorState = memo(function PolicyEditorState({
       });
       setValidation({ source: draft, result });
       setIssues(result.errors);
-      setMessage(result.compiled_ok ? "Validation passed — the draft compiles." : "");
+      setMessage(
+        result.compiled_ok
+          ? tr("pages.admin_policy.policy_editor_panel.validation_passed_the_draft_compiles")
+          : "",
+      );
     } catch (error) {
       const nextIssues = compileIssuesFromError(error);
       setIssues(nextIssues);
@@ -338,14 +363,21 @@ const PolicyEditorState = memo(function PolicyEditorState({
         });
       }
       setComment("");
-      toast.success(`Saved v${result.version_number}`);
+      toast.success("feedback.admin_policy.policy_editor_panel.saved_v_version", {
+        values: { version: result.version_number },
+      });
     } catch (error) {
       const nextIssues = compileIssuesFromError(error);
       setIssues(nextIssues);
       setMessage(
         nextIssues.length > 0
-          ? "The server rejected this draft — fix the issues below."
-          : messageFromError(error, "Failed to save policy version."),
+          ? tr(
+              "pages.admin_policy.policy_editor_panel.the_server_rejected_this_draft_fix_the_issues_below",
+            )
+          : tr.error(
+              "errors.admin_policy.policy_editor_panel.failed_to_save_policy_version",
+              error,
+            ),
       );
     }
   }
@@ -356,9 +388,13 @@ const PolicyEditorState = memo(function PolicyEditorState({
       await activateVersion.mutateAsync({ documentId: document.id, version: savedTarget.id });
       setConfirmActivate(false);
       setSaved(undefined);
-      toast.success(`v${savedTarget.version_number} is now live`);
+      toast.success("feedback.admin_policy.policy_editor_panel.v_version_is_now_live", {
+        values: { version: savedTarget.version_number },
+      });
     } catch (error) {
-      toast.error(messageFromError(error, "Failed to activate policy version"));
+      toast.error("errors.admin_policy.policy_editor_panel.reported_message", {
+        values: { message: messageFromError(error, "Failed to activate policy version") },
+      });
     }
   }
 
@@ -368,21 +404,26 @@ const PolicyEditorState = memo(function PolicyEditorState({
         return (
           <Button type="button" onClick={validateDraft} disabled={validatePolicy.isPending}>
             <CheckCircle2 className="size-4" />
-            {validatePolicy.isPending ? "Validating..." : "Validate draft"}
+            {validatePolicy.isPending
+              ? tr("pages.admin_policy.policy_editor_panel.validating")
+              : tr("pages.admin_policy.policy_editor_panel.validate_draft")}
           </Button>
         );
       case "save":
         return (
           <Button type="button" onClick={saveVersion} disabled={createVersion.isPending}>
             <Save className="size-4" />
-            {createVersion.isPending ? "Saving..." : "Save as version"}
+            {createVersion.isPending
+              ? tr("pages.admin_policy.policy_editor_panel.saving")
+              : tr("pages.admin_policy.policy_editor_panel.save_as_version")}
           </Button>
         );
       case "activate":
         return (
           <Button type="button" onClick={() => setConfirmActivate(true)}>
             <ShieldCheck className="size-4" />
-            Activate v{savedTarget?.version_number}
+            {tr("pages.admin_policy.policy_editor_panel.activate_v")}
+            {savedTarget?.version_number}
           </Button>
         );
       case "live":
@@ -414,7 +455,7 @@ const PolicyEditorState = memo(function PolicyEditorState({
                 onClick={validateDraft}
                 disabled={validatePolicy.isPending}
               >
-                Re-validate
+                {tr("pages.admin_policy.policy_editor_panel.re_validate")}
               </Button>
             )}
             {primaryAction}
@@ -423,14 +464,16 @@ const PolicyEditorState = memo(function PolicyEditorState({
 
         {step === "live" && (
           <p className="text-muted-foreground mt-3 text-sm">
-            This source is what the live policy runs today. Edit it to start a new draft — nothing
-            changes until you activate the result.
+            {tr(
+              "pages.admin_policy.policy_editor_panel.this_source_is_what_the_live_policy_runs_today_edit",
+            )}
           </p>
         )}
         {!document.enabled && (
           <p className="text-warning mt-3 text-sm">
-            This override is disabled: the Silo baseline applies unchanged until it is re-enabled
-            from the overrides list.
+            {tr(
+              "pages.admin_policy.policy_editor_panel.this_override_is_disabled_the_silo_baseline_applies_unchanged_until",
+            )}
           </p>
         )}
 
@@ -438,9 +481,18 @@ const PolicyEditorState = memo(function PolicyEditorState({
           <div className="border-warning/40 bg-warning/10 mt-4 flex flex-col gap-2 rounded-lg border px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
             <span className="text-warning">
               {newerSeed.versionNumber !== undefined
-                ? `Version ${newerSeed.versionNumber} is now live elsewhere.`
-                : "A newer policy is now live elsewhere."}{" "}
-              Loading it will discard your unsaved draft.
+                ? tr(
+                    "pages.admin_policy.policy_editor_panel.version_version_number_is_now_live_elsewhere",
+                    {
+                      versionNumber: newerSeed.versionNumber,
+                    },
+                  )
+                : tr(
+                    "pages.admin_policy.policy_editor_panel.a_newer_policy_is_now_live_elsewhere",
+                  )}{" "}
+              {tr(
+                "pages.admin_policy.policy_editor_panel.loading_it_will_discard_your_unsaved_draft",
+              )}
             </span>
             <Button
               type="button"
@@ -449,7 +501,7 @@ const PolicyEditorState = memo(function PolicyEditorState({
               className="shrink-0"
               onClick={newerSeed.onAdopt}
             >
-              Load live version
+              {tr("pages.admin_policy.policy_editor_panel.load_live_version")}
             </Button>
           </div>
         )}
@@ -459,8 +511,10 @@ const PolicyEditorState = memo(function PolicyEditorState({
             <Input
               value={comment}
               onChange={(event) => setComment(event.target.value)}
-              placeholder="What changed? (optional, shown in history)"
-              aria-label="Policy version comment"
+              placeholder={tr(
+                "pages.admin_policy.policy_editor_panel.what_changed_optional_shown_in_history",
+              )}
+              aria-label={tr("pages.admin_policy.policy_editor_panel.policy_version_comment")}
             />
           </div>
         )}
@@ -473,12 +527,19 @@ const PolicyEditorState = memo(function PolicyEditorState({
 
         {issues.length > 0 && (
           <div className="border-destructive/40 bg-destructive/10 text-destructive mt-4 rounded-lg border px-3 py-2">
-            <h3 className="text-sm font-semibold">Compile issues</h3>
+            <h3 className="text-sm font-semibold">
+              {tr("pages.admin_policy.policy_editor_panel.compile_issues")}
+            </h3>
             <ul className="mt-2 space-y-1 text-xs">
               {issues.map((issue, index) => (
                 <li key={issueKey(issue, index)}>
-                  {issue.row > 0 ? `${issue.row}:${issue.col} ` : ""}
-                  {issue.message}
+                  {issue.row > 0
+                    ? tr("pages.admin_policy.policy_editor_panel.row_col", {
+                        row: issue.row,
+                        col: issue.col,
+                      })
+                    : ""}
+                  {tr.remote({ message: issue.message })}
                 </li>
               ))}
             </ul>
@@ -500,18 +561,21 @@ const PolicyEditorState = memo(function PolicyEditorState({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Make v{savedTarget?.version_number} the live policy?
+              {tr("pages.admin_policy.policy_editor_panel.make_v")}
+              {savedTarget?.version_number}{" "}
+              {tr("pages.admin_policy.policy_editor_panel.the_live_policy")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              New requests start using it immediately, on every server node. You can roll back to
-              any earlier version from the history below.
+              {tr(
+                "pages.admin_policy.policy_editor_panel.new_requests_start_using_it_immediately_on_every_server_node",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={activateSavedVersion} disabled={activateVersion.isPending}>
               <Play className="size-4" />
-              Go live
+              {tr("pages.admin_policy.policy_editor_panel.go_live")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

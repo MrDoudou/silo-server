@@ -19,10 +19,13 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBirthDate, computeAge } from "@/lib/date";
 import { getInitials } from "@/lib/text";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type TypeFilter = "all" | "movie" | "series";
 
 export default function PersonDetail() {
+  useUILanguage();
   const { id } = useParams<{ id: string }>();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [editOpen, setEditOpen] = useState(false);
@@ -53,7 +56,7 @@ export default function PersonDetail() {
     },
   });
 
-  useDocumentTitle(person?.name ?? "Person");
+  useDocumentTitle(person?.name ?? tr("pages.person_detail.person"));
 
   useEffect(() => {
     if (!person || !user || !isPersonMetadataIncomplete(person)) {
@@ -98,7 +101,7 @@ export default function PersonDetail() {
   if (!person) {
     return (
       <div className="page-shell flex min-h-[40vh] items-center justify-center">
-        <p className="text-muted-foreground">Person not found.</p>
+        <p className="text-muted-foreground">{tr("pages.person_detail.person_not_found")}</p>
       </div>
     );
   }
@@ -140,15 +143,15 @@ export default function PersonDetail() {
                     disabled={refreshMutation.isPending}
                   >
                     <RefreshCw
-                      className={`h-3.5 w-3.5 ${refreshMutation.isPending ? "animate-spin" : ""}`}
+                      className={"h-3.5 w-3.5 " + (refreshMutation.isPending ? "animate-spin" : "")}
                     />
                     {refreshMutation.isPending
                       ? isAdmin
-                        ? "Refreshing..."
-                        : "Queueing..."
+                        ? tr("pages.person_detail.refreshing")
+                        : tr("pages.person_detail.queueing")
                       : isAdmin
-                        ? "Refresh now"
-                        : "Refresh metadata"}
+                        ? tr("pages.person_detail.refresh_now")
+                        : tr("pages.person_detail.refresh_metadata")}
                   </Button>
                   {isAdmin ? (
                     <Button
@@ -158,7 +161,7 @@ export default function PersonDetail() {
                       onClick={() => setEditOpen(true)}
                     >
                       <Pencil className="h-3.5 w-3.5" />
-                      Edit metadata
+                      {tr("pages.person_detail.edit_metadata")}
                     </Button>
                   ) : null}
                 </div>
@@ -168,15 +171,20 @@ export default function PersonDetail() {
             {/* Metadata badges */}
             <div className="mb-4 flex flex-wrap items-center gap-2">
               {person.birth_date && (
-                <span className="metadata-badge">Born {formatBirthDate(person.birth_date)}</span>
+                <span className="metadata-badge">
+                  {tr("pages.person_detail.born")} {formatBirthDate(person.birth_date)}
+                </span>
               )}
               {person.birth_date && !person.death_date && (
-                <span className="metadata-badge">{computeAge(person.birth_date)} years old</span>
+                <span className="metadata-badge">
+                  {computeAge(person.birth_date)} {tr("pages.person_detail.years_old")}
+                </span>
               )}
               {person.death_date && person.birth_date && (
                 <span className="metadata-badge">
-                  Died {formatBirthDate(person.death_date)} (age{" "}
-                  {computeAge(person.birth_date, person.death_date)})
+                  {tr("pages.person_detail.died")} {formatBirthDate(person.death_date)}{" "}
+                  {tr("pages.person_detail.age")} {computeAge(person.birth_date, person.death_date)}
+                  )
                 </span>
               )}
               {person.birthplace && <span className="metadata-badge">{person.birthplace}</span>}
@@ -198,7 +206,9 @@ export default function PersonDetail() {
       {/* Filmography */}
       <div className="page-shell space-y-6 py-6 sm:py-8">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold tracking-tight">Filmography</h2>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {tr("pages.person_detail.filmography")}
+          </h2>
           <div className="flex gap-1.5">
             {(["all", "movie", "series"] as const).map((t) => (
               <button
@@ -208,13 +218,18 @@ export default function PersonDetail() {
                   setTypeFilter(t);
                   setVisibleRange([0, limit - 1]);
                 }}
-                className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  typeFilter === t
+                className={
+                  "rounded-md border px-3 py-1.5 text-xs font-medium transition-colors " +
+                  (typeFilter === t
                     ? "border-border/20 bg-foreground/10 text-foreground"
-                    : "border-border/10 text-muted-foreground hover:text-foreground"
-                }`}
+                    : "border-border/10 text-muted-foreground hover:text-foreground")
+                }
               >
-                {t === "all" ? "All" : t === "movie" ? "Movies" : "Series"}
+                {t === "all"
+                  ? tr("pages.person_detail.all")
+                  : t === "movie"
+                    ? tr("pages.person_detail.movies")
+                    : tr("pages.person_detail.series")}
               </button>
             ))}
           </div>

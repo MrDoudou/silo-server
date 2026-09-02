@@ -8,7 +8,7 @@ import type {
   UpdateHistoryImportMappingRequest,
 } from "@/api/types";
 import { adminKeys } from "../keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 // --- Mappings ---
 
@@ -36,13 +36,15 @@ export function useCreateAdminMapping() {
         body: JSON.stringify(body),
       }),
     onSuccess: (_data, variables) => {
-      toast.success("User mapping created");
+      toast.success("feedback.queries.admin.history_import_admin.user_mapping_created");
       queryClient.invalidateQueries({
         queryKey: adminKeys.historyImportMappings(variables.source_id),
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to create mapping");
+      toast.error("errors.queries.admin.history_import_admin.failed_to_create_mapping", {
+        error: err,
+      });
     },
   });
 }
@@ -56,11 +58,13 @@ export function useUpdateAdminMapping() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Mapping updated");
+      toast.success("feedback.queries.admin.history_import_admin.mapping_updated");
       queryClient.invalidateQueries({ queryKey: ["admin", "historyImportMappings"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update mapping");
+      toast.error("errors.queries.admin.history_import_admin.failed_to_update_mapping", {
+        error: err,
+      });
     },
   });
 }
@@ -70,11 +74,13 @@ export function useDeleteAdminMapping() {
   return useMutation({
     mutationFn: (id: number) => api(`/admin/history-imports/mappings/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Mapping deleted");
+      toast.success("feedback.queries.admin.history_import_admin.mapping_deleted");
       queryClient.invalidateQueries({ queryKey: ["admin", "historyImportMappings"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete mapping");
+      toast.error("errors.queries.admin.history_import_admin.failed_to_delete_mapping", {
+        error: err,
+      });
     },
   });
 }
@@ -89,12 +95,14 @@ export function useCreateAdminRunForMapping() {
         method: "POST",
       }),
     onSuccess: () => {
-      toast.success("Import started");
+      toast.success("feedback.queries.admin.history_import_admin.import_started");
       queryClient.invalidateQueries({ queryKey: ["admin", "historyImportAdminRuns"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "historyImportMappings"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to start import");
+      toast.error("errors.queries.admin.history_import_admin.failed_to_start_import", {
+        error: err,
+      });
     },
   });
 }
@@ -108,12 +116,16 @@ export function useAdminBulkRun() {
       }),
     onSuccess: (data) => {
       const count = data?.runs?.length ?? 0;
-      toast.success(`Started ${count} import${count !== 1 ? "s" : ""}`);
+      toast.success("feedback.queries.admin.history_import_admin.imports_started_count", {
+        values: { count },
+      });
       queryClient.invalidateQueries({ queryKey: ["admin", "historyImportAdminRuns"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "historyImportMappings"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to start bulk import");
+      toast.error("errors.queries.admin.history_import_admin.failed_to_start_bulk_import", {
+        error: err,
+      });
     },
   });
 }
@@ -145,11 +157,11 @@ export function useCancelAdminRun() {
     mutationFn: (runId: string) =>
       api(`/admin/history-imports/runs/${runId}/cancel`, { method: "POST" }),
     onSuccess: () => {
-      toast.success("Run cancelled");
+      toast.success("feedback.queries.admin.history_import_admin.run_cancelled");
       queryClient.invalidateQueries({ queryKey: ["admin", "historyImportAdminRuns"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to cancel run");
+      toast.error("errors.queries.admin.history_import_admin.failed_to_cancel_run", { error: err });
     },
   });
 }

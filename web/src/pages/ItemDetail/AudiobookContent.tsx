@@ -17,6 +17,8 @@ import { audiobookFilesFromVersions } from "@/lib/audiobooks/files";
 import { useAudiobookPlaybackController } from "@/pages/audiobooks/player/audiobookPlaybackContext";
 import { coldResumePosition } from "@/pages/audiobooks/player/smartRewind";
 import { getAudiobookSmartRewind } from "@/pages/audiobooks/player/useAudiobookPrefs";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function formatSeconds(totalSeconds: number): string {
   if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return "";
@@ -71,6 +73,7 @@ export default function AudiobookContent({
   item: ItemDetail & { type: "audiobook" };
   libraryId?: number;
 }) {
+  useUILanguage();
   const [searchParams] = useSearchParams();
   const handledPlayParamRef = useRef(false);
   const [addToCollectionOpen, setAddToCollectionOpen] = useState(false);
@@ -176,12 +179,17 @@ export default function AudiobookContent({
             <div className="text-muted-foreground flex flex-col gap-0.5 text-sm">
               {author && (
                 <span>
-                  <span className="font-medium">By</span> {author}
+                  <span className="font-medium">
+                    {tr("pages.item_detail.audiobook_content.by")}
+                  </span>{" "}
+                  {author}
                 </span>
               )}
               {narrator && (
                 <span>
-                  <span className="font-medium">Narrated by</span>{" "}
+                  <span className="font-medium">
+                    {tr("pages.item_detail.audiobook_content.narrated_by")}
+                  </span>{" "}
                   {(item.audiobook?.other_narrations ?? []).length > 0 ? (
                     <NarratorPicker
                       currentNarrator={narrator}
@@ -217,7 +225,8 @@ export default function AudiobookContent({
                     />
                   </div>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    {formatSeconds(resumeSeconds)} listened ·{" "}
+                    {formatSeconds(resumeSeconds)}{" "}
+                    {tr("pages.item_detail.audiobook_content.listened")}{" "}
                     {Math.round((resumeSeconds / durationTotal) * 100)}%
                   </p>
                 </div>
@@ -236,14 +245,14 @@ export default function AudiobookContent({
                   size="lg"
                   onClick={() => setAddToCollectionOpen(true)}
                   className="gap-2"
-                  title="Add to a manual collection"
+                  title={tr("pages.item_detail.audiobook_content.add_to_a_manual_collection")}
                 >
                   <FolderPlus className="h-4 w-4" />
-                  Add to Collection
+                  {tr("pages.item_detail.audiobook_content.add_to_collection")}
                 </Button>
                 {hasProgress && (
                   <Button variant="outline" size="lg" onClick={() => openPlayer(0)}>
-                    Listen from Start
+                    {tr("pages.item_detail.audiobook_content.listen_from_start")}
                   </Button>
                 )}
               </div>
@@ -261,14 +270,23 @@ export default function AudiobookContent({
         {item.audiobook?.series && item.audiobook.series.entries.length > 0 && (
           <RelatedRail
             heading={
-              item.audiobook.series.name ? `In ${item.audiobook.series.name}` : "In this series"
+              item.audiobook.series.name
+                ? tr("pages.item_detail.audiobook_content.in_series_name", {
+                    seriesName: item.audiobook.series.name,
+                  })
+                : tr("pages.item_detail.audiobook_content.in_this_series")
             }
             items={item.audiobook.series.entries.map((entry) => ({
               content_id: entry.content_id,
               title: entry.title,
               poster_url: entry.poster_url,
-              subtitle:
-                typeof entry.series_index === "number" ? `Book ${entry.series_index}` : undefined,
+              get subtitle() {
+                return typeof entry.series_index === "number"
+                  ? tr("pages.item_detail.audiobook_content.book_series_index", {
+                      seriesIndex: entry.series_index,
+                    })
+                  : undefined;
+              },
               highlight: entry.content_id === item.content_id,
             }))}
           />
@@ -276,7 +294,7 @@ export default function AudiobookContent({
 
         {(item.audiobook?.related.also_by_author ?? []).length > 0 && (
           <RelatedRail
-            heading={`Also by ${author ?? "this author"}`}
+            heading={"Also by " + (author ?? "this author")}
             items={(item.audiobook?.related.also_by_author ?? []).map((entry) => ({
               content_id: entry.content_id,
               title: entry.title,

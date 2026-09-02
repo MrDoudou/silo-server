@@ -3,6 +3,8 @@ import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import type { LibraryCollection } from "@/api/types";
 import { CollectionRow } from "./CollectionRow";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface UngroupedSectionProps {
   collections: LibraryCollection[];
@@ -21,6 +23,7 @@ export function UngroupedSection({
   syncingCollectionID = null,
   collapsed = false,
 }: UngroupedSectionProps) {
+  useUILanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: "ungrouped",
     data: { kind: "group", id: "ungrouped" },
@@ -45,19 +48,22 @@ export function UngroupedSection({
           {...attributes}
           {...listeners}
           className="text-muted-foreground hover:text-foreground cursor-grab"
-          aria-label="Drag ungrouped section"
+          aria-label={tr("components.collections.admin.ungrouped_section.drag_ungrouped_section")}
           type="button"
         >
           ⋮⋮
         </button>
-        <h4 className="text-muted-foreground flex-1 text-sm font-medium">Ungrouped</h4>
+        <h4 className="text-muted-foreground flex-1 text-sm font-medium">
+          {tr("components.collections.admin.ungrouped_section.ungrouped")}
+        </h4>
       </div>
       {!collapsed && (
-        <div ref={setDroppableRef} className={`p-3 ${isOver ? "bg-muted/40" : ""}`}>
+        <div ref={setDroppableRef} className={"p-3 " + (isOver ? "bg-muted/40" : "")}>
           {collections.length === 0 ? (
             <div className="text-muted-foreground rounded border border-dashed p-4 text-center text-sm">
-              Drop collections here to remove them from any group. They'll appear on the library tab
-              at this section's position.
+              {tr(
+                "components.collections.admin.ungrouped_section.drop_collections_here_to_remove_them_from_any_group_they",
+              )}
             </div>
           ) : (
             <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>

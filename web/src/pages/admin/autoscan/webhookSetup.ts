@@ -1,5 +1,7 @@
 import type { AutoscanPathRewrite, AutoscanWebhookProvider, Library } from "@/api/types";
 
+import { tr } from "@/i18n/translate";
+
 /**
  * The arr notification triggers Silo actually consumes.
  *
@@ -23,17 +25,23 @@ export interface WebhookTrigger {
 
 const SHARED_TRIGGERS: WebhookTrigger[] = [
   {
-    label: "On Import",
+    get label() {
+      return tr("pages.admin.autoscan.webhook_setup.on_import");
+    },
     reason: "The main one — fires when a download finishes and is moved into your library.",
     required: true,
   },
   {
-    label: "On Upgrade",
+    get label() {
+      return tr("pages.admin.autoscan.webhook_setup.on_upgrade");
+    },
     reason: "Fires when an existing file is replaced by a better quality version.",
     required: true,
   },
   {
-    label: "On Rename",
+    get label() {
+      return tr("pages.admin.autoscan.webhook_setup.on_rename");
+    },
     reason: "Fires when files are renamed, so Silo does not lose track of them.",
     required: false,
   },
@@ -42,7 +50,9 @@ const SHARED_TRIGGERS: WebhookTrigger[] = [
 const SONARR_TRIGGERS: WebhookTrigger[] = [
   ...SHARED_TRIGGERS,
   {
-    label: "On Episode File Delete",
+    get label() {
+      return tr("pages.admin.autoscan.webhook_setup.on_episode_file_delete");
+    },
     reason: "Lets Silo drop episodes you removed, instead of leaving dead entries.",
     required: false,
   },
@@ -51,7 +61,9 @@ const SONARR_TRIGGERS: WebhookTrigger[] = [
 const RADARR_TRIGGERS: WebhookTrigger[] = [
   ...SHARED_TRIGGERS,
   {
-    label: "On Movie File Delete",
+    get label() {
+      return tr("pages.admin.autoscan.webhook_setup.on_movie_file_delete");
+    },
     reason: "Lets Silo drop movies you removed, instead of leaving dead entries.",
     required: false,
   },
@@ -67,7 +79,7 @@ export function triggersFor(provider: AutoscanWebhookProvider | "auto"): Webhook
   return [
     ...SHARED_TRIGGERS,
     {
-      label: "On Episode File Delete / On Movie File Delete",
+      label: tr("pages.admin.autoscan.webhook_setup.on_episode_file_delete_on_movie_file_delete"),
       reason: "Whichever your service offers — lets Silo drop files you removed.",
       required: false,
     },

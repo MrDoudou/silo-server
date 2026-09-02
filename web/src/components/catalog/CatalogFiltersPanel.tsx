@@ -17,6 +17,8 @@ import ActiveFilterBadges from "./ActiveFilterBadges";
 import CatalogFilterBar, { CATALOG_SOURCE_ORDER_SORT_FIELD } from "./CatalogFilterBar";
 import CatalogFilterSheet from "./CatalogFilterSheet";
 import { countActiveFilters, getActiveFilterBadges } from "./catalogFilterBadges";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface CatalogFiltersPanelProps {
   state: CatalogSearchState;
@@ -45,6 +47,7 @@ export default function CatalogFiltersPanel({
   resultCountLoading = false,
   libraryType,
 }: CatalogFiltersPanelProps) {
+  useUILanguage();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<"guided" | "advanced">("guided");
 
@@ -73,8 +76,12 @@ export default function CatalogFiltersPanel({
   if (isLocked) {
     return (
       <section className="bg-card space-y-2 rounded-lg border p-4">
-        <h2 className="text-sm font-medium">Filters</h2>
-        <p className="text-muted-foreground text-sm">Filters are locked to this source.</p>
+        <h2 className="text-sm font-medium">
+          {tr("components.catalog.catalog_filters_panel.filters")}
+        </h2>
+        <p className="text-muted-foreground text-sm">
+          {tr("components.catalog.catalog_filters_panel.filters_are_locked_to_this_source")}
+        </p>
       </section>
     );
   }

@@ -10,7 +10,7 @@ import {
   MoreVertical,
   RefreshCw,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import type { FileVersion, ItemDetail, MangaChapter } from "@/api/types";
 import DownloadVersionPicker from "@/components/DownloadVersionPicker";
 import MangaFilesDialog from "@/components/MangaFilesDialog";
@@ -44,6 +44,8 @@ import MetadataBadges from "./components/MetadataBadges";
 import ScoreRow from "./components/ScoreRow";
 import { formatFileSize } from "@/lib/mediaFormat";
 import { formatPageCount, metadataLine } from "./components/versionFormatUtils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function genreHref(genre: string, libraryId?: number): string {
   const params = new URLSearchParams();
@@ -98,6 +100,8 @@ function MangaRow({
   seriesContentId: string;
   libraryId?: number;
 }) {
+  useUILanguage();
+  useUILanguage();
   const { user } = useAuth();
   const readerHref = chapterReaderHref(chapter.content_id, seriesContentId, libraryId);
 
@@ -131,13 +135,13 @@ function MangaRow({
     try {
       const versions = await fetchCatalogItemVersions(chapter.content_id);
       if (versions.length === 0) {
-        toast.error("No downloadable files for this chapter");
+        toast.error("errors.item_detail.manga_content.no_downloadable_files_for_this_chapter");
         return;
       }
       setDownloadVersions(versions);
       setDownloadOpen(true);
     } catch {
-      toast.error("Couldn't load chapter files. Try again later");
+      toast.error("errors.item_detail.manga_content.couldn_t_load_chapter_files_try_again_later");
     } finally {
       setLoadingVersions(false);
     }
@@ -150,7 +154,7 @@ function MangaRow({
 
   return (
     <div
-      id={`manga-chapter-${chapter.content_id}`}
+      id={"manga-chapter-" + chapter.content_id}
       className="hover:bg-muted/40 flex items-center gap-3 px-4 py-2 transition-colors"
     >
       <ViewTransitionLink to={readerHref} className="flex min-w-0 flex-1 items-center gap-3">
@@ -174,13 +178,21 @@ function MangaRow({
           {label}
         </span>
         {markedRead && (
-          <span className="text-success flex-shrink-0" title="Read">
+          <span
+            className="text-success flex-shrink-0"
+            title={tr("pages.item_detail.manga_content.read")}
+          >
             <Check className="size-4" />
-            <span className="sr-only">Read</span>
+            <span className="sr-only">{tr("pages.item_detail.manga_content.read")}</span>
           </span>
         )}
         {progressPct != null && (
-          <span className="flex flex-shrink-0 items-center gap-1.5" title={`${progressPct}% read`}>
+          <span
+            className="flex flex-shrink-0 items-center gap-1.5"
+            title={tr("pages.item_detail.manga_content.progress_pct_read", {
+              progressPct: progressPct,
+            })}
+          >
             <span className="bg-muted block h-1 w-16 overflow-hidden rounded-full">
               <span
                 className="bg-primary block h-full rounded-full"
@@ -196,9 +208,17 @@ function MangaRow({
           type="button"
           variant={markedRead ? "secondary" : "ghost"}
           size="icon-sm"
-          aria-label={markedRead ? "Mark chapter unread" : "Mark chapter read"}
+          aria-label={
+            markedRead
+              ? tr("pages.item_detail.manga_content.mark_chapter_unread")
+              : tr("pages.item_detail.manga_content.mark_chapter_read")
+          }
           aria-pressed={markedRead}
-          title={markedRead ? "Mark unread" : "Mark read"}
+          title={
+            markedRead
+              ? tr("pages.item_detail.manga_content.mark_unread")
+              : tr("pages.item_detail.manga_content.mark_read")
+          }
           disabled={watchedMutation.isPending}
           onClick={() => {
             const next = !markedRead;
@@ -215,8 +235,8 @@ function MangaRow({
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label="Download chapter"
-            title="Download"
+            aria-label={tr("pages.item_detail.manga_content.download_chapter")}
+            title={tr("common.actions.download")}
             disabled={loadingVersions}
             onClick={() => void handleDownload()}
           >
@@ -248,6 +268,8 @@ export default function MangaContent({
   item: ItemDetail & { type: "manga" };
   libraryId?: number;
 }) {
+  useUILanguage();
+  useUILanguage();
   useAmbientColor(item.poster_thumbhash);
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -341,8 +363,8 @@ export default function MangaContent({
                 <Button
                   variant="glass"
                   size="icon-lg"
-                  title="More"
-                  aria-label="More actions"
+                  title={tr("pages.item_detail.manga_content.more")}
+                  aria-label={tr("pages.item_detail.manga_content.more_actions")}
                   className="size-11 rounded-full"
                 >
                   <MoreVertical className="size-[18px]" />
@@ -351,7 +373,7 @@ export default function MangaContent({
               <DropdownMenuContent align="start" className="w-56">
                 <DropdownMenuItem onSelect={() => setFilesOpen(true)}>
                   <FileText className="size-4" />
-                  View Details
+                  {tr("pages.item_detail.manga_content.view_details")}
                 </DropdownMenuItem>
                 {isAdmin && (
                   <>
@@ -363,7 +385,7 @@ export default function MangaContent({
                       {refreshMetadataMutation.isPending && (
                         <RefreshCw className="size-4 animate-spin" />
                       )}
-                      Refresh Metadata
+                      {tr("pages.item_detail.manga_content.refresh_metadata")}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -388,20 +410,22 @@ export default function MangaContent({
               }}
             >
               <CornerDownRight className="size-4" />
-              Jump to {resume.label}
+              {tr("pages.item_detail.manga_content.jump_to")} {resume.label}
             </Button>
           </div>
         )}
         {entries.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No chapters found. Chapters appear here once the library scan completes.
+            {tr(
+              "pages.item_detail.manga_content.no_chapters_found_chapters_appear_here_once_the_library_scan",
+            )}
           </p>
         ) : (
           <ul className="divide-border/40 border-border/40 divide-y overflow-hidden rounded-lg border">
             {entries.map((entry) =>
               entry.kind === "section" ? (
                 <MangaSection
-                  key={`section-${entry.label}`}
+                  key={"section-" + entry.label}
                   entry={entry}
                   seriesContentId={item.content_id}
                   libraryId={libraryId}
@@ -452,6 +476,8 @@ function MangaSection({
   seriesContentId: string;
   libraryId?: number;
 }) {
+  useUILanguage();
+  useUILanguage();
   const allRead = entry.chapters.every((chapter) => chapter.read === true);
   const [open, setOpen] = useState(!allRead);
 
@@ -468,12 +494,20 @@ function MangaSection({
         </span>
         <span className="text-muted-foreground flex items-center gap-2 text-xs">
           {allRead && (
-            <span className="text-success flex items-center" title="All chapters read">
+            <span
+              className="text-success flex items-center"
+              title={tr("pages.item_detail.manga_content.all_chapters_read")}
+            >
               <Check className="size-3.5" />
-              <span className="sr-only">All chapters read</span>
+              <span className="sr-only">
+                {tr("pages.item_detail.manga_content.all_chapters_read")}
+              </span>
             </span>
           )}
-          {entry.chapters.length} {entry.chapters.length === 1 ? "chapter" : "chapters"}
+          {entry.chapters.length}{" "}
+          {entry.chapters.length === 1
+            ? tr("pages.item_detail.manga_content.chapter")
+            : tr("pages.item_detail.manga_content.chapters")}
           <ChevronDown className={cn("size-4 transition-transform", !open && "-rotate-90")} />
         </span>
       </button>

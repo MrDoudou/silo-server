@@ -4,6 +4,8 @@ import { TriangleAlert } from "lucide-react";
 import { RestartServerButton } from "@/components/admin/RestartServerButton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface RestartBannerProps {
   /**
@@ -45,6 +47,7 @@ export function RestartBanner({
   description,
   className,
 }: RestartBannerProps) {
+  useUILanguage();
   const pending = restartRequired;
   // "Later" records what was pending at the time, not a boolean: the server's
   // restart_required flag never clears while the process lives, so a fresh
@@ -77,16 +80,18 @@ export function RestartBanner({
           their own row instead of squeezing the message to a few characters,
           and on a wide page everything still shares one line. */}
       <div className="min-w-0 flex-1 basis-64">
-        <p className="text-[13px] font-medium">Restart required</p>
+        <p className="text-[13px] font-medium">
+          {tr("components.admin.restart_banner.restart_required")}
+        </p>
         <p className="text-muted-foreground text-[11.5px]">
           {description ?? DEFAULT_RESTART_DESCRIPTION}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Button variant="ghost" size="sm" onClick={() => setDismissedSignature(signature)}>
-          Later
+          {tr("components.admin.restart_banner.later")}
         </Button>
-        <RestartServerButton label="Restart server" />
+        <RestartServerButton label={tr("components.admin.restart_banner.restart_server")} />
       </div>
     </div>
   );

@@ -20,13 +20,30 @@ import type {
   RequestMediaResult,
   RequestMediaType,
 } from "@/api/types";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type BrowseSort = "popularity" | "vote_average" | "release_date";
 
 const SORT_OPTIONS: { value: BrowseSort; label: string }[] = [
-  { value: "popularity", label: "Popularity" },
-  { value: "vote_average", label: "Rating" },
-  { value: "release_date", label: "Release date" },
+  {
+    value: "popularity",
+    get label() {
+      return tr("pages.request_browse.popularity");
+    },
+  },
+  {
+    value: "vote_average",
+    get label() {
+      return tr("pages.request_browse.rating");
+    },
+  },
+  {
+    value: "release_date",
+    get label() {
+      return tr("pages.request_browse.release_date");
+    },
+  },
 ];
 
 interface RequestBrowseProps {
@@ -34,6 +51,7 @@ interface RequestBrowseProps {
 }
 
 export default function RequestBrowse({ kind }: RequestBrowseProps) {
+  useUILanguage();
   const { slug = "" } = useParams<{ slug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -51,7 +69,11 @@ export default function RequestBrowse({ kind }: RequestBrowseProps) {
     : undefined;
 
   const title = browse.data?.display_name ?? humanizeSlug(slug);
-  useDocumentTitle(title ? `${title} - Requests` : "Requests");
+  useDocumentTitle(
+    title
+      ? tr("pages.request_browse.title_requests", { title: title })
+      : tr("pages.request_browse.requests"),
+  );
 
   function updateSort(next: string) {
     const params = new URLSearchParams(searchParams);
@@ -86,7 +108,12 @@ export default function RequestBrowse({ kind }: RequestBrowseProps) {
       <div className="relative space-y-4 py-10 text-center">
         <PageBack to="/requests" up />
         <p className="text-foreground mt-10 text-lg font-semibold sm:mt-12">
-          {kind === "studio" ? "Studio" : kind === "network" ? "Network" : "Genre"} not found.
+          {kind === "studio"
+            ? tr("pages.request_browse.studio")
+            : kind === "network"
+              ? tr("pages.request_browse.network")
+              : tr("pages.request_browse.genre")}{" "}
+          {tr("pages.request_browse.not_found")}
         </p>
       </div>
     );
@@ -103,16 +130,19 @@ export default function RequestBrowse({ kind }: RequestBrowseProps) {
               <h1 className="text-foreground truncate text-2xl font-semibold">{title}</h1>
               <p className="text-muted-foreground text-sm">
                 {browse.isLoading
-                  ? "Loading..."
+                  ? tr("pages.request_browse.loading")
                   : results.length > 0
-                    ? `Page ${page} of ${totalPages}`
-                    : "No results."}
+                    ? tr("pages.request_browse.page_page_of_total_pages", {
+                        page: page,
+                        totalPages: totalPages,
+                      })
+                    : tr("pages.request_browse.no_results")}
               </p>
             </div>
           </div>
           <Select value={sort} onValueChange={updateSort}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Sort" />
+              <SelectValue placeholder={tr("pages.request_browse.sort")} />
             </SelectTrigger>
             <SelectContent>
               {SORT_OPTIONS.map((option) => (
@@ -130,8 +160,8 @@ export default function RequestBrowse({ kind }: RequestBrowseProps) {
             onValueChange={(value) => updateMediaType(value as RequestMediaType)}
           >
             <TabsList>
-              <TabsTrigger value="movie">Movies</TabsTrigger>
-              <TabsTrigger value="series">Series</TabsTrigger>
+              <TabsTrigger value="movie">{tr("pages.request_browse.movies")}</TabsTrigger>
+              <TabsTrigger value="series">{tr("pages.request_browse.series")}</TabsTrigger>
             </TabsList>
           </Tabs>
         ) : null}
@@ -142,10 +172,12 @@ export default function RequestBrowse({ kind }: RequestBrowseProps) {
           <BrowseGridSkeleton />
         ) : browse.isError ? (
           <p className="text-muted-foreground text-sm">
-            Could not load this browse page. Try a different sort or media type.
+            {tr("pages.request_browse.could_not_load_this_browse_page_try_a_different_sort")}
           </p>
         ) : results.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nothing matched. Try a different sort.</p>
+          <p className="text-muted-foreground text-sm">
+            {tr("pages.request_browse.nothing_matched_try_a_different_sort")}
+          </p>
         ) : (
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
             {results.map((item) => (
@@ -168,17 +200,17 @@ export default function RequestBrowse({ kind }: RequestBrowseProps) {
       {totalPages > 1 ? (
         <div className="flex items-center justify-center gap-3 px-4">
           <Button variant="outline" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
-            Prev
+            {tr("pages.request_browse.prev")}
           </Button>
           <span className="text-muted-foreground text-sm tabular-nums">
-            Page {page} of {totalPages}
+            {tr("pages.request_browse.page")} {page} {tr("pages.request_browse.of")} {totalPages}
           </span>
           <Button
             variant="outline"
             disabled={page >= totalPages}
             onClick={() => goToPage(page + 1)}
           >
-            Next
+            {tr("common.actions.next")}
           </Button>
         </div>
       ) : null}
@@ -195,6 +227,7 @@ function BrowseHeaderTile({
   kind: DiscoverBrowseKind;
   fallback: string;
 }) {
+  useUILanguage();
   if (!browse) {
     return <div className="bg-muted h-16 w-28 rounded-md" aria-hidden />;
   }
@@ -223,6 +256,7 @@ function BrowseHeaderTile({
 }
 
 function BrowseGridSkeleton() {
+  useUILanguage();
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
       {Array.from({ length: 16 }).map((_, idx) => (

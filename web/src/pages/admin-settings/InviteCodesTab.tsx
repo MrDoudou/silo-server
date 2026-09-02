@@ -31,12 +31,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AlertTriangle, ArrowRight, Copy, Plus, PlusCircle, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { formatDate } from "@/lib/datetime";
 import { Link } from "react-router";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function InviteCodesTab() {
+  useUILanguage();
   const { data: codes = [], isLoading } = useAdminInviteCodes();
   const { data: serverSettings } = useAdminServerSettings();
   const signupsEnabled = serverSettings?.["signup.enabled"] === "true";
@@ -56,10 +59,11 @@ export default function InviteCodesTab() {
 
   function handleCopy(text: string) {
     navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard");
+    toast.success("feedback.admin_settings.invite_codes_tab.copied_to_clipboard");
   }
 
-  if (isLoading) return <div>Loading invite codes...</div>;
+  if (isLoading)
+    return <div>{tr("pages.admin_settings.invite_codes_tab.loading_invite_codes")}</div>;
 
   return (
     <div className="space-y-6">
@@ -68,9 +72,14 @@ export default function InviteCodesTab() {
         onOpenChange={(open) => {
           if (!open) setConfirmDeleteCode(null);
         }}
-        title="Delete invite code"
-        description={`Delete invite code "${confirmDeleteCode?.code}"? This action cannot be undone.`}
-        confirmLabel="Delete"
+        title={tr("pages.admin_settings.invite_codes_tab.delete_invite_code")}
+        description={tr(
+          "pages.admin_settings.invite_codes_tab.delete_invite_code_code_this_action_cannot_be_undone",
+          {
+            code: confirmDeleteCode?.code,
+          },
+        )}
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         onConfirm={() => {
           if (confirmDeleteCode) deleteCode.mutate(confirmDeleteCode.id);
@@ -86,10 +95,13 @@ export default function InviteCodesTab() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Top Up Invite Code</DialogTitle>
+            <DialogTitle>
+              {tr("pages.admin_settings.invite_codes_tab.top_up_invite_code")}
+            </DialogTitle>
             <DialogDescription>
-              Add extra uses to {topUpCode?.code}. Current usage is {topUpCode?.use_count} /{" "}
-              {topUpCode?.max_uses}.
+              {tr("pages.admin_settings.invite_codes_tab.add_extra_uses_to")} {topUpCode?.code}
+              {tr("pages.admin_settings.invite_codes_tab.current_usage_is")} {topUpCode?.use_count}{" "}
+              / {topUpCode?.max_uses}.
             </DialogDescription>
           </DialogHeader>
           {topUpCode && <TopUpInviteCodeForm code={topUpCode} onClose={() => setTopUpCode(null)} />}
@@ -100,12 +112,15 @@ export default function InviteCodesTab() {
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button size="sm">
-              <Plus className="mr-1 h-4 w-4" /> Create Code
+              <Plus className="mr-1 h-4 w-4" />{" "}
+              {tr("pages.admin_settings.invite_codes_tab.create_code")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Invite Code</DialogTitle>
+              <DialogTitle>
+                {tr("pages.admin_settings.invite_codes_tab.create_invite_code")}
+              </DialogTitle>
             </DialogHeader>
             <CreateInviteCodeForm onClose={() => setCreateOpen(false)} />
           </DialogContent>
@@ -115,12 +130,14 @@ export default function InviteCodesTab() {
       {serverSettings !== undefined &&
         (signupsEnabled ? (
           <p className="text-muted-foreground text-sm">
-            Codes only work while public signups are on.{" "}
+            {tr(
+              "pages.admin_settings.invite_codes_tab.codes_only_work_while_public_signups_are_on",
+            )}{" "}
             <Link
               to="/admin/settings/general"
               className="text-foreground inline-flex items-center gap-1 font-medium hover:underline"
             >
-              Public signups setting
+              {tr("pages.admin_settings.invite_codes_tab.public_signups_setting")}
               <ArrowRight className="h-3 w-3" aria-hidden="true" />
             </Link>
           </p>
@@ -128,13 +145,17 @@ export default function InviteCodesTab() {
           <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
             <p className="text-[13px] leading-relaxed">
-              <span className="font-medium text-amber-500">Public signups are off</span> — these
-              codes won't work until you enable them.{" "}
+              <span className="font-medium text-amber-500">
+                {tr("pages.admin_settings.invite_codes_tab.public_signups_are_off")}
+              </span>{" "}
+              {tr(
+                "pages.admin_settings.invite_codes_tab.these_codes_won_t_work_until_you_enable_them",
+              )}{" "}
               <Link
                 to="/admin/settings/general"
                 className="text-foreground inline-flex items-center gap-1 font-medium hover:underline"
               >
-                Public signups setting
+                {tr("pages.admin_settings.invite_codes_tab.public_signups_setting")}
                 <ArrowRight className="h-3 w-3" aria-hidden="true" />
               </Link>
             </p>
@@ -144,19 +165,23 @@ export default function InviteCodesTab() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Code</TableHead>
-            <TableHead>Label</TableHead>
-            <TableHead>Usage</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead className="w-32">Actions</TableHead>
+            <TableHead>{tr("pages.admin_settings.invite_codes_tab.code")}</TableHead>
+            <TableHead>{tr("pages.admin_settings.invite_codes_tab.label")}</TableHead>
+            <TableHead>{tr("pages.admin_settings.invite_codes_tab.usage")}</TableHead>
+            <TableHead>{tr("pages.admin_settings.invite_codes_tab.status")}</TableHead>
+            <TableHead>{tr("pages.admin_settings.invite_codes_tab.created")}</TableHead>
+            <TableHead className="w-32">
+              {tr("pages.admin_settings.invite_codes_tab.actions")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {codes.length === 0 && (
             <TableRow>
               <TableCell colSpan={6} className="text-muted-foreground text-center">
-                No invite codes yet. Create one to get started.
+                {tr(
+                  "pages.admin_settings.invite_codes_tab.no_invite_codes_yet_create_one_to_get_started",
+                )}
               </TableCell>
             </TableRow>
           )}
@@ -189,7 +214,9 @@ export default function InviteCodesTab() {
                 <div className="flex items-center gap-2">
                   <Switch checked={code.enabled} onCheckedChange={() => handleToggleCode(code)} />
                   <Badge variant={code.enabled ? "outline" : "secondary"}>
-                    {code.enabled ? "Active" : "Disabled"}
+                    {code.enabled
+                      ? tr("pages.admin_settings.invite_codes_tab.active")
+                      : tr("pages.admin_settings.invite_codes_tab.disabled")}
                   </Badge>
                 </div>
               </TableCell>
@@ -203,7 +230,10 @@ export default function InviteCodesTab() {
                     size="icon"
                     className="h-7 w-7"
                     onClick={() => setTopUpCode(code)}
-                    aria-label={`Top up invite code ${code.code}`}
+                    aria-label={tr(
+                      "pages.admin_settings.invite_codes_tab.top_up_invite_code_code",
+                      { code: code.code },
+                    )}
                   >
                     <PlusCircle className="h-3 w-3" />
                   </Button>
@@ -212,7 +242,10 @@ export default function InviteCodesTab() {
                     size="icon"
                     className="h-7 w-7"
                     onClick={() => handleDelete(code)}
-                    aria-label={`Delete invite code ${code.code}`}
+                    aria-label={tr(
+                      "pages.admin_settings.invite_codes_tab.delete_invite_code_code",
+                      { code: code.code },
+                    )}
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -227,6 +260,7 @@ export default function InviteCodesTab() {
 }
 
 function CreateInviteCodeForm({ onClose }: { onClose: () => void }) {
+  useUILanguage();
   const [code, setCode] = useState("");
   const [label, setLabel] = useState("");
   const [maxUses, setMaxUses] = useState("10");
@@ -236,7 +270,7 @@ function CreateInviteCodeForm({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     const max = parseInt(maxUses, 10);
     if (isNaN(max) || max <= 0) {
-      toast.error("Max uses must be a positive number");
+      toast.error("errors.admin_settings.invite_codes_tab.max_uses_must_be_a_positive_number");
       return;
     }
     createMutation.mutate(
@@ -248,23 +282,25 @@ function CreateInviteCodeForm({ onClose }: { onClose: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label>Code (optional, auto-generated if empty)</Label>
+        <Label>
+          {tr("pages.admin_settings.invite_codes_tab.code_optional_auto_generated_if_empty")}
+        </Label>
         <Input
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="e.g. BETA2026"
+          placeholder={tr("pages.admin_settings.invite_codes_tab.e_g_beta2026")}
         />
       </div>
       <div className="space-y-2">
-        <Label>Label</Label>
+        <Label>{tr("pages.admin_settings.invite_codes_tab.label")}</Label>
         <Input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="e.g. Beta testers"
+          placeholder={tr("pages.admin_settings.invite_codes_tab.e_g_beta_testers")}
         />
       </div>
       <div className="space-y-2">
-        <Label>Max uses</Label>
+        <Label>{tr("pages.admin_settings.invite_codes_tab.max_uses")}</Label>
         <Input
           type="number"
           min="1"
@@ -274,13 +310,16 @@ function CreateInviteCodeForm({ onClose }: { onClose: () => void }) {
         />
       </div>
       <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-        {createMutation.isPending ? "Creating..." : "Create"}
+        {createMutation.isPending
+          ? tr("pages.admin_settings.invite_codes_tab.creating")
+          : tr("common.actions.create")}
       </Button>
     </form>
   );
 }
 
 function TopUpInviteCodeForm({ code, onClose }: { code: InviteCode; onClose: () => void }) {
+  useUILanguage();
   const [additionalUses, setAdditionalUses] = useState("1");
   const topUpMutation = useTopUpInviteCode();
 
@@ -288,7 +327,9 @@ function TopUpInviteCodeForm({ code, onClose }: { code: InviteCode; onClose: () 
     e.preventDefault();
     const amount = parseInt(additionalUses, 10);
     if (isNaN(amount) || amount <= 0) {
-      toast.error("Additional uses must be a positive number");
+      toast.error(
+        "errors.admin_settings.invite_codes_tab.additional_uses_must_be_a_positive_number",
+      );
       return;
     }
 
@@ -301,7 +342,7 @@ function TopUpInviteCodeForm({ code, onClose }: { code: InviteCode; onClose: () 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label>Additional uses</Label>
+        <Label>{tr("pages.admin_settings.invite_codes_tab.additional_uses")}</Label>
         <Input
           type="number"
           min="1"
@@ -311,7 +352,9 @@ function TopUpInviteCodeForm({ code, onClose }: { code: InviteCode; onClose: () 
         />
       </div>
       <Button type="submit" className="w-full" disabled={topUpMutation.isPending}>
-        {topUpMutation.isPending ? "Adding..." : "Add Uses"}
+        {topUpMutation.isPending
+          ? tr("pages.admin_settings.invite_codes_tab.adding")
+          : tr("pages.admin_settings.invite_codes_tab.add_uses")}
       </Button>
     </form>
   );

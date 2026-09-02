@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { buildDetailLine, buildQualitySummary, sortByResolution } from "./VersionFlyout";
 import { buildMediaSpecSections, type MediaSpecSection } from "./mediaSpecSections";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface MediaInfoDialogProps {
   open: boolean;
@@ -26,6 +28,7 @@ interface MediaInfoDialogProps {
 }
 
 function VersionSpecSheet({ sections }: { sections: MediaSpecSection[] }) {
+  useUILanguage();
   return (
     <div className="space-y-4">
       {sections.map((section) => (
@@ -57,6 +60,7 @@ export default function MediaInfoDialog({
   title,
   initialFileId,
 }: MediaInfoDialogProps) {
+  useUILanguage();
   const sorted = useMemo(() => sortByResolution(versions), [versions]);
   const initialValue = useMemo(() => {
     const target = sorted.find((version) => version.file_id === initialFileId) ?? sorted[0];
@@ -68,7 +72,9 @@ export default function MediaInfoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl overflow-hidden sm:max-w-2xl">
         <DialogHeader className="min-w-0">
-          <DialogTitle>Media Info</DialogTitle>
+          <DialogTitle>
+            {tr("pages.item_detail.components.media_info_dialog.media_info")}
+          </DialogTitle>
           <DialogDescription className="truncate">{title}</DialogDescription>
         </DialogHeader>
 
@@ -107,7 +113,7 @@ export default function MediaInfoDialog({
           )}
           {sorted.length === 0 && (
             <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-center text-sm">
-              No media files for this item.
+              {tr("pages.item_detail.components.media_info_dialog.no_media_files_for_this_item")}
             </div>
           )}
         </div>

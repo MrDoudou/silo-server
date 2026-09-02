@@ -1,4 +1,6 @@
 import { Star } from "lucide-react";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ScoreRowProps {
   ratingImdb?: number | null;
@@ -7,6 +9,7 @@ interface ScoreRowProps {
 }
 
 export default function ScoreRow({ ratingImdb, ratingRtCritic, ratingRtAudience }: ScoreRowProps) {
+  useUILanguage();
   if (ratingImdb == null && ratingRtCritic == null && ratingRtAudience == null) {
     return null;
   }
@@ -17,7 +20,9 @@ export default function ScoreRow({ ratingImdb, ratingRtCritic, ratingRtAudience 
         <div className="flex items-center gap-1.5">
           <Star className="text-primary size-4 fill-current" />
           <span className="text-primary text-[15px] font-bold">{ratingImdb.toFixed(1)}</span>
-          <span className="text-muted-foreground/50 text-xs">/10</span>
+          <span className="text-muted-foreground/50 text-xs">
+            {tr("pages.item_detail.components.score_row.value_10")}
+          </span>
         </div>
       )}
       {ratingRtCritic != null && (

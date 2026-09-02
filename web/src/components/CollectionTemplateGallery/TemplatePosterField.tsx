@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { CollectionTemplate } from "@/lib/collectionTemplates";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export type TemplatePosterMode = "default" | "custom";
 
@@ -24,21 +26,30 @@ export function TemplatePosterField({
   onCustomUrlChange,
   inputId,
 }: TemplatePosterFieldProps) {
+  useUILanguage();
   const hasDefaultPoster = Boolean(template.poster_path);
 
   return (
     <div className="space-y-2">
-      <Label>Poster</Label>
+      <Label>{tr("components.collection_template_gallery.template_poster_field.poster")}</Label>
       <div className="border-border space-y-3 rounded-md border p-3">
         {hasDefaultPoster ? (
-          <div role="radiogroup" aria-label="Poster source" className="grid gap-2 sm:grid-cols-2">
+          <div
+            role="radiogroup"
+            aria-label={tr(
+              "components.collection_template_gallery.template_poster_field.poster_source",
+            )}
+            className="grid gap-2 sm:grid-cols-2"
+          >
             <PosterChoiceButton
-              label="Server default"
+              label={tr(
+                "components.collection_template_gallery.template_poster_field.server_default",
+              )}
               active={mode === "default"}
               onClick={() => onModeChange("default")}
             />
             <PosterChoiceButton
-              label="Custom URL"
+              label={tr("components.collection_template_gallery.template_poster_field.custom_url")}
               active={mode === "custom"}
               onClick={() => onModeChange("custom")}
             />
@@ -54,7 +65,9 @@ export function TemplatePosterField({
               className="border-border bg-muted h-20 w-14 shrink-0 rounded-md border object-cover"
             />
             <div className="min-w-0">
-              <p className="text-sm font-medium">Server default</p>
+              <p className="text-sm font-medium">
+                {tr("components.collection_template_gallery.template_poster_field.server_default")}
+              </p>
               <p className="text-muted-foreground truncate text-xs">{template.poster_path}</p>
             </div>
           </div>
@@ -65,7 +78,9 @@ export function TemplatePosterField({
               type="url"
               value={customUrl}
               onChange={(event) => onCustomUrlChange(event.target.value)}
-              placeholder="https://example.com/poster.jpg"
+              placeholder={tr(
+                "components.collection_template_gallery.template_poster_field.https_example_com_poster_jpg",
+              )}
             />
           </div>
         )}
@@ -83,6 +98,7 @@ function PosterChoiceButton({
   active: boolean;
   onClick: () => void;
 }) {
+  useUILanguage();
   return (
     <button
       type="button"

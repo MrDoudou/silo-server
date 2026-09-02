@@ -17,12 +17,15 @@ import ConnectionsPanel from "@/pages/admin/autoscan/ConnectionsPanel";
 import ActivityPanel from "@/pages/admin/autoscan/ActivityPanel";
 import SourcesPanel from "@/pages/admin/autoscan/SourcesPanel";
 import { isLegacyAdvancedTab, normalizeTab } from "@/pages/autoscanSearchParams";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // ---------------------------------------------------------------------------
 // Settings tab
 // ---------------------------------------------------------------------------
 
 function SettingsTab() {
+  useUILanguage();
   const settings = useAutoscanSettings();
   const updateSettings = useUpdateAutoscanSettings();
 
@@ -50,14 +53,20 @@ function SettingsTab() {
   }
 
   if (settings.isLoading) {
-    return <p className="text-muted-foreground py-4 text-sm">Loading settings…</p>;
+    return (
+      <p className="text-muted-foreground py-4 text-sm">
+        {tr("pages.admin_autoscan.loading_settings")}
+      </p>
+    );
   }
 
   return (
     <div className="max-w-lg space-y-6">
       {/* Default poll interval */}
       <div className="space-y-1.5">
-        <Label htmlFor="default-poll-interval">Default check interval (seconds)</Label>
+        <Label htmlFor="default-poll-interval">
+          {tr("pages.admin_autoscan.default_check_interval_seconds")}
+        </Label>
         <div className="flex items-center gap-2">
           <Input
             id="default-poll-interval"
@@ -70,16 +79,16 @@ function SettingsTab() {
             }
             onBlur={() => save()}
           />
-          <span className="text-muted-foreground text-sm">sec</span>
+          <span className="text-muted-foreground text-sm">{tr("pages.admin_autoscan.sec")}</span>
         </div>
         <p className="text-muted-foreground text-xs">
-          Used by sources that don&apos;t set their own.
+          {tr("pages.admin_autoscan.used_by_sources_that_don_t_set_their_own")}
         </p>
       </div>
 
       {/* Debounce */}
       <div className="space-y-1.5">
-        <Label htmlFor="debounce-seconds">Debounce (seconds)</Label>
+        <Label htmlFor="debounce-seconds">{tr("pages.admin_autoscan.debounce_seconds")}</Label>
         <div className="flex items-center gap-2">
           <Input
             id="debounce-seconds"
@@ -90,10 +99,10 @@ function SettingsTab() {
             onChange={(e) => patch({ debounce_seconds: Number(e.target.value) || 0 })}
             onBlur={() => save()}
           />
-          <span className="text-muted-foreground text-sm">sec</span>
+          <span className="text-muted-foreground text-sm">{tr("pages.admin_autoscan.sec")}</span>
         </div>
         <p className="text-muted-foreground text-xs">
-          Coalesces rapid change events before triggering a scan.
+          {tr("pages.admin_autoscan.coalesces_rapid_change_events_before_triggering_a_scan")}
         </p>
       </div>
     </div>
@@ -114,6 +123,7 @@ interface AdminAutoscanProps {
 }
 
 export default function AdminAutoscan({ embedded = false }: AdminAutoscanProps = {}) {
+  useUILanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = embedded ? "view" : "tab";
   const requestedTab = searchParams.get(tabParam);
@@ -149,37 +159,38 @@ export default function AdminAutoscan({ embedded = false }: AdminAutoscanProps =
         <div className="space-y-2">
           <div className="flex items-center gap-2.5">
             {embedded ? (
-              <h2 className="text-xl font-semibold tracking-tight">Autoscan</h2>
+              <h2 className="text-xl font-semibold tracking-tight">
+                {tr("pages.admin_autoscan.autoscan")}
+              </h2>
             ) : (
               <h1 className="text-3xl font-semibold tracking-normal text-balance sm:text-4xl">
-                Autoscan
+                {tr("pages.admin_autoscan.autoscan")}
               </h1>
             )}
             {settings.data &&
               (enabled ? (
-                <Badge variant="secondary">Enabled</Badge>
+                <Badge variant="secondary">{tr("pages.admin_autoscan.enabled")}</Badge>
               ) : (
                 <Badge variant="outline" className="text-muted-foreground">
-                  Disabled
+                  {tr("pages.admin_autoscan.disabled")}
                 </Badge>
               ))}
           </div>
           <p className="text-muted-foreground max-w-2xl text-sm leading-6">
-            Silo re-scans a library as soon as something changes, instead of waiting for the next
-            scheduled scan. Add a source for each thing you want watched.
+            {tr("pages.admin_autoscan.silo_re_scans_a_library_as_soon_as_something_changes")}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Label htmlFor="autoscan-enabled" className="text-muted-foreground text-sm">
-              Autoscan
+              {tr("pages.admin_autoscan.autoscan")}
             </Label>
             <Switch
               id="autoscan-enabled"
               checked={enabled}
               onCheckedChange={toggleEnabled}
               disabled={!settings.data || updateSettings.isPending}
-              aria-label="Enable autoscan"
+              aria-label={tr("pages.admin_autoscan.enable_autoscan")}
             />
           </div>
           <Button
@@ -189,15 +200,17 @@ export default function AdminAutoscan({ embedded = false }: AdminAutoscanProps =
             onClick={() => trigger.mutate()}
           >
             <Play />
-            {trigger.isPending ? "Triggering…" : "Run now"}
+            {trigger.isPending
+              ? tr("pages.admin_autoscan.triggering")
+              : tr("pages.admin_autoscan.run_now")}
           </Button>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-5">
         <TabsList variant="line" className="border-border w-full justify-start border-b">
-          <TabsTrigger value="sources">Sources</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="sources">{tr("pages.admin_autoscan.sources")}</TabsTrigger>
+          <TabsTrigger value="activity">{tr("pages.admin_autoscan.activity")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="sources" className="space-y-6">
@@ -219,9 +232,9 @@ export default function AdminAutoscan({ embedded = false }: AdminAutoscanProps =
               ) : (
                 <ChevronRight className="text-muted-foreground size-4 shrink-0" />
               )}
-              <span className="text-sm font-medium">Advanced</span>
+              <span className="text-sm font-medium">{tr("pages.admin_autoscan.advanced")}</span>
               <span className="text-muted-foreground text-xs">
-                Saved servers and polling defaults
+                {tr("pages.admin_autoscan.saved_servers_and_polling_defaults")}
               </span>
             </button>
 
@@ -230,9 +243,11 @@ export default function AdminAutoscan({ embedded = false }: AdminAutoscanProps =
                 <ConnectionsPanel />
                 <div className="space-y-4">
                   <div className="space-y-1">
-                    <h2 className="text-sm font-medium">Polling defaults</h2>
+                    <h2 className="text-sm font-medium">
+                      {tr("pages.admin_autoscan.polling_defaults")}
+                    </h2>
                     <p className="text-muted-foreground text-xs">
-                      Applied to sources that don&apos;t override them.
+                      {tr("pages.admin_autoscan.applied_to_sources_that_don_t_override_them")}
                     </p>
                   </div>
                   <SettingsTab />

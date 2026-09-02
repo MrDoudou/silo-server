@@ -1,0 +1,613 @@
+{
+  "api": {
+    "messages": {
+      "connection_successful": "Connexion réussie."
+    },
+    "responses": {
+      "connection_check_failed": "La vérification de la connexion a échoué : {{reason}}",
+      "connection_successful": "Connexion réussie."
+    }
+  },
+  "common": {
+    "actions": {
+      "refresh_page": "Actualiser la page",
+      "search": "Rechercher",
+      "try_again": "Réessayer"
+    },
+    "errors": {
+      "unexpected_body": "Une erreur inattendue s’est produite. Essayez d’actualiser la page.",
+      "unexpected_title": "Une erreur s’est produite"
+    },
+    "language": {
+      "english": "Anglais",
+      "french": "Français",
+      "label": "Langue"
+    },
+    "loading": {
+      "application": "Chargement de l’application",
+      "page": "Chargement de la page",
+      "request_availability": "Vérification de la disponibilité des demandes",
+      "visible": "Chargement…"
+    },
+    "status": {
+      "page_loaded": "Page chargée"
+    }
+  },
+  "components": {
+    "add_to_collection_dialog": {
+      "collections": "Collections"
+    },
+    "admin": {
+      "dashboard": {
+        "registry": {
+          "libraries": "Bibliothèques"
+        },
+        "widgets": {
+          "libraries_widget": {
+            "libraries": "Bibliothèques"
+          },
+          "users_widget": {
+            "user": "Utilisateur"
+          }
+        }
+      },
+      "subtitles": {
+        "admin_subtitle_edit_sheet": {
+          "language": "Langue"
+        },
+        "admin_subtitles_filters": {
+          "language": "Langue"
+        },
+        "admin_subtitles_table": {
+          "language": "Langue"
+        }
+      }
+    },
+    "admin_layout": {
+      "admin": "Administration"
+    },
+    "collection_searchable_select": {
+      "loading": "Chargement…"
+    },
+    "collection_template_gallery": {
+      "collection_template_config_form": {
+        "libraries": "Bibliothèques"
+      },
+      "collection_template_gallery": {
+        "home": "Accueil",
+        "libraries": "Bibliothèques"
+      },
+      "user_collection_template_config_form": {
+        "libraries": "Bibliothèques"
+      }
+    },
+    "collections": {
+      "collection_guided_rules_editor": {
+        "libraries": "Bibliothèques"
+      },
+      "collection_rules_editor": {
+        "libraries": "Bibliothèques"
+      }
+    },
+    "filter_easy_mode": {
+      "add_filter_popover": {
+        "language": "Langue"
+      }
+    },
+    "metadata_translate_panel": {
+      "language": "Langue"
+    },
+    "recipe_gallery": {
+      "recipe_param_fields": {
+        "libraries": "Bibliothèques"
+      }
+    },
+    "sections": {
+      "section_editor_drawer": {
+        "libraries": "Bibliothèques"
+      }
+    },
+    "settings": {
+      "settings_page_rail": {
+        "settings": "Paramètres"
+      }
+    },
+    "subtitles": {
+      "subtitle_upload_form": {
+        "language": "Langue"
+      }
+    },
+    "theme": {
+      "catalog_browser": {
+        "try_again": "Réessayer"
+      }
+    },
+    "ui": {
+      "facet_search_select": {
+        "loading": "Chargement…"
+      },
+      "person_search_select": {
+        "loading": "Chargement…"
+      },
+      "searchable_select": {
+        "loading": "Chargement…"
+      }
+    }
+  },
+  "errors": {
+    "admin_libraries": {
+      "reported_message": "{{message}}"
+    },
+    "admin_policy": {
+      "policy_editor_panel": {
+        "reported_message": "{{message}}"
+      },
+      "policy_version_history": {
+        "reported_message": "{{message}}"
+      }
+    },
+    "api": {
+      "already_available": "Ce média est déjà disponible.",
+      "already_requested": "Ce média a déjà été demandé.",
+      "already_used": "Cette invitation a déjà été utilisée.",
+      "builtin_installation": "Les fournisseurs intégrés ne peuvent pas être modifiés.",
+      "code_disabled": "Ce code d’invitation n’est plus actif.",
+      "code_exhausted": "Ce code d’invitation a atteint son nombre maximal d’utilisations.",
+      "duplicate": "Ce nom d’utilisateur ou cette adresse e-mail est déjà utilisé.",
+      "impersonation_not_allowed": "L’usurpation n’est pas autorisée.",
+      "invalid_code": "Le code d’invitation est invalide.",
+      "invalid_credentials": "Le nom d’utilisateur ou le mot de passe est invalide.",
+      "invalid_state": "La demande n’est pas dans un état valide pour cette action.",
+      "invalid_token": "Le jeton de session est invalide ou a expiré.",
+      "managed_repository": "Les dépôts de plugins intégrés sont gérés depuis les paramètres du catalogue.",
+      "not_impersonating": "Aucune session d’usurpation n’est active.",
+      "password_too_long": "Le mot de passe ne doit pas dépasser {{max_bytes}} octets.",
+      "profile_unverified": "Vérifiez le code PIN du profil actif avant de continuer.",
+      "quota_exceeded": "Vous avez atteint la limite de {{limit}} demandes sur une période de {{window_days}} jours.",
+      "requesting_blocked": "Votre profil n’est pas autorisé à envoyer des demandes.",
+      "requests_disabled": "Les demandes sont désactivées sur ce serveur.",
+      "session_revoked": "Cette session a été révoquée.",
+      "setup_complete": "La configuration initiale a déjà été terminée.",
+      "signup_disabled": "Les inscriptions publiques ne sont pas disponibles actuellement.",
+      "user_disabled": "Ce compte utilisateur est désactivé.",
+      "weak_password": "Le mot de passe doit contenir au moins {{min_length}} caractères."
+    },
+    "api_client": {
+      "authentication_required": "Authentification requise.",
+      "permission_denied": "Vous n’avez pas l’autorisation d’effectuer cette action.",
+      "request_failed": "La requête a échoué.",
+      "request_failed_with_status": "La requête a échoué ({{status}}).",
+      "resource_not_found": "La ressource demandée est introuvable.",
+      "response_too_large": "Ce fichier est trop volumineux pour être ouvert dans le navigateur ({{size_mib}} Mio, limite {{limit_mib}} Mio). Téléchargez-le à la place.",
+      "server_error": "La requête a échoué. Réessayez."
+    },
+    "audiobooks": {
+      "player": {
+        "use_audiobook_playback": {
+          "reported_message": "{{message}}"
+        }
+      }
+    },
+    "auth": {
+      "device_approval_failed": "Impossible d’approuver la demande de l’appareil.",
+      "device_denial_failed": "Impossible de refuser la demande de l’appareil.",
+      "device_login_failed": "La connexion de l’appareil a échoué.",
+      "device_login_start_failed": "Impossible de démarrer la connexion de l’appareil.",
+      "device_request_not_found": "La demande de l’appareil est introuvable.",
+      "impersonation_end_failed": "Impossible de terminer l’usurpation.",
+      "invitation_accept_failed": "Impossible de créer votre compte.",
+      "login_failed": "La connexion a échoué.",
+      "oauth_code_missing": "Le code de finalisation de la connexion est absent. Réessayez.",
+      "oauth_completion_failed": "Impossible de terminer la connexion.",
+      "oauth_response_expired": "La réponse de connexion a expiré. Réessayez.",
+      "passwords_do_not_match": "Les mots de passe ne correspondent pas.",
+      "profile_pin_verification_failed": "Le profil a été créé, mais la vérification du code PIN a échoué.",
+      "signup_failed": "L’inscription a échoué."
+    },
+    "common": {
+      "request_failed": "La requête a échoué. Réessayez."
+    },
+    "metadata_translate_panel": {
+      "reported_message": "{{message}}"
+    },
+    "player": {
+      "components": {
+        "video_player": {
+          "reported_message": "{{message}}"
+        },
+        "watch_page": {
+          "reported_message": "{{message}}"
+        }
+      }
+    },
+    "plugins": {
+      "auth_binding_save_failed": "Impossible d’enregistrer la liaison d’authentification.",
+      "catalog_settings_update_failed": "Impossible de mettre à jour les paramètres du catalogue de plugins.",
+      "config_save_failed": "Impossible d’enregistrer la configuration du plugin.",
+      "connection_check_failed": "La vérification de la connexion du plugin a échoué.",
+      "install_failed": "Impossible d’installer le plugin.",
+      "remove_failed": "Impossible de supprimer le plugin.",
+      "repository_add_failed": "Impossible d’ajouter le dépôt de plugins.",
+      "repository_remove_failed": "Impossible de supprimer le dépôt de plugins.",
+      "repository_update_failed": "Impossible de mettre à jour le dépôt de plugins.",
+      "task_binding_save_failed": "Impossible d’enregistrer la liaison de tâche.",
+      "update_check_start_failed": "Impossible de lancer la recherche de mises à jour des plugins.",
+      "update_failed": "Impossible de mettre à jour le plugin.",
+      "upload_failed": "Impossible d’envoyer le plugin."
+    },
+    "queries": {
+      "admin": {
+        "collections": {
+          "reported_message": "{{message}}"
+        },
+        "markers": {
+          "reported_message": "{{message}}"
+        },
+        "nodes": {
+          "reported_message": "{{message}}"
+        }
+      },
+      "watch_providers": {
+        "reported_message": "{{message}}"
+      }
+    },
+    "settings": {
+      "interface_settings": {
+        "reported_message": "{{message}}"
+      },
+      "notifications_settings": {
+        "reported_message": "{{message}}"
+      }
+    },
+    "setup": {
+      "admin_account_create_failed": "Impossible de créer le compte administrateur.",
+      "connection_check_failed": "La vérification de la connexion a échoué.",
+      "downloads_save_failed": "Impossible d’enregistrer les paramètres de téléchargement.",
+      "profile_create_failed": "Impossible de créer le profil.",
+      "provider_test_failed": "Le test du fournisseur a échoué.",
+      "recommendations_save_failed": "Impossible d’enregistrer les paramètres de recommandation.",
+      "server_settings_save_failed": "Impossible d’enregistrer les paramètres du serveur."
+    }
+  },
+  "feedback": {
+    "admin_libraries": {
+      "reported_message": "{{message}}"
+    },
+    "admin_session_actions": {
+      "reported_message": "{{message}}"
+    },
+    "audiobooks": {
+      "player": {
+        "use_audiobook_playback": {
+          "reported_message": "{{message}}"
+        }
+      }
+    },
+    "media_locations": {
+      "reported_message": "{{message}}"
+    },
+    "metadata_translate_panel": {
+      "reported_message": "{{message}}"
+    },
+    "queries": {
+      "admin": {
+        "collections": {
+          "reported_message": "{{message}}"
+        },
+        "diagnostics": {
+          "reported_message": "{{message}}"
+        },
+        "libraries": {
+          "reported_message": "{{message}}"
+        },
+        "nodes": {
+          "reported_message": "{{message}}"
+        },
+        "plugins": {
+          "reported_message": "{{message}}"
+        }
+      },
+      "downloads": {
+        "reported_message": "{{message}}"
+      },
+      "favorites": {
+        "reported_message": "{{message}}"
+      },
+      "history": {
+        "reported_message": "{{message}}"
+      },
+      "home_dismissals": {
+        "reported_message": "{{message}}"
+      },
+      "items": {
+        "reported_message": "{{message}}"
+      },
+      "user_collection_imports": {
+        "reported_message": "{{message}}"
+      },
+      "watchlist": {
+        "reported_message": "{{message}}"
+      }
+    },
+    "realtime_events_provider": {
+      "reported_message": "{{message}}"
+    },
+    "watch_together_actions": {
+      "reported_message": "{{message}}"
+    }
+  },
+  "lib": {
+    "admin_navigation": {
+      "collections": "Collections",
+      "libraries": "Bibliothèques",
+      "recommendations": "Recommandations",
+      "requests": "Demandes",
+      "settings": "Paramètres"
+    },
+    "admin_settings_search": {
+      "notifications": "Notifications",
+      "settings": "Paramètres"
+    },
+    "document_title": {
+      "admin": "Administration"
+    },
+    "overlays": {
+      "registry": {
+        "metadata": {
+          "language": "Langue"
+        }
+      }
+    },
+    "section_types": {
+      "favorites": "Favoris",
+      "watchlist": "Liste de suivi"
+    },
+    "settings_contract": {
+      "theme": "Thème"
+    }
+  },
+  "pages": {
+    "admin": {
+      "autoscan": {
+        "activity_panel": {
+          "try_again": "Réessayer"
+        },
+        "sources_panel": {
+          "try_again": "Réessayer"
+        }
+      }
+    },
+    "admin_activity": {
+      "requests": "Demandes",
+      "user": "Utilisateur"
+    },
+    "admin_api_keys": {
+      "user": "Utilisateur"
+    },
+    "admin_collections": {
+      "collections": "Collections"
+    },
+    "admin_collections_shared": {
+      "libraries": "Bibliothèques"
+    },
+    "admin_devices": {
+      "user": "Utilisateur"
+    },
+    "admin_diagnostics": {
+      "loading": "Chargement…",
+      "user": "Utilisateur"
+    },
+    "admin_history_import": {
+      "admin": "Administration",
+      "favorites": "Favoris",
+      "history": "Historique",
+      "watchlist": "Liste de suivi"
+    },
+    "admin_libraries": {
+      "libraries": "Bibliothèques"
+    },
+    "admin_logs": {
+      "user": "Utilisateur"
+    },
+    "admin_playback_history": {
+      "user": "Utilisateur"
+    },
+    "admin_policy": {
+      "policy_decision_log_table": {
+        "user": "Utilisateur"
+      }
+    },
+    "admin_recommendations": {
+      "recommendations": "Recommandations"
+    },
+    "admin_requests": {
+      "requests": "Demandes",
+      "settings": "Paramètres",
+      "user": "Utilisateur"
+    },
+    "admin_sections": {
+      "home_70f8bb9a": "Accueil"
+    },
+    "admin_settings": {
+      "appearance_settings": {
+        "loading": "Chargement…"
+      },
+      "invitations_tab": {
+        "admin": "Administration",
+        "user": "Utilisateur"
+      },
+      "marker_tasks_card": {
+        "history": "Historique"
+      },
+      "notifications_admin_settings": {
+        "notifications": "Notifications"
+      },
+      "playback_settings": {
+        "loading": "Chargement…"
+      },
+      "settings_overview": {
+        "settings": "Paramètres"
+      }
+    },
+    "admin_task_detail": {
+      "admin": "Administration",
+      "loading": "Chargement…"
+    },
+    "admin_user_detail": {
+      "admin": "Administration",
+      "requests": "Demandes",
+      "settings": "Paramètres",
+      "user": "Utilisateur"
+    },
+    "admin_users": {
+      "admin": "Administration",
+      "user": "Utilisateur"
+    },
+    "calendar": {
+      "calendar": "Calendrier",
+      "loading": "Chargement…"
+    },
+    "collections": {
+      "collections": "Collections"
+    },
+    "ebook_reader": {
+      "settings": "Paramètres",
+      "theme": "Thème"
+    },
+    "home": {
+      "home": "Accueil"
+    },
+    "imported_collection_editor": {
+      "libraries": "Bibliothèques"
+    },
+    "item_detail": {
+      "components": {
+        "subtitle_search_dialog": {
+          "language": "Langue"
+        }
+      }
+    },
+    "library_collections": {
+      "collections": "Collections"
+    },
+    "notifications": {
+      "favorites": "Favoris",
+      "notifications": "Notifications",
+      "watchlist": "Liste de suivi"
+    },
+    "recommendations": {
+      "recommendations": "Recommandations"
+    },
+    "request_browse": {
+      "loading": "Chargement…",
+      "requests": "Demandes"
+    },
+    "requests": {
+      "discover": "Découvrir",
+      "requests": "Demandes"
+    },
+    "settings": {
+      "appearance_settings": {
+        "theme": "Thème"
+      },
+      "history_import_settings": {
+        "favorites": "Favoris",
+        "history": "Historique",
+        "watchlist": "Liste de suivi"
+      },
+      "home_screen_settings": {
+        "home": "Accueil"
+      },
+      "library_settings": {
+        "libraries": "Bibliothèques"
+      },
+      "notifications_settings": {
+        "favorites": "Favoris",
+        "notifications": "Notifications",
+        "requests": "Demandes",
+        "watchlist": "Liste de suivi"
+      },
+      "watch_providers_settings": {
+        "favorites": "Favoris",
+        "watchlist": "Liste de suivi"
+      },
+      "webhook_sync_settings": {
+        "notifications": "Notifications",
+        "user_9f8a2389": "Utilisateur"
+      }
+    },
+    "settings_layout": {
+      "libraries": "Bibliothèques",
+      "notifications": "Notifications",
+      "settings": "Paramètres"
+    },
+    "setup_wizard": {
+      "loading": "Chargement…"
+    },
+    "user_collections_shared": {
+      "libraries": "Bibliothèques"
+    },
+    "watch_together_join": {
+      "watch_party": "Visionnage partagé"
+    },
+    "watch_together_room_page": {
+      "loading": "Chargement…",
+      "watch_party": "Visionnage partagé"
+    }
+  },
+  "player": {
+    "components": {
+      "subtitle_search_modal": {
+        "language": "Langue"
+      },
+      "video_player": {
+        "watch_party": "Visionnage partagé"
+      },
+      "watch_together_panel": {
+        "watch_party": "Visionnage partagé"
+      }
+    }
+  },
+  "shell": {
+    "accessibility": {
+      "collapse": "Réduire {{label}}",
+      "expand": "Développer {{label}}",
+      "unpin": "Désépingler"
+    },
+    "impersonation": {
+      "authorized_by": "autorisé par <name>{{name}}</name>",
+      "end_action": "Terminer la session",
+      "end_aria_label": "Terminer la session d’usurpation",
+      "viewing_as": "Affichage en tant que"
+    },
+    "navigation": {
+      "admin": "Administration",
+      "apps": "Applications",
+      "aria_label": "Navigation principale",
+      "calendar": "Calendrier",
+      "collections": "Collections",
+      "discover": "Découvrir",
+      "favorites": "Favoris",
+      "for_you": "Pour vous",
+      "go_home": "Aller à l’accueil",
+      "history": "Historique",
+      "home": "Accueil",
+      "libraries": "Bibliothèques",
+      "notifications": "Notifications",
+      "recommendations": "Recommandations",
+      "requests": "Demandes",
+      "search": "Rechercher",
+      "watch_party": "Visionnage partagé",
+      "watchlist": "Liste de suivi",
+      "your_stuff": "Vos contenus"
+    },
+    "profile": {
+      "default_name": "Utilisateur",
+      "logout": "Se déconnecter",
+      "menu_aria_label": "Menu de {{name}}",
+      "settings": "Paramètres",
+      "switch_profile": "Changer de profil",
+      "theme": "Thème"
+    }
+  }
+}

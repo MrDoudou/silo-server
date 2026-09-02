@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PluginSettingsSummary } from "@/api/types";
+import { changeLanguage } from "@/i18n";
 import { SEARCH_SHORTCUT_LABEL } from "@/lib/keyboardShortcut";
 
 import AppSidebar from "./AppSidebar";
@@ -166,7 +167,13 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DropdownMenuItem: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DropdownMenuLabel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuPortal: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuRadioGroup: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuRadioItem: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DropdownMenuSeparator: () => <hr />,
+  DropdownMenuSub: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuSubContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuSubTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 function renderSidebar(entry: string, { collapsed = false }: { collapsed?: boolean } = {}) {
@@ -184,7 +191,8 @@ function parseMarkup(markup: string): Document {
 }
 
 describe("AppSidebar", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await changeLanguage("en");
     mockLogout.mockReset();
     mockClearProfile.mockReset();
     mockTogglePin.mockReset();
@@ -204,6 +212,16 @@ describe("AppSidebar", () => {
     const markup = renderSidebar("/");
 
     expect(markup).toContain(`>${SEARCH_SHORTCUT_LABEL}</kbd>`);
+  });
+
+  it("renders translated shell labels when the language changes", async () => {
+    await changeLanguage("fr");
+
+    const markup = renderSidebar("/");
+
+    expect(markup).toContain("Accueil");
+    expect(markup).toContain("Bibliothèques");
+    expect(markup).toContain("Vos contenus");
   });
 
   it("renders the Silo brand mark instead of the old play glyph", () => {

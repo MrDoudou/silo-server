@@ -10,6 +10,8 @@ import { SkipIcon } from "./SkipIcon";
 import { SpeedControl } from "./SpeedControl";
 import type { AudiobookPlayback } from "./useAudiobookPlayback";
 import type { AudiobookPrefs } from "./useAudiobookPrefs";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface MiniBarProps {
   contentId: string;
@@ -30,6 +32,7 @@ export function MiniBar({
   onClose,
   onExpand,
 }: MiniBarProps) {
+  useUILanguage();
   const hasChapters = playback.chapters.length > 0;
   const hasNextChapter =
     playback.currentChapter != null && playback.currentChapter.index + 1 < playback.chapters.length;
@@ -89,8 +92,8 @@ export function MiniBar({
               <CircleButton
                 size="sm"
                 variant="secondary"
-                ariaLabel="Previous chapter"
-                title="Previous chapter (P)"
+                ariaLabel={tr("pages.audiobooks.player.mini_bar.previous_chapter")}
+                title={tr("pages.audiobooks.player.mini_bar.previous_chapter_p")}
                 onClick={playback.prevChapter}
                 disabled={!playback.hasFile}
               >
@@ -102,8 +105,12 @@ export function MiniBar({
           <CircleButton
             size="sm"
             variant="secondary"
-            ariaLabel={`Back ${prefs.skipBack} seconds`}
-            title={`Back ${prefs.skipBack} seconds (←)`}
+            ariaLabel={tr("pages.audiobooks.player.mini_bar.back_value1_seconds", {
+              value1: prefs.skipBack,
+            })}
+            title={tr("pages.audiobooks.player.mini_bar.back_skip_back_seconds", {
+              skipBack: prefs.skipBack,
+            })}
             className="group"
             onClick={() => playback.skip(-prefs.skipBack)}
             disabled={!playback.hasFile}
@@ -114,8 +121,12 @@ export function MiniBar({
           <CircleButton
             size="md"
             variant="primary"
-            ariaLabel={playback.playing ? "Pause" : "Play"}
-            title={playback.playing ? "Pause (space)" : "Play (space)"}
+            ariaLabel={tr(playback.playing ? "common.actions.pause" : "common.actions.play")}
+            title={
+              playback.playing
+                ? tr("pages.audiobooks.player.mini_bar.pause_space")
+                : tr("pages.audiobooks.player.mini_bar.play_space")
+            }
             onClick={playback.togglePlay}
             disabled={!playback.hasFile}
             data-paused={!playback.playing}
@@ -130,8 +141,12 @@ export function MiniBar({
           <CircleButton
             size="sm"
             variant="secondary"
-            ariaLabel={`Forward ${prefs.skipForward} seconds`}
-            title={`Forward ${prefs.skipForward} seconds (→)`}
+            ariaLabel={tr("pages.audiobooks.player.mini_bar.forward_value1_seconds", {
+              value1: prefs.skipForward,
+            })}
+            title={tr("pages.audiobooks.player.mini_bar.forward_skip_forward_seconds", {
+              skipForward: prefs.skipForward,
+            })}
             className="group"
             onClick={() => playback.skip(prefs.skipForward)}
             disabled={!playback.hasFile}
@@ -144,8 +159,8 @@ export function MiniBar({
               <CircleButton
                 size="sm"
                 variant="secondary"
-                ariaLabel="Next chapter"
-                title="Next chapter (N)"
+                ariaLabel={tr("pages.audiobooks.player.mini_bar.next_chapter")}
+                title={tr("pages.audiobooks.player.mini_bar.next_chapter_n")}
                 onClick={playback.nextChapter}
                 disabled={!playback.hasFile || !hasNextChapter}
               >
@@ -183,7 +198,7 @@ export function MiniBar({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close player"
+              aria-label={tr("pages.audiobooks.player.mini_bar.close_player")}
               className="text-muted-foreground hover:text-foreground rounded p-1.5"
             >
               <X className="h-4 w-4" />

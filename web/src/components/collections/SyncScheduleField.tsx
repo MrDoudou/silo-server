@@ -8,14 +8,46 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const PRESET_VALUES = [
-  { value: "0 * * * *", label: "Every hour" },
-  { value: "0 */6 * * *", label: "Every 6 hours" },
-  { value: "0 3 * * *", label: "Daily at 3:00 AM" },
-  { value: "0 3 * * 1", label: "Weekly (Monday 3:00 AM)" },
-  { value: "0 3 * * 0", label: "Weekly (Sunday 3:00 AM)" },
-  { value: "0 3 1 * *", label: "Monthly (1st at 3:00 AM)" },
+  {
+    value: "0 * * * *",
+    get label() {
+      return tr("components.collections.sync_schedule_field.every_hour");
+    },
+  },
+  {
+    value: "0 */6 * * *",
+    get label() {
+      return tr("components.collections.sync_schedule_field.every_6_hours");
+    },
+  },
+  {
+    value: "0 3 * * *",
+    get label() {
+      return tr("components.collections.sync_schedule_field.daily_at_3_00_am");
+    },
+  },
+  {
+    value: "0 3 * * 1",
+    get label() {
+      return tr("components.collections.sync_schedule_field.weekly_monday_3_00_am");
+    },
+  },
+  {
+    value: "0 3 * * 0",
+    get label() {
+      return tr("components.collections.sync_schedule_field.weekly_sunday_3_00_am");
+    },
+  },
+  {
+    value: "0 3 1 * *",
+    get label() {
+      return tr("components.collections.sync_schedule_field.monthly_1st_at_3_00_am");
+    },
+  },
 ] as const;
 
 function findPreset(value: string): string | undefined {
@@ -35,6 +67,7 @@ interface SyncScheduleFieldProps {
 }
 
 export function SyncScheduleField({ value, onChange, disabled }: SyncScheduleFieldProps) {
+  useUILanguage();
   const [mode, setMode] = useState<"none" | "preset" | "custom">(() => deriveMode(value));
 
   const selectValue =
@@ -42,7 +75,7 @@ export function SyncScheduleField({ value, onChange, disabled }: SyncScheduleFie
 
   return (
     <div className="space-y-2">
-      <Label>Sync Schedule</Label>
+      <Label>{tr("components.collections.sync_schedule_field.sync_schedule")}</Label>
       <Select
         value={selectValue}
         onValueChange={(v) => {
@@ -62,16 +95,22 @@ export function SyncScheduleField({ value, onChange, disabled }: SyncScheduleFie
         disabled={disabled}
       >
         <SelectTrigger className="w-full sm:w-[280px]">
-          <SelectValue placeholder="Select a schedule" />
+          <SelectValue
+            placeholder={tr("components.collections.sync_schedule_field.select_a_schedule")}
+          />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__none__">No automatic sync</SelectItem>
+          <SelectItem value="__none__">
+            {tr("components.collections.sync_schedule_field.no_automatic_sync")}
+          </SelectItem>
           {PRESET_VALUES.map((preset) => (
             <SelectItem key={preset.value} value={preset.value}>
               {preset.label}
             </SelectItem>
           ))}
-          <SelectItem value="custom">Custom cron expression</SelectItem>
+          <SelectItem value="custom">
+            {tr("components.collections.sync_schedule_field.custom_cron_expression")}
+          </SelectItem>
         </SelectContent>
       </Select>
 
@@ -79,14 +118,16 @@ export function SyncScheduleField({ value, onChange, disabled }: SyncScheduleFie
         <div className="space-y-1">
           <Input
             type="text"
-            placeholder="0 3 * * *"
+            placeholder={tr("components.collections.sync_schedule_field.value_0_3")}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             className="w-full font-mono sm:w-[280px]"
           />
           <p className="text-muted-foreground text-xs">
-            Standard cron format: minute hour day-of-month month day-of-week
+            {tr(
+              "components.collections.sync_schedule_field.standard_cron_format_minute_hour_day_of_month_month_day",
+            )}
           </p>
         </div>
       )}

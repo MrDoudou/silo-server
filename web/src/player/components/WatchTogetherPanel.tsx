@@ -6,6 +6,8 @@ import {
 } from "@/components/watchtogether/ConnectionStatusDot";
 import { EndWatchPartyDialog } from "@/components/watchtogether/EndWatchPartyDialog";
 import type { GuestControlPolicy, WatchTogetherRoomSnapshot } from "@/lib/watchTogether";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface WatchTogetherPanelProps {
   room: WatchTogetherRoomSnapshot | null;
@@ -24,6 +26,7 @@ export function WatchTogetherPanel({
   onToggleGuestControl,
   onEndRoom,
 }: WatchTogetherPanelProps) {
+  useUILanguage();
   const [endConfirmOpen, setEndConfirmOpen] = useState(false);
   const isHost = room?.self_can_manage_room === true;
   const policy = room?.guest_control_policy ?? "host_only";
@@ -40,13 +43,14 @@ export function WatchTogetherPanel({
     <div
       aria-hidden={!visible}
       inert={!visible}
-      className={`absolute top-4 right-4 z-50 w-56 rounded-xl border border-white/10 bg-black/80 p-3 text-white shadow-2xl backdrop-blur-xl transition-opacity duration-300 ${
-        visible ? "opacity-100" : "pointer-events-none opacity-0"
-      }`}
+      className={
+        "absolute top-4 right-4 z-50 w-56 rounded-xl border border-white/10 bg-black/80 p-3 text-white shadow-2xl backdrop-blur-xl transition-opacity duration-300 " +
+        (visible ? "opacity-100" : "pointer-events-none opacity-0")
+      }
     >
       {/* Label + status */}
       <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.16em] text-white/60 uppercase">
-        <span>Watch Party</span>
+        <span>{tr("player.components.watch_together_panel.watch_party")}</span>
         <ConnectionStatusDot state={connectionState} className="size-1.5" />
         <span>
           <ConnectionStateLabel state={connectionState} />
@@ -60,7 +64,10 @@ export function WatchTogetherPanel({
         </span>
         {room ? (
           <span className="text-xs text-white/50">
-            {room.member_count} {room.member_count === 1 ? "viewer" : "viewers"}
+            {room.member_count}{" "}
+            {room.member_count === 1
+              ? tr("player.components.watch_together_panel.viewer")
+              : tr("player.components.watch_together_panel.viewers")}
           </span>
         ) : null}
       </div>
@@ -69,7 +76,9 @@ export function WatchTogetherPanel({
       {room ? (
         <div className="mt-1.5 text-[11px] leading-snug text-white/50">{policyLabel}</div>
       ) : (
-        <div className="mt-1.5 text-[11px] leading-snug text-white/50">Syncing room state</div>
+        <div className="mt-1.5 text-[11px] leading-snug text-white/50">
+          {tr("player.components.watch_together_panel.syncing_room_state")}
+        </div>
       )}
 
       {/* Actions */}
@@ -78,10 +87,10 @@ export function WatchTogetherPanel({
           <button
             type="button"
             onClick={onCopyInvite}
-            aria-label="Copy invite link"
+            aria-label={tr("player.components.watch_together_panel.copy_invite_link")}
             className="rounded-md bg-white/12 px-2.5 py-1 text-[11px] font-medium text-white/90 transition-colors hover:bg-white/20"
           >
-            Invite
+            {tr("player.components.watch_together_panel.invite")}
           </button>
           <button
             type="button"
@@ -90,14 +99,16 @@ export function WatchTogetherPanel({
             }
             className="rounded-md bg-white/12 px-2.5 py-1 text-[11px] font-medium text-white/90 transition-colors hover:bg-white/20"
           >
-            {policy === "guest_play_pause" ? "Host Only" : "Allow Pause"}
+            {policy === "guest_play_pause"
+              ? tr("player.components.watch_together_panel.host_only")
+              : tr("player.components.watch_together_panel.allow_pause")}
           </button>
           <button
             type="button"
             onClick={() => setEndConfirmOpen(true)}
             className="ml-auto rounded-md bg-red-500/25 px-2.5 py-1 text-[11px] font-medium text-red-100 transition-colors hover:bg-red-500/35"
           >
-            End
+            {tr("player.components.watch_together_panel.end")}
           </button>
         </div>
       ) : null}

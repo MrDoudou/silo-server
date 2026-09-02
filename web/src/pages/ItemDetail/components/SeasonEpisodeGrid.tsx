@@ -14,6 +14,8 @@ import type { CardQuickActionMode } from "@/lib/cardQuickActions";
 import { overlayDataFromEpisodeListItem, type CardOverlayPrefs } from "@/lib/overlays";
 import { EpisodeGridSkeleton } from "./SectionSkeletons";
 import type { EpisodeNavigationState } from "../itemDetailLayout";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * How much of a season stays visible before the section scrolls, so a long one
@@ -37,6 +39,7 @@ export default function SeasonEpisodeGrid({
   isLoading,
   episodeLinkState,
 }: SeasonEpisodeGridProps) {
+  useUILanguage();
   const { prefs: overlayPrefs, quickActionMode } = useOverlayPrefs();
   const prefetchEpisodeDetail = usePrefetchCatalogItemDetail();
   const setGridRef = useGridRowCap<HTMLDivElement>(VISIBLE_EPISODE_ROWS, episodes.length);
@@ -48,7 +51,9 @@ export default function SeasonEpisodeGrid({
   if (episodes.length === 0) {
     return (
       <div className="border-border text-muted-foreground bg-surface rounded-lg border p-5 text-sm">
-        No episodes are available for this season yet.
+        {tr(
+          "pages.item_detail.components.season_episode_grid.no_episodes_are_available_for_this_season_yet",
+        )}
       </div>
     );
   }
@@ -87,6 +92,7 @@ function SeasonEpisodeCard({
   quickActionMode: CardQuickActionMode;
   onPrefetch: () => void;
 }) {
+  useUILanguage();
   const cardRef = useRef<HTMLDivElement>(null);
   const prefetchHandlers = useDwellPrefetch(onPrefetch);
   const hasPartialProgress =
@@ -99,7 +105,7 @@ function SeasonEpisodeCard({
     <div ref={cardRef} className="group/card media-card media-card-longpress" {...prefetchHandlers}>
       <div className="relative">
         <ViewTransitionLink
-          to={`/item/${episode.content_id}`}
+          to={"/item/" + episode.content_id}
           state={episodeLinkState}
           className="group block"
         >
@@ -159,18 +165,26 @@ function SeasonEpisodeCard({
         />
       </div>
       <ViewTransitionLink
-        to={`/item/${episode.content_id}`}
+        to={"/item/" + episode.content_id}
         state={episodeLinkState}
         className="block"
       >
         <div className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
-          <span>Episode {episode.episode_number}</span>
+          <span>
+            {tr("pages.item_detail.components.season_episode_grid.episode")}{" "}
+            {episode.episode_number}
+          </span>
           {episode.user_data?.played && <WatchedCheckIndicator className="ml-auto" />}
         </div>
         <p className="text-foreground truncate text-sm font-semibold">{episodeTitle}</p>
         <div className="mt-1.5 space-y-1">
           <div className="text-muted-foreground flex items-center gap-2 text-xs">
-            {episode.runtime > 0 && <span>{episode.runtime}m</span>}
+            {episode.runtime > 0 && (
+              <span>
+                {episode.runtime}
+                {tr("pages.item_detail.components.season_episode_grid.m")}
+              </span>
+            )}
             {episode.air_date && (
               <span>
                 {new Intl.DateTimeFormat(undefined, {

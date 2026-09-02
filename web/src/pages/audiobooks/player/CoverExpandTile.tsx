@@ -1,4 +1,6 @@
 import { Maximize2 } from "lucide-react";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CoverExpandTileProps {
   contentId: string;
@@ -8,11 +10,12 @@ interface CoverExpandTileProps {
 }
 
 export function CoverExpandTile({ contentId, posterUrl, title, onExpand }: CoverExpandTileProps) {
+  useUILanguage();
   return (
     <button
       type="button"
       onClick={onExpand}
-      aria-label="Open Now Listening"
+      aria-label={tr("pages.audiobooks.player.cover_expand_tile.open_now_listening")}
       className="group/tile bg-muted relative h-[54px] w-[36px] shrink-0 overflow-hidden rounded-md transition-transform hover:scale-[1.04] focus-visible:scale-[1.04] focus-visible:outline-none"
       style={{ viewTransitionName: `audiobook-cover-${contentId}` }}
     >

@@ -4,6 +4,8 @@ import type { MarkerEditor } from "../hooks/useMarkerEditor";
 import { MARKER_KINDS, MARKER_LABELS } from "../hooks/useMarkerEditor";
 import type { MarkerKind } from "../types";
 import { formatTime } from "./SeekBar";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface MarkerEditPanelProps {
   editor: MarkerEditor;
@@ -25,6 +27,7 @@ const DOT_COLORS: Record<MarkerKind, string> = {
  * a single line so the panel reads cleanly.
  */
 export function MarkerEditPanel({ editor, currentTime }: MarkerEditPanelProps) {
+  useUILanguage();
   const { draft, activeKind, saving, error, dirty } = editor;
   const panelRef = useRef<HTMLDivElement>(null);
   const dragCleanupRef = useRef<(() => void) | null>(null);
@@ -90,15 +93,19 @@ export function MarkerEditPanel({ editor, currentTime }: MarkerEditPanelProps) {
         <div className="flex items-start gap-2">
           <GripHorizontal className="mt-0.5 h-4 w-4 shrink-0 text-white/30" />
           <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold tracking-tight">Edit markers</span>
+            <span className="text-sm font-semibold tracking-tight">
+              {tr("player.components.marker_edit_panel.edit_markers")}
+            </span>
             <span className="text-[11px] leading-tight text-white/40">
-              Drag the timeline handles, or set points to the playhead.
+              {tr(
+                "player.components.marker_edit_panel.drag_the_timeline_handles_or_set_points_to_the_playhead",
+              )}
             </span>
           </div>
         </div>
         <button
           type="button"
-          aria-label="Close marker editor"
+          aria-label={tr("player.components.marker_edit_panel.close_marker_editor")}
           className="-mr-1 rounded-md p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={editor.cancel}
@@ -146,23 +153,30 @@ export function MarkerEditPanel({ editor, currentTime }: MarkerEditPanelProps) {
                     range ? "text-white/75" : "text-white/35",
                   ].join(" ")}
                 >
-                  {range ? `${formatTime(range.start)} – ${formatTime(range.end)}` : "Not set"}
+                  {range
+                    ? tr("player.components.marker_edit_panel.value_value2", {
+                        value: formatTime(range.start),
+                        value2: formatTime(range.end),
+                      })
+                    : tr("player.components.marker_edit_panel.not_set")}
                 </span>
               </button>
 
               {isActive && (
                 <div className="mt-2 flex items-center gap-1.5">
                   <EdgeButton onClick={() => editor.setEdge(kind, "start", currentTime)}>
-                    Set start
+                    {tr("player.components.marker_edit_panel.set_start")}
                   </EdgeButton>
                   <EdgeButton onClick={() => editor.setEdge(kind, "end", currentTime)}>
-                    Set end
+                    {tr("player.components.marker_edit_panel.set_end")}
                   </EdgeButton>
                   <div className="ml-auto flex items-center gap-0.5">
                     <button
                       type="button"
-                      aria-label={`Reset ${MARKER_LABELS[kind]} marker`}
-                      title="Reset to saved"
+                      aria-label={tr("player.components.marker_edit_panel.reset_value_marker", {
+                        value: MARKER_LABELS[kind],
+                      })}
+                      title={tr("player.components.marker_edit_panel.reset_to_saved")}
                       disabled={!editor.isKindDirty(kind)}
                       onClick={() => editor.resetKind(kind)}
                       className="rounded-md p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-25"
@@ -171,8 +185,10 @@ export function MarkerEditPanel({ editor, currentTime }: MarkerEditPanelProps) {
                     </button>
                     <button
                       type="button"
-                      aria-label={`Clear ${MARKER_LABELS[kind]} marker`}
-                      title="Clear marker"
+                      aria-label={tr("player.components.marker_edit_panel.clear_value_marker", {
+                        value: MARKER_LABELS[kind],
+                      })}
+                      title={tr("player.components.marker_edit_panel.clear_marker")}
                       disabled={!range}
                       onClick={() => editor.clearKind(kind)}
                       className="rounded-md p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-red-300 disabled:pointer-events-none disabled:opacity-25"
@@ -203,11 +219,11 @@ export function MarkerEditPanel({ editor, currentTime }: MarkerEditPanelProps) {
             <button
               type="button"
               onClick={editor.resetAll}
-              title="Reset all markers to saved"
+              title={tr("player.components.marker_edit_panel.reset_all_markers_to_saved")}
               className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-white/60 transition-colors hover:bg-white/10 hover:text-white"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Reset all
+              {tr("player.components.marker_edit_panel.reset_all")}
             </button>
           )}
           <button
@@ -215,7 +231,7 @@ export function MarkerEditPanel({ editor, currentTime }: MarkerEditPanelProps) {
             onClick={editor.cancel}
             className="rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white/70 transition-colors hover:bg-white/10 hover:text-white"
           >
-            Cancel
+            {tr("common.actions.cancel")}
           </button>
           <button
             type="button"
@@ -230,7 +246,7 @@ export function MarkerEditPanel({ editor, currentTime }: MarkerEditPanelProps) {
             ) : (
               <Check className="h-3.5 w-3.5" />
             )}
-            Save
+            {tr("common.actions.save")}
           </button>
         </div>
       </div>
@@ -239,6 +255,7 @@ export function MarkerEditPanel({ editor, currentTime }: MarkerEditPanelProps) {
 }
 
 function EdgeButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  useUILanguage();
   return (
     <button
       type="button"

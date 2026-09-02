@@ -1,6 +1,8 @@
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { ItemVideo } from "@/api/types";
 import { extraKindLabel } from "@/lib/extraKinds";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface TrailerModalProps {
   video: ItemVideo | null;
@@ -13,16 +15,19 @@ interface TrailerModalProps {
  * primitive's backdrop/Escape/close-button behavior.
  */
 export default function TrailerModal({ video, onOpenChange }: TrailerModalProps) {
+  useUILanguage();
   const title = video?.name || (video ? extraKindLabel(video.kind) : "");
 
   return (
     <Dialog open={video !== null} onOpenChange={onOpenChange}>
       <DialogContent className="gap-0 overflow-hidden border-none bg-black p-0 sm:max-w-4xl">
         <DialogTitle className="sr-only">{title}</DialogTitle>
-        <DialogDescription className="sr-only">Trailer video player</DialogDescription>
+        <DialogDescription className="sr-only">
+          {tr("pages.item_detail.components.trailer_modal.trailer_video_player")}
+        </DialogDescription>
         {video && (
           <iframe
-            src={`https://www.youtube-nocookie.com/embed/${video.site_key}?autoplay=1`}
+            src={"https://www.youtube-nocookie.com/embed/" + video.site_key + "?autoplay=1"}
             allow="autoplay; encrypted-media; fullscreen"
             title={title}
             className="aspect-video w-full"

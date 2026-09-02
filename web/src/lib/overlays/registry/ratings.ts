@@ -1,5 +1,7 @@
 import type { OverlayDef } from "../types";
 
+import { tr } from "@/i18n/translate";
+
 function formatRating(
   value: number | null | undefined,
   max: number,
@@ -14,8 +16,12 @@ export const RATINGS_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "rating_imdb",
     category: "ratings",
-    label: "IMDb Rating",
-    description: "IMDb score out of 10",
+    get label() {
+      return tr("lib.overlays.registry.ratings.imdb_rating");
+    },
+    get description() {
+      return tr("lib.overlays.registry.ratings.imdb_score_out_of_10");
+    },
     defaultPosition: "top-right",
     defaultEnabled: false,
     iconId: "star",
@@ -26,8 +32,12 @@ export const RATINGS_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "rating_tmdb",
     category: "ratings",
-    label: "TMDB Rating",
-    description: "TMDB score out of 10",
+    get label() {
+      return tr("lib.overlays.registry.ratings.tmdb_rating");
+    },
+    get description() {
+      return tr("lib.overlays.registry.ratings.tmdb_score_out_of_10");
+    },
     defaultPosition: "top-right",
     defaultEnabled: false,
     iconId: "star",
@@ -38,8 +48,12 @@ export const RATINGS_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "rating_rt",
     category: "ratings",
-    label: "RT Critics",
-    description: "Rotten Tomatoes critic score",
+    get label() {
+      return tr("lib.overlays.registry.ratings.rt_critics");
+    },
+    get description() {
+      return tr("lib.overlays.registry.ratings.rotten_tomatoes_critic_score");
+    },
     defaultPosition: "top-right",
     defaultEnabled: false,
     iconId: "tomato",
@@ -50,8 +64,12 @@ export const RATINGS_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "rating_rt_audience",
     category: "ratings",
-    label: "RT Audience",
-    description: "Rotten Tomatoes audience score",
+    get label() {
+      return tr("lib.overlays.registry.ratings.rt_audience");
+    },
+    get description() {
+      return tr("lib.overlays.registry.ratings.rotten_tomatoes_audience_score");
+    },
     defaultPosition: "top-right",
     defaultEnabled: false,
     iconId: "tomato",
@@ -62,8 +80,12 @@ export const RATINGS_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "content_rating",
     category: "ratings",
-    label: "Age Rating",
-    description: "Content rating (PG-13, TV-MA, R, etc.)",
+    get label() {
+      return tr("lib.overlays.registry.ratings.age_rating");
+    },
+    get description() {
+      return tr("lib.overlays.registry.ratings.content_rating_pg_13_tv_ma_r_etc");
+    },
     defaultPosition: "bottom-right",
     defaultEnabled: false,
     iconId: "shield",

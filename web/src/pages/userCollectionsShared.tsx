@@ -21,6 +21,8 @@ import CollectionBuilder, {
 } from "@/components/collections/CollectionBuilder";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export function buildUserCollectionEditorPath(id: "new" | string) {
   return id === "new" ? "/collections/new" : `/collections/${id}/edit`;
@@ -103,6 +105,7 @@ function UserCollectionSummary({
   collection: Collection | null;
   libraries: Array<{ id: number; name: string }>;
 }) {
+  useUILanguage();
   const profileSummary =
     draft.access.allowed_profile_ids.length > 0
       ? `${draft.access.allowed_profile_ids.length} selected`
@@ -124,31 +127,51 @@ function UserCollectionSummary({
   return (
     <Card className="surface-panel gap-0 rounded-[1.5rem] border-0 shadow-none">
       <CardHeader>
-        <CardTitle>Collection Summary</CardTitle>
-        <CardDescription>Preview and sharing stay visible while you edit.</CardDescription>
+        <CardTitle>{tr("pages.user_collections_shared.collection_summary")}</CardTitle>
+        <CardDescription>
+          {tr("pages.user_collections_shared.preview_and_sharing_stay_visible_while_you_edit")}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <SummaryRow label="Mode" value={draft.collection_type === "smart" ? "Smart" : "Manual"} />
-        <SummaryRow label="Libraries" value={librarySummary} />
+        <SummaryRow
+          label={tr("pages.user_collections_shared.mode")}
+          value={draft.collection_type === "smart" ? "Smart" : "Manual"}
+        />
+        <SummaryRow label={tr("pages.user_collections_shared.libraries")} value={librarySummary} />
         {draft.collection_type === "manual" ? (
           <>
-            <SummaryRow label="Watch state" value={collectionWatchFilterLabel(displayWatch)} />
-            <SummaryRow label="Content" value={collectionMediaFilterLabel(displayMedia)} />
+            <SummaryRow
+              label={tr("pages.user_collections_shared.watch_state")}
+              value={collectionWatchFilterLabel(displayWatch)}
+            />
+            <SummaryRow
+              label={tr("pages.user_collections_shared.content")}
+              value={collectionMediaFilterLabel(displayMedia)}
+            />
           </>
         ) : null}
-        <SummaryRow label="Shared" value={draft.access.is_shared ? "Yes" : "No"} />
-        <SummaryRow label="Profiles" value={profileSummary} />
         <SummaryRow
-          label="In my library tab"
+          label={tr("pages.user_collections_shared.shared")}
+          value={draft.access.is_shared ? "Yes" : "No"}
+        />
+        <SummaryRow label={tr("pages.user_collections_shared.profiles")} value={profileSummary} />
+        <SummaryRow
+          label={tr("pages.user_collections_shared.in_my_library_tab")}
           value={draft.include_in_server_collections ? "Yes" : "No"}
         />
-        {collection ? <SummaryRow label="Collection" value={collection.name} /> : null}
+        {collection ? (
+          <SummaryRow
+            label={tr("pages.user_collections_shared.collection")}
+            value={collection.name}
+          />
+        ) : null}
       </CardContent>
     </Card>
   );
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
+  useUILanguage();
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <span className="text-muted-foreground">{label}</span>
@@ -164,6 +187,7 @@ export function UserCollectionForm({
   collection: Collection | null;
   onClose: () => void;
 }) {
+  useUILanguage();
   const [draft, setDraft] = useState(() => toUserCollectionBuilderValue(collection));
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [posterSourceUrl, setPosterSourceUrl] = useState("");
@@ -217,7 +241,7 @@ export function UserCollectionForm({
       value={draft}
       onChange={setDraft}
       onSubmit={handleSubmit}
-      submitLabel="Save Collection"
+      submitLabel={tr("pages.user_collections_shared.save_collection")}
       profiles={profiles.map((entry) => ({ id: entry.id, name: entry.name }))}
       libraries={builderLibraries}
       allowAccessControls
@@ -233,10 +257,13 @@ export function UserCollectionForm({
       {draft.collection_type === "smart" ? (
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Libraries</h2>
+            <h2 className="text-lg font-semibold">
+              {tr("pages.user_collections_shared.libraries")}
+            </h2>
             <p className="text-muted-foreground mt-1 text-sm">
-              Limit this collection to specific libraries. Leave empty to span every library you can
-              see.
+              {tr(
+                "pages.user_collections_shared.limit_this_collection_to_specific_libraries_leave_empty_to_span",
+              )}
             </p>
           </div>
           <CollectionLibraryPicker
@@ -250,15 +277,16 @@ export function UserCollectionForm({
       {!readOnly ? (
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">Poster</h2>
+            <h2 className="text-lg font-semibold">{tr("pages.user_collections_shared.poster")}</h2>
             <p className="text-muted-foreground mt-1 text-sm">
-              Upload a custom poster or paste an image URL. Leave empty to fall back to the default
-              card.
+              {tr(
+                "pages.user_collections_shared.upload_a_custom_poster_or_paste_an_image_url_leave",
+              )}
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <ImageUploadField
-              label="Poster"
+              label={tr("pages.user_collections_shared.poster")}
               currentUrl={collection?.poster_url}
               file={posterFile}
               onFileChange={setPosterFile}

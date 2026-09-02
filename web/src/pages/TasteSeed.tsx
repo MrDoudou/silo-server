@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Check, Loader2, Sparkles } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -9,14 +10,17 @@ import { decodeThumbhash } from "@/lib/thumbhash";
 import type { SectionItem } from "@/api/types";
 import { useTasteSeedItems, useSubmitTasteSeed } from "@/hooks/queries/tasteSeed";
 import { setTasteSeedDismissed } from "@/lib/tasteSeed";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const MIN_PICKS = 3;
 
 export default function TasteSeed() {
+  useUILanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { profile } = useAuth();
-  useDocumentTitle("Pick what you love");
+  useDocumentTitle(tr("pages.taste_seed.pick_what_you_love"));
 
   const isReturning = searchParams.get("from") === "settings";
 
@@ -87,7 +91,9 @@ export default function TasteSeed() {
 
   const handleSubmit = useCallback(async () => {
     if (selected.size < MIN_PICKS) {
-      toast.error(`Pick at least ${MIN_PICKS} to continue`);
+      toast.error("errors.taste_seed.pick_at_least_count_titles_to_continue", {
+        values: { count: MIN_PICKS },
+      });
       return;
     }
     // Only submit IDs that aren't already favorited — the server will skip
@@ -112,14 +118,14 @@ export default function TasteSeed() {
       if (profile) {
         setTasteSeedDismissed(profile.id);
       }
-      toast.success(
-        result.added === 1
-          ? "Added 1 favorite — personalizing your home"
-          : `Added ${result.added} favorites — personalizing your home`,
-      );
+      toast.success("feedback.taste_seed.favorites_added_count_personalizing_your_home", {
+        values: {
+          count: result.added,
+        },
+      });
       navigate(isReturning ? "/settings/playback" : "/", { replace: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save your picks");
+      toast.error("errors.taste_seed.failed_to_save_your_picks", { error: err });
     }
   }, [selected, items, submit, navigate, profile, isReturning]);
 
@@ -133,26 +139,37 @@ export default function TasteSeed() {
           <div className="min-w-0 flex-1">
             <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl">
               <Sparkles className="text-primary h-5 w-5" aria-hidden="true" />
-              Pick what you love
+              {tr("pages.taste_seed.pick_what_you_love")}
             </h1>
             <p className="text-muted-foreground mt-0.5 text-sm">
               {selected.size === 0
-                ? `Select at least ${MIN_PICKS} titles to personalize your recommendations`
-                : `${selected.size} selected${selected.size < MIN_PICKS ? ` — ${MIN_PICKS - selected.size} more to continue` : ""}`}
+                ? tr(
+                    "pages.taste_seed.select_at_least_min_picks_titles_to_personalize_your_recommendations",
+                    {
+                      MIN_PICKS: MIN_PICKS,
+                    },
+                  )
+                : tr("pages.taste_seed.size_selected_value", {
+                    size: selected.size,
+                    value:
+                      selected.size < MIN_PICKS
+                        ? ` — ${MIN_PICKS - selected.size} more to continue`
+                        : "",
+                  })}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Button variant="ghost" onClick={handleSkip} disabled={submit.isPending}>
-              {isReturning ? "Cancel" : "Skip"}
+              {isReturning ? tr("common.actions.cancel") : tr("common.actions.skip")}
             </Button>
             <Button onClick={handleSubmit} disabled={submitDisabled}>
               {submit.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {tr("pages.taste_seed.saving")}
                 </>
               ) : (
-                "Done"
+                tr("common.actions.done")
               )}
             </Button>
           </div>
@@ -164,12 +181,12 @@ export default function TasteSeed() {
           <TasteSeedGridSkeleton />
         ) : items.length === 0 ? (
           <div className="text-muted-foreground flex flex-col items-center gap-3 py-24 text-center">
-            <p className="text-base font-medium">No items to show yet</p>
+            <p className="text-base font-medium">{tr("pages.taste_seed.no_items_to_show_yet")}</p>
             <p className="text-sm">
-              Once your library has matched content, you'll see popular titles here.
+              {tr("pages.taste_seed.once_your_library_has_matched_content_you_ll_see_popular")}
             </p>
             <Button variant="ghost" className="mt-4" onClick={handleSkip}>
-              Continue
+              {tr("common.actions.continue")}
             </Button>
           </div>
         ) : (
@@ -177,7 +194,7 @@ export default function TasteSeed() {
             <div
               role="listbox"
               aria-multiselectable="true"
-              aria-label="Popular titles to choose from"
+              aria-label={tr("pages.taste_seed.popular_titles_to_choose_from")}
               className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7"
             >
               {items.map((item) => (
@@ -194,12 +211,12 @@ export default function TasteSeed() {
             {isFetchingNextPage && (
               <div className="text-muted-foreground flex justify-center py-4 text-sm">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading more
+                {tr("pages.taste_seed.loading_more")}
               </div>
             )}
             {!hasNextPage && !isFetching && items.length > 0 && (
               <p className="text-muted-foreground py-6 text-center text-xs">
-                That's everything popular on this server.
+                {tr("pages.taste_seed.that_s_everything_popular_on_this_server")}
               </p>
             )}
           </>
@@ -218,6 +235,7 @@ function TasteSeedCard({
   selected: boolean;
   onToggle: (contentId: string) => void;
 }) {
+  useUILanguage();
   const [loaded, setLoaded] = useState(false);
   const thumbhashUrl = item.poster_thumbhash ? decodeThumbhash(item.poster_thumbhash) : "";
 
@@ -226,7 +244,11 @@ function TasteSeedCard({
       type="button"
       role="option"
       aria-selected={selected}
-      aria-label={selected ? `Deselect ${item.title}` : `Select ${item.title}`}
+      aria-label={
+        selected
+          ? tr("pages.taste_seed.deselect_title", { title: item.title })
+          : tr("pages.taste_seed.select_title", { title: item.title })
+      }
       onClick={() => onToggle(item.content_id)}
       className="group focus-visible:ring-ring relative block overflow-hidden rounded-xl text-left focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
     >
@@ -246,30 +268,37 @@ function TasteSeedCard({
           <img
             src={item.poster_url}
             alt=""
-            className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+            className={
+              "h-full w-full object-cover transition-opacity duration-300 " +
+              (loaded ? "opacity-100" : "opacity-0")
+            }
             loading="lazy"
             onLoad={() => setLoaded(true)}
           />
         ) : (
           <div className="text-muted-foreground flex h-full w-full flex-col items-center justify-center gap-1 p-3 text-center text-xs">
-            <span className="line-clamp-3 font-medium">{item.title || "No Poster"}</span>
+            <span className="line-clamp-3 font-medium">
+              {item.title || tr("pages.taste_seed.no_poster")}
+            </span>
           </div>
         )}
 
         {/* Dim overlay when unselected to make selected posters pop */}
         <div
-          className={`pointer-events-none absolute inset-0 transition-opacity ${
-            selected ? "bg-primary/20 opacity-100" : "bg-black/0 group-hover:bg-black/15"
-          }`}
+          className={
+            "pointer-events-none absolute inset-0 transition-opacity " +
+            (selected ? "bg-primary/20 opacity-100" : "bg-black/0 group-hover:bg-black/15")
+          }
         />
 
         {/* Selection check indicator */}
         <span
-          className={`absolute top-2 right-2 inline-flex size-7 items-center justify-center rounded-full border transition ${
-            selected
+          className={
+            "absolute top-2 right-2 inline-flex size-7 items-center justify-center rounded-full border transition " +
+            (selected
               ? "border-primary bg-primary text-primary-foreground"
-              : "border-white/60 bg-black/40 text-transparent group-hover:bg-black/55"
-          }`}
+              : "border-white/60 bg-black/40 text-transparent group-hover:bg-black/55")
+          }
         >
           <Check className="size-4" />
         </span>
@@ -279,6 +308,7 @@ function TasteSeedCard({
 }
 
 function TasteSeedGridSkeleton() {
+  useUILanguage();
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
       {Array.from({ length: 24 }).map((_, i) => (

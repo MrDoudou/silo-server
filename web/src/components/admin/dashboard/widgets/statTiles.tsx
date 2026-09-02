@@ -9,6 +9,8 @@ import {
 import { classifyActivityMethod } from "@/pages/adminActivityPresentation";
 import { formatFileCount, formatMbps } from "../format";
 import { latestFreshPoint } from "./timeseriesSeries";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function StatTile({
   label,
@@ -25,6 +27,7 @@ function StatTile({
   isLoading: boolean;
   error: unknown;
 }) {
+  useUILanguage();
   if (isLoading) {
     return <Skeleton className="h-full min-h-24 rounded-2xl" />;
   }
@@ -39,7 +42,9 @@ function StatTile({
         <div className="text-muted-foreground">{icon}</div>
       </div>
       {error ? (
-        <div className="text-destructive text-sm">Unavailable</div>
+        <div className="text-destructive text-sm">
+          {tr("components.admin.dashboard.widgets.stat_tiles.unavailable")}
+        </div>
       ) : (
         <>
           <div className="mb-0.5 text-[28px] leading-none font-extrabold tracking-tight">
@@ -53,13 +58,20 @@ function StatTile({
 }
 
 export function ActiveStreamsStatWidget() {
+  useUILanguage();
   const sessionsQuery = useAdminSessions();
   const sessionCount = sessionsQuery.data?.length ?? 0;
   return (
     <StatTile
-      label="Active Streams"
+      label={tr("components.admin.dashboard.widgets.stat_tiles.active_streams")}
       value={String(sessionCount)}
-      sub={sessionCount === 1 ? "1 session" : `${sessionCount} sessions`}
+      sub={
+        sessionCount === 1
+          ? tr("components.admin.dashboard.widgets.stat_tiles.value_1_session")
+          : tr("components.admin.dashboard.widgets.stat_tiles.count_sessions", {
+              count: sessionCount,
+            })
+      }
       icon={<Activity className="h-4 w-4" />}
       isLoading={sessionsQuery.isLoading}
       error={sessionsQuery.error}
@@ -73,13 +85,18 @@ export function ActiveStreamsStatWidget() {
 const EGRESS_SAMPLE_MAX_AGE_MS = 2 * 60_000;
 
 export function EgressNowStatWidget() {
+  useUILanguage();
   const timeseriesQuery = useAdminTimeseries(1);
   const latest = latestFreshPoint(timeseriesQuery.data, EGRESS_SAMPLE_MAX_AGE_MS);
   return (
     <StatTile
-      label="Egress now"
+      label={tr("components.admin.dashboard.widgets.stat_tiles.egress_now")}
       value={latest ? formatMbps(latest.egress_kbps / 1_000) : "—"}
-      sub={latest ? "node + server egress" : "waiting for a sample"}
+      sub={tr(
+        latest
+          ? "components.admin.dashboard.widgets.stat_tiles.node_server_egress"
+          : "components.admin.dashboard.widgets.stat_tiles.waiting_for_a_sample",
+      )}
       icon={<Gauge className="h-4 w-4" />}
       isLoading={timeseriesQuery.isLoading}
       error={timeseriesQuery.error}
@@ -88,6 +105,7 @@ export function EgressNowStatWidget() {
 }
 
 export function TranscodeShareStatWidget() {
+  useUILanguage();
   const sessionsQuery = useAdminSessions();
   const sessions = sessionsQuery.data ?? [];
   // Same reduction the activity page uses: the server-computed
@@ -100,12 +118,15 @@ export function TranscodeShareStatWidget() {
   const share = sessions.length > 0 ? Math.round((transcoding / sessions.length) * 100) : null;
   return (
     <StatTile
-      label="Transcode share"
+      label={tr("components.admin.dashboard.widgets.stat_tiles.transcode_share")}
       value={share === null ? "—" : `${share}%`}
       sub={
         sessions.length > 0
-          ? `${transcoding.toLocaleString()} of ${sessions.length.toLocaleString()} streams`
-          : "no active streams"
+          ? tr("components.admin.dashboard.widgets.stat_tiles.transcoding_of_total_streams", {
+              transcoding: transcoding.toLocaleString(),
+              total: sessions.length.toLocaleString(),
+            })
+          : tr("components.admin.dashboard.widgets.stat_tiles.no_active_streams")
       }
       icon={<Zap className="h-4 w-4" />}
       isLoading={sessionsQuery.isLoading}
@@ -115,15 +136,16 @@ export function TranscodeShareStatWidget() {
 }
 
 export function ProfilesActiveStatWidget() {
+  useUILanguage();
   const activityQuery = useAdminPlaybackActivity(24);
   const profiles = activityQuery.data?.profiles_active_24h;
   return (
     <StatTile
       // A rolling 24h window, not "today": the server has no user timezone, so
       // the label says 24h rather than implying a calendar day.
-      label="Profiles · 24h"
+      label={tr("components.admin.dashboard.widgets.stat_tiles.profiles_24h")}
       value={profiles === undefined ? "—" : profiles.toLocaleString()}
-      sub="watched on this server"
+      sub={tr("components.admin.dashboard.widgets.stat_tiles.watched_on_this_server")}
       icon={<UserCheck className="h-4 w-4" />}
       isLoading={activityQuery.isLoading}
       error={activityQuery.error}
@@ -132,11 +154,12 @@ export function ProfilesActiveStatWidget() {
 }
 
 export function MoviesStatWidget() {
+  useUILanguage();
   const statsQuery = useAdminStats();
   const stats = statsQuery.data;
   return (
     <StatTile
-      label="Total Movies"
+      label={tr("components.admin.dashboard.widgets.stat_tiles.total_movies")}
       value={stats ? stats.total_movies.toLocaleString() : "—"}
       sub={formatFileCount(stats?.total_movie_files)}
       icon={<Film className="h-4 w-4" />}
@@ -147,11 +170,12 @@ export function MoviesStatWidget() {
 }
 
 export function ShowsStatWidget() {
+  useUILanguage();
   const statsQuery = useAdminStats();
   const stats = statsQuery.data;
   return (
     <StatTile
-      label="Total Shows"
+      label={tr("components.admin.dashboard.widgets.stat_tiles.total_shows")}
       value={stats ? stats.total_shows.toLocaleString() : "—"}
       sub={formatFileCount(stats?.total_show_files)}
       icon={<Tv className="h-4 w-4" />}
@@ -162,13 +186,16 @@ export function ShowsStatWidget() {
 }
 
 export function UsersStatWidget() {
+  useUILanguage();
   const statsQuery = useAdminStats();
   const stats = statsQuery.data;
   return (
     <StatTile
-      label="Users"
+      label={tr("components.admin.dashboard.widgets.stat_tiles.users")}
       value={stats ? String(stats.total_users) : "—"}
-      sub={`${stats?.total_users ?? 0} registered`}
+      sub={tr("components.admin.dashboard.widgets.stat_tiles.value1_registered", {
+        value1: stats?.total_users ?? 0,
+      })}
       icon={<Users className="h-4 w-4" />}
       isLoading={statsQuery.isLoading || (!stats && !statsQuery.error)}
       error={statsQuery.error}
@@ -177,6 +204,7 @@ export function UsersStatWidget() {
 }
 
 export function StorageStatWidget() {
+  useUILanguage();
   const statsQuery = useAdminStats();
   const stats = statsQuery.data;
   let storageDisplay = "—";
@@ -187,7 +215,7 @@ export function StorageStatWidget() {
   }
   return (
     <StatTile
-      label="Storage"
+      label={tr("components.admin.dashboard.widgets.stat_tiles.storage")}
       value={storageDisplay}
       sub={formatFileCount(stats?.total_files)}
       icon={<HardDrive className="h-4 w-4" />}

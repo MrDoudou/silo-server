@@ -37,6 +37,8 @@ import { SyncScheduleField } from "@/components/collections/SyncScheduleField";
 
 import { MDBListBrowser } from "./MDBListBrowser";
 import { TemplatePosterField, type TemplatePosterMode } from "./TemplatePosterField";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface Props {
   template: CollectionTemplate;
@@ -83,6 +85,7 @@ export function CollectionTemplateConfigForm({
   onCancel,
   onCreated,
 }: Props) {
+  useUILanguage();
   const tmdbMutation = useImportTMDBCollection();
   const traktMutation = useImportTraktCollection();
   const mdblistMutation = useImportMDBListCollection();
@@ -222,7 +225,9 @@ export function CollectionTemplateConfigForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label>Libraries</Label>
+          <Label>
+            {tr("components.collection_template_gallery.collection_template_config_form.libraries")}
+          </Label>
           <CollectionLibraryPicker
             libraries={libraries}
             value={libraryIds}
@@ -231,7 +236,11 @@ export function CollectionTemplateConfigForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="template-title">Collection Title</Label>
+          <Label htmlFor="template-title">
+            {tr(
+              "components.collection_template_gallery.collection_template_config_form.collection_title",
+            )}
+          </Label>
           <Input
             id="template-title"
             value={title}
@@ -242,12 +251,16 @@ export function CollectionTemplateConfigForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="template-description">Description</Label>
+        <Label htmlFor="template-description">
+          {tr("components.collection_template_gallery.collection_template_config_form.description")}
+        </Label>
         <Input
           id="template-description"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          placeholder="Optional summary shown to viewers"
+          placeholder={tr(
+            "components.collection_template_gallery.collection_template_config_form.optional_summary_shown_to_viewers",
+          )}
         />
       </div>
 
@@ -262,17 +275,30 @@ export function CollectionTemplateConfigForm({
             }}
           />
           <div className="space-y-2">
-            <Label htmlFor="template-mdblist-url">MDBList URL</Label>
+            <Label htmlFor="template-mdblist-url">
+              {tr(
+                "components.collection_template_gallery.collection_template_config_form.mdblist_url",
+              )}
+            </Label>
             <Input
               id="template-mdblist-url"
               value={mdblistUrl}
               onChange={(event) => setMdblistUrl(event.target.value)}
-              placeholder="https://mdblist.com/lists/user/slug"
+              placeholder={tr(
+                "components.collection_template_gallery.collection_template_config_form.https_mdblist_com_lists_user_slug",
+              )}
               required
             />
             <p className="text-muted-foreground text-xs">
-              Pick a list above or paste any public MDBList list URL (with or without{" "}
-              <code>/json</code>). Items resolve via TMDB/IMDb/TVDB IDs.
+              {tr(
+                "components.collection_template_gallery.collection_template_config_form.pick_a_list_above_or_paste_any_public_mdblist_list",
+              )}{" "}
+              <code>
+                {tr("components.collection_template_gallery.collection_template_config_form.json")}
+              </code>
+              {tr(
+                "components.collection_template_gallery.collection_template_config_form.items_resolve_via_tmdb_imdb_tvdb_ids",
+              )}
             </p>
           </div>
         </div>
@@ -280,10 +306,16 @@ export function CollectionTemplateConfigForm({
 
       {template.requires_profile ? (
         <div className="space-y-2">
-          <Label>Profile</Label>
+          <Label>
+            {tr("components.collection_template_gallery.collection_template_config_form.profile")}
+          </Label>
           <Select value={profileId} onValueChange={setProfileId}>
             <SelectTrigger>
-              <SelectValue placeholder="Choose a profile" />
+              <SelectValue
+                placeholder={tr(
+                  "components.collection_template_gallery.collection_template_config_form.choose_a_profile",
+                )}
+              />
             </SelectTrigger>
             <SelectContent>
               {profiles.map((profile) => (
@@ -294,8 +326,9 @@ export function CollectionTemplateConfigForm({
             </SelectContent>
           </Select>
           <p className="text-muted-foreground text-xs">
-            This template uses the chosen profile's connected Trakt account from Watch Providers
-            settings.
+            {tr(
+              "components.collection_template_gallery.collection_template_config_form.this_template_uses_the_chosen_profile_s_connected_trakt_account",
+            )}
           </p>
         </div>
       ) : null}
@@ -311,7 +344,9 @@ export function CollectionTemplateConfigForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="template-limit">Max Items</Label>
+          <Label htmlFor="template-limit">
+            {tr("components.collection_template_gallery.collection_template_config_form.max_items")}
+          </Label>
           <Input
             id="template-limit"
             type="number"
@@ -321,13 +356,25 @@ export function CollectionTemplateConfigForm({
             inputMode="numeric"
             value={limit}
             onChange={(event) => setLimit(event.target.value)}
-            placeholder={template.default_limit ? String(template.default_limit) : "No limit"}
+            placeholder={
+              template.default_limit
+                ? String(template.default_limit)
+                : tr(
+                    "components.collection_template_gallery.collection_template_config_form.no_limit",
+                  )
+            }
           />
         </div>
         <div className="space-y-2">
-          <Label>Featured</Label>
+          <Label>
+            {tr("components.collection_template_gallery.collection_template_config_form.featured")}
+          </Label>
           <div className="border-border flex h-9 items-center justify-between rounded-md border px-3">
-            <span className="text-muted-foreground text-xs">Surface in hero shelves</span>
+            <span className="text-muted-foreground text-xs">
+              {tr(
+                "components.collection_template_gallery.collection_template_config_form.surface_in_hero_shelves",
+              )}
+            </span>
             <Switch checked={featured} onCheckedChange={setFeatured} />
           </div>
         </div>
@@ -343,10 +390,14 @@ export function CollectionTemplateConfigForm({
 
       <div className="border-border flex justify-end gap-2 border-t pt-4">
         <Button type="button" variant="ghost" onClick={onCancel} disabled={isPending}>
-          Cancel
+          {tr("common.actions.cancel")}
         </Button>
         <Button type="submit" disabled={submitDisabled}>
-          {isPending ? "Importing..." : "Create Collection"}
+          {isPending
+            ? tr("components.collection_template_gallery.collection_template_config_form.importing")
+            : tr(
+                "components.collection_template_gallery.collection_template_config_form.create_collection",
+              )}
         </Button>
       </div>
     </form>
@@ -365,6 +416,7 @@ interface TMDBCollectionTemplateSummaryProps {
 // apply via Template Bundles, where bulk creation, dedupe by management key,
 // and featured-section wiring are all handled in one shot.
 function TMDBCollectionTemplateSummary({ template, onCancel }: TMDBCollectionTemplateSummaryProps) {
+  useUILanguage();
   const collectionId = template.tmdb_collection?.collection_id ?? 0;
   const isPlaceholder = collectionId === 0;
 
@@ -393,39 +445,61 @@ function TMDBCollectionTemplateSummary({ template, onCancel }: TMDBCollectionTem
 
       <dl className="grid gap-2 text-sm sm:grid-cols-2">
         <div className="space-y-0.5">
-          <dt className="text-muted-foreground text-xs uppercase">TMDB Collection ID</dt>
+          <dt className="text-muted-foreground text-xs uppercase">
+            {tr(
+              "components.collection_template_gallery.collection_template_config_form.tmdb_collection_id",
+            )}
+          </dt>
           <dd className="font-mono text-sm">
-            {isPlaceholder ? "(unset — admin fills in at apply)" : collectionId}
+            {isPlaceholder
+              ? tr(
+                  "components.collection_template_gallery.collection_template_config_form.unset_admin_fills_in_at_apply",
+                )
+              : collectionId}
           </dd>
         </div>
         {typeof template.default_sort_order === "number" ? (
           <div className="space-y-0.5">
-            <dt className="text-muted-foreground text-xs uppercase">Default Sort Order</dt>
+            <dt className="text-muted-foreground text-xs uppercase">
+              {tr(
+                "components.collection_template_gallery.collection_template_config_form.default_sort_order",
+              )}
+            </dt>
             <dd className="font-mono text-sm">{template.default_sort_order}</dd>
           </div>
         ) : null}
       </dl>
 
       <p className="text-muted-foreground border-border bg-muted/30 rounded-md border p-3 text-xs">
-        TMDB franchise templates are bundle-driven. Apply them through Template Bundles so the
-        management key, library scoping, and sync schedule are wired up consistently across
-        libraries.
+        {tr(
+          "components.collection_template_gallery.collection_template_config_form.tmdb_franchise_templates_are_bundle_driven_apply_them_through_template",
+        )}
         {isPlaceholder ? (
           <>
             {" "}
-            This template is a placeholder; after applying, edit the collection's source_config and
-            replace <code>collection_id: 0</code> with the real TMDB collection ID before the first
-            sync.
+            {tr(
+              "components.collection_template_gallery.collection_template_config_form.this_template_is_a_placeholder_after_applying_edit_the_collection",
+            )}{" "}
+            <code>
+              {tr(
+                "components.collection_template_gallery.collection_template_config_form.collection_id_0",
+              )}
+            </code>{" "}
+            {tr(
+              "components.collection_template_gallery.collection_template_config_form.with_the_real_tmdb_collection_id_before_the_first_sync",
+            )}
           </>
         ) : null}
       </p>
 
       <div className="border-border flex justify-end gap-2 border-t pt-4">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Close
+          {tr("common.actions.close")}
         </Button>
         <Button type="button" disabled>
-          Use Template Bundles
+          {tr(
+            "components.collection_template_gallery.collection_template_config_form.use_template_bundles",
+          )}
         </Button>
       </div>
     </div>
@@ -473,6 +547,7 @@ function summarizeDiscoverSpec(spec: NonNullable<CollectionTemplate["tmdb_discov
 // discover templates ship as backend-driven blueprints (genre matrices etc.)
 // and apply through Template Bundles, not the per-template create form.
 function TMDBDiscoverTemplateSummary({ template, onCancel }: TMDBDiscoverTemplateSummaryProps) {
+  useUILanguage();
   const spec = template.tmdb_discover;
 
   return (
@@ -501,12 +576,20 @@ function TMDBDiscoverTemplateSummary({ template, onCancel }: TMDBDiscoverTemplat
       {spec ? (
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div className="space-y-0.5">
-            <dt className="text-muted-foreground text-xs uppercase">Filter Summary</dt>
+            <dt className="text-muted-foreground text-xs uppercase">
+              {tr(
+                "components.collection_template_gallery.collection_template_config_form.filter_summary",
+              )}
+            </dt>
             <dd className="text-sm">{summarizeDiscoverSpec(spec)}</dd>
           </div>
           {typeof template.default_sort_order === "number" ? (
             <div className="space-y-0.5">
-              <dt className="text-muted-foreground text-xs uppercase">Default Sort Order</dt>
+              <dt className="text-muted-foreground text-xs uppercase">
+                {tr(
+                  "components.collection_template_gallery.collection_template_config_form.default_sort_order",
+                )}
+              </dt>
               <dd className="font-mono text-sm">{template.default_sort_order}</dd>
             </div>
           ) : null}
@@ -514,17 +597,19 @@ function TMDBDiscoverTemplateSummary({ template, onCancel }: TMDBDiscoverTemplat
       ) : null}
 
       <p className="text-muted-foreground border-border bg-muted/30 rounded-md border p-3 text-xs">
-        Discover templates are applied via Template Bundles. The filter set ships from the backend
-        catalog; apply through a bundle so the management key, library scoping, and sync schedule
-        are wired up consistently across libraries.
+        {tr(
+          "components.collection_template_gallery.collection_template_config_form.discover_templates_are_applied_via_template_bundles_the_filter_set",
+        )}
       </p>
 
       <div className="border-border flex justify-end gap-2 border-t pt-4">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Close
+          {tr("common.actions.close")}
         </Button>
         <Button type="button" disabled>
-          Use Template Bundles
+          {tr(
+            "components.collection_template_gallery.collection_template_config_form.use_template_bundles",
+          )}
         </Button>
       </div>
     </div>

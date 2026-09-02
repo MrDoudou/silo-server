@@ -19,6 +19,8 @@ import { getDashboardWidget } from "./registry";
 import type { WidgetId } from "./types";
 import type { DashboardLayout } from "./useDashboardLayout";
 import { WidgetChromeProvider } from "./widgetChrome";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /** Fallback for the `gap` of `.admin-widget-grid` in app.css (0.875rem). */
 const GRID_GAP_PX = 14;
@@ -99,6 +101,7 @@ export function DashboardGrid({
   isAddPanelOpen: boolean;
   onAddPanelOpenChange: (open: boolean) => void;
 }) {
+  useUILanguage();
   const {
     entries,
     hiddenWidgets,
@@ -278,7 +281,14 @@ export function DashboardGrid({
             ? entries.length + 1
             : Math.max(1, entries.findIndex((entry) => entry.id === beforeId) + 1);
         setLiveMessage(
-          `${getDashboardWidget(id).title} added at position ${position} of ${entries.length + 1}`,
+          tr(
+            "components.admin.dashboard.dashboard_grid.value1_added_at_position_value2_of_value3",
+            {
+              value1: getDashboardWidget(id).title,
+              value2: position,
+              value3: entries.length + 1,
+            },
+          ),
         );
         onAddPanelOpenChange(false);
         return;
@@ -423,7 +433,16 @@ export function DashboardGrid({
       }
       resizeWidget(session.id, { span: session.latestSpan, rows: session.latestRows });
       setLiveMessage(
-        `${session.title} resized to ${session.latestSpan} of ${GRID_COLUMNS} columns × ${session.latestRows} ${session.latestRows === 1 ? "row" : "rows"}`,
+        tr(
+          "components.admin.dashboard.dashboard_grid.value1_resized_to_value2_of_value3_columns_value4_value5",
+          {
+            value1: session.title,
+            value2: session.latestSpan,
+            value3: GRID_COLUMNS,
+            value4: session.latestRows,
+            value5: session.latestRows === 1 ? "row" : "rows",
+          },
+        ),
       );
     },
     [autoScroll, resizeWidget],
@@ -447,7 +466,11 @@ export function DashboardGrid({
         moveWidget(id, after ? after.id : null);
       }
       setLiveMessage(
-        `${getDashboardWidget(id).title} moved to position ${nextIndex + 1} of ${entries.length}`,
+        tr("components.admin.dashboard.dashboard_grid.value1_moved_to_position_value2_of_value3", {
+          value1: getDashboardWidget(id).title,
+          value2: nextIndex + 1,
+          value3: entries.length,
+        }),
       );
     },
     [entries, moveWidget],
@@ -473,7 +496,16 @@ export function DashboardGrid({
       if (nextSpan === currentSpan && nextRows === currentRows) return;
       resizeWidget(id, { span: nextSpan, rows: nextRows });
       setLiveMessage(
-        `${widget.title} resized to ${nextSpan} of ${GRID_COLUMNS} columns × ${nextRows} ${nextRows === 1 ? "row" : "rows"}`,
+        tr(
+          "components.admin.dashboard.dashboard_grid.value1_resized_to_value2_of_value3_columns_value4_value5",
+          {
+            value1: widget.title,
+            value2: nextSpan,
+            value3: GRID_COLUMNS,
+            value4: nextRows,
+            value5: nextRows === 1 ? "row" : "rows",
+          },
+        ),
       );
     },
     [resizeWidget],
@@ -560,8 +592,15 @@ export function DashboardGrid({
                   <div className="border-border bg-background/95 absolute -top-3 right-3 z-20 flex items-center gap-0.5 rounded-full border px-1 py-0.5 shadow-md backdrop-blur">
                     <button
                       type="button"
-                      aria-label={`Move ${widget.title} (drag, or arrow keys)`}
-                      title="Drag or use arrow keys to move"
+                      aria-label={tr(
+                        "components.admin.dashboard.dashboard_grid.move_title_drag_or_arrow_keys",
+                        {
+                          title: widget.title,
+                        },
+                      )}
+                      title={tr(
+                        "components.admin.dashboard.dashboard_grid.drag_or_use_arrow_keys_to_move",
+                      )}
                       className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex h-6 w-6 cursor-grab items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-none active:cursor-grabbing"
                       onKeyDown={(event) => handleMoveKeyDown(event, entry.id)}
                     >
@@ -569,8 +608,10 @@ export function DashboardGrid({
                     </button>
                     <button
                       type="button"
-                      aria-label={`Remove ${widget.title}`}
-                      title="Remove"
+                      aria-label={tr("components.admin.dashboard.dashboard_grid.remove_title", {
+                        title: widget.title,
+                      })}
+                      title={tr("common.actions.remove")}
                       className="text-muted-foreground hover:text-destructive focus-visible:ring-ring flex h-6 w-6 cursor-pointer items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-none"
                       onClick={() => removeWidget(entry.id)}
                     >
@@ -584,8 +625,15 @@ export function DashboardGrid({
                   {canResize && (
                     <button
                       type="button"
-                      aria-label={`Resize ${widget.title} (drag, or arrow keys)`}
-                      title="Drag or use arrow keys to resize"
+                      aria-label={tr(
+                        "components.admin.dashboard.dashboard_grid.resize_title_drag_or_arrow_keys",
+                        {
+                          title: widget.title,
+                        },
+                      )}
+                      title={tr(
+                        "components.admin.dashboard.dashboard_grid.drag_or_use_arrow_keys_to_resize",
+                      )}
                       className={cn(
                         "border-border bg-background/95 hover:border-primary hover:bg-primary/30 focus-visible:ring-ring absolute -right-1.5 -bottom-1.5 z-20 hidden h-3.5 w-3.5 cursor-nwse-resize touch-none rounded-[4px] border shadow-md focus-visible:ring-2 focus-visible:outline-none lg:block",
                         isWidgetResizing && "border-primary bg-primary/30",
@@ -633,15 +681,19 @@ export function DashboardGrid({
           onInteractOutside={(event) => event.preventDefault()}
         >
           <SheetHeader className="pb-0">
-            <SheetTitle>Add widget</SheetTitle>
+            <SheetTitle>{tr("components.admin.dashboard.dashboard_grid.add_widget")}</SheetTitle>
             <SheetDescription>
-              Widgets you&apos;ve removed or haven&apos;t placed yet.
+              {tr(
+                "components.admin.dashboard.dashboard_grid.widgets_you_ve_removed_or_haven_t_placed_yet",
+              )}
             </SheetDescription>
           </SheetHeader>
           <div className="overlay-scroll flex flex-col gap-2 overflow-y-auto p-4 pt-2">
             {hiddenWidgets.length === 0 ? (
               <p className="text-muted-foreground py-4 text-sm">
-                Everything is on the dashboard already.
+                {tr(
+                  "components.admin.dashboard.dashboard_grid.everything_is_on_the_dashboard_already",
+                )}
               </p>
             ) : (
               hiddenWidgets.map((widget) => (

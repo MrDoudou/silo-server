@@ -145,7 +145,7 @@ describe("useUpdateDiagnosticsUploadsEnabled", () => {
     });
 
     expect(caught).toBe(error);
-    expect(mocks.toastError).toHaveBeenCalledWith(error.message);
+    expect(mocks.toastError).toHaveBeenCalledWith("Failed to update client diagnostic uploads");
     expect(mocks.toastSuccess).not.toHaveBeenCalled();
   });
 });

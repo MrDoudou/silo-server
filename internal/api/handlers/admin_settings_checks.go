@@ -30,8 +30,12 @@ type adminSettingsConnectionCheckRequest struct {
 }
 
 type connectionCheckResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Success        bool           `json:"success"`
+	Message        string         `json:"message"`
+	TranslationKey string         `json:"translation_key,omitempty"`
+	Error          string         `json:"error,omitempty"`
+	Params         map[string]any `json:"params,omitempty"`
+	PluginID       string         `json:"plugin_id,omitempty"`
 }
 
 type s3SettingsCheckClient interface {

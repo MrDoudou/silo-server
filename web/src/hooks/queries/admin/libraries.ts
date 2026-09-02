@@ -28,9 +28,11 @@ import type {
   FilesystemBrowseResponse,
 } from "@/api/types";
 import { adminKeys, libraryKeys } from "../keys";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import type { LibraryReorderEntry } from "@/pages/adminLibraryOrder";
 import { usePageActivity } from "@/hooks/usePageActivity";
+import { tr } from "@/i18n/translate";
 
 const ADMIN_STALE_TIME = 30_000;
 
@@ -206,7 +208,7 @@ export function useReorderLibraries() {
       queryClient.invalidateQueries({ queryKey: libraryKeys.all });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to reorder libraries");
+      toast.error("errors.queries.admin.libraries.failed_to_reorder_libraries", { error: err });
     },
   });
 }
@@ -245,10 +247,10 @@ export function useUpsertLibraryRootOverride() {
       }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: adminKeys.libraryRoots(variables.library_id) });
-      toast.success("Root override saved");
+      toast.success("feedback.queries.admin.libraries.root_override_saved");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save root override");
+      toast.error("errors.queries.admin.libraries.failed_to_save_root_override", { error: err });
     },
   });
 }
@@ -263,10 +265,10 @@ export function useDeleteLibraryRootOverride() {
       }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: adminKeys.libraryRoots(variables.library_id) });
-      toast.success("Root override removed");
+      toast.success("feedback.queries.admin.libraries.root_override_removed");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to remove root override");
+      toast.error("errors.queries.admin.libraries.failed_to_remove_root_override", { error: err });
     },
   });
 }
@@ -286,10 +288,10 @@ export function useRematchStaleMediaID() {
       api(`/libraries/stale-ids/${contentId}/rematch`, { method: "POST" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.staleMediaIDs() });
-      toast.success("Re-match started");
+      toast.success("feedback.queries.admin.libraries.re_match_started");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Re-match failed");
+      toast.error("errors.queries.admin.libraries.re_match_failed", { error: err });
     },
   });
 }
@@ -303,11 +305,11 @@ export function useCreateLibrary() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Library created");
+      toast.success("feedback.queries.admin.libraries.library_created");
       queryClient.invalidateQueries({ queryKey: adminKeys.libraries() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error("errors.queries.admin.libraries.failed_to_save", { error: err });
     },
   });
 }
@@ -321,11 +323,11 @@ export function useUpdateLibrary() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Library updated");
+      toast.success("feedback.queries.admin.libraries.library_updated");
       queryClient.invalidateQueries({ queryKey: adminKeys.libraries() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error("errors.queries.admin.libraries.failed_to_save", { error: err });
     },
   });
 }
@@ -335,12 +337,12 @@ export function useDeleteLibrary() {
   return useMutation({
     mutationFn: (id: number) => api<AdminJob>(`/libraries/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Library deletion started");
+      toast.success("feedback.queries.admin.libraries.library_deletion_started");
       queryClient.invalidateQueries({ queryKey: adminKeys.libraries() });
       queryClient.invalidateQueries({ queryKey: adminKeys.jobs("delete_library") });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete");
+      toast.error("errors.queries.admin.libraries.failed_to_delete", { error: err });
     },
   });
 }
@@ -353,10 +355,10 @@ export function useScanLibrary() {
         body: JSON.stringify({ library_id: id }),
       }),
     onSuccess: () => {
-      toast.success("Full ingest scan started");
+      toast.success("feedback.queries.admin.libraries.full_ingest_scan_started");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Scan failed");
+      toast.error("errors.queries.admin.libraries.scan_failed", { error: err });
     },
   });
 }
@@ -367,11 +369,15 @@ export function useCheckLibraryMount() {
     mutationFn: (id: number) =>
       api<LibraryMountCheckResponse>(`/libraries/${id}/check-mount`, { method: "POST" }),
     onSuccess: (data) => {
-      toast.success(data.healthy ? "Mount check passed" : "Mount check found unreachable roots");
+      toast.success("feedback.queries.admin.libraries.reported_message", {
+        values: {
+          message: data.healthy ? "Mount check passed" : "Mount check found unreachable roots",
+        },
+      });
       queryClient.invalidateQueries({ queryKey: adminKeys.libraries() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Mount check failed");
+      toast.error("errors.queries.admin.libraries.mount_check_failed", { error: err });
     },
   });
 }
@@ -383,10 +389,10 @@ export function useScanAllLibraries() {
         method: "POST",
       }),
     onSuccess: () => {
-      toast.success("Full ingest scan started for all libraries");
+      toast.success("feedback.queries.admin.libraries.full_ingest_scan_started_for_all_libraries");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Scan failed");
+      toast.error("errors.queries.admin.libraries.scan_failed", { error: err });
     },
   });
 }
@@ -400,11 +406,11 @@ export function useCancelLibraryScans() {
         body: JSON.stringify({ library_id: id }),
       }),
     onSuccess: () => {
-      toast.success("Scan cancellation requested");
+      toast.success("feedback.queries.admin.libraries.scan_cancellation_requested");
       queryClient.invalidateQueries({ queryKey: adminKeys.libraryMatchQueueStatuses() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to cancel scans");
+      toast.error("errors.queries.admin.libraries.failed_to_cancel_scans", { error: err });
     },
   });
 }
@@ -448,14 +454,14 @@ export function useRetryLibraryMetadataMatchQueue() {
         method: "POST",
       }),
     onSuccess: (_data, id) => {
-      toast.success("Metadata matcher backlog queued");
+      toast.success("feedback.queries.admin.libraries.metadata_matcher_backlog_queued");
       queryClient.invalidateQueries({ queryKey: adminKeys.libraryMatchQueueStatuses() });
       queryClient.invalidateQueries({ queryKey: adminKeys.libraryMatchQueueDetail(id) });
     },
     onError: (err) => {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to rebuild metadata matcher backlog",
-      );
+      toast.error("errors.queries.admin.libraries.failed_to_rebuild_metadata_matcher_backlog", {
+        error: err,
+      });
     },
   });
 }
@@ -468,12 +474,14 @@ export function useCancelLibraryMetadataMatchQueue() {
         method: "POST",
       }),
     onSuccess: (_data, id) => {
-      toast.success("Metadata matcher backlog cancelled");
+      toast.success("feedback.queries.admin.libraries.metadata_matcher_backlog_cancelled");
       queryClient.invalidateQueries({ queryKey: adminKeys.libraryMatchQueueStatuses() });
       queryClient.invalidateQueries({ queryKey: adminKeys.libraryMatchQueueDetail(id) });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to cancel metadata matcher backlog");
+      toast.error("errors.queries.admin.libraries.failed_to_cancel_metadata_matcher_backlog", {
+        error: err,
+      });
     },
   });
 }
@@ -514,13 +522,13 @@ export function useSetLibraryProviders() {
         body: JSON.stringify(body),
       }),
     onSuccess: (_data, variables) => {
-      toast.success("Provider chain updated");
+      toast.success("feedback.queries.admin.libraries.provider_chain_updated");
       queryClient.invalidateQueries({
         queryKey: adminKeys.libraryProviders(variables.id),
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update provider chain");
+      toast.error("errors.queries.admin.libraries.failed_to_update_provider_chain", { error: err });
     },
   });
 }
@@ -543,11 +551,11 @@ export function useUploadLibraryPoster() {
       return (await res.json()) as Library;
     },
     onSuccess: () => {
-      toast.success("Library poster updated");
+      toast.success("feedback.queries.admin.libraries.library_poster_updated");
       queryClient.invalidateQueries({ queryKey: adminKeys.libraries() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to upload poster");
+      toast.error("errors.queries.admin.libraries.failed_to_upload_poster", { error: err });
     },
   });
 }
@@ -557,11 +565,11 @@ export function useDeleteLibraryPoster() {
   return useMutation({
     mutationFn: (id: number) => api(`/libraries/${id}/poster`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Library poster removed");
+      toast.success("feedback.queries.admin.libraries.library_poster_removed");
       queryClient.invalidateQueries({ queryKey: adminKeys.libraries() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to remove poster");
+      toast.error("errors.queries.admin.libraries.failed_to_remove_poster", { error: err });
     },
   });
 }
@@ -582,18 +590,18 @@ export function useRefreshLibraryMetadata() {
       return (await res.json()) as AdminJob;
     },
     onSuccess: () => {
-      toast.success("Metadata refresh queued");
+      toast.success("feedback.queries.admin.libraries.metadata_refresh_queued");
       queryClient.invalidateQueries({ queryKey: adminKeys.jobs("library_refresh") });
       queryClient.invalidateQueries({ queryKey: adminKeys.jobs("__all") });
     },
     onError: (err) => {
       if (err instanceof AdminJobRequestError && err.activeJobId) {
-        toast.error(err.message);
+        toast.error("errors.common.request_failed", { error: err });
         queryClient.invalidateQueries({ queryKey: adminKeys.jobs("library_refresh") });
         queryClient.invalidateQueries({ queryKey: adminKeys.jobs("__all") });
         return;
       }
-      toast.error(err instanceof Error ? err.message : "Refresh failed");
+      toast.error("errors.queries.admin.libraries.refresh_failed", { error: err });
     },
   });
 }
@@ -604,12 +612,12 @@ export function useCancelAdminJob() {
     mutationFn: (id: string) =>
       api<AdminJob>(`/admin/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
     onSuccess: () => {
-      toast.success("Cancellation requested");
+      toast.success("feedback.queries.admin.libraries.cancellation_requested");
       queryClient.invalidateQueries({ queryKey: adminKeys.jobs("library_refresh") });
       queryClient.invalidateQueries({ queryKey: adminKeys.jobs("__all") });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to cancel job");
+      toast.error("errors.queries.admin.libraries.failed_to_cancel_job", { error: err });
     },
   });
 }
@@ -640,11 +648,13 @@ export function useConfirmEmptyRootCleanup() {
     mutationFn: (id: number) =>
       api(`/libraries/${id}/confirm-empty-root-cleanup`, { method: "POST" }),
     onSuccess: () => {
-      toast.success("Deletion confirmed for the next empty-root scan");
+      toast.success(
+        "feedback.queries.admin.libraries.deletion_confirmed_for_the_next_empty_root_scan",
+      );
       queryClient.invalidateQueries({ queryKey: adminKeys.libraries() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to confirm cleanup");
+      toast.error("errors.queries.admin.libraries.failed_to_confirm_cleanup", { error: err });
     },
   });
 }
@@ -725,16 +735,16 @@ export function useCreateCatalogExportJob() {
   return useMutation({
     mutationFn: (body?: CatalogSeedExportRequest) => createCatalogExportJob(body),
     onSuccess: () => {
-      toast.success("Catalog export queued");
+      toast.success("feedback.queries.admin.libraries.catalog_export_queued");
       queryClient.invalidateQueries({ queryKey: adminKeys.jobs("catalog_export") });
     },
     onError: (err) => {
       if (err instanceof AdminJobRequestError && err.activeJobId) {
-        toast.error(err.message);
+        toast.error("errors.common.request_failed", { error: err });
         queryClient.invalidateQueries({ queryKey: adminKeys.jobs("catalog_export") });
         return;
       }
-      toast.error(err instanceof Error ? err.message : "Failed to queue catalog export");
+      toast.error("errors.queries.admin.libraries.failed_to_queue_catalog_export", { error: err });
     },
   });
 }
@@ -744,11 +754,13 @@ export function usePublishCatalogExportJob() {
   return useMutation({
     mutationFn: (id: string) => publishCatalogExportJob(id),
     onSuccess: () => {
-      toast.success("Catalog export published");
+      toast.success("feedback.queries.admin.libraries.catalog_export_published");
       queryClient.invalidateQueries({ queryKey: adminKeys.jobs("catalog_export") });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to publish catalog export");
+      toast.error("errors.queries.admin.libraries.failed_to_publish_catalog_export", {
+        error: err,
+      });
     },
   });
 }
@@ -774,23 +786,30 @@ export function useImportCatalogSeed() {
     },
     onSuccess: (payload) => {
       if (payload.mode === "job") {
-        toast.success("Catalog import queued");
+        toast.success("feedback.queries.admin.libraries.catalog_import_queued");
         queryClient.invalidateQueries({ queryKey: adminKeys.jobs("catalog_import") });
         return;
       }
-      toast.success(
-        `Catalog imported: ${payload.result.items_created} items, ${payload.result.files_created} files`,
-      );
+      toast.success("feedback.queries.admin.libraries.catalog_imported_items_items_files_files", {
+        values: {
+          items: payload.result.items_created,
+          files: payload.result.files_created,
+        },
+      });
       queryClient.invalidateQueries({ queryKey: adminKeys.libraries() });
     },
     onError: (err) => {
       if (err instanceof AdminJobRequestError && err.unmatchedRoots?.length) {
-        toast.error(
-          `${err.message}: ${err.unmatchedRoots.slice(0, 2).join(", ")}${err.unmatchedRoots.length > 2 ? "..." : ""}`,
-        );
+        toast.error("errors.queries.admin.libraries.message_roots_suffix", {
+          values: {
+            message: tr.remote({ message: err.message }),
+            roots: err.unmatchedRoots.slice(0, 2).join(", "),
+            suffix: err.unmatchedRoots.length > 2 ? "…" : "",
+          },
+        });
         return;
       }
-      toast.error(err instanceof Error ? err.message : "Failed to import catalog seed");
+      toast.error("errors.queries.admin.libraries.failed_to_import_catalog_seed", { error: err });
     },
   });
 }

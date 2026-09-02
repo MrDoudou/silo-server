@@ -3,6 +3,8 @@ import { ListVideo } from "lucide-react";
 import type { PlayerChapter } from "../types";
 import { formatTime } from "./SeekBar";
 import { PlayerMenuSurface } from "./PlayerMenuSurface";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ChaptersMenuProps {
   chapters: PlayerChapter[];
@@ -27,6 +29,7 @@ export function ChaptersMenu({
   onOpenChange,
   hideTrigger = false,
 }: ChaptersMenuProps) {
+  useUILanguage();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpen = useCallback(
@@ -100,7 +103,7 @@ export function ChaptersMenu({
           type="button"
           className="player-utility-btn"
           onClick={() => setOpen((value) => !value)}
-          aria-label="Chapters"
+          aria-label={tr("player.components.chapters_menu.chapters")}
           aria-expanded={open}
           aria-haspopup="menu"
         >
@@ -115,7 +118,7 @@ export function ChaptersMenu({
           onKeyDown={handleMenuKeyDown}
         >
           <div className="px-3 py-1.5 text-xs font-medium tracking-wide text-white/50 uppercase">
-            Chapters
+            {tr("player.components.chapters_menu.chapters")}
           </div>
           {chapters.map((chapter, index) => (
             <button
@@ -125,9 +128,10 @@ export function ChaptersMenu({
               }}
               role="menuitem"
               type="button"
-              className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-                index === activeIndex ? "bg-white/5 text-white" : "text-white/75"
-              }`}
+              className={
+                "flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+                (index === activeIndex ? "bg-white/5 text-white" : "text-white/75")
+              }
               onClick={() => {
                 onSeek(chapter.start_seconds);
                 setOpen(false);

@@ -11,7 +11,9 @@ import { Label } from "@/components/ui/label";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useServerBranding } from "@/hooks/useServerBranding";
 import { AuthBackground } from "@/components/auth/AuthBackground";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function normalizeCode(value: string) {
   const clean = value
@@ -25,6 +27,7 @@ function normalizeCode(value: string) {
 }
 
 export default function ActivateDevice() {
+  useUILanguage();
   const { user, loading, setupLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [codeInput, setCodeInput] = useState(searchParams.get("code") ?? "");
@@ -33,7 +36,7 @@ export default function ActivateDevice() {
   const [acting, setActing] = useState(false);
   const { serverName } = useServerBranding();
 
-  useDocumentTitle("Approve Device");
+  useDocumentTitle(tr("pages.activate_device.approve_device"));
 
   const token = searchParams.get("token") ?? "";
   const code = searchParams.get("code") ?? "";
@@ -61,7 +64,7 @@ export default function ActivateDevice() {
       setDetails(result);
     } catch (error) {
       setDetails(null);
-      toast.error(error instanceof Error ? error.message : "Device request not found");
+      toast.error("errors.auth.device_request_not_found", { error: error });
     } finally {
       setLoadingDetails(false);
     }
@@ -80,7 +83,12 @@ export default function ActivateDevice() {
       });
       await loadDetails();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : `Failed to ${action} request`);
+      toast.error(
+        action === "approve"
+          ? "errors.auth.device_approval_failed"
+          : "errors.auth.device_denial_failed",
+        { error: error },
+      );
     } finally {
       setActing(false);
     }
@@ -104,14 +112,16 @@ export default function ActivateDevice() {
         <CardHeader>
           <CardTitle className="text-3xl font-extrabold tracking-[-0.04em]">{serverName}</CardTitle>
           <CardDescription className="mt-2 text-sm leading-6">
-            Approve sign-in for the device you&apos;re trying to use.
+            {tr("pages.activate_device.approve_sign_in_for_the_device_you_re_trying_to")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {!token && !code ? (
             <form onSubmit={handleCodeSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="device-code">Enter the code from your screen</Label>
+                <Label htmlFor="device-code">
+                  {tr("pages.activate_device.enter_the_code_from_your_screen")}
+                </Label>
                 <Input
                   id="device-code"
                   value={codeInput}
@@ -119,25 +129,29 @@ export default function ActivateDevice() {
                   autoCapitalize="characters"
                   autoComplete="off"
                   autoCorrect="off"
-                  placeholder="ABCD-EFGH"
+                  placeholder={tr("pages.activate_device.abcd_efgh")}
                 />
               </div>
               <Button type="submit" className="w-full">
-                Continue
+                {tr("common.actions.continue")}
               </Button>
             </form>
           ) : loadingDetails || loading || setupLoading ? (
-            <div className="text-muted-foreground text-sm">Loading device request...</div>
+            <div className="text-muted-foreground text-sm">
+              {tr("pages.activate_device.loading_device_request")}
+            </div>
           ) : !details ? (
             <div className="space-y-4">
-              <p className="text-sm">That sign-in request could not be found.</p>
+              <p className="text-sm">
+                {tr("pages.activate_device.that_sign_in_request_could_not_be_found")}
+              </p>
               <Button
                 type="button"
                 variant="outline"
                 className="w-full"
                 onClick={() => setSearchParams({})}
               >
-                Enter another code
+                {tr("pages.activate_device.enter_another_code")}
               </Button>
             </div>
           ) : (
@@ -145,7 +159,7 @@ export default function ActivateDevice() {
               <div className="border-border/60 bg-background/50 rounded-md border p-4">
                 <div className="space-y-1">
                   <div className="text-lg font-semibold">
-                    {details.device_name || "This device"}
+                    {details.device_name || tr("pages.activate_device.this_device")}
                   </div>
                   {details.device_platform ? (
                     <div className="text-muted-foreground text-sm">{details.device_platform}</div>
@@ -157,7 +171,7 @@ export default function ActivateDevice() {
                 {details.match_code ? (
                   <div className="mt-4">
                     <div className="text-muted-foreground text-xs tracking-[0.12em] uppercase">
-                      Match code
+                      {tr("pages.activate_device.match_code")}
                     </div>
                     <div className="text-lg font-semibold">{details.match_code}</div>
                   </div>
@@ -166,19 +180,22 @@ export default function ActivateDevice() {
 
               {!user ? (
                 <Button asChild className="w-full">
-                  <Link to={loginHref}>Sign in to approve</Link>
+                  <Link to={loginHref}>{tr("pages.activate_device.sign_in_to_approve")}</Link>
                 </Button>
               ) : details.status === "pending" ? (
                 <div className="space-y-3">
                   <p className="text-sm">
-                    Signed in as <span className="font-medium">{user.username}</span>.
+                    {tr("pages.activate_device.signed_in_as")}{" "}
+                    <span className="font-medium">{user.username}</span>.
                   </p>
                   <Button
                     className="w-full"
                     disabled={acting}
                     onClick={() => void handleDecision("approve")}
                   >
-                    {acting ? "Approving..." : "Approve sign-in"}
+                    {acting
+                      ? tr("pages.activate_device.approving")
+                      : tr("pages.activate_device.approve_sign_in")}
                   </Button>
                   <Button
                     variant="outline"
@@ -186,17 +203,25 @@ export default function ActivateDevice() {
                     disabled={acting}
                     onClick={() => void handleDecision("deny")}
                   >
-                    Deny
+                    {tr("pages.activate_device.deny")}
                   </Button>
                 </div>
               ) : details.status === "approved" ? (
-                <p className="text-sm">Approved. Finish sign-in on the device.</p>
+                <p className="text-sm">
+                  {tr("pages.activate_device.approved_finish_sign_in_on_the_device")}
+                </p>
               ) : details.status === "consumed" ? (
-                <p className="text-sm">This device is already signed in.</p>
+                <p className="text-sm">
+                  {tr("pages.activate_device.this_device_is_already_signed_in")}
+                </p>
               ) : details.status === "denied" ? (
-                <p className="text-sm">This sign-in request was denied.</p>
+                <p className="text-sm">
+                  {tr("pages.activate_device.this_sign_in_request_was_denied")}
+                </p>
               ) : (
-                <p className="text-sm">This sign-in request has expired.</p>
+                <p className="text-sm">
+                  {tr("pages.activate_device.this_sign_in_request_has_expired")}
+                </p>
               )}
 
               {!token ? (
@@ -206,7 +231,7 @@ export default function ActivateDevice() {
                   className="w-full"
                   onClick={() => setSearchParams({})}
                 >
-                  Enter another code
+                  {tr("pages.activate_device.enter_another_code")}
                 </Button>
               ) : null}
             </div>

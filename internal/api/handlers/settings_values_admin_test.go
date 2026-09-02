@@ -364,7 +364,7 @@ func TestAdminSetRejectsInvalidValueLikeTheSessionRoute(t *testing.T) {
 	if adminErr.Error != "invalid_value" {
 		t.Errorf("admin error code = %q, want invalid_value", adminErr.Error)
 	}
-	if adminErr != sessionErr {
+	if !bytes.Equal(adminRec.Body.Bytes(), sessionRec.Body.Bytes()) {
 		t.Errorf("error bodies differ: admin %+v, session %+v", adminErr, sessionErr)
 	}
 }

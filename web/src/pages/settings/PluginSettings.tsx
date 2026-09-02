@@ -11,8 +11,11 @@ import {
 } from "@/hooks/queries/pluginSettings";
 import { pluginRouteHref } from "@/lib/pluginRouteHref";
 import { navigateToPluginRoute } from "@/lib/buildPluginHref";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function PluginSettingsCard({ installationId }: { installationId: number }) {
+  useUILanguage();
   const { data, isLoading } = usePluginSettingsDetail(installationId, installationId > 0);
   const updateSettings = useUpdatePluginSettings();
   const [values, setValues] = useState<Record<string, string>>({});
@@ -57,7 +60,7 @@ function PluginSettingsCard({ installationId }: { installationId: number }) {
             })
           }
         >
-          Save
+          {tr("common.actions.save")}
         </Button>
         {userRoutes.map((route) => {
           const href = pluginRouteHref(installationId, route.path);
@@ -81,6 +84,7 @@ function PluginSettingsCard({ installationId }: { installationId: number }) {
 }
 
 export default function PluginSettings() {
+  useUILanguage();
   const { data, isLoading } = usePluginSettingsList();
 
   if (isLoading) {
@@ -104,16 +108,20 @@ export default function PluginSettings() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight">Plugins</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">
+          {tr("pages.settings.plugin_settings.plugins")}
+        </h2>
         <p className="text-muted-foreground text-sm">
-          Configure installed plugins and open plugin-hosted account pages.
+          {tr(
+            "pages.settings.plugin_settings.configure_installed_plugins_and_open_plugin_hosted_account_pages",
+          )}
         </p>
       </div>
 
       <div className="space-y-4">
         {installations.length === 0 ? (
           <div className="text-muted-foreground rounded-[1rem] border p-5 text-sm">
-            No plugins expose user settings for this account.
+            {tr("pages.settings.plugin_settings.no_plugins_expose_user_settings_for_this_account")}
           </div>
         ) : (
           installations.map((installation) => (

@@ -9,6 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * One-time reveal of a webhook signing secret (profile webhooks and admin
@@ -21,16 +23,19 @@ export function SigningSecretDialog({
   secret: string | null;
   onClose: () => void;
 }) {
+  useUILanguage();
   const [copied, setCopied] = useState(false);
   return (
     <Dialog open={secret != null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Save your signing secret</DialogTitle>
+          <DialogTitle>
+            {tr("components.signing_secret_dialog.save_your_signing_secret")}
+          </DialogTitle>
           <DialogDescription>
-            Silo signs every delivery with this secret so your receiver can verify it. It is shown
-            only once — store it on the receiving service now. You can rotate it later if it is
-            lost.
+            {tr(
+              "components.signing_secret_dialog.silo_signs_every_delivery_with_this_secret_so_your_receiver",
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="bg-muted flex items-center gap-2 rounded-lg p-3 font-mono text-xs break-all">
@@ -50,7 +55,7 @@ export function SigningSecretDialog({
           </Button>
         </div>
         <DialogFooter>
-          <Button onClick={onClose}>I've saved it</Button>
+          <Button onClick={onClose}>{tr("components.signing_secret_dialog.i_ve_saved_it")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

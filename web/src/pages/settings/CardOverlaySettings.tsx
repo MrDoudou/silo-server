@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from "react";
 import { Check, ImageIcon, ImageOff, RotateCcw, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
@@ -38,6 +38,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CARD_QUICK_ACTION_OPTIONS, type EnabledCardQuickActionMode } from "@/lib/cardQuickActions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SettingRowProps {
   label: string;
@@ -47,6 +49,8 @@ interface SettingRowProps {
 }
 
 function SettingRow({ label, description, hint, control }: SettingRowProps) {
+  useUILanguage();
+  useUILanguage();
   const controlId = useId();
   return (
     <div className="border-border/50 flex flex-col gap-3 border-t pt-4 first:border-t-0 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
@@ -70,6 +74,8 @@ interface AccentSwatchProps {
 }
 
 function AccentSwatch({ value, defaultValue, disabled, onChange }: AccentSwatchProps) {
+  useUILanguage();
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const display = value ?? defaultValue ?? "#94a3b8";
   const hasOverride = !!value;
@@ -81,13 +87,23 @@ function AccentSwatch({ value, defaultValue, disabled, onChange }: AccentSwatchP
           disabled={disabled}
           className="border-border/60 hover:border-border focus:border-border focus-visible:ring-ring relative h-6 w-6 rounded-full border transition-colors focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-40"
           style={{ background: display }}
-          aria-label={hasOverride ? "Change accent color" : "Set accent color"}
-          title={hasOverride ? `Accent: ${display}` : "Default accent"}
+          aria-label={
+            hasOverride
+              ? tr("pages.settings.card_overlay_settings.change_accent_color")
+              : tr("pages.settings.card_overlay_settings.set_accent_color")
+          }
+          title={
+            hasOverride
+              ? tr("pages.settings.card_overlay_settings.accent_display", { display: display })
+              : tr("pages.settings.card_overlay_settings.default_accent")
+          }
         />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[200px] p-3">
         <div className="space-y-2">
-          <div className="text-xs font-medium tracking-wide uppercase">Accent color</div>
+          <div className="text-xs font-medium tracking-wide uppercase">
+            {tr("pages.settings.card_overlay_settings.accent_color")}
+          </div>
           <div className="grid grid-cols-6 gap-1.5">
             {ACCENT_PALETTE.map((color) => (
               <button
@@ -122,7 +138,7 @@ function AccentSwatch({ value, defaultValue, disabled, onChange }: AccentSwatchP
             }}
             className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 text-xs"
           >
-            <X size={12} /> Reset to default
+            <X size={12} /> {tr("pages.settings.card_overlay_settings.reset_to_default")}
           </button>
         </div>
       </PopoverContent>
@@ -137,6 +153,8 @@ interface OverlayToggleProps {
 }
 
 function OverlayToggle({ overlayId, prefs, onUpdate }: OverlayToggleProps) {
+  useUILanguage();
+  useUILanguage();
   const def = getOverlayDef(overlayId);
   if (!def) return null;
   const config = prefs.items[overlayId];
@@ -150,7 +168,9 @@ function OverlayToggle({ overlayId, prefs, onUpdate }: OverlayToggleProps) {
       description={def.description}
       hint={
         suppressed
-          ? "Hidden while the combined Resolution + HDR badge is enabled."
+          ? tr(
+              "pages.settings.card_overlay_settings.hidden_while_the_combined_resolution_hdr_badge_is_enabled",
+            )
           : def.availabilityNote
       }
       control={({ id }) => (
@@ -169,8 +189,16 @@ function OverlayToggle({ overlayId, prefs, onUpdate }: OverlayToggleProps) {
                 })
               }
               className="text-muted-foreground hover:text-foreground disabled:opacity-40"
-              title={resolvedShowIcon ? "Hide icon" : "Show icon"}
-              aria-label={resolvedShowIcon ? "Hide icon" : "Show icon"}
+              title={
+                resolvedShowIcon
+                  ? tr("pages.settings.card_overlay_settings.hide_icon")
+                  : tr("pages.settings.card_overlay_settings.show_icon")
+              }
+              aria-label={
+                resolvedShowIcon
+                  ? tr("pages.settings.card_overlay_settings.hide_icon")
+                  : tr("pages.settings.card_overlay_settings.show_icon")
+              }
             >
               {resolvedShowIcon ? <ImageIcon size={16} /> : <ImageOff size={16} />}
             </button>
@@ -238,6 +266,8 @@ interface PresetPickerProps {
 }
 
 function PresetPicker({ value, onChange }: PresetPickerProps) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {PRESET_IDS.map((id) => {
@@ -248,18 +278,19 @@ function PresetPicker({ value, onChange }: PresetPickerProps) {
             key={id}
             type="button"
             onClick={() => onChange(id)}
-            className={`flex flex-col items-stretch gap-2 rounded-lg border p-3 text-left transition-colors ${
-              active
+            className={
+              "flex flex-col items-stretch gap-2 rounded-lg border p-3 text-left transition-colors " +
+              (active
                 ? "border-primary bg-primary/5"
-                : "border-border/60 hover:border-border bg-transparent"
-            }`}
+                : "border-border/60 hover:border-border bg-transparent")
+            }
           >
             <div className="flex h-12 items-center justify-center rounded-md bg-gradient-to-br from-slate-700 to-slate-900">
               <span
                 className={preset.badgeClass}
                 style={preset.badgeStyle(preset.id === "vibrant" ? "#f5c518" : undefined)}
               >
-                Sample
+                {tr("pages.settings.card_overlay_settings.sample")}
               </span>
             </div>
             <div>
@@ -274,6 +305,8 @@ function PresetPicker({ value, onChange }: PresetPickerProps) {
 }
 
 export default function CardOverlaySettings() {
+  useUILanguage();
+  useUILanguage();
   const {
     prefs,
     setPrefs,
@@ -293,22 +326,22 @@ export default function CardOverlaySettings() {
 
   const handleUpdate = (next: CardOverlayPrefs) => {
     setPrefs(next);
-    toast.success("Setting saved");
+    toast.success("feedback.settings.card_overlay_settings.setting_saved");
   };
 
   const handleQuickActionModeChange = (next: EnabledCardQuickActionMode) => {
     setQuickActionMode(next);
-    toast.success("Setting saved");
+    toast.success("feedback.settings.card_overlay_settings.setting_saved");
   };
 
   const handleQuickActionsEnabledChange = (next: boolean) => {
     setQuickActionsEnabled(next);
-    toast.success("Setting saved");
+    toast.success("feedback.settings.card_overlay_settings.setting_saved");
   };
 
   const handleOverlaysEnabledChange = (next: boolean) => {
     setOverlaysEnabled(next);
-    toast.success("Setting saved");
+    toast.success("feedback.settings.card_overlay_settings.setting_saved");
   };
 
   // Removing the profile document is what puts this profile back on the
@@ -318,9 +351,11 @@ export default function CardOverlaySettings() {
     try {
       await resetPrefs();
       setConfirmRestoreOpen(false);
-      toast.success("Restored the server's default badges");
+      toast.success("feedback.settings.card_overlay_settings.restored_the_server_s_default_badges");
     } catch {
-      toast.error("Failed to restore the server's default badges");
+      toast.error(
+        "errors.settings.card_overlay_settings.failed_to_restore_the_server_s_default_badges",
+      );
     }
   };
 
@@ -330,17 +365,27 @@ export default function CardOverlaySettings() {
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Card Overlays</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.settings.card_overlay_settings.card_overlays")}
+        </h2>
         <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-          Choose the quick actions and badges shown on media cards, where badges sit, and how they
-          look. Inspired by Kometa.
+          {tr(
+            "pages.settings.card_overlay_settings.choose_the_quick_actions_and_badges_shown_on_media_cards",
+          )}
         </p>
       </div>
 
-      <SettingsGroup title="General" description="Override the server defaults for this profile.">
+      <SettingsGroup
+        title={tr("pages.settings.card_overlay_settings.general")}
+        description={tr(
+          "pages.settings.card_overlay_settings.override_the_server_defaults_for_this_profile",
+        )}
+      >
         <SettingRow
-          label="Card quick actions"
-          description="Choose the favorite and watched shortcuts shown for this profile."
+          label={tr("pages.settings.card_overlay_settings.card_quick_actions")}
+          description={tr(
+            "pages.settings.card_overlay_settings.choose_the_favorite_and_watched_shortcuts_shown_for_this_profile",
+          )}
           control={({ id }) => (
             <div className="flex items-center gap-2">
               <Select
@@ -350,7 +395,10 @@ export default function CardOverlaySettings() {
                   handleQuickActionModeChange(value as EnabledCardQuickActionMode)
                 }
               >
-                <SelectTrigger className="w-[190px]" aria-label="Card quick action mode">
+                <SelectTrigger
+                  className="w-[190px]"
+                  aria-label={tr("pages.settings.card_overlay_settings.card_quick_action_mode")}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -365,20 +413,22 @@ export default function CardOverlaySettings() {
                 id={id}
                 checked={quickActionsEnabled}
                 onCheckedChange={handleQuickActionsEnabledChange}
-                aria-label="Enable card quick actions"
+                aria-label={tr("pages.settings.card_overlay_settings.enable_card_quick_actions")}
               />
             </div>
           )}
         />
         <SettingRow
-          label="Card overlay badges"
-          description="Show overlay badges on media cards for this profile."
+          label={tr("pages.settings.card_overlay_settings.card_overlay_badges")}
+          description={tr(
+            "pages.settings.card_overlay_settings.show_overlay_badges_on_media_cards_for_this_profile",
+          )}
           control={({ id }) => (
             <Switch
               id={id}
               checked={overlaysEnabled}
               onCheckedChange={handleOverlaysEnabledChange}
-              aria-label="Enable card overlay badges"
+              aria-label={tr("pages.settings.card_overlay_settings.enable_card_overlay_badges")}
             />
           )}
         />
@@ -387,9 +437,11 @@ export default function CardOverlaySettings() {
       <ConfirmDialog
         open={confirmRestoreOpen}
         onOpenChange={setConfirmRestoreOpen}
-        title="Restore default server settings"
-        description="Discard your badge customizations and follow the server defaults again, including any the administrator changes later. This cannot be undone."
-        confirmLabel="Restore"
+        title={tr("pages.settings.card_overlay_settings.restore_default_server_settings")}
+        description={tr(
+          "pages.settings.card_overlay_settings.discard_your_badge_customizations_and_follow_the_server_defaults_again",
+        )}
+        confirmLabel={tr("pages.settings.card_overlay_settings.restore")}
         variant="destructive"
         isPending={isResetting}
         onConfirm={() => {
@@ -405,8 +457,10 @@ export default function CardOverlaySettings() {
         className={overlaysEnabled ? "" : "pointer-events-none opacity-50"}
       >
         <SettingsGroup
-          title="Preview"
-          description="Live preview of your current overlay configuration."
+          title={tr("pages.settings.card_overlay_settings.preview")}
+          description={tr(
+            "pages.settings.card_overlay_settings.live_preview_of_your_current_overlay_configuration",
+          )}
           actions={
             hasOverride ? (
               <button
@@ -415,10 +469,12 @@ export default function CardOverlaySettings() {
                 className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
               >
                 <RotateCcw className="h-3 w-3" aria-hidden="true" />
-                Restore default server settings
+                {tr("pages.settings.card_overlay_settings.restore_default_server_settings")}
               </button>
             ) : (
-              <span className="text-muted-foreground text-xs">Following the server defaults</span>
+              <span className="text-muted-foreground text-xs">
+                {tr("pages.settings.card_overlay_settings.following_the_server_defaults")}
+              </span>
             )
           }
         >
@@ -430,8 +486,12 @@ export default function CardOverlaySettings() {
 
         <Tabs defaultValue="overlays" className="mt-6">
           <TabsList>
-            <TabsTrigger value="overlays">Overlays</TabsTrigger>
-            <TabsTrigger value="style">Style</TabsTrigger>
+            <TabsTrigger value="overlays">
+              {tr("pages.settings.card_overlay_settings.overlays")}
+            </TabsTrigger>
+            <TabsTrigger value="style">
+              {tr("pages.settings.card_overlay_settings.style")}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overlays" className="mt-4 space-y-6">
@@ -455,32 +515,52 @@ export default function CardOverlaySettings() {
 
           <TabsContent value="style" className="mt-4 space-y-6">
             <SettingsGroup
-              title="Preset"
-              description="A preset controls the base appearance of every badge. You can override the accent color of individual badges in the Overlays tab."
+              title={tr("pages.settings.card_overlay_settings.preset")}
+              description={tr(
+                "pages.settings.card_overlay_settings.a_preset_controls_the_base_appearance_of_every_badge_you",
+              )}
             >
               <PresetPicker
                 value={displayPrefs.preset}
                 onChange={(next) => handleUpdate({ ...displayPrefs, preset: next })}
               />
             </SettingsGroup>
-            <SettingsGroup title="How styling works" description="Where to find what.">
+            <SettingsGroup
+              title={tr("pages.settings.card_overlay_settings.how_styling_works")}
+              description={tr("pages.settings.card_overlay_settings.where_to_find_what")}
+            >
               <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
                 <li>
-                  <strong className="text-foreground">Preset</strong> sets the badge shape,
-                  background, font, and whether icons show by default.
+                  <strong className="text-foreground">
+                    {tr("pages.settings.card_overlay_settings.preset")}
+                  </strong>{" "}
+                  {tr(
+                    "pages.settings.card_overlay_settings.sets_the_badge_shape_background_font_and_whether_icons_show",
+                  )}
                 </li>
                 <li>
-                  <strong className="text-foreground">Accent color</strong> (per overlay) tints that
-                  badge — gold for IMDb, red for RT, etc.
+                  <strong className="text-foreground">
+                    {tr("pages.settings.card_overlay_settings.accent_color")}
+                  </strong>{" "}
+                  {tr(
+                    "pages.settings.card_overlay_settings.per_overlay_tints_that_badge_gold_for_imdb_red_for",
+                  )}
                 </li>
                 <li>
-                  <strong className="text-foreground">Icon toggle</strong> (per overlay) overrides
-                  the preset's icon default for a single overlay.
+                  <strong className="text-foreground">
+                    {tr("pages.settings.card_overlay_settings.icon_toggle")}
+                  </strong>{" "}
+                  {tr(
+                    "pages.settings.card_overlay_settings.per_overlay_overrides_the_preset_s_icon_default_for_a",
+                  )}
                 </li>
                 <li>
-                  <strong className="text-foreground">Position</strong> picks which corner the badge
-                  sits in. Multiple badges in the same corner stack vertically. Bottom corners share
-                  space with the card's quick actions, which draw over the badge while they show.
+                  <strong className="text-foreground">
+                    {tr("pages.settings.card_overlay_settings.position")}
+                  </strong>{" "}
+                  {tr(
+                    "pages.settings.card_overlay_settings.picks_which_corner_the_badge_sits_in_multiple_badges_in",
+                  )}
                 </li>
               </ul>
             </SettingsGroup>

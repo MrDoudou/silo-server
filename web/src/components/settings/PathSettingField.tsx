@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SETTINGS_CONTROL_WIDTH, SettingFieldRow } from "@/pages/admin-settings/SettingField";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface PathSettingFieldProps {
   label: string;
@@ -40,6 +42,7 @@ export function PathSettingField({
   onChange,
   restartRequired,
 }: PathSettingFieldProps) {
+  useUILanguage();
   const controlId = useId();
   const descriptionId = useId();
   // Nothing to reset while the field already runs the default, whether it is
@@ -77,11 +80,13 @@ export function PathSettingField({
             // Several of these rows can share a page, so the label names the
             // field instead of leaving a screen reader with three identical
             // "Reset to default" buttons.
-            aria-label={`Reset ${label} to default`}
+            aria-label={tr("components.settings.path_setting_field.reset_label_to_default", {
+              label: label,
+            })}
             className="text-muted-foreground hover:text-foreground -mr-2 self-end"
             onClick={() => onChange("")}
           >
-            Reset to default
+            {tr("components.settings.path_setting_field.reset_to_default")}
           </Button>
         ) : null}
       </div>

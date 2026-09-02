@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { MoreHorizontal, MessageSquare, Pause, Play, Square, OctagonAlert } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { api } from "@/api/client";
 import type { AdminSession } from "@/api/types";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getPrimaryPlaybackAction, isSessionPaused } from "./adminSessionActionModel";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type SessionActionKind = "pause" | "resume" | "stop" | "terminate" | "message";
 
@@ -65,6 +67,7 @@ export function AdminSessionActions({
   inlinePrefixActions,
   showInlineTerminate = false,
 }: AdminSessionActionsProps) {
+  useUILanguage();
   const [pendingAction, setPendingAction] = useState<SessionActionKind | null>(null);
   const [messageOpen, setMessageOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -83,7 +86,7 @@ export function AdminSessionActions({
 
   const paused = optimisticPaused ?? isSessionPaused(session);
   const primaryAction = paused
-    ? { action: "resume" as const, label: "Resume" }
+    ? { action: "resume" as const, label: tr("components.admin_session_actions.resume") }
     : getPrimaryPlaybackAction(session);
 
   async function runAction(action: Exclude<SessionActionKind, "message">) {
@@ -100,13 +103,16 @@ export function AdminSessionActions({
       } else if (response.status === "dispatched" && action === "resume") {
         setOptimisticPaused(false);
       }
-      toast.success(
-        response.status === "fallback_scheduled"
-          ? fallbackMessages[action]
-          : successMessages[action],
-      );
+      toast.success("feedback.admin_session_actions.reported_message", {
+        values: {
+          message:
+            response.status === "fallback_scheduled"
+              ? fallbackMessages[action]
+              : successMessages[action],
+        },
+      });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to send session command");
+      toast.error("errors.admin_session_actions.failed_to_send_session_command", { error: error });
     } finally {
       setPendingAction(null);
     }
@@ -115,7 +121,7 @@ export function AdminSessionActions({
   async function sendMessage() {
     const trimmed = message.trim();
     if (!trimmed) {
-      toast.error("Message is required");
+      toast.error("errors.admin_session_actions.message_is_required");
       return;
     }
 
@@ -125,11 +131,11 @@ export function AdminSessionActions({
         method: "POST",
         body: JSON.stringify({ message: trimmed }),
       });
-      toast.success("Message sent");
+      toast.success("feedback.admin_session_actions.message_sent");
       setMessage("");
       setMessageOpen(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to send message");
+      toast.error("errors.admin_session_actions.failed_to_send_message", { error: error });
     } finally {
       setPendingAction(null);
     }
@@ -148,7 +154,7 @@ export function AdminSessionActions({
       disabled={pendingAction !== null}
     >
       <OctagonAlert className="h-3.5 w-3.5" />
-      Terminate
+      {tr("components.admin_session_actions.terminate")}
     </Button>
   ) : null;
 
@@ -159,7 +165,7 @@ export function AdminSessionActions({
           variant="ghost"
           size="icon"
           className={compact ? "h-7 w-7" : "h-8 w-8"}
-          aria-label="Session actions"
+          aria-label={tr("components.admin_session_actions.session_actions")}
           disabled={pendingAction !== null}
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -169,7 +175,9 @@ export function AdminSessionActions({
         {layout === "menu" ? (
           <>
             <DropdownMenuLabel>
-              {supportsPlaybackControl ? "Playback Actions" : "Limited Playback Actions"}
+              {supportsPlaybackControl
+                ? tr("components.admin_session_actions.playback_actions")
+                : tr("components.admin_session_actions.limited_playback_actions")}
             </DropdownMenuLabel>
             {supportsPlaybackControl ? (
               <DropdownMenuItem onSelect={() => void runAction(primaryAction.action)}>
@@ -190,11 +198,13 @@ export function AdminSessionActions({
             )}
             <DropdownMenuItem onSelect={() => void runAction("stop")}>
               <Square className="h-4 w-4" />
-              Stop
+              {tr("common.actions.stop")}
             </DropdownMenuItem>
           </>
         ) : (
-          <DropdownMenuLabel>Session Actions</DropdownMenuLabel>
+          <DropdownMenuLabel>
+            {tr("components.admin_session_actions.session_actions_66febf73")}
+          </DropdownMenuLabel>
         )}
         {extraMenuItems ? (
           <>
@@ -205,7 +215,7 @@ export function AdminSessionActions({
         {supportsPlaybackControl ? (
           <DropdownMenuItem onSelect={() => setMessageOpen(true)}>
             <MessageSquare className="h-4 w-4" />
-            Message…
+            {tr("components.admin_session_actions.message")}
           </DropdownMenuItem>
         ) : layout === "inline" ? (
           <>
@@ -220,7 +230,7 @@ export function AdminSessionActions({
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={() => void runAction("terminate")}>
               <OctagonAlert className="h-4 w-4" />
-              Terminate
+              {tr("components.admin_session_actions.terminate")}
             </DropdownMenuItem>
           </>
         )}
@@ -246,17 +256,23 @@ export function AdminSessionActions({
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Send Message</DialogTitle>
+            <DialogTitle>{tr("components.admin_session_actions.send_message")}</DialogTitle>
             <DialogDescription>
-              Send a custom message to {session.username || `User #${session.user_id}`} during
-              playback.
+              {tr("components.admin_session_actions.send_a_custom_message_to")}{" "}
+              {session.username ||
+                tr("components.admin_session_actions.user_user_id", {
+                  user_id: session.user_id,
+                })}{" "}
+              {tr("components.admin_session_actions.during_playback")}
             </DialogDescription>
           </DialogHeader>
           <textarea
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             rows={4}
-            placeholder="Server restart in 5 minutes. Please finish this episode soon."
+            placeholder={tr(
+              "components.admin_session_actions.server_restart_in_5_minutes_please_finish_this_episode_soon",
+            )}
             className="border-border bg-background text-foreground min-h-24 w-full resize-y rounded-md border px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
           />
           <DialogFooter>
@@ -265,10 +281,10 @@ export function AdminSessionActions({
               onClick={() => setMessageOpen(false)}
               disabled={pendingAction === "message"}
             >
-              Cancel
+              {tr("common.actions.cancel")}
             </Button>
             <Button onClick={() => void sendMessage()} disabled={pendingAction === "message"}>
-              Send Message
+              {tr("components.admin_session_actions.send_message")}
             </Button>
           </DialogFooter>
         </DialogContent>

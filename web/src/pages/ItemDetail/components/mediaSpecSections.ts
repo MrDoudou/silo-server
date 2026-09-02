@@ -9,6 +9,8 @@ import {
 } from "@/lib/mediaFormat";
 import { formatAddedAt, formatLanguageName } from "./versionFormatUtils";
 
+import { tr } from "@/i18n/translate";
+
 export interface MediaSpecRow {
   label: string;
   value: string;
@@ -20,12 +22,42 @@ export interface MediaSpecSection {
 }
 
 const CHROMA_SUBSAMPLING_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
-  { pattern: /444/, label: "4:4:4" },
-  { pattern: /440/, label: "4:4:0" },
-  { pattern: /422/, label: "4:2:2" },
-  { pattern: /420|^nv12|^nv21|^p010|^p016/, label: "4:2:0" },
-  { pattern: /411/, label: "4:1:1" },
-  { pattern: /410/, label: "4:1:0" },
+  {
+    pattern: /444/,
+    get label() {
+      return tr("pages.item_detail.components.media_spec_sections.value_4_4_4");
+    },
+  },
+  {
+    pattern: /440/,
+    get label() {
+      return tr("pages.item_detail.components.media_spec_sections.value_4_4_0");
+    },
+  },
+  {
+    pattern: /422/,
+    get label() {
+      return tr("pages.item_detail.components.media_spec_sections.value_4_2_2");
+    },
+  },
+  {
+    pattern: /420|^nv12|^nv21|^p010|^p016/,
+    get label() {
+      return tr("pages.item_detail.components.media_spec_sections.value_4_2_0");
+    },
+  },
+  {
+    pattern: /411/,
+    get label() {
+      return tr("pages.item_detail.components.media_spec_sections.value_4_1_1");
+    },
+  },
+  {
+    pattern: /410/,
+    get label() {
+      return tr("pages.item_detail.components.media_spec_sections.value_4_1_0");
+    },
+  },
 ];
 
 export function formatChromaSubsampling(pixelFormat?: string): string {
@@ -159,7 +191,7 @@ export function buildGeneralSection(version: FileVersion): MediaSpecSection {
   pushRow(rows, "Edition", version.edition_raw);
   pushRow(rows, "Added", formatAddedAt(version.added_at));
   pushRow(rows, "File Path", version.file_path?.trim());
-  return { title: "General", rows };
+  return { title: tr("pages.item_detail.components.media_spec_sections.general"), rows };
 }
 
 export function buildVideoSections(version: FileVersion): MediaSpecSection[] {

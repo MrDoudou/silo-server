@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSelection, type SelectionKind } from "./GroupsBoard";
 import { BulkSelectionCheckbox } from "@/components/BulkSelectionCheckbox";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export interface CollectionRowProps {
   collection: LibraryCollection;
@@ -31,6 +33,7 @@ export function CollectionRow({
   onSync,
   isSyncing = false,
 }: CollectionRowProps) {
+  useUILanguage();
   const sortableId = `col:${collection.id}`;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: sortableId,
@@ -80,7 +83,9 @@ export function CollectionRow({
       )}
     >
       <BulkSelectionCheckbox
-        label={`Select ${collection.title}`}
+        label={tr("components.collections.admin.collection_row.select_title", {
+          title: collection.title,
+        })}
         selected={selected}
         onSelectionChange={onSelectionChange}
       />
@@ -90,7 +95,7 @@ export function CollectionRow({
         {...listeners}
         onClick={(e) => e.stopPropagation()}
         className="text-muted-foreground hover:text-foreground cursor-grab disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label="Drag to reorder"
+        aria-label={tr("components.collections.admin.collection_row.drag_to_reorder")}
         disabled={dragDisabled}
       >
         <GripVertical className="h-4 w-4" />
@@ -101,10 +106,16 @@ export function CollectionRow({
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <div className="truncate font-medium">{collection.title}</div>
-          {collection.featured ? <Badge variant="secondary">Featured</Badge> : null}
+          {collection.featured ? (
+            <Badge variant="secondary">
+              {tr("components.collections.admin.collection_row.featured")}
+            </Badge>
+          ) : null}
         </div>
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-          <span>{collection.item_count} items</span>
+          <span>
+            {collection.item_count} {tr("components.collections.admin.collection_row.items")}
+          </span>
           <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
             {collection.collection_type}
           </Badge>
@@ -121,7 +132,7 @@ export function CollectionRow({
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            aria-label="Sync collection"
+            aria-label={tr("components.collections.admin.collection_row.sync_collection")}
             disabled={isSyncing}
             onClick={(e) => {
               e.stopPropagation();
@@ -135,7 +146,7 @@ export function CollectionRow({
           variant="ghost"
           size="icon"
           className="h-8 w-8"
-          aria-label="Edit collection"
+          aria-label={tr("components.collections.admin.collection_row.edit_collection")}
           onClick={(e) => {
             e.stopPropagation();
             onEdit();
@@ -147,7 +158,7 @@ export function CollectionRow({
           variant="ghost"
           size="icon"
           className="text-destructive hover:bg-destructive/10 hover:text-destructive h-8 w-8"
-          aria-label="Delete collection"
+          aria-label={tr("components.collections.admin.collection_row.delete_collection")}
           onClick={(e) => {
             e.stopPropagation();
             onDelete();

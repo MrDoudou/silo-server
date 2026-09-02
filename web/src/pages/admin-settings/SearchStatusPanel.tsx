@@ -7,6 +7,9 @@ import { useCatalogSearchStatus } from "@/hooks/queries/admin/settings";
 import { formatDateTime } from "@/lib/datetime";
 
 import { SettingFieldStatus } from "./SettingField";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 /**
  * Read-only view of the catalog search index: which provider is answering
@@ -14,6 +17,7 @@ import { SettingFieldStatus } from "./SettingField";
  * tasks. Diagnostics, not settings — it lives behind a disclosure.
  */
 export function SearchStatusPanel() {
+  useUILanguage();
   const { data: status, isLoading, isError, error } = useCatalogSearchStatus();
 
   if (isLoading) {
@@ -35,7 +39,9 @@ export function SearchStatusPanel() {
     return (
       <div className="space-y-3 py-3">
         <SettingFieldStatus tone="warn">
-          {`Couldn't load search status${error instanceof Error && error.message ? `: ${error.message}` : "."}`}
+          {tr("pages.admin_settings.search_status_panel.couldn_t_load_search_status_value", {
+            value: error ? `: ${tr.error("errors.common.request_failed", error)}` : ".",
+          })}
         </SettingFieldStatus>
         <SearchTaskLinks />
       </div>
@@ -47,12 +53,13 @@ export function SearchStatusPanel() {
       {status.degraded && (
         <div className="py-3">
           <SettingFieldStatus tone="warn">
-            {status.degraded_reason ?? "Search is running in a degraded mode."}
+            {status.degraded_reason ??
+              tr("pages.admin_settings.search_status_panel.search_is_running_in_a_degraded_mode")}
           </SettingFieldStatus>
         </div>
       )}
       <StatusRow
-        label="Answering searches"
+        label={tr("pages.admin_settings.search_status_panel.answering_searches")}
         value={
           status.active_provider === "meilisearch"
             ? status.index.rebuild_required
@@ -63,12 +70,12 @@ export function SearchStatusPanel() {
         badge={status.configured_provider}
       />
       <StatusRow
-        label="Health"
+        label={tr("pages.admin_settings.search_status_panel.health")}
         value={status.meilisearch.healthy ? "Healthy" : status.meilisearch.circuit_state}
         badge={status.meilisearch.configured ? "configured" : "not configured"}
       />
       <StatusRow
-        label="Active index"
+        label={tr("pages.admin_settings.search_status_panel.active_index")}
         value={status.index.active_index_uid || "Not built"}
         badge={
           status.index.rebuild_required
@@ -76,39 +83,48 @@ export function SearchStatusPanel() {
             : `schema ${status.index.schema_version}/${status.index.expected_schema_version}`
         }
       />
-      <StatusRow label="Documents" value={String(status.index.document_count)} />
-      <StatusRow label="Indexed types" value={formatIndexedTypes(status.meilisearch.index_types)} />
       <StatusRow
-        label="Compressed vectors"
+        label={tr("pages.admin_settings.search_status_panel.documents")}
+        value={String(status.index.document_count)}
+      />
+      <StatusRow
+        label={tr("pages.admin_settings.search_status_panel.indexed_types")}
+        value={formatIndexedTypes(status.meilisearch.index_types)}
+      />
+      <StatusRow
+        label={tr("pages.admin_settings.search_status_panel.compressed_vectors")}
         value={status.meilisearch.binary_quantized ? "Enabled" : "Disabled"}
       />
       <StatusRow
-        label="Meaning-based search"
+        label={tr("pages.admin_settings.search_status_panel.meaning_based_search")}
         value={status.meilisearch.semantic_enabled ? "Enabled" : "Disabled"}
         badge={status.meilisearch.embedder}
       />
       <StatusRow
-        label="Meaning-based share of results"
+        label={tr("pages.admin_settings.search_status_panel.meaning_based_share_of_results")}
         value={formatSemanticRatio(status.meilisearch.semantic_ratio)}
       />
-      <StatusRow label="Items with vectors" value={String(status.index.vector_document_count)} />
+      <StatusRow
+        label={tr("pages.admin_settings.search_status_panel.items_with_vectors")}
+        value={String(status.index.vector_document_count)}
+      />
       {status.semantic && (
         <>
           <StatusRow
-            label="Meaning-based readiness"
+            label={tr("pages.admin_settings.search_status_panel.meaning_based_readiness")}
             value={status.semantic.ready ? "Ready" : "Not ready"}
             badge={status.semantic.ready ? undefined : status.semantic.disabled_reason}
           />
           <StatusRow
-            label="Vector coverage"
+            label={tr("pages.admin_settings.search_status_panel.vector_coverage")}
             value={formatPercent(status.semantic.vector_coverage_ratio)}
           />
           <StatusRow
-            label="Coverage updated"
+            label={tr("pages.admin_settings.search_status_panel.coverage_updated")}
             value={formatStatusDate(status.semantic.coverage_updated_at) || "Never"}
           />
           <StatusRow
-            label="Embedding model"
+            label={tr("pages.admin_settings.search_status_panel.embedding_model")}
             value={
               status.semantic.capability.ok
                 ? "OK"
@@ -118,7 +134,9 @@ export function SearchStatusPanel() {
           />
           {status.semantic.per_type && status.semantic.per_type.length > 0 && (
             <div className="flex flex-col gap-2 py-3">
-              <span className="text-sm font-medium">Coverage by type</span>
+              <span className="text-sm font-medium">
+                {tr("pages.admin_settings.search_status_panel.coverage_by_type")}
+              </span>
               <div className="divide-border/60 divide-y">
                 {status.semantic.per_type.map((t) => (
                   <div key={t.type} className="flex items-center justify-between gap-2 py-1.5">
@@ -127,7 +145,9 @@ export function SearchStatusPanel() {
                       {formatPercent(t.vector_coverage_ratio)})
                     </span>
                     <Badge variant={t.ready ? "secondary" : "outline"}>
-                      {t.ready ? "Ready" : "Not ready"}
+                      {t.ready
+                        ? tr("pages.admin_settings.search_status_panel.ready")
+                        : tr("pages.admin_settings.search_status_panel.not_ready")}
                     </Badge>
                   </div>
                 ))}
@@ -136,17 +156,26 @@ export function SearchStatusPanel() {
           )}
         </>
       )}
-      <StatusRow label="Pending events" value={String(status.index.pending_events)} />
+      <StatusRow
+        label={tr("pages.admin_settings.search_status_panel.pending_events")}
+        value={String(status.index.pending_events)}
+      />
       {status.index.dead_lettered_events > 0 && (
         <StatusRow
-          label="Dropped events"
+          label={tr("pages.admin_settings.search_status_panel.dropped_events")}
           value={String(status.index.dead_lettered_events)}
           badge="stale until rebuild"
         />
       )}
-      <StatusRow label="Last sync" value={formatStatusDate(status.index.last_sync_at) || "Never"} />
+      <StatusRow
+        label={tr("pages.admin_settings.search_status_panel.last_sync")}
+        value={formatStatusDate(status.index.last_sync_at) || "Never"}
+      />
       {status.meilisearch.last_fallback && (
-        <StatusRow label="Last fallback" value={status.meilisearch.last_fallback} />
+        <StatusRow
+          label={tr("pages.admin_settings.search_status_panel.last_fallback")}
+          value={status.meilisearch.last_fallback}
+        />
       )}
       <SearchTaskLinks />
     </div>
@@ -155,19 +184,25 @@ export function SearchStatusPanel() {
 
 /** The two index maintenance tasks. Shown whether or not the status resolved. */
 function SearchTaskLinks() {
+  useUILanguage();
   return (
     <div className="flex flex-wrap gap-2 py-3">
       <Button asChild size="sm" variant="outline">
-        <Link to="/admin/tasks/rebuild_catalog_search_index">Rebuild index</Link>
+        <Link to="/admin/tasks/rebuild_catalog_search_index">
+          {tr("pages.admin_settings.search_status_panel.rebuild_index")}
+        </Link>
       </Button>
       <Button asChild size="sm" variant="ghost">
-        <Link to="/admin/tasks/sync_catalog_search_index">Automatic maintenance</Link>
+        <Link to="/admin/tasks/sync_catalog_search_index">
+          {tr("pages.admin_settings.search_status_panel.automatic_maintenance")}
+        </Link>
       </Button>
     </div>
   );
 }
 
 function StatusRow({ label, value, badge }: { label: string; value: string; badge?: string }) {
+  useUILanguage();
   return (
     <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
       <span className="text-sm font-medium">{label}</span>

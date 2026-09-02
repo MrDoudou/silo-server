@@ -19,6 +19,8 @@ import {
 import { GroupCard } from "./GroupCard";
 import { UngroupedSection } from "./UngroupedSection";
 import { updateCheckboxSelection } from "@/lib/checkboxSelection";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // ---------------------------------------------------------------------------
 // Selection context
@@ -93,6 +95,7 @@ export function GroupsBoard({
   setSelectedIds,
   syncingCollectionID = null,
 }: GroupsBoardProps) {
+  useUILanguage();
   // --- selection state ---
   const selectionKindRef = useRef<SelectionKind | null>(null);
   const anchorRef = useRef<AnchorRef | null>(null);
@@ -357,11 +360,16 @@ export function GroupsBoard({
         <DragOverlay>
           {activeId && draggedIds.length > 1 ? (
             <div className="bg-card rounded-md border px-3 py-2 text-sm font-medium shadow-lg">
-              {draggedIds.length} collections selected
+              {draggedIds.length}{" "}
+              {tr("components.collections.admin.groups_board.collections_selected")}
             </div>
           ) : null}
         </DragOverlay>
-        {activeId && <div className="sr-only">Dragging {activeId}</div>}
+        {activeId && (
+          <div className="sr-only">
+            {tr("components.collections.admin.groups_board.dragging")} {activeId}
+          </div>
+        )}
       </DndContext>
     </SelectionContext.Provider>
   );

@@ -4,6 +4,8 @@ import type { GuidedFormState } from "@/components/collections/CollectionGuidedR
 import { Badge } from "@/components/ui/badge";
 
 import type { ActiveFilterBadge } from "./catalogFilterBadges";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ActiveFilterBadgesProps {
   badges: ActiveFilterBadge[];
@@ -11,6 +13,7 @@ interface ActiveFilterBadgesProps {
 }
 
 export default function ActiveFilterBadges({ badges, onClear }: ActiveFilterBadgesProps) {
+  useUILanguage();
   if (badges.length === 0) return null;
 
   return (
@@ -24,7 +27,9 @@ export default function ActiveFilterBadges({ badges, onClear }: ActiveFilterBadg
             className="hover:bg-muted ml-0.5 rounded-sm p-0.5"
           >
             <X className="h-3 w-3" />
-            <span className="sr-only">Remove {badge.label}</span>
+            <span className="sr-only">
+              {tr("common.actions.remove")} {badge.label}
+            </span>
           </button>
         </Badge>
       ))}

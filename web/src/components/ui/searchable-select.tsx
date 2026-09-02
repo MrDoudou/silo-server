@@ -4,6 +4,8 @@ import { Check, ChevronsUpDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { PortalContainerContext } from "./portal-container-context";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SearchableSelectProps {
   /** The full list of available options. */
@@ -30,6 +32,7 @@ export function SearchableSelect({
   isLoading = false,
   getLabel,
 }: SearchableSelectProps) {
+  useUILanguage();
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [focusedIndex, setFocusedIndex] = React.useState(-1);
@@ -103,8 +106,8 @@ export function SearchableSelect({
                 setFocusedIndex(-1);
               }}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Search..."
-              aria-label="Search options"
+              placeholder={tr("components.ui.searchable_select.search")}
+              aria-label={tr("components.ui.searchable_select.search_options")}
               aria-controls={listboxId}
               aria-activedescendant={
                 focusedIndex >= 0 ? `${listboxId}-opt-${focusedIndex}` : undefined
@@ -120,13 +123,17 @@ export function SearchableSelect({
             className="max-h-60 overflow-y-auto overscroll-contain p-1"
           >
             {isLoading ? (
-              <p className="text-muted-foreground py-4 text-center text-sm">Loading...</p>
+              <p className="text-muted-foreground py-4 text-center text-sm">
+                {tr("components.ui.searchable_select.loading")}
+              </p>
             ) : filtered.length === 0 ? (
-              <p className="text-muted-foreground py-4 text-center text-sm">No results found</p>
+              <p className="text-muted-foreground py-4 text-center text-sm">
+                {tr("components.ui.searchable_select.no_results_found")}
+              </p>
             ) : (
               <>
                 <button
-                  id={`${listboxId}-opt-0`}
+                  id={listboxId + "-opt-0"}
                   type="button"
                   role="option"
                   aria-selected={!value}
@@ -144,12 +151,14 @@ export function SearchableSelect({
                   <Check
                     className={cn("mr-2 h-4 w-4 shrink-0", value ? "opacity-0" : "opacity-100")}
                   />
-                  <span className="text-muted-foreground italic">Any</span>
+                  <span className="text-muted-foreground italic">
+                    {tr("components.ui.searchable_select.any")}
+                  </span>
                 </button>
 
                 {filtered.map((opt, i) => (
                   <button
-                    id={`${listboxId}-opt-${i + 1}`}
+                    id={listboxId + "-opt-" + (i + 1)}
                     type="button"
                     role="option"
                     aria-selected={value === opt}
@@ -208,6 +217,7 @@ export function SearchableMultiSelect({
   isLoading = false,
   getLabel,
 }: SearchableMultiSelectProps) {
+  useUILanguage();
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [focusedIndex, setFocusedIndex] = React.useState(-1);
@@ -304,8 +314,8 @@ export function SearchableMultiSelect({
                 setFocusedIndex(-1);
               }}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Search..."
-              aria-label="Search options"
+              placeholder={tr("components.ui.searchable_select.search")}
+              aria-label={tr("components.ui.searchable_select.search_options")}
               aria-controls={listboxId}
               aria-activedescendant={
                 focusedIndex >= 0 ? `${listboxId}-opt-${focusedIndex}` : undefined
@@ -322,14 +332,18 @@ export function SearchableMultiSelect({
             className="max-h-60 overflow-y-auto overscroll-contain p-1"
           >
             {isLoading ? (
-              <p className="text-muted-foreground py-4 text-center text-sm">Loading...</p>
+              <p className="text-muted-foreground py-4 text-center text-sm">
+                {tr("components.ui.searchable_select.loading")}
+              </p>
             ) : filtered.length === 0 ? (
-              <p className="text-muted-foreground py-4 text-center text-sm">No results found</p>
+              <p className="text-muted-foreground py-4 text-center text-sm">
+                {tr("components.ui.searchable_select.no_results_found")}
+              </p>
             ) : (
               <>
                 {value.length > 0 ? (
                   <button
-                    id={`${listboxId}-opt-0`}
+                    id={listboxId + "-opt-0"}
                     type="button"
                     role="option"
                     aria-selected={false}
@@ -340,7 +354,9 @@ export function SearchableMultiSelect({
                     onClick={() => onChange([])}
                   >
                     <Check className="mr-2 h-4 w-4 shrink-0 opacity-0" />
-                    <span className="text-muted-foreground italic">Clear all</span>
+                    <span className="text-muted-foreground italic">
+                      {tr("components.ui.searchable_select.clear_all")}
+                    </span>
                   </button>
                 ) : null}
 
@@ -348,7 +364,7 @@ export function SearchableMultiSelect({
                   const optIndex = hasClear ? i + 1 : i;
                   return (
                     <button
-                      id={`${listboxId}-opt-${optIndex}`}
+                      id={listboxId + "-opt-" + optIndex}
                       type="button"
                       role="option"
                       aria-selected={selected.has(opt)}

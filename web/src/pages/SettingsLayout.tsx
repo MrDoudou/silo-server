@@ -38,6 +38,8 @@ import {
   filterSettingsSearchGroups,
 } from "@/components/settings/settingsSearch";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface NavItem {
   path: string;
@@ -71,13 +73,19 @@ const WIDE_SETTINGS_PAGES = new Set(["devices"]);
  */
 const NAV_SECTIONS: NavSection[] = [
   {
-    label: "Playback",
+    get label() {
+      return tr("pages.settings_layout.playback");
+    },
     items: [
       {
         path: "playback",
-        label: "Playback",
+        get label() {
+          return tr("pages.settings_layout.playback");
+        },
         icon: Play,
-        description: "Quality, languages, skipping, and what plays next.",
+        get description() {
+          return tr("pages.settings_layout.quality_languages_skipping_and_what_plays_next");
+        },
         keywords: [
           "video quality",
           "bitrate",
@@ -104,9 +112,13 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "subtitle-appearance",
-        label: "Subtitles",
+        get label() {
+          return tr("pages.settings_layout.subtitles");
+        },
         icon: Subtitles,
-        description: "Subtitle language, when they appear, and how they look.",
+        get description() {
+          return tr("pages.settings_layout.subtitle_language_when_they_appear_and_how_they_look");
+        },
         keywords: [
           "subtitle language",
           "forced subtitles",
@@ -134,9 +146,13 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "devices",
-        label: "Your Devices",
+        get label() {
+          return tr("pages.settings_layout.your_devices");
+        },
         icon: MonitorSmartphone,
-        description: "Per-device quality, HDR, and audio or subtitle sync.",
+        get description() {
+          return tr("pages.settings_layout.per_device_quality_hdr_and_audio_or_subtitle_sync");
+        },
         keywords: [
           "devices",
           "tv",
@@ -166,13 +182,19 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "Appearance",
+    get label() {
+      return tr("pages.settings_layout.appearance");
+    },
     items: [
       {
         path: "appearance",
-        label: "Appearance",
+        get label() {
+          return tr("pages.settings_layout.appearance");
+        },
         icon: Palette,
-        description: "Theme, interface tone, and date and time formats.",
+        get description() {
+          return tr("pages.settings_layout.theme_interface_tone_and_date_and_time_formats");
+        },
         keywords: [
           "theme",
           "profile theme",
@@ -196,9 +218,13 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "interface",
-        label: "Navigation & Cards",
+        get label() {
+          return tr("pages.settings_layout.navigation_cards");
+        },
         icon: PanelTop,
-        description: "Your primary menu, poster size, and card captions.",
+        get description() {
+          return tr("pages.settings_layout.your_primary_menu_poster_size_and_card_captions");
+        },
         keywords: [
           "navigation",
           "menu",
@@ -225,9 +251,13 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "card-overlays",
-        label: "Card Overlays",
+        get label() {
+          return tr("pages.settings_layout.card_overlays");
+        },
         icon: Layers,
-        description: "Badges drawn on poster cards, and where they sit.",
+        get description() {
+          return tr("pages.settings_layout.badges_drawn_on_poster_cards_and_where_they_sit");
+        },
         keywords: ["poster", "badges", "overlay", "accent color", "preset"],
         settings: settingIndex(
           "Preview",
@@ -240,30 +270,44 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "accessibility",
-        label: "Accessibility",
+        get label() {
+          return tr("pages.settings_layout.accessibility");
+        },
         icon: Eye,
-        description: "Text size, weight, and contrast for easier reading.",
+        get description() {
+          return tr("pages.settings_layout.text_size_weight_and_contrast_for_easier_reading");
+        },
         keywords: ["contrast", "readability", "motion", "transparency", "text"],
         settings: settingIndex("Text size", "Text weight", "Contrast", "High Contrast", "Preview"),
       },
       {
         path: "theme-editor",
-        label: "Theme Editor",
+        get label() {
+          return tr("pages.settings_layout.theme_editor");
+        },
         icon: Wand2,
-        description: "Fine-tune theme colors and add your own CSS.",
+        get description() {
+          return tr("pages.settings_layout.fine_tune_theme_colors_and_add_your_own_css");
+        },
         keywords: ["design tokens", "token overrides", "custom css", "community themes"],
         settings: settingIndex("Preview", "Token Overrides", "Custom CSS", "Community Themes"),
       },
     ],
   },
   {
-    label: "Home & Discovery",
+    get label() {
+      return tr("pages.settings_layout.home_discovery");
+    },
     items: [
       {
         path: "home-screen",
-        label: "Home Screen",
+        get label() {
+          return tr("pages.settings_layout.home_screen");
+        },
         icon: LayoutDashboard,
-        description: "Which rows appear on Home, and in what order.",
+        get description() {
+          return tr("pages.settings_layout.which_rows_appear_on_home_and_in_what_order");
+        },
         keywords: ["sections", "rows", "continue watching", "next up", "library order"],
         settings: settingIndex(
           "Scope",
@@ -277,17 +321,27 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "personalize",
-        label: "Personalize",
+        get label() {
+          return tr("pages.settings_layout.personalize");
+        },
         icon: Sparkles,
-        description: "Re-tune the taste profile behind your recommendations.",
+        get description() {
+          return tr("pages.settings_layout.re_tune_the_taste_profile_behind_your_recommendations");
+        },
         keywords: ["taste profile", "recommendations", "ratings", "likes", "dislikes"],
         settings: settingIndex("Refine your taste profile", "Taste profile", "Recommendations"),
       },
       {
         path: "libraries",
-        label: "Libraries",
+        get label() {
+          return tr("pages.settings_layout.libraries");
+        },
         icon: Library,
-        description: "Which libraries you see, their order, and per-library audio.",
+        get description() {
+          return tr(
+            "pages.settings_layout.which_libraries_you_see_their_order_and_per_library_audio",
+          );
+        },
         keywords: [
           "library visibility",
           "access",
@@ -309,13 +363,19 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "Connections",
+    get label() {
+      return tr("pages.settings_layout.connections");
+    },
     items: [
       {
         path: "connect-apps",
-        label: "Connect Apps",
+        get label() {
+          return tr("pages.settings_layout.connect_apps");
+        },
         icon: Cast,
-        description: "Sign-in details for Silo and Jellyfin-compatible apps.",
+        get description() {
+          return tr("pages.settings_layout.sign_in_details_for_silo_and_jellyfin_compatible_apps");
+        },
         keywords: [
           "jellyfin",
           "infuse",
@@ -342,9 +402,13 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "watch-providers",
-        label: "Watch Providers",
+        get label() {
+          return tr("pages.settings_layout.watch_providers");
+        },
         icon: Cloud,
-        description: "Trakt watch history, favorites, and scrobbling.",
+        get description() {
+          return tr("pages.settings_layout.trakt_watch_history_favorites_and_scrobbling");
+        },
         keywords: ["trakt", "import", "export", "scrobble", "favorites", "watch history"],
         settings: settingIndex(
           "Last imported",
@@ -364,9 +428,13 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "webhook-sync",
-        label: "Webhook Sync",
+        get label() {
+          return tr("pages.settings_layout.webhook_sync");
+        },
         icon: Server,
-        description: "Take progress from Plex, Emby, and Jellyfin webhooks.",
+        get description() {
+          return tr("pages.settings_layout.take_progress_from_plex_emby_and_jellyfin_webhooks");
+        },
         keywords: ["plex", "emby", "jellyfin", "webhook", "progress", "watched"],
         settings: settingIndex(
           "Add a connection",
@@ -381,9 +449,13 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "history-import",
-        label: "History Import",
+        get label() {
+          return tr("pages.settings_layout.history_import");
+        },
         icon: Clock,
-        description: "Bring an existing Emby watch history into Silo.",
+        get description() {
+          return tr("pages.settings_layout.bring_an_existing_emby_watch_history_into_silo");
+        },
         keywords: ["emby", "watched history", "import", "mapping", "sync"],
         settings: settingIndex(
           "New import",
@@ -399,22 +471,32 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "Account",
+    get label() {
+      return tr("pages.settings_layout.account");
+    },
     items: [
       {
         path: "account",
-        label: "Account",
+        get label() {
+          return tr("pages.settings_layout.account");
+        },
         icon: KeyRound,
-        description: "Change the password shared by every household profile.",
+        get description() {
+          return tr("pages.settings_layout.change_the_password_shared_by_every_household_profile");
+        },
         keywords: ["password", "credential", "sign in", "security", "account"],
         settings: settingIndex("Current password", "New password", "Confirm new password"),
         primaryOrAdmin: true,
       },
       {
         path: "profiles",
-        label: "Profiles",
+        get label() {
+          return tr("pages.settings_layout.profiles");
+        },
         icon: Users,
-        description: "Household profile names, PINs, and library access.",
+        get description() {
+          return tr("pages.settings_layout.household_profile_names_pins_and_library_access");
+        },
         keywords: ["profile name", "pin", "access", "primary profile", "household"],
         settings: settingIndex(
           "Profile name",
@@ -428,9 +510,13 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         path: "notifications",
-        label: "Notifications",
+        get label() {
+          return tr("pages.settings_layout.notifications");
+        },
         icon: Bell,
-        description: "New-episode alerts by email, Discord, push, or webhook.",
+        get description() {
+          return tr("pages.settings_layout.new_episode_alerts_by_email_discord_push_or_webhook");
+        },
         keywords: ["new episodes", "email", "discord", "browser push", "webhooks"],
         settings: settingIndex(
           "New Episode Notifications",
@@ -461,13 +547,16 @@ interface SettingsOverviewProps {
  * itself — the exact shape of the desktop complaint.
  */
 function SettingsOverview({ sections, profile }: SettingsOverviewProps) {
+  useUILanguage();
   const profileName = profile?.name ?? "Your profile";
 
   return (
     <div className="w-full space-y-6">
       <Link
         to="/profiles"
-        aria-label={`Current profile: ${profileName}`}
+        aria-label={tr("pages.settings_layout.current_profile_profile_name", {
+          profileName: profileName,
+        })}
         className="surface-panel-subtle hover:bg-surface-hover/70 focus-visible:ring-ring flex min-h-16 items-center gap-3 rounded-2xl px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none sm:max-w-md"
       >
         <Avatar className="border-border h-10 w-10 border">
@@ -477,7 +566,9 @@ function SettingsOverview({ sections, profile }: SettingsOverviewProps) {
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="text-muted-foreground text-xs">Current profile</p>
+          <p className="text-muted-foreground text-xs">
+            {tr("pages.settings_layout.current_profile")}
+          </p>
           <p className="truncate text-sm font-semibold">{profileName}</p>
         </div>
         <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden="true" />
@@ -494,7 +585,7 @@ function SettingsOverview({ sections, profile }: SettingsOverviewProps) {
             href: `/settings/${item.path}`,
           })),
         }))}
-        ariaLabel="Settings sections"
+        ariaLabel={tr("pages.settings_layout.settings_sections")}
         idPrefix="settings-index"
         variant="directory"
       />
@@ -503,6 +594,7 @@ function SettingsOverview({ sections, profile }: SettingsOverviewProps) {
 }
 
 export default function SettingsLayout() {
+  useUILanguage();
   const location = useLocation();
   const [settingsSearch, setSettingsSearch] = useState("");
   const { profile } = useCurrentProfile();
@@ -544,13 +636,17 @@ export default function SettingsLayout() {
               className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-1 inline-flex w-fit items-center gap-1.5 rounded-lg pr-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none lg:hidden"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-              All settings
+              {tr("pages.settings_layout.all_settings")}
             </Link>
             <div className="page-header mt-10 hidden gap-5 sm:mt-12 lg:flex">
               <div className="min-w-0 space-y-3">
-                <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Settings</h1>
+                <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+                  {tr("pages.settings_layout.settings")}
+                </h1>
                 <p className="page-subtitle text-sm sm:text-base">
-                  Manage your playback preferences, libraries, and display options.
+                  {tr(
+                    "pages.settings_layout.manage_your_playback_preferences_libraries_and_display_options",
+                  )}
                 </p>
               </div>
               <SettingsSearchInput
@@ -574,7 +670,7 @@ export default function SettingsLayout() {
             <div className="surface-panel-lg mt-5 flex min-w-0 flex-1 flex-col lg:mt-10 lg:min-h-[500px] lg:flex-row lg:overflow-hidden">
               <aside className="border-border hidden lg:block lg:w-60 lg:flex-shrink-0 lg:border-r">
                 <nav
-                  aria-label="Settings sections"
+                  aria-label={tr("pages.settings_layout.settings_sections")}
                   className="sticky top-6 space-y-5 py-5 pr-3 pl-5"
                 >
                   {filteredSections.map((section) => (
@@ -588,14 +684,16 @@ export default function SettingsLayout() {
                           key={item.path}
                           label={item.label}
                           icon={item.icon}
-                          href={`/settings/${item.path}`}
+                          href={"/settings/" + item.path}
                           active={item.path === activeSegment}
                         />
                       ))}
                     </SideNavSection>
                   ))}
                   {filteredSections.length === 0 ? (
-                    <p className="text-muted-foreground px-2 text-sm">No matching settings</p>
+                    <p className="text-muted-foreground px-2 text-sm">
+                      {tr("pages.settings_layout.no_matching_settings")}
+                    </p>
                   ) : null}
                 </nav>
               </aside>
@@ -612,9 +710,11 @@ export default function SettingsLayout() {
             <PageBack to="/" up floating />
             <div className="page-header mt-10 mb-6 gap-5 sm:mt-12 sm:mb-8">
               <div className="min-w-0 space-y-3">
-                <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Settings</h1>
+                <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+                  {tr("pages.settings_layout.settings")}
+                </h1>
                 <p className="page-subtitle text-sm sm:text-base">
-                  Make Silo work the way you like.
+                  {tr("pages.settings_layout.make_silo_work_the_way_you_like")}
                 </p>
               </div>
               <SettingsSearchInput

@@ -1,3 +1,4 @@
+import { tr } from "@/i18n/translate";
 /**
  * ═══════════════════════════════════════════════════════════════════
  * SILO DESIGN SYSTEM
@@ -41,10 +42,12 @@ export const DESIGN_PRINCIPLES = [
   {
     id: "content-first",
     name: "Content is King",
-    description:
-      "Media artwork and imagery are the primary visual elements. UI chrome " +
-      "recedes to let content shine. Poster art, backdrops, and thumbnails " +
-      "provide the visual richness — not the UI itself.",
+    get description() {
+      return tr(
+        "lib.design_system.media_artwork_and_imagery_are_the_primary_visual_elements_ui",
+        {},
+      );
+    },
     examples: [
       "Hero sections use full-bleed backdrop images",
       "Card grids let poster art dominate; text labels are secondary",
@@ -54,10 +57,12 @@ export const DESIGN_PRINCIPLES = [
   {
     id: "cinematic-darkness",
     name: "Cinematic Darkness",
-    description:
-      "Deep, dark surfaces create a theater-like atmosphere. Multiple " +
-      "layers of darkness (background → surface → raised) establish depth " +
-      "without harsh contrast. The darkness makes media imagery pop.",
+    get description() {
+      return tr(
+        "lib.design_system.deep_dark_surfaces_create_a_theater_like_atmosphere_multiple_layers",
+        {},
+      );
+    },
     examples: [
       "Page backgrounds are near-black (#121215 – #1e1e2e range)",
       "Sidebars are darker than the main background",
@@ -67,10 +72,12 @@ export const DESIGN_PRINCIPLES = [
   {
     id: "subtle-chrome",
     name: "Subtle Chrome",
-    description:
-      "Borders, dividers, and backgrounds are minimal and low-contrast. " +
-      "Interactive elements use opacity shifts and soft background " +
-      "changes rather than bold outlines or shadows.",
+    get description() {
+      return tr(
+        "lib.design_system.borders_dividers_and_backgrounds_are_minimal_and_low_contrast_interactive",
+        {},
+      );
+    },
     examples: [
       "Borders are 1px with ~8% opacity difference from surface",
       "Hover states change background, not border or shadow",
@@ -80,10 +87,12 @@ export const DESIGN_PRINCIPLES = [
   {
     id: "clear-hierarchy",
     name: "Clear Hierarchy",
-    description:
-      "Information importance is conveyed through size, weight, and " +
-      "opacity — not color. Titles are large and bold. Metadata is small " +
-      "and muted. Color is reserved for accent cues and actions.",
+    get description() {
+      return tr(
+        "lib.design_system.information_importance_is_conveyed_through_size_weight_and_opacity_not",
+        {},
+      );
+    },
     examples: [
       "Hero title: text-5xl font-bold (largest, heaviest)",
       "Section headers: text-xl font-semibold",
@@ -94,11 +103,9 @@ export const DESIGN_PRINCIPLES = [
   {
     id: "ambient-immersion",
     name: "Ambient Immersion",
-    description:
-      "The UI should feel alive with the content it displays. Featured " +
-      "artwork influences the surrounding atmosphere through subtle color " +
-      "bleed and ambient glow. The page should feel like it belongs to the " +
-      "content currently on screen.",
+    get description() {
+      return tr("lib.design_system.the_ui_should_feel_alive_with_the_content_it_displays", {});
+    },
     examples: [
       "Hero backdrops emit a soft ambient glow via --ambient color",
       "Detail pages shift atmosphere to match the featured title",
@@ -109,11 +116,12 @@ export const DESIGN_PRINCIPLES = [
   {
     id: "discovery-first",
     name: "Discovery-First Layout",
-    description:
-      "Horizontal scroll rows are the primary discovery pattern. Users " +
-      "browse by scanning rows of artwork, not by reading lists or " +
-      "navigating grids. Grids are reserved for search results, 'view all' " +
-      "pages, and library management.",
+    get description() {
+      return tr(
+        "lib.design_system.horizontal_scroll_rows_are_the_primary_discovery_pattern_users_browse",
+        {},
+      );
+    },
     examples: [
       "Home and discover pages use carousel rows as the primary layout",
       "Each row shows partially visible items at edges to signal scrollability",
@@ -124,12 +132,12 @@ export const DESIGN_PRINCIPLES = [
   {
     id: "fluid-motion",
     name: "Fluid Motion",
-    description:
-      "Transitions are smooth and purposeful. Elements fade, slide, " +
-      "and scale with ease. Motion guides attention without distraction. " +
-      "Prefer CSS transitions over JS animation where possible. Ambient " +
-      "cinematic motion uses longer durations and gentler easing than " +
-      "interaction motion.",
+    get description() {
+      return tr(
+        "lib.design_system.transitions_are_smooth_and_purposeful_elements_fade_slide_and_scale",
+        {},
+      );
+    },
     examples: [
       "Page transitions: fade + slight slide (300ms ease-out)",
       "Card hover: subtle scale(1.03) + brightness lift (150ms)",
@@ -142,11 +150,9 @@ export const DESIGN_PRINCIPLES = [
   {
     id: "immersion-levels",
     name: "Immersion Levels",
-    description:
-      "The UI adapts its density and chrome based on how deeply a user is " +
-      "engaged with content. Deeper engagement means less UI and more " +
-      "content. Browse shows full navigation. Focus dims surroundings. " +
-      "Detail gives content the full stage. Watch hides everything.",
+    get description() {
+      return tr("lib.design_system.the_ui_adapts_its_density_and_chrome_based_on_how", {});
+    },
     examples: [
       "Browse: sidebar visible, multiple rows, standard hero",
       "Focus: surrounding content dims, focused item expands",
@@ -157,10 +163,12 @@ export const DESIGN_PRINCIPLES = [
   {
     id: "responsive-density",
     name: "Responsive Density",
-    description:
-      "Information density adapts to the viewport. Desktop shows " +
-      "persistent sidebar navigation and wide grids. Tablet reduces " +
-      "columns. Mobile collapses to drawers and stacked layouts.",
+    get description() {
+      return tr(
+        "lib.design_system.information_density_adapts_to_the_viewport_desktop_shows_persistent_sidebar",
+        {},
+      );
+    },
     examples: [
       "Desktop: 5-6 column poster grid, persistent sidebar",
       "Tablet: 3-4 column grid, collapsible sidebar",

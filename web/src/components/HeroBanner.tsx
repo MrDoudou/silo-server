@@ -10,6 +10,8 @@ import { buildItemHref, buildMediaPlayHref } from "@/lib/mediaNavigation";
 import { useAudiobookPlaybackController } from "@/pages/audiobooks/player/audiobookPlaybackContext";
 import ViewTransitionLink from "@/components/ViewTransitionLink";
 import { formatHeroMetadata } from "./heroMetadata";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface HeroBannerProps {
   items: SectionItem[];
@@ -65,13 +67,18 @@ const HeroBackdropSlide = memo(function HeroBackdropSlide({
   isActive: boolean;
   keepsMotion: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   const [loaded, setLoaded] = useState(false);
   const thumbhash = slide.backdrop_thumbhash ? decodeThumbhash(slide.backdrop_thumbhash) : "";
 
   return (
     <div
-      aria-roledescription="slide"
-      className={`bg-muted absolute inset-0 transition-opacity duration-1000 ease-in-out ${isActive ? "opacity-100" : "opacity-0"}`}
+      aria-roledescription={tr("components.hero_banner.slide")}
+      className={
+        "bg-muted absolute inset-0 transition-opacity duration-1000 ease-in-out " +
+        (isActive ? "opacity-100" : "opacity-0")
+      }
       style={
         thumbhash
           ? {
@@ -137,6 +144,8 @@ export default function HeroBanner({
   reserveHeaderSpace = false,
   libraryId,
 }: HeroBannerProps) {
+  useUILanguage();
+  useUILanguage();
   const slides = useMemo(() => items.slice(0, maxSlides), [items, maxSlides]);
   const [{ activeIndex, outgoingIndex }, setBackdropState] = useState({
     activeIndex: 0,
@@ -239,8 +248,8 @@ export default function HeroBanner({
         heightClassName,
         bleed ? "-mt-[96px] mb-0 sm:-mt-[104px]" : "border-border/60 mb-10 border-b",
       )}
-      aria-roledescription="carousel"
-      aria-label="Featured content"
+      aria-roledescription={tr("components.hero_banner.carousel")}
+      aria-label={tr("components.hero_banner.featured_content")}
       onMouseEnter={pause}
       onMouseLeave={resume}
       onFocus={pause}
@@ -276,9 +285,11 @@ export default function HeroBanner({
         <div className="w-full max-w-[1380px]">
           <div className="max-w-3xl">
             <p className="hero-eyebrow mb-4 hidden sm:block">
-              <span className="hero-eyebrow-strong">Featured</span>
+              <span className="hero-eyebrow-strong">{tr("components.hero_banner.featured")}</span>
               <span className="hero-eyebrow-divider">—</span>
-              <span>No. {padded(activeIndex + 1)}</span>
+              <span>
+                {tr("components.hero_banner.no")} {padded(activeIndex + 1)}
+              </span>
             </p>
             <h1
               key={current.content_id}
@@ -319,7 +330,7 @@ export default function HeroBanner({
                 className="pill pill-glass transition-colors duration-(--duration-fast)"
               >
                 <Info className="h-4 w-4" />
-                More Info
+                {tr("components.hero_banner.more_info")}
               </ViewTransitionLink>
             </div>
           </div>
@@ -342,7 +353,7 @@ export default function HeroBanner({
             type="button"
             onClick={prev}
             className="glass-subtle absolute top-1/2 left-3 z-20 -translate-y-1/2 rounded-full p-1.5 opacity-60 transition-opacity duration-(--duration-fast) hover:opacity-100 sm:left-5 sm:p-2 sm:opacity-80 lg:opacity-0 lg:group-hover:opacity-90"
-            aria-label="Previous slide"
+            aria-label={tr("components.hero_banner.previous_slide")}
           >
             <ChevronLeft className="size-4 sm:size-5" />
           </button>
@@ -350,7 +361,7 @@ export default function HeroBanner({
             type="button"
             onClick={next}
             className="glass-subtle absolute top-1/2 right-3 z-20 -translate-y-1/2 rounded-full p-1.5 opacity-60 transition-opacity duration-(--duration-fast) hover:opacity-100 sm:right-5 sm:p-2 sm:opacity-80 lg:opacity-0 lg:group-hover:opacity-90"
-            aria-label="Next slide"
+            aria-label={tr("components.hero_banner.next_slide")}
           >
             <ChevronRight className="size-4 sm:size-5" />
           </button>
@@ -376,7 +387,11 @@ export default function HeroBanner({
             <button
               type="button"
               onClick={togglePause}
-              aria-label={paused ? "Play slideshow" : "Pause slideshow"}
+              aria-label={
+                paused
+                  ? tr("components.hero_banner.play_slideshow")
+                  : tr("components.hero_banner.pause_slideshow")
+              }
               className="glass-subtle flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-colors hover:text-white"
             >
               {paused ? <Play className="size-3" /> : <Pause className="size-3" />}
@@ -402,7 +417,11 @@ export default function HeroBanner({
             <button
               type="button"
               onClick={togglePause}
-              aria-label={paused ? "Play slideshow" : "Pause slideshow"}
+              aria-label={
+                paused
+                  ? tr("components.hero_banner.play_slideshow")
+                  : tr("components.hero_banner.pause_slideshow")
+              }
               className="flex h-7 w-7 items-center justify-center rounded-full text-white/70 transition-colors hover:text-white"
             >
               {paused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}

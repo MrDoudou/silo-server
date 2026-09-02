@@ -9,21 +9,59 @@ import { formatDate, formatTime } from "@/lib/datetime";
 import type { DateFormatPreference, TimeFormatPreference } from "@/lib/datetime";
 import { CURATED_THEME_IDS, THEMES } from "@/lib/themes";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const DATE_FORMAT_CHOICES: ReadonlyArray<{ value: DateFormatPreference; label: string }> = [
-  { value: "auto", label: "Auto (browser)" },
-  { value: "DD/MM/YYYY", label: "DD/MM/YYYY" },
-  { value: "MM/DD/YYYY", label: "MM/DD/YYYY" },
-  { value: "YYYY-MM-DD", label: "YYYY-MM-DD" },
+  {
+    value: "auto",
+    get label() {
+      return tr("pages.settings.appearance_settings.auto_browser");
+    },
+  },
+  {
+    value: "DD/MM/YYYY",
+    get label() {
+      return tr("pages.settings.appearance_settings.dd_mm_yyyy");
+    },
+  },
+  {
+    value: "MM/DD/YYYY",
+    get label() {
+      return tr("pages.settings.appearance_settings.mm_dd_yyyy");
+    },
+  },
+  {
+    value: "YYYY-MM-DD",
+    get label() {
+      return tr("pages.settings.appearance_settings.yyyy_mm_dd");
+    },
+  },
 ];
 
 const TIME_FORMAT_CHOICES: ReadonlyArray<{ value: TimeFormatPreference; label: string }> = [
-  { value: "auto", label: "Auto (browser)" },
-  { value: "12h", label: "12-hour" },
-  { value: "24h", label: "24-hour" },
+  {
+    value: "auto",
+    get label() {
+      return tr("pages.settings.appearance_settings.auto_browser");
+    },
+  },
+  {
+    value: "12h",
+    get label() {
+      return tr("pages.settings.appearance_settings.value_12_hour");
+    },
+  },
+  {
+    value: "24h",
+    get label() {
+      return tr("pages.settings.appearance_settings.value_24_hour");
+    },
+  },
 ];
 
 export default function AppearanceSettings() {
+  useUILanguage();
   const { theme, setTheme, previewTheme, resetPreviewTheme } = useTheme();
   const activeTheme = THEMES[theme];
   const { dateFormat, timeFormat, setDateFormat, setTimeFormat } = useDateTimeFormatSettings();
@@ -34,11 +72,15 @@ export default function AppearanceSettings() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Appearance</h2>
+      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        {tr("pages.settings.appearance_settings.appearance")}
+      </h2>
 
       <SettingsGroup
-        title="Theme"
-        description="Hover to preview. Click to apply and persist the selection to this profile."
+        title={tr("pages.settings.appearance_settings.theme")}
+        description={tr(
+          "pages.settings.appearance_settings.hover_to_preview_click_to_apply_and_persist_the_selection",
+        )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
           {CURATED_THEME_IDS.map((id) => {
@@ -128,13 +170,15 @@ export default function AppearanceSettings() {
       </SettingsGroup>
 
       <SettingsGroup
-        title="Date & time"
-        description="Choose how dates and clock times are displayed across the app. Saved for the active profile."
+        title={tr("pages.settings.appearance_settings.date_time")}
+        description={tr(
+          "pages.settings.appearance_settings.choose_how_dates_and_clock_times_are_displayed_across_the",
+        )}
       >
         <div className="space-y-4">
           <div className="space-y-2">
             <p id={dateFormatLabelId} className="text-sm font-medium">
-              Date format
+              {tr("pages.settings.appearance_settings.date_format")}
             </p>
             <div
               role="radiogroup"
@@ -158,7 +202,7 @@ export default function AppearanceSettings() {
 
           <div className="space-y-2">
             <p id={timeFormatLabelId} className="text-sm font-medium">
-              Time format
+              {tr("pages.settings.appearance_settings.time_format")}
             </p>
             <div
               role="radiogroup"
@@ -181,15 +225,17 @@ export default function AppearanceSettings() {
           </div>
 
           <p className="text-muted-foreground text-[13px]">
-            Preview: {formatDate(previewDate)} · {formatDate(previewDate, "medium")} ·{" "}
-            {formatTime(previewDate)}
+            {tr("pages.settings.appearance_settings.preview")} {formatDate(previewDate)} ·{" "}
+            {formatDate(previewDate, "medium")} · {formatTime(previewDate)}
           </p>
         </div>
       </SettingsGroup>
 
       <SettingsGroup
-        title="Current selection"
-        description="Changes apply immediately and are saved for the active profile."
+        title={tr("pages.settings.appearance_settings.current_selection")}
+        description={tr(
+          "pages.settings.appearance_settings.changes_apply_immediately_and_are_saved_for_the_active_profile",
+        )}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -203,7 +249,7 @@ export default function AppearanceSettings() {
             onClick={() => setTheme("midnight-cinema")}
             className="border-border text-foreground hover:bg-accent inline-flex h-8 items-center justify-center rounded-md border px-3 text-sm font-medium transition-colors"
           >
-            Reset to Cinema Dark
+            {tr("pages.settings.appearance_settings.reset_to_cinema_dark")}
           </button>
         </div>
       </SettingsGroup>

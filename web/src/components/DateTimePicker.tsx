@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDateTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Calendar + time-of-day picker that speaks the same `YYYY-MM-DDTHH:mm` local
@@ -26,6 +28,7 @@ export function DateTimePicker({
   placeholder?: string;
   className?: string;
 }) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const selected = parseLocalDateTime(value);
   const time = selected ? value.slice(11, 16) : "";
@@ -72,7 +75,7 @@ export function DateTimePicker({
         <div className="flex items-center gap-2 border-t p-3">
           <Input
             type="time"
-            aria-label="Time of day"
+            aria-label={tr("components.date_time_picker.time_of_day")}
             value={time}
             onChange={(event) => handleTimeChange(event.target.value)}
             className="h-8"
@@ -84,7 +87,7 @@ export function DateTimePicker({
             disabled={!selected}
             onClick={() => onChange("")}
           >
-            Clear
+            {tr("components.date_time_picker.clear")}
           </Button>
         </div>
       </PopoverContent>

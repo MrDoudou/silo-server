@@ -5,22 +5,54 @@ import type {
   UserCollectionWatchFilter,
 } from "@/api/types";
 
+import { tr } from "@/i18n/translate";
+
 export const COLLECTION_WATCH_FILTER_OPTIONS: Array<{
   value: UserCollectionWatchFilter;
   label: string;
 }> = [
-  { value: "all", label: "All" },
-  { value: "unwatched", label: "Unwatched" },
-  { value: "watched", label: "Watched" },
+  {
+    value: "all",
+    get label() {
+      return tr("lib.collection_display_filters.all");
+    },
+  },
+  {
+    value: "unwatched",
+    get label() {
+      return tr("lib.collection_display_filters.unwatched");
+    },
+  },
+  {
+    value: "watched",
+    get label() {
+      return tr("lib.collection_display_filters.watched");
+    },
+  },
 ];
 
 export const COLLECTION_MEDIA_FILTER_OPTIONS: Array<{
   value: UserCollectionMediaFilter;
   label: string;
 }> = [
-  { value: "all", label: "All" },
-  { value: "movie", label: "Movies" },
-  { value: "series", label: "Shows" },
+  {
+    value: "all",
+    get label() {
+      return tr("lib.collection_display_filters.all");
+    },
+  },
+  {
+    value: "movie",
+    get label() {
+      return tr("lib.collection_display_filters.movies");
+    },
+  },
+  {
+    value: "series",
+    get label() {
+      return tr("lib.collection_display_filters.shows");
+    },
+  },
 ];
 
 export function collectionWatchFilterLabel(value: UserCollectionWatchFilter): string {

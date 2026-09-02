@@ -12,6 +12,8 @@ import {
 } from "@/hooks/queries/admin/settings";
 import { useHWAccelDetection, type HWAccelInfo } from "@/hooks/queries/admin/system";
 
+import { tr } from "@/i18n/translate";
+
 /**
  * The settings pages the overview links to. The ids here are stable route
  * segments and have to match the pages the settings layout mounts.
@@ -107,16 +109,17 @@ function sentenceCase(value: string): string {
 }
 
 const HW_ACCEL_LABELS: Record<string, string> = {
-  auto: "Auto",
-  qsv: "Quick Sync",
-  vaapi: "VA-API",
-  nvenc: "NVENC",
-  videotoolbox: "VideoToolbox",
-  none: "Software",
+  auto: "hooks.admin.use_settings_overview.auto",
+  qsv: "hooks.admin.use_settings_overview.quick_sync",
+  vaapi: "hooks.admin.use_settings_overview.va_api",
+  nvenc: "hooks.admin.use_settings_overview.nvenc",
+  videotoolbox: "hooks.admin.use_settings_overview.video_toolbox",
+  none: "hooks.admin.use_settings_overview.software",
 };
 
 function hwAccelLabel(value: string): string {
-  return HW_ACCEL_LABELS[value] ?? value.toUpperCase();
+  const knownLabel = HW_ACCEL_LABELS[value];
+  return knownLabel ? tr(knownLabel) : value.toUpperCase();
 }
 
 /**
@@ -127,18 +130,19 @@ function transcodeModeLabel(configured: string, detection: HWAccelInfo | undefin
   const mode = configured || "auto";
   if (mode !== "auto") return hwAccelLabel(mode);
   const resolved = detection?.resolved;
-  if (!resolved) return "Auto";
-  if (resolved === "none") return "Auto · software";
-  return `Auto · ${hwAccelLabel(resolved)}`;
+  if (!resolved) return tr("hooks.admin.use_settings_overview.auto");
+  if (resolved === "none") return tr("hooks.admin.use_settings_overview.auto_software");
+  return tr("hooks.admin.use_settings_overview.auto_value", { value: hwAccelLabel(resolved) });
 }
 
 const SEARCH_PROVIDER_LABELS: Record<string, string> = {
-  postgres: "Postgres",
-  meilisearch: "Meilisearch",
+  postgres: "hooks.admin.use_settings_overview.postgres",
+  meilisearch: "hooks.admin.use_settings_overview.meilisearch",
 };
 
 function searchProviderLabel(value: string): string {
-  return SEARCH_PROVIDER_LABELS[value] ?? sentenceCase(value);
+  const knownLabel = SEARCH_PROVIDER_LABELS[value];
+  return knownLabel ? tr(knownLabel) : sentenceCase(value);
 }
 
 /**
@@ -193,8 +197,8 @@ function tileAction(
   state: OverviewState,
   page: AdminSettingsPageID,
 ): OverviewTileAction | undefined {
-  if (state === "warn") return { label: "Fix", page };
-  if (state === "off") return { label: "Set up", page };
+  if (state === "warn") return { label: tr("hooks.admin.use_settings_overview.fix"), page };
+  if (state === "off") return { label: tr("hooks.admin.use_settings_overview.set_up"), page };
   return undefined;
 }
 
@@ -259,25 +263,35 @@ function buildTiles(input: SettingsOverviewInput): OverviewTile[] {
   return [
     {
       id: "storage",
-      label: "Storage",
+      label: tr("hooks.admin.use_settings_overview.storage"),
       state: storageState,
-      stateText: storageReady
-        ? "Healthy"
-        : storageRestartPending
-          ? "Restart pending"
-          : "Not set up",
-      detail: storageReady
-        ? bucketDetail
-        : storageRestartPending
-          ? `${bucketDetail} · applies after a restart`
-          : "Artwork and uploads have nowhere to go",
+      get stateText() {
+        return tr(
+          storageReady
+            ? "hooks.admin.use_settings_overview.healthy"
+            : storageRestartPending
+              ? "hooks.admin.use_settings_overview.restart_pending"
+              : "hooks.admin.use_settings_overview.not_set_up",
+        );
+      },
+      get detail() {
+        if (storageReady) return bucketDetail;
+        if (storageRestartPending) {
+          return tr("hooks.admin.use_settings_overview.detail_applies_after_a_restart", {
+            detail: bucketDetail,
+          });
+        }
+        return tr("hooks.admin.use_settings_overview.artwork_and_uploads_have_nowhere_to_go");
+      },
       action: tileAction(storageState, "infrastructure"),
     },
     {
       id: "database",
-      label: "Database",
+      label: tr("hooks.admin.use_settings_overview.database"),
       state: "ok",
-      stateText: "Healthy",
+      get stateText() {
+        return tr("hooks.admin.use_settings_overview.healthy");
+      },
       detail: join([
         "Postgres",
         maxConnections ? `max ${maxConnections} connections` : null,
@@ -286,41 +300,65 @@ function buildTiles(input: SettingsOverviewInput): OverviewTile[] {
     },
     {
       id: "transcoding",
-      label: "Transcoding",
+      label: tr("hooks.admin.use_settings_overview.transcoding"),
       state: transcodeState,
-      stateText: playbackRestartPending ? "Restart pending" : transcodeEnabled ? "Ready" : "Off",
-      detail: playbackRestartPending
-        ? "Saved changes apply after a restart"
-        : transcodeEnabled
-          ? join([transcodeMode, renderDevice])
-          : "Clients only get what they can already play",
+      get stateText() {
+        return tr(
+          playbackRestartPending
+            ? "hooks.admin.use_settings_overview.restart_pending"
+            : transcodeEnabled
+              ? "hooks.admin.use_settings_overview.ready"
+              : "hooks.admin.use_settings_overview.off",
+        );
+      },
+      get detail() {
+        if (playbackRestartPending)
+          return tr("hooks.admin.use_settings_overview.saved_changes_apply_after_a_restart");
+        if (transcodeEnabled) return join([transcodeMode, renderDevice]);
+        return tr("hooks.admin.use_settings_overview.clients_only_get_what_they_can_already_play");
+      },
       action: tileAction(transcodeState, "playback"),
     },
     {
       id: "search",
-      label: "Search",
+      label: tr("common.actions.search"),
       state: searchState,
       stateText: searchProviderLabel(activeSearch),
-      detail:
-        activeSearch === "meilisearch"
-          ? !searchStatusResolved
-            ? "Checking connection"
-            : searchDegraded
-              ? (input.search?.degraded_reason ?? "Search is running in a degraded mode")
-              : meiliHealthy
-                ? "Meilisearch connected"
-                : "Meilisearch not reachable"
-          : meiliConfigured
-            ? "Meilisearch configured but not active"
-            : "Meilisearch not connected",
+      get detail() {
+        if (activeSearch === "meilisearch") {
+          if (!searchStatusResolved)
+            return tr("hooks.admin.use_settings_overview.checking_connection");
+          if (searchDegraded) {
+            return input.search?.degraded_reason
+              ? tr.remote({ message: input.search.degraded_reason })
+              : tr("hooks.admin.use_settings_overview.search_is_running_in_a_degraded_mode");
+          }
+          return meiliHealthy
+            ? tr("hooks.admin.use_settings_overview.meilisearch_connected")
+            : tr("hooks.admin.use_settings_overview.meilisearch_not_reachable");
+        }
+        return meiliConfigured
+          ? tr("hooks.admin.use_settings_overview.meilisearch_configured_but_not_active")
+          : tr("hooks.admin.use_settings_overview.meilisearch_not_connected");
+      },
       action: tileAction(searchState, "library"),
     },
     {
       id: "email",
-      label: "Email",
+      label: tr("hooks.admin.use_settings_overview.email"),
       state: emailState,
-      stateText: mailReady ? "Ready" : "Not set up",
-      detail: mailReady ? `SMTP · ${emailHost}` : "Invites and resets can't send",
+      get stateText() {
+        return tr(
+          mailReady
+            ? "hooks.admin.use_settings_overview.ready"
+            : "hooks.admin.use_settings_overview.not_set_up",
+        );
+      },
+      get detail() {
+        return mailReady
+          ? tr("hooks.admin.use_settings_overview.smtp_email_host", { emailHost })
+          : tr("hooks.admin.use_settings_overview.invites_and_resets_can_t_send");
+      },
       action: tileAction(emailState, "notifications"),
     },
   ];

@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { OverlayPreviewVariant } from "./OverlayPreviewCard";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface OverlayPreviewVariantToggleProps {
   value: OverlayPreviewVariant;
@@ -20,8 +22,13 @@ export function OverlayPreviewVariantToggle({
   onChange,
   className,
 }: OverlayPreviewVariantToggleProps) {
+  useUILanguage();
   return (
-    <div className={cn("flex gap-1.5", className)} role="group" aria-label="Preview sample">
+    <div
+      className={cn("flex gap-1.5", className)}
+      role="group"
+      aria-label={tr("components.overlays.overlay_preview_variant_toggle.preview_sample")}
+    >
       {VARIANTS.map((variant) => (
         <button
           key={variant}

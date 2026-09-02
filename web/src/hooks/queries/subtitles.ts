@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import { api, ApiClientError } from "@/api/client";
 import {
@@ -160,7 +160,7 @@ export function useDeleteSubtitlePreference() {
         queryClient.invalidateQueries({ queryKey: [...settingsKeys.all, "values"] }),
       ]),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to reset subtitle preference");
+      toast.error("errors.queries.subtitles.failed_to_reset_subtitle_preference", { error: err });
     },
   });
 }
@@ -207,7 +207,7 @@ export function useSetSubtitlePreference() {
       }),
     onSuccess: () => invalidateItemDetails(queryClient),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save subtitle preference");
+      toast.error("errors.queries.subtitles.failed_to_save_subtitle_preference", { error: err });
     },
   });
 }
@@ -218,13 +218,13 @@ export function useDownloadSubtitle() {
   return useMutation({
     mutationFn: (request: SubtitleDownloadRequest) => downloadSubtitle(request),
     onSuccess: async (_response, request) => {
-      toast.success("Subtitle downloaded");
+      toast.success("feedback.queries.subtitles.subtitle_downloaded");
       await queryClient.invalidateQueries({
         queryKey: subtitleKeys.downloaded(request.media_file_id),
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to download subtitle");
+      toast.error("errors.queries.subtitles.failed_to_download_subtitle", { error: err });
     },
   });
 }
@@ -235,13 +235,13 @@ export function useUploadSubtitle() {
   return useMutation({
     mutationFn: (request: SubtitleUploadRequest) => uploadSubtitle(request),
     onSuccess: async (_response, request) => {
-      toast.success("Subtitle uploaded");
+      toast.success("feedback.queries.subtitles.subtitle_uploaded");
       await queryClient.invalidateQueries({
         queryKey: subtitleKeys.downloaded(request.media_file_id),
       });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to upload subtitle");
+      toast.error("errors.queries.subtitles.failed_to_upload_subtitle", { error: err });
     },
   });
 }

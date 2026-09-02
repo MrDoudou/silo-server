@@ -20,14 +20,18 @@ import DetailBreadcrumb from "./components/DetailBreadcrumb";
 import SeasonEpisodeGrid from "./components/SeasonEpisodeGrid";
 import type { EpisodeNavigationState } from "./itemDetailLayout";
 import { canCurateMetadata as canCurateMetadataForUser } from "@/lib/permissions";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 function seasonLabel(seasonNumber: number, title?: string) {
   if (title) return title;
-  if (seasonNumber === 0) return "Specials";
-  return `Season ${seasonNumber}`;
+  if (seasonNumber === 0) return tr("pages.item_detail.season_content.specials");
+  return tr("pages.item_detail.season_content.season_season_number", { seasonNumber });
 }
 
 export default function SeasonContent({ item }: { item: ItemDetail & { type: "season" } }) {
+  useUILanguage();
   const { translating: overviewTranslating, onTranslate: onTranslateOverview } =
     useOnViewTranslation(item);
   const navigate = useNavigate();
@@ -77,10 +81,10 @@ export default function SeasonContent({ item }: { item: ItemDetail & { type: "se
           up
           className="text-muted-foreground hover:text-foreground text-sm"
         >
-          &larr; Back to {seriesTitle}
+          {tr("pages.item_detail.season_content.larr_back_to")} {seriesTitle}
         </ViewTransitionLink>
         <p className="text-muted-foreground mt-6 text-sm">
-          {episodesError instanceof Error ? episodesError.message : "Season not found"}
+          {tr.error("errors.item_detail.season_content.season_not_found", episodesError)}
         </p>
       </div>
     );
@@ -133,9 +137,11 @@ export default function SeasonContent({ item }: { item: ItemDetail & { type: "se
 
       <div className="page-shell detail-supporting-content py-8 sm:py-10">
         <div className="mb-5 flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">Episodes</h2>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {tr("pages.item_detail.season_content.episodes")}
+          </h2>
           <span className="text-muted-foreground text-sm">
-            {item.episode_count ?? episodes.length} total
+            {item.episode_count ?? episodes.length} {tr("pages.item_detail.season_content.total")}
           </span>
         </div>
 
@@ -147,7 +153,9 @@ export default function SeasonContent({ item }: { item: ItemDetail & { type: "se
 
         {item.cast && item.cast.length > 0 && (
           <div className="mt-10">
-            <h2 className="mb-4 text-xl font-semibold tracking-tight">Cast</h2>
+            <h2 className="mb-4 text-xl font-semibold tracking-tight">
+              {tr("pages.item_detail.season_content.cast")}
+            </h2>
             <CastCarousel cast={item.cast} />
           </div>
         )}

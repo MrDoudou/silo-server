@@ -1,4 +1,6 @@
 import type { EpisodeRef } from "../types";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface NextEpisodeOverlayProps {
   episode: EpisodeRef;
@@ -16,13 +18,18 @@ export function NextEpisodeOverlay({
   onSkip,
   onCancel,
 }: NextEpisodeOverlayProps) {
+  useUILanguage();
   return (
     <div className="absolute right-6 bottom-24 z-50 flex min-w-[260px] flex-col gap-2 rounded-lg bg-black/80 p-4 text-white">
       <div className="text-xs tracking-wider text-white/60 uppercase">
-        Up Next in {secondsRemaining}s
+        {tr("player.components.next_episode_overlay.up_next_in")} {secondsRemaining}
+        {tr("player.components.next_episode_overlay.s")}
       </div>
       <div className="text-sm font-medium">
-        S{episode.seasonNumber}:E{episode.episodeNumber} — {episode.title}
+        {tr("player.components.next_episode_overlay.s_02aa629c")}
+        {episode.seasonNumber}
+        {tr("player.components.next_episode_overlay.e")}
+        {episode.episodeNumber} — {episode.title}
       </div>
       <div className="mt-1 flex gap-2">
         <button
@@ -30,14 +37,14 @@ export function NextEpisodeOverlay({
           type="button"
           className="flex-1 rounded bg-white px-3 py-1.5 text-sm font-medium text-black transition-colors hover:bg-white/90"
         >
-          Play Now
+          {tr("player.components.next_episode_overlay.play_now")}
         </button>
         <button
           onClick={onCancel}
           type="button"
           className="rounded border border-white/30 px-3 py-1.5 text-sm transition-colors hover:bg-white/10"
         >
-          Cancel
+          {tr("common.actions.cancel")}
         </button>
       </div>
     </div>

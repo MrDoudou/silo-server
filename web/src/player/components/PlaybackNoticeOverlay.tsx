@@ -27,7 +27,9 @@ export function PlaybackNoticeOverlay({
   return (
     <div className="pointer-events-none absolute inset-x-0 top-20 z-40 flex justify-center px-4">
       <div
-        className={`max-w-xl rounded-2xl border px-5 py-4 text-white shadow-2xl backdrop-blur ${accentClass}`}
+        className={
+          "max-w-xl rounded-2xl border px-5 py-4 text-white shadow-2xl backdrop-blur " + accentClass
+        }
       >
         {title ? (
           <div className="text-sm font-semibold tracking-wide text-white">{title}</div>

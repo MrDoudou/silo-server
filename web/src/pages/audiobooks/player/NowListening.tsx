@@ -10,6 +10,8 @@ import { SkipIcon } from "./SkipIcon";
 import { SpeedControl, formatRate } from "./SpeedControl";
 import type { AudiobookPlayback } from "./useAudiobookPlayback";
 import type { AudiobookPrefs } from "./useAudiobookPrefs";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 type TimeMode = "total" | "remaining" | "remaining-at-speed";
 
@@ -34,6 +36,7 @@ export function NowListening({
   prefs,
   onCollapse,
 }: NowListeningProps) {
+  useUILanguage();
   const [timeMode, setTimeMode] = useState<TimeMode>("total");
 
   const remaining = Math.max(0, playback.duration - playback.currentTime);
@@ -70,7 +73,7 @@ export function NowListening({
           className="text-muted-foreground hover:bg-muted hover:text-foreground -ml-2 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
         >
           <ChevronDown className="h-5 w-5" />
-          <span>Back to player</span>
+          <span>{tr("pages.audiobooks.player.now_listening.back_to_player")}</span>
         </button>
         <PlayerSettingsMenu prefs={prefs} />
       </div>
@@ -93,7 +96,8 @@ export function NowListening({
             {author && <p className="text-muted-foreground text-base">{author}</p>}
             {narrator && (
               <p className="text-muted-foreground text-sm">
-                Narrated by <span className="text-foreground">{narrator}</span>
+                {tr("pages.audiobooks.player.now_listening.narrated_by")}{" "}
+                <span className="text-foreground">{narrator}</span>
               </p>
             )}
           </div>
@@ -101,7 +105,8 @@ export function NowListening({
           {playback.currentChapter && (
             <div className="space-y-1">
               <p className="text-muted-foreground text-[11px] tracking-[0.18em] uppercase">
-                Chapter {playback.currentChapter.index + 1}
+                {tr("pages.audiobooks.player.now_listening.chapter")}{" "}
+                {playback.currentChapter.index + 1}
               </p>
               <p className="text-foreground text-lg font-medium">{playback.currentChapter.title}</p>
             </div>
@@ -121,7 +126,9 @@ export function NowListening({
                 type="button"
                 data-testid="now-listening-right-time"
                 onClick={cycleTimeMode}
-                title="Toggle total / remaining / remaining at speed"
+                title={tr(
+                  "pages.audiobooks.player.now_listening.toggle_total_remaining_remaining_at_speed",
+                )}
                 className="hover:text-foreground transition-colors"
               >
                 {rightTimeLabel}
@@ -134,8 +141,8 @@ export function NowListening({
               <CircleButton
                 size="sm"
                 variant="secondary"
-                ariaLabel="Previous chapter"
-                title="Previous chapter (P)"
+                ariaLabel={tr("pages.audiobooks.player.now_listening.previous_chapter")}
+                title={tr("pages.audiobooks.player.now_listening.previous_chapter_p")}
                 onClick={playback.prevChapter}
                 disabled={!playback.hasFile}
               >
@@ -146,8 +153,12 @@ export function NowListening({
             <CircleButton
               size="sm"
               variant="secondary"
-              ariaLabel={`Back ${prefs.skipBack} seconds`}
-              title={`Back ${prefs.skipBack} seconds (←)`}
+              ariaLabel={tr("pages.audiobooks.player.now_listening.back_value1_seconds", {
+                value1: prefs.skipBack,
+              })}
+              title={tr("pages.audiobooks.player.now_listening.back_skip_back_seconds", {
+                skipBack: prefs.skipBack,
+              })}
               className="group"
               onClick={() => playback.skip(-prefs.skipBack)}
               disabled={!playback.hasFile}
@@ -158,8 +169,12 @@ export function NowListening({
             <CircleButton
               size="lg"
               variant="primary"
-              ariaLabel={playback.playing ? "Pause" : "Play"}
-              title={playback.playing ? "Pause (space)" : "Play (space)"}
+              ariaLabel={tr(playback.playing ? "common.actions.pause" : "common.actions.play")}
+              title={
+                playback.playing
+                  ? tr("pages.audiobooks.player.now_listening.pause_space")
+                  : tr("pages.audiobooks.player.now_listening.play_space")
+              }
               onClick={playback.togglePlay}
               disabled={!playback.hasFile}
               data-paused={!playback.playing}
@@ -174,8 +189,12 @@ export function NowListening({
             <CircleButton
               size="sm"
               variant="secondary"
-              ariaLabel={`Forward ${prefs.skipForward} seconds`}
-              title={`Forward ${prefs.skipForward} seconds (→)`}
+              ariaLabel={tr("pages.audiobooks.player.now_listening.forward_value1_seconds", {
+                value1: prefs.skipForward,
+              })}
+              title={tr("pages.audiobooks.player.now_listening.forward_skip_forward_seconds", {
+                skipForward: prefs.skipForward,
+              })}
               className="group"
               onClick={() => playback.skip(prefs.skipForward)}
               disabled={!playback.hasFile}
@@ -187,8 +206,8 @@ export function NowListening({
               <CircleButton
                 size="sm"
                 variant="secondary"
-                ariaLabel="Next chapter"
-                title="Next chapter (N)"
+                ariaLabel={tr("pages.audiobooks.player.now_listening.next_chapter")}
+                title={tr("pages.audiobooks.player.now_listening.next_chapter_n")}
                 onClick={playback.nextChapter}
                 disabled={!playback.hasFile || !hasNextChapter}
               >

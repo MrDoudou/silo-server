@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface ProfilePinDialogProps {
   profile: Profile | null;
@@ -23,6 +25,7 @@ export function ProfilePinDialog({
   onVerified,
   verifyPin,
 }: ProfilePinDialogProps) {
+  useUILanguage();
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -50,10 +53,10 @@ export function ProfilePinDialog({
         return;
       }
 
-      setError("Incorrect PIN");
+      setError(tr("components.profiles.profile_pin_dialog.incorrect_pin"));
       setPin("");
     } catch {
-      setError("Verification failed");
+      setError(tr("components.profiles.profile_pin_dialog.verification_failed"));
     } finally {
       setVerifying(false);
     }
@@ -70,18 +73,20 @@ export function ProfilePinDialog({
     >
       <DialogContent className="sm:max-w-xs">
         <DialogHeader>
-          <DialogTitle>Enter PIN for {profile?.name}</DialogTitle>
+          <DialogTitle>
+            {tr("components.profiles.profile_pin_dialog.enter_pin_for")} {profile?.name}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor={pinInputId}>PIN</Label>
+            <Label htmlFor={pinInputId}>{tr("components.profiles.profile_pin_dialog.pin")}</Label>
             <Input
               id={pinInputId}
               type="password"
               inputMode="numeric"
               maxLength={4}
-              placeholder="Enter 4-digit PIN"
+              placeholder={tr("components.profiles.profile_pin_dialog.enter_4_digit_pin")}
               value={pin}
               onChange={(event) => setPin(event.target.value)}
               autoFocus
@@ -92,10 +97,12 @@ export function ProfilePinDialog({
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={handleClose}>
-              Cancel
+              {tr("common.actions.cancel")}
             </Button>
             <Button type="submit" disabled={verifying || pin.length === 0}>
-              {verifying ? "Verifying..." : "Confirm"}
+              {verifying
+                ? tr("components.profiles.profile_pin_dialog.verifying")
+                : tr("common.actions.confirm")}
             </Button>
           </div>
         </form>

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Lock, Plus } from "lucide-react";
-import { toast } from "sonner";
 
 import type { Profile } from "@/api/types";
 import { ProfileEditorDialog } from "@/components/profiles/ProfileEditorDialog";
@@ -14,8 +13,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAvailableUserLibraries } from "@/hooks/queries/libraries";
 import { useProfiles } from "@/hooks/queries/profiles";
 import { sanitizeAuthRedirect } from "@/lib/authRedirect";
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function Profiles() {
+  useUILanguage();
   const { data: profiles = [], isLoading: profilesLoading, avatarUploadEnabled } = useProfiles();
   const { data: libraries = [], isLoading: librariesLoading } = useAvailableUserLibraries();
   const [editorOpen, setEditorOpen] = useState(false);
@@ -25,7 +28,7 @@ export default function Profiles() {
   const [searchParams] = useSearchParams();
   const redirectTarget = sanitizeAuthRedirect(searchParams.get("redirect"));
 
-  useDocumentTitle("Profiles");
+  useDocumentTitle(tr("pages.profiles.profiles"));
 
   const isLoading = profilesLoading || librariesLoading;
 
@@ -66,7 +69,7 @@ export default function Profiles() {
       // fall through to the toast below
     }
 
-    toast.error("Profile created, but PIN verification failed");
+    toast.error("errors.auth.profile_pin_verification_failed");
   }
 
   if (isLoading) {
@@ -90,19 +93,21 @@ export default function Profiles() {
       <div className="auth-shell flex-col gap-6">
         <div className="relative z-10 flex flex-col items-center gap-6">
           <div className="w-full max-w-md space-y-3 text-center">
-            <h1 className="page-title text-[clamp(2.1rem,6vw,4rem)]">Create your first profile</h1>
+            <h1 className="page-title text-[clamp(2.1rem,6vw,4rem)]">
+              {tr("pages.profiles.create_your_first_profile")}
+            </h1>
             <p className="text-muted-foreground text-sm">
-              You need a profile before you can enter the app.
+              {tr("pages.profiles.you_need_a_profile_before_you_can_enter_the_app")}
             </p>
           </div>
 
           <Button onClick={() => setEditorOpen(true)}>
             <Plus className="h-4 w-4" />
-            Create profile
+            {tr("pages.profiles.create_profile")}
           </Button>
 
           <Button variant="outline" size="sm" onClick={logout}>
-            Sign out
+            {tr("pages.profiles.sign_out")}
           </Button>
         </div>
 
@@ -120,7 +125,9 @@ export default function Profiles() {
   return (
     <div className="auth-shell flex-col gap-8">
       <div className="relative z-10 text-center">
-        <h1 className="page-title text-[clamp(2.2rem,7vw,4.5rem)]">Who&apos;s watching?</h1>
+        <h1 className="page-title text-[clamp(2.2rem,7vw,4.5rem)]">
+          {tr("pages.profiles.who_s_watching")}
+        </h1>
       </div>
 
       <div className="relative z-10 flex max-w-5xl flex-wrap justify-center gap-5">
@@ -128,7 +135,11 @@ export default function Profiles() {
           <div key={profile.id} className="group relative">
             <button
               onClick={() => handleSelect(profile)}
-              aria-label={profile.has_pin ? `${profile.name} (PIN protected)` : profile.name}
+              aria-label={
+                profile.has_pin
+                  ? tr("pages.profiles.name_pin_protected", { name: profile.name })
+                  : profile.name
+              }
               className="surface-panel hover:border-primary flex w-[148px] flex-col items-center gap-3 rounded-[1.75rem] p-5 transition-all duration-150 hover:-translate-y-1"
             >
               <div className="relative">
@@ -151,7 +162,7 @@ export default function Profiles() {
       </div>
 
       <Button variant="outline" size="sm" onClick={logout} className="relative z-10 mt-2">
-        Sign out
+        {tr("pages.profiles.sign_out")}
       </Button>
 
       <ProfilePinDialog

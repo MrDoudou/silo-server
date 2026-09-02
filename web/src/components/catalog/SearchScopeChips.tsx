@@ -1,10 +1,27 @@
 import { cn } from "@/lib/utils";
 import type { SearchMediaScope } from "@/hooks/useSearchMediaScope";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const SCOPE_OPTIONS: Array<{ value: SearchMediaScope; label: string }> = [
-  { value: "video", label: "Media" },
-  { value: "audiobook", label: "Audiobooks" },
-  { value: "all", label: "All" },
+  {
+    value: "video",
+    get label() {
+      return tr("components.catalog.search_scope_chips.media");
+    },
+  },
+  {
+    value: "audiobook",
+    get label() {
+      return tr("components.catalog.search_scope_chips.audiobooks");
+    },
+  },
+  {
+    value: "all",
+    get label() {
+      return tr("components.catalog.search_scope_chips.all");
+    },
+  },
 ];
 
 export interface SearchScopeChipsProps {
@@ -18,10 +35,11 @@ export interface SearchScopeChipsProps {
  * results and saves the choice as the user's default search scope.
  */
 export default function SearchScopeChips({ activeScope, onScopeChange }: SearchScopeChipsProps) {
+  useUILanguage();
   return (
     <div
       role="radiogroup"
-      aria-label="Search scope"
+      aria-label={tr("components.catalog.search_scope_chips.search_scope")}
       className="search-paint-surface inline-flex items-center gap-1 rounded-full border p-1"
     >
       {SCOPE_OPTIONS.map((option) => {

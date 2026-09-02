@@ -9,6 +9,8 @@ import type { ResolvedSection } from "@/api/types";
 import { Pin, PinOff } from "lucide-react";
 import { useUICustomization } from "@/hooks/useUICustomization";
 import { carouselCardWidthClasses } from "@/lib/uiCustomization";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SectionRowProps {
   section: ResolvedSection;
@@ -25,6 +27,7 @@ function SectionPinButton({
   sectionTitle: string;
   libraryId: number;
 }) {
+  useUILanguage();
   const { togglePin, isPinned, canToggle } = useToggleSidebarPin();
   const pinned = isPinned(libraryId, "section", sectionId);
 
@@ -33,12 +36,17 @@ function SectionPinButton({
   return (
     <button
       onClick={() => togglePin(libraryId, { type: "section", id: sectionId, label: sectionTitle })}
-      className={`rounded-full p-1.5 transition-colors ${
-        pinned
+      className={
+        "rounded-full p-1.5 transition-colors " +
+        (pinned
           ? "text-primary hover:text-primary/80"
-          : "text-muted-foreground/40 hover:bg-accent/60 hover:text-muted-foreground opacity-0 group-hover/carousel:opacity-100"
-      }`}
-      title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+          : "text-muted-foreground/40 hover:bg-accent/60 hover:text-muted-foreground opacity-0 group-hover/carousel:opacity-100")
+      }
+      title={
+        pinned
+          ? tr("components.section_row.unpin_from_sidebar")
+          : tr("components.section_row.pin_to_sidebar")
+      }
     >
       {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
     </button>
@@ -46,6 +54,7 @@ function SectionPinButton({
 }
 
 export default function SectionRow({ section, libraryId }: SectionRowProps) {
+  useUILanguage();
   const navigate = useViewTransitionNavigate();
   const browseSupported = isSectionBrowseSupported(section.section_type);
   const { prefs: overlayPrefs, quickActionMode } = useOverlayPrefs();

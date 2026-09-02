@@ -10,6 +10,8 @@ import {
 import { cn } from "@/lib/utils";
 import { LANGUAGES } from "@/player/utils/languageNames";
 import { SUBTITLE_PROVIDER_OPTIONS } from "./subtitleAdminStyles";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const ALL = "all";
 
@@ -38,6 +40,7 @@ export default function AdminSubtitlesFilters({
   onSearchChange,
   onReset,
 }: AdminSubtitlesFiltersProps) {
+  useUILanguage();
   return (
     <div className="surface-panel rounded-2xl border-0 px-3 py-3 sm:px-4">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -45,16 +48,22 @@ export default function AdminSubtitlesFilters({
           <Input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search release name…"
+            placeholder={tr(
+              "components.admin.subtitles.admin_subtitles_filters.search_release_name",
+            )}
             className="font-mono text-xs sm:max-w-sm"
-            aria-label="Search subtitle release name"
+            aria-label={tr(
+              "components.admin.subtitles.admin_subtitles_filters.search_subtitle_release_name",
+            )}
           />
         </div>
 
         <div
           className="flex flex-wrap items-center gap-1.5"
           role="group"
-          aria-label="Filter by subtitle provider"
+          aria-label={tr(
+            "components.admin.subtitles.admin_subtitles_filters.filter_by_subtitle_provider",
+          )}
         >
           {SUBTITLE_PROVIDER_OPTIONS.map((option) => {
             const active = provider === option.value;
@@ -79,11 +88,20 @@ export default function AdminSubtitlesFilters({
 
         <div className="flex flex-wrap items-center gap-2">
           <Select value={language} onValueChange={onLanguageChange}>
-            <SelectTrigger className="w-[180px]" aria-label="Filter by language">
-              <SelectValue placeholder="Language" />
+            <SelectTrigger
+              className="w-[180px]"
+              aria-label={tr(
+                "components.admin.subtitles.admin_subtitles_filters.filter_by_language",
+              )}
+            >
+              <SelectValue
+                placeholder={tr("components.admin.subtitles.admin_subtitles_filters.language")}
+              />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>All languages</SelectItem>
+              <SelectItem value={ALL}>
+                {tr("components.admin.subtitles.admin_subtitles_filters.all_languages")}
+              </SelectItem>
               {LANGUAGES.map((lang) => (
                 <SelectItem key={lang.code} value={lang.code}>
                   {lang.label}
@@ -93,11 +111,20 @@ export default function AdminSubtitlesFilters({
           </Select>
 
           <Select value={userId} onValueChange={onUserChange}>
-            <SelectTrigger className="w-[200px]" aria-label="Filter by uploader">
-              <SelectValue placeholder="Uploader" />
+            <SelectTrigger
+              className="w-[200px]"
+              aria-label={tr(
+                "components.admin.subtitles.admin_subtitles_filters.filter_by_uploader",
+              )}
+            >
+              <SelectValue
+                placeholder={tr("components.admin.subtitles.admin_subtitles_filters.uploader")}
+              />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>All uploaders</SelectItem>
+              <SelectItem value={ALL}>
+                {tr("components.admin.subtitles.admin_subtitles_filters.all_uploaders")}
+              </SelectItem>
               {users.map((user) => (
                 <SelectItem key={user.id} value={String(user.id)}>
                   {user.username}
@@ -107,7 +134,7 @@ export default function AdminSubtitlesFilters({
           </Select>
 
           <Button type="button" variant="ghost" size="sm" onClick={onReset}>
-            Reset filters
+            {tr("components.admin.subtitles.admin_subtitles_filters.reset_filters")}
           </Button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 import { api } from "@/api/client";
 import type {
   AutoscanAvailableSourcesResponse,
@@ -46,11 +46,11 @@ export function useUpdateAutoscanSettings() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Autoscan settings saved");
+      toast.success("feedback.queries.use_autoscan.autoscan_settings_saved");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanSettings() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save autoscan settings");
+      toast.error("errors.queries.use_autoscan.failed_to_save_autoscan_settings", { error: err });
     },
   });
 }
@@ -77,11 +77,13 @@ export function useCreateAutoscanConnection() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Autoscan connection created");
+      toast.success("feedback.queries.use_autoscan.autoscan_connection_created");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanConnections() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to create autoscan connection");
+      toast.error("errors.queries.use_autoscan.failed_to_create_autoscan_connection", {
+        error: err,
+      });
     },
   });
 }
@@ -95,11 +97,13 @@ export function useUpdateAutoscanConnection() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Autoscan connection updated");
+      toast.success("feedback.queries.use_autoscan.autoscan_connection_updated");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanConnections() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to update autoscan connection");
+      toast.error("errors.queries.use_autoscan.failed_to_update_autoscan_connection", {
+        error: err,
+      });
     },
   });
 }
@@ -112,13 +116,15 @@ export function useDeleteAutoscanConnection() {
         method: "DELETE",
       }),
     onSuccess: () => {
-      toast.success("Autoscan connection deleted");
+      toast.success("feedback.queries.use_autoscan.autoscan_connection_deleted");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanConnections() });
       // Sources may have lost their connection binding; invalidate them too.
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanSources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete autoscan connection");
+      toast.error("errors.queries.use_autoscan.failed_to_delete_autoscan_connection", {
+        error: err,
+      });
     },
   });
 }
@@ -154,11 +160,11 @@ export function useCreateAutoscanSource() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Autoscan source created");
+      toast.success("feedback.queries.use_autoscan.autoscan_source_created");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanSources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to create autoscan source");
+      toast.error("errors.queries.use_autoscan.failed_to_create_autoscan_source", { error: err });
     },
   });
 }
@@ -172,11 +178,11 @@ export function useUpdateAutoscanSource() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      toast.success("Autoscan source saved");
+      toast.success("feedback.queries.use_autoscan.autoscan_source_saved");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanSources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save autoscan source");
+      toast.error("errors.queries.use_autoscan.failed_to_save_autoscan_source", { error: err });
     },
   });
 }
@@ -189,11 +195,11 @@ export function useDeleteAutoscanSource() {
         method: "DELETE",
       }),
     onSuccess: () => {
-      toast.success("Autoscan source deleted");
+      toast.success("feedback.queries.use_autoscan.autoscan_source_deleted");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanSources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete autoscan source");
+      toast.error("errors.queries.use_autoscan.failed_to_delete_autoscan_source", { error: err });
     },
   });
 }
@@ -208,11 +214,11 @@ export function useCreateAutoscanWebhook() {
         method: "POST",
       }),
     onSuccess: () => {
-      toast.success("Webhook URL created");
+      toast.success("feedback.queries.use_autoscan.webhook_url_created");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanSources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to create webhook URL");
+      toast.error("errors.queries.use_autoscan.failed_to_create_webhook_url", { error: err });
     },
   });
 }
@@ -225,11 +231,13 @@ export function useRotateAutoscanWebhook() {
         method: "POST",
       }),
     onSuccess: () => {
-      toast.success("Webhook URL rotated — update Sonarr/Radarr with the new URL");
+      toast.success(
+        "feedback.queries.use_autoscan.webhook_url_rotated_update_sonarr_radarr_with_the_new_url",
+      );
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanSources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to rotate webhook URL");
+      toast.error("errors.queries.use_autoscan.failed_to_rotate_webhook_url", { error: err });
     },
   });
 }
@@ -242,11 +250,11 @@ export function useDeleteAutoscanWebhook() {
         method: "DELETE",
       }),
     onSuccess: () => {
-      toast.success("Webhook URL deleted");
+      toast.success("feedback.queries.use_autoscan.webhook_url_deleted");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanSources() });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete webhook URL");
+      toast.error("errors.queries.use_autoscan.failed_to_delete_webhook_url", { error: err });
     },
   });
 }
@@ -279,9 +287,9 @@ export function useAutoscanRewriteSuggestions() {
         `/admin/autoscan/sources/${encodeURIComponent(id)}/rewrite-suggestions`,
       ),
     onError: (err) =>
-      toast.error(
-        err instanceof Error ? err.message : "Could not sync rewrites from the arr instance",
-      ),
+      toast.error("errors.queries.use_autoscan.could_not_sync_rewrites_from_the_arr_instance", {
+        error: err,
+      }),
   });
 }
 
@@ -372,12 +380,12 @@ export function useTriggerAutoscan() {
         method: "POST",
       }),
     onSuccess: () => {
-      toast.success("Autoscan triggered");
+      toast.success("feedback.queries.use_autoscan.autoscan_triggered");
       queryClient.invalidateQueries({ queryKey: adminKeys.autoscanStatus() });
       queryClient.invalidateQueries({ queryKey: ["admin", "autoscan", "events"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to trigger autoscan");
+      toast.error("errors.queries.use_autoscan.failed_to_trigger_autoscan", { error: err });
     },
   });
 }

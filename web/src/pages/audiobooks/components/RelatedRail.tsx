@@ -38,13 +38,16 @@ export function RelatedRail({
         {items.map((item) => (
           <ViewTransitionLink
             key={item.content_id}
-            to={`/item/${encodeURIComponent(item.content_id)}`}
-            className={`block ${carouselCardWidthClasses(cardPresentation.poster_size)}`}
+            to={"/item/" + encodeURIComponent(item.content_id)}
+            className={"block " + carouselCardWidthClasses(cardPresentation.poster_size)}
           >
             <div
-              className={`bg-muted relative ${coverAspectClass} overflow-hidden rounded-lg ${
-                item.highlight ? "ring-primary ring-offset-background ring-2 ring-offset-2" : ""
-              }`}
+              className={
+                "bg-muted relative " +
+                coverAspectClass +
+                " overflow-hidden rounded-lg" +
+                (item.highlight ? "ring-primary ring-offset-background ring-2 ring-offset-2" : "")
+              }
             >
               {item.poster_url ? (
                 <img

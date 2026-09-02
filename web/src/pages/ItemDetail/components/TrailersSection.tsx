@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { useCarouselEmbla } from "@/hooks/useCarouselEmbla";
 import { extraKindLabel } from "@/lib/extraKinds";
 import TrailerModal from "./TrailerModal";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface TrailersSectionProps {
   videos: ItemVideo[];
@@ -17,6 +19,7 @@ interface TrailersSectionProps {
  * (trailers first, official first).
  */
 export default function TrailersSection({ videos }: TrailersSectionProps) {
+  useUILanguage();
   const { emblaRef, canScrollPrev, canScrollNext, scrollPrev, scrollNext } = useCarouselEmbla();
   const [activeVideo, setActiveVideo] = useState<ItemVideo | null>(null);
 
@@ -25,14 +28,16 @@ export default function TrailersSection({ videos }: TrailersSectionProps) {
 
   return (
     <div>
-      <h2 className="mb-5 text-xl font-semibold tracking-tight">Trailers &amp; More</h2>
+      <h2 className="mb-5 text-xl font-semibold tracking-tight">
+        {tr("pages.item_detail.components.trailers_section.trailers_more")}
+      </h2>
       <div className="group/carousel relative">
         {canScrollPrev && (
           <button
             type="button"
             onClick={scrollPrev}
             className="from-background/90 absolute top-0 bottom-0 left-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-r to-transparent opacity-0 transition-opacity duration-200 group-hover/carousel:opacity-100 focus-visible:opacity-100"
-            aria-label="Scroll left"
+            aria-label={tr("pages.item_detail.components.trailers_section.scroll_left")}
           >
             <ChevronLeft className="text-foreground h-6 w-6" />
           </button>
@@ -53,7 +58,7 @@ export default function TrailersSection({ videos }: TrailersSectionProps) {
             type="button"
             onClick={scrollNext}
             className="from-background/90 absolute top-0 right-0 bottom-0 z-10 flex h-11 w-11 items-center justify-center self-center bg-gradient-to-l to-transparent opacity-0 transition-opacity duration-200 group-hover/carousel:opacity-100 focus-visible:opacity-100"
-            aria-label="Scroll right"
+            aria-label={tr("pages.item_detail.components.trailers_section.scroll_right")}
           >
             <ChevronRight className="text-foreground h-6 w-6" />
           </button>
@@ -66,6 +71,7 @@ export default function TrailersSection({ videos }: TrailersSectionProps) {
 }
 
 function TrailerCard({ video, onPlay }: { video: ItemVideo; onPlay: () => void }) {
+  useUILanguage();
   const label = video.name || extraKindLabel(video.kind);
 
   return (
@@ -76,7 +82,7 @@ function TrailerCard({ video, onPlay }: { video: ItemVideo; onPlay: () => void }
     >
       <div className="media-card-image relative mb-2.5 aspect-video overflow-hidden rounded-lg">
         <img
-          src={`https://i.ytimg.com/vi/${video.site_key}/hqdefault.jpg`}
+          src={"https://i.ytimg.com/vi/" + video.site_key + "/hqdefault.jpg"}
           alt={label}
           className="h-full w-full object-cover transition-transform duration-300 group-hover/trailer:scale-105"
           loading="lazy"
@@ -94,7 +100,7 @@ function TrailerCard({ video, onPlay }: { video: ItemVideo; onPlay: () => void }
           <span>{extraKindLabel(video.kind)}</span>
           {video.is_official && (
             <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-              Official
+              {tr("pages.item_detail.components.trailers_section.official")}
             </Badge>
           )}
         </div>

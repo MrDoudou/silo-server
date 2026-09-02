@@ -39,19 +39,29 @@ import {
   playbackQualityValueFromPreset,
   type PlaybackQualityPreset,
 } from "@/lib/playback-quality";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 // The two assignable permissions (mirrors auth.assignablePermissions). A group
 // mask of `null` means "all assignable"; a list narrows to those named.
 const ASSIGNABLE_PERMISSIONS: Array<{ value: string; label: string; description: string }> = [
   {
     value: PERMISSION_METADATA_CURATION,
-    label: "Metadata curation",
-    description: "Edit metadata for items in the member's libraries.",
+    get label() {
+      return tr("pages.admin_access_groups.metadata_curation");
+    },
+    get description() {
+      return tr("pages.admin_access_groups.edit_metadata_for_items_in_the_member_s_libraries");
+    },
   },
   {
     value: PERMISSION_MARKER_EDIT,
-    label: "Marker editing",
-    description: "Create and adjust intro / credit markers.",
+    get label() {
+      return tr("pages.admin_access_groups.marker_editing");
+    },
+    get description() {
+      return tr("pages.admin_access_groups.create_and_adjust_intro_credit_markers");
+    },
   },
 ];
 
@@ -60,7 +70,8 @@ function limitLabel(value: number) {
 }
 
 export default function AdminAccessGroups() {
-  useDocumentTitle("Access Groups");
+  useUILanguage();
+  useDocumentTitle(tr("pages.admin_access_groups.access_groups"));
   const groups = useAccessGroups();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
@@ -92,7 +103,7 @@ export default function AdminAccessGroups() {
           onClick={() => setSelectedId(null)}
         >
           <ArrowLeft className="size-4" />
-          All groups
+          {tr("pages.admin_access_groups.all_groups")}
         </Button>
         <AccessGroupEditor
           key={selected.id}
@@ -107,17 +118,17 @@ export default function AdminAccessGroups() {
     <div className="page-shell space-y-6 py-4 sm:py-6">
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Access Groups</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_access_groups.access_groups")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            The shared policy layer for a set of users. A group supplies the value for every field
-            its members leave on Inherit; a per-user override replaces the group value in either
-            direction.
+            {tr("pages.admin_access_groups.the_shared_policy_layer_for_a_set_of_users_a")}
           </p>
         </div>
         {!creating && (
           <Button type="button" onClick={() => setCreating(true)}>
             <Plus className="size-4" />
-            New group
+            {tr("pages.admin_access_groups.new_group")}
           </Button>
         )}
       </div>
@@ -130,13 +141,13 @@ export default function AdminAccessGroups() {
             onKeyDown={(event) => {
               if (event.key === "Enter") void create();
             }}
-            placeholder="Group name (e.g. Kids, Guests)"
-            aria-label="New group name"
+            placeholder={tr("pages.admin_access_groups.group_name_e_g_kids_guests")}
+            aria-label={tr("pages.admin_access_groups.new_group_name")}
             className="max-w-xs"
             autoFocus
           />
           <Button type="button" onClick={create} disabled={createGroup.isPending}>
-            Create
+            {tr("common.actions.create")}
           </Button>
           <Button
             type="button"
@@ -146,22 +157,27 @@ export default function AdminAccessGroups() {
               setNewName("");
             }}
           >
-            Cancel
+            {tr("common.actions.cancel")}
           </Button>
         </div>
       )}
 
       {groups.isLoading && (
-        <p className="text-muted-foreground text-sm">Loading access groups...</p>
+        <p className="text-muted-foreground text-sm">
+          {tr("pages.admin_access_groups.loading_access_groups")}
+        </p>
       )}
 
       {!groups.isLoading && groups.data?.length === 0 && !creating && (
         <div className="surface-panel-subtle rounded-2xl p-8 text-center">
           <UsersRound className="text-muted-foreground mx-auto size-8" />
-          <h2 className="mt-3 text-lg font-semibold">No access groups yet</h2>
+          <h2 className="mt-3 text-lg font-semibold">
+            {tr("pages.admin_access_groups.no_access_groups_yet")}
+          </h2>
           <p className="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
-            Create a group to manage libraries, downloads, streams, and permissions for many users
-            at once, then assign users to it from their profile.
+            {tr(
+              "pages.admin_access_groups.create_a_group_to_manage_libraries_downloads_streams_and_permissions",
+            )}
           </p>
         </div>
       )}
@@ -178,6 +194,7 @@ export default function AdminAccessGroups() {
 }
 
 function AccessGroupCard({ group, onClick }: { group: AccessGroup; onClick: () => void }) {
+  useUILanguage();
   const facts = [
     group.library_ids === null
       ? "All libraries"
@@ -198,7 +215,7 @@ function AccessGroupCard({ group, onClick }: { group: AccessGroup; onClick: () =
             <h2 className="truncate text-base font-semibold tracking-tight">{group.name}</h2>
             {group.is_default && (
               <span className="border-border text-muted-foreground shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase">
-                Default
+                {tr("pages.admin_access_groups.default")}
               </span>
             )}
           </div>
@@ -207,7 +224,10 @@ function AccessGroupCard({ group, onClick }: { group: AccessGroup; onClick: () =
           )}
         </div>
         <span className="bg-secondary text-secondary-foreground shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium">
-          {group.member_count} {group.member_count === 1 ? "member" : "members"}
+          {group.member_count}{" "}
+          {group.member_count === 1
+            ? tr("pages.admin_access_groups.member")
+            : tr("pages.admin_access_groups.members")}
         </span>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -230,6 +250,7 @@ interface AccessGroupEditorProps {
 }
 
 function AccessGroupEditor({ group, onDeleted }: AccessGroupEditorProps) {
+  useUILanguage();
   const libraries = useAdminLibraries();
   const updateGroup = useUpdateAccessGroup();
   const deleteGroup = useDeleteAccessGroup();
@@ -295,25 +316,29 @@ function AccessGroupEditor({ group, onDeleted }: AccessGroupEditorProps) {
       <div className="surface-panel space-y-4 rounded-2xl border-0 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="group-name">Name</Label>
+            <Label htmlFor="group-name">{tr("pages.admin_access_groups.name")}</Label>
             <Input id="group-name" value={name} onChange={(event) => setName(event.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="group-description">Description</Label>
+            <Label htmlFor="group-description">{tr("pages.admin_access_groups.description")}</Label>
             <Input
               id="group-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="Optional"
+              placeholder={tr("pages.admin_access_groups.optional")}
             />
           </div>
         </div>
         <ToggleRow
-          label="Default for new users"
+          label={tr("pages.admin_access_groups.default_for_new_users")}
           description={
             group.is_default
-              ? "Newly created accounts are placed in this group automatically. To change this, make another group the default."
-              : "Newly created accounts are placed in this group automatically. Existing users are never moved."
+              ? tr(
+                  "pages.admin_access_groups.newly_created_accounts_are_placed_in_this_group_automatically_to",
+                )
+              : tr(
+                  "pages.admin_access_groups.newly_created_accounts_are_placed_in_this_group_automatically_existing",
+                )
           }
           checked={isDefault}
           onCheckedChange={setIsDefault}
@@ -322,14 +347,18 @@ function AccessGroupEditor({ group, onDeleted }: AccessGroupEditorProps) {
       </div>
 
       <section className="surface-panel space-y-4 rounded-2xl border-0 p-5">
-        <h2 className="text-sm font-semibold">Libraries &amp; playback</h2>
+        <h2 className="text-sm font-semibold">
+          {tr("pages.admin_access_groups.libraries_playback")}
+        </h2>
         <LibraryAccessSelector
           libraries={libraries.data ?? []}
           value={libraryIds}
           onChange={setLibraryIds}
         />
         <div className="space-y-2">
-          <Label htmlFor="group-quality">Maximum playback quality</Label>
+          <Label htmlFor="group-quality">
+            {tr("pages.admin_access_groups.maximum_playback_quality")}
+          </Label>
           <Select
             value={qualityPreset}
             onValueChange={(value) => setQualityPreset(value as PlaybackQualityPreset)}
@@ -349,55 +378,67 @@ function AccessGroupEditor({ group, onDeleted }: AccessGroupEditorProps) {
       </section>
 
       <section className="surface-panel space-y-3 rounded-2xl border-0 p-5">
-        <h2 className="text-sm font-semibold">Downloads &amp; requests</h2>
+        <h2 className="text-sm font-semibold">
+          {tr("pages.admin_access_groups.downloads_requests")}
+        </h2>
         <ToggleRow
-          label="Allow downloads"
-          description="Members may download items to their devices."
+          label={tr("pages.admin_access_groups.allow_downloads")}
+          description={tr("pages.admin_access_groups.members_may_download_items_to_their_devices")}
           checked={downloadAllowed}
           onCheckedChange={setDownloadAllowed}
         />
         <ToggleRow
-          label="Allow transcoded downloads"
-          description="Members may download converted versions, not just the original file."
+          label={tr("pages.admin_access_groups.allow_transcoded_downloads")}
+          description={tr(
+            "pages.admin_access_groups.members_may_download_converted_versions_not_just_the_original_file",
+          )}
           checked={transcodeAllowed}
           onCheckedChange={setTranscodeAllowed}
           disabled={!downloadAllowed}
         />
         <ToggleRow
-          label="Allow media requests"
-          description="Members may request titles that aren't in the library yet."
+          label={tr("pages.admin_access_groups.allow_media_requests")}
+          description={tr(
+            "pages.admin_access_groups.members_may_request_titles_that_aren_t_in_the_library",
+          )}
           checked={requestsAllowed}
           onCheckedChange={setRequestsAllowed}
         />
       </section>
 
       <section className="surface-panel space-y-4 rounded-2xl border-0 p-5">
-        <h2 className="text-sm font-semibold">Concurrent streams</h2>
+        <h2 className="text-sm font-semibold">
+          {tr("pages.admin_access_groups.concurrent_streams")}
+        </h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <LimitField
             id="group-streams"
-            label="Max streams"
-            hint="0 = unlimited"
+            label={tr("pages.admin_access_groups.max_streams")}
+            hint={tr("pages.admin_access_groups.value_0_unlimited")}
             value={maxStreams}
             onChange={setMaxStreams}
           />
           <LimitField
             id="group-transcodes"
-            label="Max transcodes"
-            hint="0 = unlimited"
+            label={tr("pages.admin_access_groups.max_transcodes")}
+            hint={tr("pages.admin_access_groups.value_0_unlimited")}
             value={maxTranscodes}
             onChange={setMaxTranscodes}
           />
         </div>
         <ToggleRow
-          label="Allow video transcoding"
-          description="Members may play items that need server-side video conversion."
+          label={tr("pages.admin_access_groups.allow_video_transcoding")}
+          description={tr(
+            "pages.admin_access_groups.members_may_play_items_that_need_server_side_video_conversion",
+          )}
           checked={videoTranscodeAllowed}
           onCheckedChange={setVideoTranscodeAllowed}
         />
         <ToggleRow
-          label="Allow audio transcoding"
-          description="Members may play items that need audio conversion without video encoding."
+          label={tr("pages.admin_access_groups.allow_audio_transcoding")}
+          description={tr(
+            "pages.admin_access_groups.members_may_play_items_that_need_audio_conversion_without_video",
+          )}
           checked={audioTranscodeAllowed}
           onCheckedChange={setAudioTranscodeAllowed}
         />
@@ -406,19 +447,23 @@ function AccessGroupEditor({ group, onDeleted }: AccessGroupEditorProps) {
       <section className="surface-panel space-y-3 rounded-2xl border-0 p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold">Permissions</h2>
+            <h2 className="text-sm font-semibold">{tr("pages.admin_access_groups.permissions")}</h2>
             <p className="text-muted-foreground mt-0.5 text-xs">
-              A member also needs the permission granted on their own account.
+              {tr(
+                "pages.admin_access_groups.a_member_also_needs_the_permission_granted_on_their_own",
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs">Allow all</span>
+            <span className="text-muted-foreground text-xs">
+              {tr("pages.admin_access_groups.allow_all")}
+            </span>
             <Switch
               checked={allPermissions}
               onCheckedChange={(checked) =>
                 setPermissions(checked ? null : ASSIGNABLE_PERMISSIONS.map((entry) => entry.value))
               }
-              aria-label="Allow all permissions"
+              aria-label={tr("pages.admin_access_groups.allow_all_permissions")}
             />
           </div>
         </div>
@@ -447,39 +492,50 @@ function AccessGroupEditor({ group, onDeleted }: AccessGroupEditorProps) {
             disabled={group.is_default}
           >
             <Trash2 className="size-4" />
-            Delete group
+            {tr("pages.admin_access_groups.delete_group")}
           </Button>
           {group.is_default && (
             <p className="text-muted-foreground text-xs">
-              The default group can’t be deleted. Make another group the default first.
+              {tr(
+                "pages.admin_access_groups.the_default_group_can_t_be_deleted_make_another_group",
+              )}
             </p>
           )}
         </div>
         <Button type="button" onClick={save} disabled={updateGroup.isPending}>
-          {updateGroup.isPending ? "Saving..." : "Save changes"}
+          {updateGroup.isPending
+            ? tr("pages.admin_access_groups.saving")
+            : tr("pages.admin_access_groups.save_changes")}
         </Button>
       </div>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{group.name}”?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {tr("pages.admin_access_groups.delete")}
+              {group.name}”?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {group.member_count > 0
-                ? `${group.member_count} ${
-                    group.member_count === 1 ? "member" : "members"
-                  } will move to no group and fall back to the built-in defaults. Their own restrictions are unchanged.`
-                : "This group has no members. This can't be undone."}
+                ? tr(
+                    "pages.admin_access_groups.member_count_value_will_move_to_no_group_and_fall",
+                    {
+                      member_count: group.member_count,
+                      value: group.member_count === 1 ? "member" : "members",
+                    },
+                  )
+                : tr("pages.admin_access_groups.this_group_has_no_members_this_can_t_be_undone")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={remove}
               disabled={deleteGroup.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {tr("common.actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -497,6 +553,7 @@ interface ToggleRowProps {
 }
 
 function ToggleRow({ label, description, checked, onCheckedChange, disabled }: ToggleRowProps) {
+  useUILanguage();
   return (
     <div className="border-border flex items-center justify-between gap-4 rounded-lg border px-3 py-2.5">
       <div className="min-w-0">
@@ -522,6 +579,7 @@ interface LimitFieldProps {
 }
 
 function LimitField({ id, label, hint, value, onChange }: LimitFieldProps) {
+  useUILanguage();
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">

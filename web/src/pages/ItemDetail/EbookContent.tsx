@@ -22,6 +22,8 @@ import ScoreRow from "./components/ScoreRow";
 import { getWatchedActionLabel } from "./watchedState";
 import { formatFileSize } from "@/lib/mediaFormat";
 import { formatPageCount, metadataLine } from "./components/versionFormatUtils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function authorNames(item: ItemDetail): string[] {
   const extensionAuthors = (item.ebook?.authors ?? [])
@@ -79,6 +81,8 @@ export default function EbookContent({
   item: ItemDetail & { type: "ebook" };
   libraryId?: number;
 }) {
+  useUILanguage();
+  useUILanguage();
   useAmbientColor(item.poster_thumbhash);
   const { user } = useAuth();
   const { data: readerProgress } = useEbookReaderProgress(item.content_id);
@@ -135,7 +139,9 @@ export default function EbookContent({
         crewLine={
           authors.length > 0 ? (
             <div className="text-muted-foreground text-[13px]">
-              <span className="text-muted-foreground/60">By </span>
+              <span className="text-muted-foreground/60">
+                {tr("pages.item_detail.ebook_content.by")}{" "}
+              </span>
               <span className="text-foreground/70 font-medium">{authors.join(", ")}</span>
             </div>
           ) : undefined
@@ -151,7 +157,9 @@ export default function EbookContent({
               >
                 <ViewTransitionLink to={readerHref}>
                   <BookOpen className="size-[18px]" />
-                  {hasSavedProgress ? "Continue" : "Read"}
+                  {hasSavedProgress
+                    ? tr("common.actions.continue")
+                    : tr("pages.item_detail.ebook_content.read")}
                   {progressLabel && (
                     <span className="text-primary-foreground/75 text-xs font-semibold tabular-nums">
                       {progressLabel}
@@ -168,7 +176,7 @@ export default function EbookContent({
                 onClick={() => setDownloadOpen(true)}
               >
                 <Download className="size-[18px]" />
-                Download
+                {tr("common.actions.download")}
               </Button>
             )}
             <Button
@@ -188,14 +196,25 @@ export default function EbookContent({
       <div className="page-shell detail-supporting-content space-y-12 py-10 sm:space-y-14">
         {item.ebook?.series && item.ebook.series.entries.length > 0 && (
           <RelatedRail
-            heading={item.ebook.series.name ? `In ${item.ebook.series.name}` : "In this series"}
+            heading={
+              item.ebook.series.name
+                ? tr("pages.item_detail.ebook_content.in_series_name", {
+                    seriesName: item.ebook.series.name,
+                  })
+                : tr("pages.item_detail.ebook_content.in_this_series")
+            }
             coverAspect="poster"
             items={item.ebook.series.entries.map((entry) => ({
               content_id: entry.content_id,
               title: entry.title,
               poster_url: entry.poster_url,
-              subtitle:
-                typeof entry.series_index === "number" ? `Book ${entry.series_index}` : undefined,
+              get subtitle() {
+                return typeof entry.series_index === "number"
+                  ? tr("pages.item_detail.ebook_content.book_series_index", {
+                      seriesIndex: entry.series_index,
+                    })
+                  : undefined;
+              },
               highlight: entry.content_id === item.content_id,
             }))}
           />
@@ -203,7 +222,7 @@ export default function EbookContent({
 
         {(item.ebook?.related.also_by_author ?? []).length > 0 && (
           <RelatedRail
-            heading={`Also by ${authors[0] ?? "this author"}`}
+            heading={"Also by " + (authors[0] ?? "this author")}
             coverAspect="poster"
             items={(item.ebook?.related.also_by_author ?? []).map((entry) => ({
               content_id: entry.content_id,
@@ -228,9 +247,9 @@ export default function EbookContent({
         )}
 
         <MediaLocations
-          title="Files"
+          title={tr("pages.item_detail.ebook_content.files")}
           versions={item.versions}
-          emptyMessage="No ebook files found."
+          emptyMessage={tr("pages.item_detail.ebook_content.no_ebook_files_found")}
           summaryBuilder={ebookVersionSummary}
         />
       </div>

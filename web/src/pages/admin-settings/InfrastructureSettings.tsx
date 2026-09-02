@@ -40,6 +40,9 @@ import {
   type LogRetentionBucketPolicy,
   type LogRetentionBucketRow,
 } from "./logRetentionPolicy";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 type SettingsForm = ReturnType<typeof useSettingsForm>;
 
@@ -132,6 +135,7 @@ function RedisGroup({
   restartKeys: RestartKeyMatcher;
   secrets: SecretEditors;
 }) {
+  useUILanguage();
   const checkConnection = useCheckAdminSettingsConnection();
   const [connectionResult, setConnectionResult] = useState<ConnectionCheckResponse | null>(null);
   const redisUrl = form.getValue("redis.url");
@@ -159,18 +163,28 @@ function RedisGroup({
     } catch (error) {
       setConnectionResult({
         success: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error(
+          "errors.admin_settings.infrastructure_settings.connection_check_failed",
+          error,
+        ),
       });
     }
   }
 
   return (
-    <FieldGroup label="Redis" restartAll={allRestart(restartKeys, REDIS_KEYS)}>
+    <FieldGroup
+      label={tr("pages.admin_settings.infrastructure_settings.redis")}
+      restartAll={allRestart(restartKeys, REDIS_KEYS)}
+    >
       <SettingField
-        label="Use Redis"
+        label={tr("pages.admin_settings.infrastructure_settings.use_redis")}
         type="toggle"
         description={
-          managedByEnv ? "Set by REDIS_URL" : "Needed when running more than one server."
+          managedByEnv
+            ? tr("pages.admin_settings.infrastructure_settings.set_by_redis_url")
+            : tr(
+                "pages.admin_settings.infrastructure_settings.needed_when_running_more_than_one_server",
+              )
         }
         value={enabled ? "true" : "false"}
         onChange={(value) => {
@@ -192,12 +206,16 @@ function RedisGroup({
             empty URL, and one clear per surface is the rule.
           */}
           <SecretField
-            label="Connection URL"
+            label={tr("pages.admin_settings.infrastructure_settings.connection_url")}
             value={redisUrl}
             configured={configured}
             onKeep={() => secrets.keepSaved("redis.url")}
             onChange={(v) => secrets.setSecret("redis.url", v)}
-            hint={managedByEnv ? "Value supplied by REDIS_URL" : "redis://host:6379"}
+            hint={tr(
+              managedByEnv
+                ? "pages.admin_settings.infrastructure_settings.value_supplied_by_redis_url"
+                : "pages.admin_settings.infrastructure_settings.redis_host_6379",
+            )}
             disabled={managedByEnv || secrets.disabled}
             restartRequired={restartKeys.has("redis.url")}
           />
@@ -235,6 +253,7 @@ function S3Group({
   description: string;
   checkKind: "s3_public" | "s3_private";
 }) {
+  useUILanguage();
   const checkConnection = useCheckAdminSettingsConnection();
   const [connectionResult, setConnectionResult] = useState<ConnectionCheckResponse | null>(null);
   const keys = scope === "public" ? PUBLIC_S3_KEYS : PRIVATE_S3_KEYS;
@@ -271,7 +290,10 @@ function S3Group({
     } catch (error) {
       setConnectionResult({
         success: false,
-        message: error instanceof Error ? error.message : "Connection check failed.",
+        message: tr.error(
+          "errors.admin_settings.infrastructure_settings.connection_check_failed",
+          error,
+        ),
       });
     }
   }
@@ -279,14 +301,14 @@ function S3Group({
   return (
     <FieldGroup label={label} description={description} restartAll={allRestart(restartKeys, keys)}>
       <SettingField
-        label="Endpoint"
-        hint="https://s3.us-east-1.amazonaws.com"
+        label={tr("pages.admin_settings.infrastructure_settings.endpoint")}
+        hint={tr("pages.admin_settings.infrastructure_settings.https_s3_us_east_1_amazonaws_com")}
         value={form.getValue(key("endpoint"))}
         onChange={(v) => form.setValue(key("endpoint"), v)}
         restartRequired={restartKeys.has(key("endpoint"))}
       />
       <SettingField
-        label="Bucket"
+        label={tr("pages.admin_settings.infrastructure_settings.bucket")}
         value={form.getValue(key("bucket"))}
         onChange={(v) => form.setValue(key("bucket"), v)}
         restartRequired={restartKeys.has(key("bucket"))}
@@ -295,15 +317,13 @@ function S3Group({
         <div className="my-3 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
           <div className="text-[13px] leading-relaxed">
-            <p className="font-medium text-amber-500">Storage location change</p>
+            <p className="font-medium text-amber-500">
+              {tr("pages.admin_settings.infrastructure_settings.storage_location_change")}
+            </p>
             <p className="text-muted-foreground mt-1">
-              Artwork is cached in this bucket. Silo will not change artwork cache records
-              automatically after restart. Copy or migrate the existing bucket objects first, then
-              manually run Reconcile Artwork Cache only if you intend every missing record to be
-              reset or cleared. Re-downloading those reset provider images is a separate, manual
-              Backfill Metadata Images action; normal scheduled caching only processes artwork
-              queued by new or changed metadata. Uploaded images (custom posters, collection
-              artwork, branding) cannot be re-downloaded.
+              {tr(
+                "pages.admin_settings.infrastructure_settings.artwork_is_cached_in_this_bucket_silo_will_not_change",
+              )}
             </p>
           </div>
         </div>
@@ -315,7 +335,7 @@ function S3Group({
         instance-role access.
       */}
       <SecretField
-        label="Access Key"
+        label={tr("pages.admin_settings.infrastructure_settings.access_key")}
         value={form.getValue(key("access_key"))}
         configured={form.sensitiveConfigured.includes(key("access_key"))}
         onKeep={() => secrets.keepSaved(key("access_key"))}
@@ -326,7 +346,7 @@ function S3Group({
         restartRequired={restartKeys.has(key("access_key"))}
       />
       <SecretField
-        label="Secret Key"
+        label={tr("pages.admin_settings.infrastructure_settings.secret_key")}
         value={form.getValue(key("secret_key"))}
         configured={form.sensitiveConfigured.includes(key("secret_key"))}
         onKeep={() => secrets.keepSaved(key("secret_key"))}
@@ -344,28 +364,36 @@ function S3Group({
       />
 
       <AdvancedSection
-        id={`infrastructure.s3.${scope}`}
+        id={"infrastructure.s3." + scope}
         count={advancedCount}
         forceOpen={advancedChanged > 0}
       >
         <SettingField
-          label="Region"
-          description="Leave blank unless your provider requires one."
+          label={tr("pages.admin_settings.infrastructure_settings.region")}
+          description={tr(
+            "pages.admin_settings.infrastructure_settings.leave_blank_unless_your_provider_requires_one",
+          )}
           value={form.getValue(key("region"))}
           onChange={(v) => form.setValue(key("region"), v)}
           restartRequired={restartKeys.has(key("region"))}
         />
         <SettingField
-          label="Put the bucket name in the URL path"
+          label={tr(
+            "pages.admin_settings.infrastructure_settings.put_the_bucket_name_in_the_url_path",
+          )}
           type="toggle"
-          description="Needed by MinIO and some self-hosted storage."
+          description={tr(
+            "pages.admin_settings.infrastructure_settings.needed_by_min_io_and_some_self_hosted_storage",
+          )}
           value={form.getValue(key("path_style"))}
           onChange={(v) => form.setValue(key("path_style"), v)}
           restartRequired={restartKeys.has(key("path_style"))}
         />
         <SettingField
-          label="Folder inside the bucket"
-          description="Leave blank to use the bucket root."
+          label={tr("pages.admin_settings.infrastructure_settings.folder_inside_the_bucket")}
+          description={tr(
+            "pages.admin_settings.infrastructure_settings.leave_blank_to_use_the_bucket_root",
+          )}
           value={form.getValue(key("key_prefix"))}
           onChange={(v) => form.setValue(key("key_prefix"), v)}
           restartRequired={restartKeys.has(key("key_prefix"))}
@@ -373,22 +401,39 @@ function S3Group({
         {scope === "public" && (
           <>
             <SettingField
-              label="How asset links are authorized"
+              label={tr(
+                "pages.admin_settings.infrastructure_settings.how_asset_links_are_authorized",
+              )}
               type="select"
-              description="Signed links work with a private bucket and suit most installs."
+              description={tr(
+                "pages.admin_settings.infrastructure_settings.signed_links_work_with_a_private_bucket_and_suit_most",
+              )}
               value={urlAuth}
               onChange={(v) => form.setValue("s3.public_url_auth", v)}
               options={[
-                { value: "presigned", label: "Signed links (recommended)" },
-                { value: "public", label: "Anyone with the link" },
-                { value: "cloudflare_token", label: "Cloudflare signed token" },
+                {
+                  value: "presigned",
+                  label: tr(
+                    "pages.admin_settings.infrastructure_settings.signed_links_recommended",
+                  ),
+                },
+                {
+                  value: "public",
+                  label: tr("pages.admin_settings.infrastructure_settings.anyone_with_the_link"),
+                },
+                {
+                  value: "cloudflare_token",
+                  label: tr("pages.admin_settings.infrastructure_settings.cloudflare_signed_token"),
+                },
               ]}
               restartRequired={restartKeys.has("s3.public_url_auth")}
             />
             {urlAuth !== "presigned" && (
               <SettingField
-                label="Address clients download from"
-                hint="https://cdn.example.com"
+                label={tr(
+                  "pages.admin_settings.infrastructure_settings.address_clients_download_from",
+                )}
+                hint={tr("pages.admin_settings.infrastructure_settings.https_cdn_example_com")}
                 value={form.getValue("s3.public_read_endpoint")}
                 onChange={(v) => form.setValue("s3.public_read_endpoint", v)}
                 restartRequired={restartKeys.has("s3.public_read_endpoint")}
@@ -402,26 +447,28 @@ function S3Group({
                   that works, since the field is hidden in those modes.
                 */}
                 <SecretField
-                  label="Token Secret"
+                  label={tr("pages.admin_settings.infrastructure_settings.token_secret")}
                   value={form.getValue("s3.public_token_secret")}
                   configured={form.sensitiveConfigured.includes("s3.public_token_secret")}
                   onKeep={() => secrets.keepSaved("s3.public_token_secret")}
                   onClear={() => secrets.clearSaved("s3.public_token_secret")}
                   cleared={form.isClearStaged("s3.public_token_secret")}
                   onChange={(v) => secrets.setSecret("s3.public_token_secret", v)}
-                  hint="Signing key configured in Cloudflare"
+                  hint={tr(
+                    "pages.admin_settings.infrastructure_settings.signing_key_configured_in_cloudflare",
+                  )}
                   disabled={secrets.disabled}
                   restartRequired={restartKeys.has("s3.public_token_secret")}
                 />
                 <SettingField
-                  label="Token query parameter"
-                  description="Usually verify."
+                  label={tr("pages.admin_settings.infrastructure_settings.token_query_parameter")}
+                  description={tr("pages.admin_settings.infrastructure_settings.usually_verify")}
                   value={form.getValue("s3.public_token_param") || "verify"}
                   onChange={(v) => form.setValue("s3.public_token_param", v)}
                   restartRequired={restartKeys.has("s3.public_token_param")}
                 />
                 <SettingField
-                  label="Link lifetime"
+                  label={tr("pages.admin_settings.infrastructure_settings.link_lifetime")}
                   type="number"
                   unit="seconds"
                   value={form.getValue("s3.public_token_ttl") || "10800"}
@@ -444,25 +491,33 @@ function DatabaseGroup({
   form: SettingsForm;
   restartKeys: RestartKeyMatcher;
 }) {
+  useUILanguage();
   const userDBBackend = form.getValue("userdb.backend");
   const sqlite = userDBBackend === "sqlite";
   const changed = countDirty(form, DATABASE_KEYS);
 
   return (
-    <FieldGroup label="Database" restartAll={allRestart(restartKeys, DATABASE_KEYS)}>
+    <FieldGroup
+      label={tr("pages.admin_settings.infrastructure_settings.database")}
+      restartAll={allRestart(restartKeys, DATABASE_KEYS)}
+    >
       <AdvancedSection id="infrastructure.database" count={sqlite ? 4 : 2} forceOpen={changed > 0}>
         <SettingField
-          label="Maximum Postgres connections"
+          label={tr("pages.admin_settings.infrastructure_settings.maximum_postgres_connections")}
           type="number"
-          description="Raise only if the logs show connection-pool waits."
+          description={tr(
+            "pages.admin_settings.infrastructure_settings.raise_only_if_the_logs_show_connection_pool_waits",
+          )}
           value={form.getValue("database.max_connections")}
           onChange={(v) => form.setValue("database.max_connections", v)}
           restartRequired={restartKeys.has("database.max_connections")}
         />
         <SettingField
-          label="Where per-user data is stored"
+          label={tr("pages.admin_settings.infrastructure_settings.where_per_user_data_is_stored")}
           type="select"
-          description="PostgreSQL is the only supported option."
+          description={tr(
+            "pages.admin_settings.infrastructure_settings.postgre_sql_is_the_only_supported_option",
+          )}
           options={USER_DATABASE_BACKEND_OPTIONS}
           value={userDBBackend}
           onChange={(v) => form.setValue("userdb.backend", v)}
@@ -471,17 +526,21 @@ function DatabaseGroup({
         {sqlite && (
           <>
             <SettingField
-              label="Open files per user"
+              label={tr("pages.admin_settings.infrastructure_settings.open_files_per_user")}
               type="number"
-              description="SQLite connections one user database may hold open."
+              description={tr(
+                "pages.admin_settings.infrastructure_settings.sqlite_connections_one_user_database_may_hold_open",
+              )}
               value={form.getValue("userdb.pool_max_open")}
               onChange={(v) => form.setValue("userdb.pool_max_open", v)}
               restartRequired={restartKeys.has("userdb.pool_max_open")}
             />
             <SettingField
-              label="Close idle user databases after"
+              label={tr(
+                "pages.admin_settings.infrastructure_settings.close_idle_user_databases_after",
+              )}
               type="duration"
-              description="For example 12h."
+              description={tr("pages.admin_settings.infrastructure_settings.for_example_12h")}
               value={form.getValue("userdb.idle_timeout")}
               onChange={(v) => form.setValue("userdb.idle_timeout", v)}
               restartRequired={restartKeys.has("userdb.idle_timeout")}
@@ -504,6 +563,7 @@ function BucketOverridesEditor({
   onChange: (rows: LogRetentionBucketRow[]) => void;
   onRestore: () => void;
 }) {
+  useUILanguage();
   function edit(id: string, field: keyof LogRetentionBucketPolicy, value: string) {
     onChange(updateBucketRow(rows, id, field, value));
   }
@@ -512,25 +572,31 @@ function BucketOverridesEditor({
     <div className="space-y-4 py-3.5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div className="min-w-0">
-          <h4 className="text-sm font-medium">Per-area limits</h4>
-          <p className="text-muted-foreground mt-1 text-xs">A limit of 0 turns that rule off.</p>
+          <h4 className="text-sm font-medium">
+            {tr("pages.admin_settings.infrastructure_settings.per_area_limits")}
+          </h4>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {tr("pages.admin_settings.infrastructure_settings.a_limit_of_0_turns_that_rule_off")}
+          </p>
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
           <Button type="button" size="sm" variant="outline" onClick={onRestore}>
             <RotateCcw className="size-4" />
-            Restore Recommended Rules
+            {tr("pages.admin_settings.infrastructure_settings.restore_recommended_rules")}
           </Button>
           <Button type="button" size="sm" onClick={() => onChange(appendBucketRow(rows))}>
             <Plus className="size-4" />
-            Add Rule
+            {tr("pages.admin_settings.infrastructure_settings.add_rule")}
           </Button>
         </div>
       </div>
 
       {parseError ? (
         <div className="border-warning/30 bg-warning/10 text-warning rounded-[1rem] border px-3 py-2 text-sm">
-          The saved rules could not be read. The editor loaded the recommended rules so you can
-          recover cleanly. Details: {parseError}
+          {tr(
+            "pages.admin_settings.infrastructure_settings.the_saved_rules_could_not_be_read_the_editor_loaded",
+          )}{" "}
+          {parseError}
         </div>
       ) : null}
 
@@ -538,11 +604,21 @@ function BucketOverridesEditor({
         <table className="w-full border-collapse text-sm">
           <thead className="bg-muted/40 text-left">
             <tr>
-              <th className="px-3 py-2 font-medium">Component</th>
-              <th className="px-3 py-2 font-medium">Level</th>
-              <th className="px-3 py-2 font-medium">Days</th>
-              <th className="px-3 py-2 font-medium">Max rows</th>
-              <th className="px-3 py-2 font-medium">Max size (MB)</th>
+              <th className="px-3 py-2 font-medium">
+                {tr("pages.admin_settings.infrastructure_settings.component")}
+              </th>
+              <th className="px-3 py-2 font-medium">
+                {tr("pages.admin_settings.infrastructure_settings.level")}
+              </th>
+              <th className="px-3 py-2 font-medium">
+                {tr("pages.admin_settings.infrastructure_settings.days")}
+              </th>
+              <th className="px-3 py-2 font-medium">
+                {tr("pages.admin_settings.infrastructure_settings.max_rows")}
+              </th>
+              <th className="px-3 py-2 font-medium">
+                {tr("pages.admin_settings.infrastructure_settings.max_size_mb")}
+              </th>
               <th className="w-[60px] px-3 py-2 font-medium"> </th>
             </tr>
           </thead>
@@ -550,7 +626,7 @@ function BucketOverridesEditor({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-muted-foreground px-3 py-6 text-center">
-                  No per-area rules configured.
+                  {tr("pages.admin_settings.infrastructure_settings.no_per_area_rules_configured")}
                 </td>
               </tr>
             ) : (
@@ -560,8 +636,11 @@ function BucketOverridesEditor({
                     <Input
                       value={row.component}
                       onChange={(event) => edit(row.id, "component", event.target.value)}
-                      placeholder="metadata"
-                      aria-label={`Component for rule ${row.id}`}
+                      placeholder={tr("pages.admin_settings.infrastructure_settings.metadata")}
+                      aria-label={tr(
+                        "pages.admin_settings.infrastructure_settings.component_for_rule_id",
+                        { id: row.id },
+                      )}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -588,7 +667,10 @@ function BucketOverridesEditor({
                       value={String(row.retention_days)}
                       onChange={(event) => edit(row.id, "retention_days", event.target.value)}
                       className="w-[110px]"
-                      aria-label={`Days for rule ${row.id}`}
+                      aria-label={tr(
+                        "pages.admin_settings.infrastructure_settings.days_for_rule_id",
+                        { id: row.id },
+                      )}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -598,7 +680,10 @@ function BucketOverridesEditor({
                       value={String(row.max_rows)}
                       onChange={(event) => edit(row.id, "max_rows", event.target.value)}
                       className="w-[140px]"
-                      aria-label={`Max rows for rule ${row.id}`}
+                      aria-label={tr(
+                        "pages.admin_settings.infrastructure_settings.max_rows_for_rule_id",
+                        { id: row.id },
+                      )}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -608,7 +693,10 @@ function BucketOverridesEditor({
                       value={String(row.max_size_mb)}
                       onChange={(event) => edit(row.id, "max_size_mb", event.target.value)}
                       className="w-[140px]"
-                      aria-label={`Max size for rule ${row.id}`}
+                      aria-label={tr(
+                        "pages.admin_settings.infrastructure_settings.max_size_for_rule_id",
+                        { id: row.id },
+                      )}
                     />
                   </td>
                   <td className="px-3 py-2 text-right">
@@ -617,7 +705,12 @@ function BucketOverridesEditor({
                       size="icon-sm"
                       variant="outline"
                       onClick={() => onChange(removeBucketRow(rows, row.id))}
-                      aria-label={`Remove ${row.component || "bucket"} rule`}
+                      aria-label={tr(
+                        "pages.admin_settings.infrastructure_settings.remove_value_rule",
+                        {
+                          value: row.component || "bucket",
+                        },
+                      )}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -633,6 +726,7 @@ function BucketOverridesEditor({
 }
 
 function LogsGroup({ form, restartKeys }: { form: SettingsForm; restartKeys: RestartKeyMatcher }) {
+  useUILanguage();
   // The bucket rules are one JSON setting edited as a table, so the rows live
   // here while they are dirty and re-hydrate from the saved value otherwise.
   const [draftRows, setDraftRows] = useState<LogRetentionBucketRow[] | null>(null);
@@ -651,9 +745,9 @@ function LogsGroup({ form, restartKeys }: { form: SettingsForm; restartKeys: Res
   }
 
   return (
-    <FieldGroup label="Logs">
+    <FieldGroup label={tr("pages.admin_settings.infrastructure_settings.logs")}>
       <SettingField
-        label="Delete log entries older than"
+        label={tr("pages.admin_settings.infrastructure_settings.delete_log_entries_older_than")}
         type="number"
         unit="days"
         value={form.getValue(OPSLOG_RETENTION_DAYS_KEY)}
@@ -661,14 +755,14 @@ function LogsGroup({ form, restartKeys }: { form: SettingsForm; restartKeys: Res
         restartRequired={restartKeys.has(OPSLOG_RETENTION_DAYS_KEY)}
       />
       <SettingField
-        label="Maximum log entries"
+        label={tr("pages.admin_settings.infrastructure_settings.maximum_log_entries")}
         type="number"
         value={form.getValue(OPSLOG_MAX_ROWS_KEY)}
         onChange={(v) => form.setValue(OPSLOG_MAX_ROWS_KEY, v)}
         restartRequired={restartKeys.has(OPSLOG_MAX_ROWS_KEY)}
       />
       <SettingField
-        label="Maximum log size"
+        label={tr("pages.admin_settings.infrastructure_settings.maximum_log_size")}
         type="number"
         unit="MB"
         value={form.getValue(OPSLOG_MAX_SIZE_MB_KEY)}
@@ -681,9 +775,13 @@ function LogsGroup({ form, restartKeys }: { form: SettingsForm; restartKeys: Res
         count={LOG_ADVANCED_KEYS.length}
         forceOpen={advancedChanged > 0}
       >
-        <SettingsSubheading>Permission checks</SettingsSubheading>
+        <SettingsSubheading>
+          {tr("pages.admin_settings.infrastructure_settings.permission_checks")}
+        </SettingsSubheading>
         <SettingField
-          label="Delete permission records older than"
+          label={tr(
+            "pages.admin_settings.infrastructure_settings.delete_permission_records_older_than",
+          )}
           type="number"
           unit="days"
           value={form.getValue("policy.decision_log_retention_days")}
@@ -691,21 +789,27 @@ function LogsGroup({ form, restartKeys }: { form: SettingsForm; restartKeys: Res
           restartRequired={restartKeys.has("policy.decision_log_retention_days")}
         />
         <SettingField
-          label="How much to record"
+          label={tr("pages.admin_settings.infrastructure_settings.how_much_to_record")}
           type="select"
-          description="Full also stores a sample of each request."
+          description={tr(
+            "pages.admin_settings.infrastructure_settings.full_also_stores_a_sample_of_each_request",
+          )}
           value={form.getValue("policy.decision_log_verbosity") || "digest"}
           onChange={(v) => form.setValue("policy.decision_log_verbosity", v)}
           options={[
-            { value: "digest", label: "Summary" },
-            { value: "verbose", label: "Full" },
+            { value: "digest", label: tr("pages.admin_settings.infrastructure_settings.summary") },
+            { value: "verbose", label: tr("pages.admin_settings.infrastructure_settings.full") },
           ]}
           restartRequired={restartKeys.has("policy.decision_log_verbosity")}
         />
         <SettingField
-          label="Record one allowed check in every"
+          label={tr(
+            "pages.admin_settings.infrastructure_settings.record_one_allowed_check_in_every",
+          )}
           type="number"
-          description="Denials and errors are always recorded."
+          description={tr(
+            "pages.admin_settings.infrastructure_settings.denials_and_errors_are_always_recorded",
+          )}
           value={form.getValue("policy.decision_log_scope_sample_rate")}
           onChange={(v) => form.setValue("policy.decision_log_scope_sample_rate", v)}
           restartRequired={restartKeys.has("policy.decision_log_scope_sample_rate")}
@@ -723,6 +827,7 @@ function LogsGroup({ form, restartKeys }: { form: SettingsForm; restartKeys: Res
 }
 
 export default function InfrastructureSettings() {
+  useUILanguage();
   const form = useSettingsForm({ keys: useMemo(() => KEYS, []) });
   const restartKeys = useRestartKeys();
   const [saveInProgress, setSaveInProgress] = useState(false);
@@ -771,9 +876,15 @@ export default function InfrastructureSettings() {
       >
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
         <div>
-          <p className="text-sm font-medium">Protected credential status is unavailable</p>
+          <p className="text-sm font-medium">
+            {tr(
+              "pages.admin_settings.infrastructure_settings.protected_credential_status_is_unavailable",
+            )}
+          </p>
           <p className="text-muted-foreground mt-1 text-xs">
-            Reload this page before editing infrastructure settings.
+            {tr(
+              "pages.admin_settings.infrastructure_settings.reload_this_page_before_editing_infrastructure_settings",
+            )}
           </p>
         </div>
       </div>
@@ -782,7 +893,11 @@ export default function InfrastructureSettings() {
 
   if (form.isLoading || !form.sensitiveStatusReady)
     return (
-      <div className="space-y-6" role="status" aria-label="Loading settings">
+      <div
+        className="space-y-6"
+        role="status"
+        aria-label={tr("pages.admin_settings.infrastructure_settings.loading_settings")}
+      >
         <Skeleton className="h-8 w-48" />
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
@@ -792,13 +907,18 @@ export default function InfrastructureSettings() {
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-        <span className="sr-only">Loading settings</span>
+        <span className="sr-only">
+          {tr("pages.admin_settings.infrastructure_settings.loading_settings")}
+        </span>
       </div>
     );
 
   return (
     <div className="flex h-full flex-col">
-      <SettingsPageHeader title="Storage & Database" className="mb-8" />
+      <SettingsPageHeader
+        title={tr("pages.admin_settings.infrastructure_settings.storage_database")}
+        className="mb-8"
+      />
 
       <div className="flex-1 space-y-5">
         <RedisGroup form={form} restartKeys={restartKeys} secrets={secrets} />
@@ -807,8 +927,10 @@ export default function InfrastructureSettings() {
           restartKeys={restartKeys}
           secrets={secrets}
           scope="public"
-          label="Public storage"
-          description="Files clients download directly: cached artwork, uploaded posters, and branding images."
+          label={tr("pages.admin_settings.infrastructure_settings.public_storage")}
+          description={tr(
+            "pages.admin_settings.infrastructure_settings.files_clients_download_directly_cached_artwork_uploaded_posters_and_branding",
+          )}
           checkKind="s3_public"
         />
         <S3Group
@@ -816,8 +938,10 @@ export default function InfrastructureSettings() {
           restartKeys={restartKeys}
           secrets={secrets}
           scope="private"
-          label="Private storage"
-          description="Files only the server reads: profile avatars, diagnostics bundles, and catalog seed artifacts."
+          label={tr("pages.admin_settings.infrastructure_settings.private_storage")}
+          description={tr(
+            "pages.admin_settings.infrastructure_settings.files_only_the_server_reads_profile_avatars_diagnostics_bundles_and",
+          )}
           checkKind="s3_private"
         />
         <DatabaseGroup form={form} restartKeys={restartKeys} />

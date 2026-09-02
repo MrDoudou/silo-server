@@ -55,7 +55,7 @@ export function Sparkline({
       aria-label={ariaLabel}
       className={cn("w-full overflow-visible", className)}
       style={{ height }}
-      viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
+      viewBox={"0 0 " + VIEW_WIDTH + " " + VIEW_HEIGHT}
       preserveAspectRatio="none"
     >
       {areaPath ? <path d={areaPath} fill={color} opacity={0.12} stroke="none" /> : null}

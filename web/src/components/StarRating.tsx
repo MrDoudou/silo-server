@@ -1,5 +1,7 @@
 import { memo, useCallback } from "react";
 import { Star } from "lucide-react";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface StarRatingProps {
   value: number | null;
@@ -10,6 +12,7 @@ interface StarRatingProps {
 const STAR_COUNT = 5;
 
 function StarRating({ value, onChange, size = 20 }: StarRatingProps) {
+  useUILanguage();
   function handleClick(star: number) {
     if (star === value) {
       onChange(null);
@@ -43,7 +46,7 @@ function StarRating({ value, onChange, size = 20 }: StarRatingProps) {
   return (
     <div
       role="radiogroup"
-      aria-label="Rating"
+      aria-label={tr("components.star_rating.rating")}
       className="star-rating flex items-center gap-0.5 rounded-full px-2.5 py-2"
       onKeyDown={handleKeyDown}
     >
@@ -55,7 +58,10 @@ function StarRating({ value, onChange, size = 20 }: StarRatingProps) {
             key={star}
             type="button"
             role="radio"
-            aria-label={`${star} star${star !== 1 ? "s" : ""}`}
+            aria-label={tr("components.star_rating.star_star_value", {
+              star: star,
+              value: star !== 1 ? "s" : "",
+            })}
             aria-checked={value === star}
             tabIndex={star === tabbableStar ? 0 : -1}
             data-filled={filled}

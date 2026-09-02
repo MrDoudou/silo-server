@@ -3,15 +3,25 @@ import { usePlayerConfig } from "../context/PlayerConfigContext";
 import { playerFetch } from "../player-fetch";
 import type { MarkerDraft, MarkerKind, PlayerTimeRange } from "../types";
 
+import { tr } from "@/i18n/translate";
+
 /** Edit order shown in the panel: chronological-ish within an episode. */
 export const MARKER_KINDS: MarkerKind[] = ["intro", "recap", "credits", "preview"];
 
 /** Human labels. "credits" doubles as the outro, so we say so. */
 export const MARKER_LABELS: Record<MarkerKind, string> = {
-  intro: "Intro",
-  recap: "Recap",
-  credits: "Credits / Outro",
-  preview: "Preview",
+  get intro() {
+    return tr("player.hooks.use_marker_editor.intro");
+  },
+  get recap() {
+    return tr("player.hooks.use_marker_editor.recap");
+  },
+  get credits() {
+    return tr("player.hooks.use_marker_editor.credits_outro");
+  },
+  get preview() {
+    return tr("player.hooks.use_marker_editor.preview");
+  },
 };
 
 // Initial span (seconds) given to a freshly created marker before the user
@@ -201,7 +211,7 @@ export function useMarkerEditor({
         body: JSON.stringify(body),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save markers");
+      setError(tr.error("errors.player.hooks.use_marker_editor.failed_to_save_markers", e));
       return;
     } finally {
       setSaving(false);

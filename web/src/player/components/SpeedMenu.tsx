@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SpeedMenuProps {
   rates: readonly number[];
@@ -7,6 +9,7 @@ interface SpeedMenuProps {
 }
 
 export function SpeedMenu({ rates, value, onChange }: SpeedMenuProps) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuItemsRef = useRef<(HTMLButtonElement | null)[]>([]);
@@ -55,7 +58,7 @@ export function SpeedMenu({ rates, value, onChange }: SpeedMenuProps) {
         type="button"
         className="player-utility-btn px-2 text-xs tabular-nums"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Playback speed"
+        aria-label={tr("player.components.speed_menu.playback_speed")}
         aria-expanded={open}
         aria-haspopup="menu"
       >
@@ -77,9 +80,10 @@ export function SpeedMenu({ rates, value, onChange }: SpeedMenuProps) {
               role="menuitem"
               type="button"
               data-active={r === value ? "true" : undefined}
-              className={`w-full px-4 py-2 text-right text-sm tabular-nums transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-                r === value ? "bg-white/5 text-white" : "text-white/75"
-              }`}
+              className={
+                "w-full px-4 py-2 text-right text-sm tabular-nums transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+                (r === value ? "bg-white/5 text-white" : "text-white/75")
+              }
               onClick={() => {
                 onChange(r);
                 setOpen(false);

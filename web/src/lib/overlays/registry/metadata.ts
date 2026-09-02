@@ -1,6 +1,8 @@
 import { formatLanguage } from "@/lib/languageDisplay";
 import type { OverlayDef } from "../types";
 
+import { tr } from "@/i18n/translate";
+
 function formatRuntime(minutes: number | null | undefined): string | null {
   if (!minutes || minutes <= 0) return null;
   const h = Math.floor(minutes / 60);
@@ -12,8 +14,12 @@ export const METADATA_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "year",
     category: "metadata",
-    label: "Year",
-    description: "Release year",
+    get label() {
+      return tr("lib.overlays.registry.metadata.year");
+    },
+    get description() {
+      return tr("lib.overlays.registry.metadata.release_year");
+    },
     defaultPosition: "bottom-left",
     defaultEnabled: false,
     iconCapable: false,
@@ -22,8 +28,12 @@ export const METADATA_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "runtime",
     category: "metadata",
-    label: "Runtime",
-    description: "Item runtime in hours and minutes",
+    get label() {
+      return tr("lib.overlays.registry.metadata.runtime");
+    },
+    get description() {
+      return tr("lib.overlays.registry.metadata.item_runtime_in_hours_and_minutes");
+    },
     defaultPosition: "bottom-left",
     defaultEnabled: false,
     iconId: "clock",
@@ -33,8 +43,12 @@ export const METADATA_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "original_language",
     category: "metadata",
-    label: "Language",
-    description: "Original language of the content",
+    get label() {
+      return tr("lib.overlays.registry.metadata.language");
+    },
+    get description() {
+      return tr("lib.overlays.registry.metadata.original_language_of_the_content");
+    },
     defaultPosition: "bottom-left",
     defaultEnabled: false,
     iconId: "globe",
@@ -44,8 +58,12 @@ export const METADATA_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "studio",
     category: "metadata",
-    label: "Studio",
-    description: "Primary production studio (movies)",
+    get label() {
+      return tr("lib.overlays.registry.metadata.studio");
+    },
+    get description() {
+      return tr("lib.overlays.registry.metadata.primary_production_studio_movies");
+    },
     defaultPosition: "bottom-right",
     defaultEnabled: false,
     iconId: "building",
@@ -55,8 +73,12 @@ export const METADATA_OVERLAYS: readonly OverlayDef[] = [
   {
     id: "network",
     category: "metadata",
-    label: "Network",
-    description: "Primary network (series)",
+    get label() {
+      return tr("lib.overlays.registry.metadata.network");
+    },
+    get description() {
+      return tr("lib.overlays.registry.metadata.primary_network_series");
+    },
     defaultPosition: "bottom-right",
     defaultEnabled: false,
     iconId: "tv",

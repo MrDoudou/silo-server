@@ -6,6 +6,8 @@ import type { RefreshResponse, User } from "@/api/types";
 import { useAuth } from "@/hooks/useAuth";
 import { sanitizeAuthRedirect } from "@/lib/authRedirect";
 
+import { tr } from "@/i18n/translate";
+
 type OAuthCompleteResponse = RefreshResponse & {
   next: string;
 };
@@ -17,7 +19,7 @@ async function completeOAuthCode(code: string): Promise<OAuthCompleteResponse> {
     body: JSON.stringify({ code }),
   });
   if (!res.ok) {
-    throw new Error("Sign-in response expired. Please try again.");
+    throw new Error(tr.error("errors.auth.oauth_response_expired", null));
   }
   return (await res.json()) as OAuthCompleteResponse;
 }
@@ -28,7 +30,7 @@ export default function OAuthComplete() {
   const [error, setError] = useState<string | null>(() =>
     new URLSearchParams(window.location.search).get("code")
       ? null
-      : "Sign-in response missing completion code. Please try again.",
+      : tr.error("errors.auth.oauth_code_missing", null),
   );
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export default function OAuthComplete() {
         if (!cancelled) {
           setAccessToken(null);
           setRefreshToken(null);
-          setError(err instanceof Error ? err.message : "Failed to complete sign-in");
+          setError(tr.error("errors.auth.oauth_completion_failed", err));
         }
       }
     })();

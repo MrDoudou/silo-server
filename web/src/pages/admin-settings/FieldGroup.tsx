@@ -3,6 +3,8 @@ import { createContext, useContext, type ReactNode } from "react";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { cn } from "@/lib/utils";
 import "@/styles/admin-settings.css";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const GroupRestartContext = createContext(false);
 
@@ -44,15 +46,21 @@ export function FieldGroup({
   className,
   children,
 }: FieldGroupProps) {
+  useUILanguage();
   // A group nested inside a restart-all group inherits that state without
   // repeating the line.
   const inheritedRestartAll = useContext(GroupRestartContext);
   const effectiveRestartAll = restartAll || inheritedRestartAll;
 
   const dirtyDot = dirty ? (
-    <span className="inline-flex items-center" title="Unsaved changes in this group">
+    <span
+      className="inline-flex items-center"
+      title={tr("pages.admin_settings.field_group.unsaved_changes_in_this_group")}
+    >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--settings-accent)]" />
-      <span className="sr-only">Unsaved changes in this group</span>
+      <span className="sr-only">
+        {tr("pages.admin_settings.field_group.unsaved_changes_in_this_group")}
+      </span>
     </span>
   ) : null;
 
@@ -62,8 +70,10 @@ export function FieldGroup({
       description={
         restartAll
           ? description
-            ? `${description} Changes apply after a restart.`
-            : "Changes apply after a restart"
+            ? tr("pages.admin_settings.field_group.description_changes_apply_after_a_restart", {
+                description: description,
+              })
+            : tr("pages.admin_settings.field_group.changes_apply_after_a_restart")
           : description
       }
       actions={

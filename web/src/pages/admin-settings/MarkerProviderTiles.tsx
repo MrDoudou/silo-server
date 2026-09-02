@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import type { MarkerProviderConfig, MarkerUserStats, PluginInstallation } from "@/api/types";
 import {
@@ -23,6 +23,9 @@ import {
   useValidateMarkerProvider,
 } from "@/hooks/queries/admin/markers";
 import { SETTINGS_NUMBER_WIDTH, SettingField, SettingFieldRow } from "./SettingField";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 const INTEGER_INPUT_PATTERN = /^[+-]?\d+$/;
 
@@ -77,6 +80,7 @@ export function MarkerProviderTiles({
   onExpand: (id: string) => void;
   onCollapse: () => void;
 }) {
+  useUILanguage();
   const providers = useMarkerProviders();
   // Installed plugins render the credential state; the tiles are useful before
   // that query lands, so they are never blocked on it.
@@ -96,12 +100,14 @@ export function MarkerProviderTiles({
   if (providerList.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        No marker provider plugins are installed. More install from the{" "}
+        {tr(
+          "pages.admin_settings.marker_provider_tiles.no_marker_provider_plugins_are_installed_more_install_from_the",
+        )}{" "}
         <Link
           to="/admin/plugins?tab=catalog"
           className="hover:text-foreground font-medium underline underline-offset-2 transition-colors"
         >
-          plugin catalog
+          {tr("pages.admin_settings.marker_provider_tiles.plugin_catalog")}
         </Link>
         .
       </p>
@@ -156,6 +162,7 @@ function MarkerProviderTile({
   result: MarkerValidation | undefined;
   onValidated: (result: MarkerValidation | undefined) => void;
 }) {
+  useUILanguage();
   const updateProvider = useUpdateMarkerProvider();
   const validateProvider = useValidateMarkerProvider();
   const displayName = provider.display_name || provider.provider;
@@ -189,11 +196,15 @@ function MarkerProviderTile({
 
   function save() {
     if (!priorityValid) {
-      toast.error("Lookup order must be a whole number.");
+      toast.error(
+        "errors.admin_settings.marker_provider_tiles.lookup_order_must_be_a_whole_number",
+      );
       return;
     }
     if (!confidenceValid) {
-      toast.error("Minimum confidence must be between 0 and 1.");
+      toast.error(
+        "errors.admin_settings.marker_provider_tiles.minimum_confidence_must_be_between_0_and_1",
+      );
       return;
     }
 
@@ -220,8 +231,8 @@ function MarkerProviderTile({
             test: {
               ok: response.valid,
               message: response.valid
-                ? "Provider validated."
-                : (response.error ?? "Validation failed."),
+                ? tr("api.messages.provider_validated")
+                : tr.remote({ message: response.error ?? "Validation failed." }),
               at: Date.now(),
               durationMs: Date.now() - started,
             },
@@ -231,7 +242,10 @@ function MarkerProviderTile({
           onValidated({
             test: {
               ok: false,
-              message: error instanceof Error ? error.message : "Validation failed.",
+              message: tr.error(
+                "errors.admin_settings.marker_provider_tiles.validation_failed",
+                error,
+              ),
               at: Date.now(),
               durationMs: Date.now() - started,
             },
@@ -264,7 +278,7 @@ function MarkerProviderTile({
   return (
     <ProviderTile
       name={displayName}
-      tagline="Intro and credits markers"
+      tagline={tr("pages.admin_settings.marker_provider_tiles.intro_and_credits_markers")}
       monogram={providerMonogram(displayName)}
       monogramClass="bg-teal-500/20 text-teal-700 dark:text-teal-300"
       state={state}
@@ -273,16 +287,26 @@ function MarkerProviderTile({
       busy={updateProvider.isPending || validateProvider.isPending}
       expanded={expanded}
       primaryAction={{
-        label: test && !test.ok ? "Fix" : credentialsReady === false ? "Set up" : "Manage",
+        get label() {
+          return tr(
+            test && !test.ok
+              ? "pages.admin_settings.marker_provider_tiles.fix"
+              : credentialsReady === false
+                ? "pages.admin_settings.marker_provider_tiles.set_up"
+                : "pages.admin_settings.marker_provider_tiles.manage",
+          );
+        },
         onClick: onExpand,
       }}
     >
       <p className="text-muted-foreground mb-1 text-xs">
         {provider.source_type === "plugin" && provider.plugin_id ? (
           <>
-            Account and API keys for this provider live on its{" "}
+            {tr(
+              "pages.admin_settings.marker_provider_tiles.account_and_api_keys_for_this_provider_live_on_its",
+            )}{" "}
             <Link to={pluginPage} className="underline underline-offset-2">
-              plugin page
+              {tr("pages.admin_settings.marker_provider_tiles.plugin_page")}
             </Link>
             .
           </>
@@ -292,15 +316,17 @@ function MarkerProviderTile({
       </p>
 
       <SettingField
-        label="Use for online marker lookup"
+        label={tr("pages.admin_settings.marker_provider_tiles.use_for_online_marker_lookup")}
         type="toggle"
         value={fetchEnabled ? "true" : "false"}
         onChange={(value) => setFetchEnabled(value === "true")}
       />
       <SettingFieldRow
-        label="Lookup order"
+        label={tr("pages.admin_settings.marker_provider_tiles.lookup_order")}
         htmlFor={priorityID}
-        description="Lower numbers win when providers overlap."
+        description={tr(
+          "pages.admin_settings.marker_provider_tiles.lower_numbers_win_when_providers_overlap",
+        )}
       >
         <Input
           id={priorityID}
@@ -313,7 +339,7 @@ function MarkerProviderTile({
         />
       </SettingFieldRow>
       <SettingField
-        label="Allow contributions"
+        label={tr("pages.admin_settings.marker_provider_tiles.allow_contributions")}
         type="toggle"
         value={contributeEnabled ? "true" : "false"}
         onChange={(value) => {
@@ -324,17 +350,23 @@ function MarkerProviderTile({
         disabled={!provider.is_submitter}
       />
       <SettingField
-        label="Send this server's markers automatically"
+        label={tr(
+          "pages.admin_settings.marker_provider_tiles.send_this_server_s_markers_automatically",
+        )}
         type="toggle"
         value={autoLocal ? "true" : "false"}
         onChange={(value) => setAutoLocal(value === "true")}
         disabled={!provider.is_submitter || !contributeEnabled}
-        hint="Only markers this server detected, and only those above the confidence floor below, are sent."
+        hint={tr(
+          "pages.admin_settings.marker_provider_tiles.only_markers_this_server_detected_and_only_those_above_the",
+        )}
       />
       <SettingFieldRow
-        label="Minimum confidence"
+        label={tr("pages.admin_settings.marker_provider_tiles.minimum_confidence")}
         htmlFor={minConfidenceID}
-        description="Use a decimal from 0 to 1. The default recommendation is 0.95."
+        description={tr(
+          "pages.admin_settings.marker_provider_tiles.use_a_decimal_from_0_to_1_the_default_recommendation",
+        )}
       >
         <Input
           id={minConfidenceID}
@@ -354,27 +386,39 @@ function MarkerProviderTile({
         <div className="border-border bg-muted/20 mt-3.5 rounded-md border px-3 py-3">
           <dl className="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
             <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Total submissions</dt>
+              <dt className="text-muted-foreground">
+                {tr("pages.admin_settings.marker_provider_tiles.total_submissions")}
+              </dt>
               <dd className="font-medium">{stats.total}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Accepted</dt>
+              <dt className="text-muted-foreground">
+                {tr("pages.admin_settings.marker_provider_tiles.accepted")}
+              </dt>
               <dd className="font-medium">{stats.accepted}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Pending</dt>
+              <dt className="text-muted-foreground">
+                {tr("pages.admin_settings.marker_provider_tiles.pending")}
+              </dt>
               <dd className="font-medium">{stats.pending}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Rejected</dt>
+              <dt className="text-muted-foreground">
+                {tr("pages.admin_settings.marker_provider_tiles.rejected")}
+              </dt>
               <dd className="font-medium">{stats.rejected}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Acceptance rate</dt>
+              <dt className="text-muted-foreground">
+                {tr("pages.admin_settings.marker_provider_tiles.acceptance_rate")}
+              </dt>
               <dd className="font-medium">{formatRate(stats.acceptance_rate)}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Best streak</dt>
+              <dt className="text-muted-foreground">
+                {tr("pages.admin_settings.marker_provider_tiles.best_streak")}
+              </dt>
               <dd className="font-medium">{stats.best_streak}</dd>
             </div>
           </dl>
@@ -388,7 +432,9 @@ function MarkerProviderTile({
           onClick={save}
           disabled={!dirty || !priorityValid || !confidenceValid || updateProvider.isPending}
         >
-          {updateProvider.isPending ? "Saving..." : "Save"}
+          {updateProvider.isPending
+            ? tr("pages.admin_settings.marker_provider_tiles.saving")
+            : tr("common.actions.save")}
         </Button>
         {provider.is_submitter && (
           <Button
@@ -398,11 +444,13 @@ function MarkerProviderTile({
             onClick={validate}
             disabled={validateProvider.isPending}
           >
-            {validateProvider.isPending ? "Validating..." : "Validate"}
+            {validateProvider.isPending
+              ? tr("pages.admin_settings.marker_provider_tiles.validating")
+              : tr("pages.admin_settings.marker_provider_tiles.validate")}
           </Button>
         )}
         <Button type="button" size="sm" variant="outline" onClick={onCollapse}>
-          Close
+          {tr("common.actions.close")}
         </Button>
       </ProviderPanelActions>
     </ProviderTile>

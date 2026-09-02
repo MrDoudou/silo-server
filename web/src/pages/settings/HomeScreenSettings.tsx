@@ -46,7 +46,9 @@ import {
 import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface RemovedSystemOverride {
   id: string;
@@ -180,6 +182,7 @@ export function buildProfileGallerySection(
 }
 
 export default function HomeScreenSettings() {
+  useUILanguage();
   const { data: libraries } = useUserLibraries();
   const { data: recipeCatalog } = useQuery({
     queryKey: ["recipe-catalog"],
@@ -268,7 +271,7 @@ export default function HomeScreenSettings() {
       },
       {
         onError: () => {
-          toast.error("Failed to save section changes");
+          toast.error("errors.settings.home_screen_settings.failed_to_save_section_changes");
           if (
             !shouldRestoreLatestSaveFailure(
               activeSelectionRef.current,
@@ -428,9 +431,13 @@ export default function HomeScreenSettings() {
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Home screen</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.settings.home_screen_settings.home_screen")}
+        </h2>
         <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-          Choose a scope, then arrange the sections that appear on that screen.
+          {tr(
+            "pages.settings.home_screen_settings.choose_a_scope_then_arrange_the_sections_that_appear_on",
+          )}
         </p>
       </div>
 
@@ -439,15 +446,20 @@ export default function HomeScreenSettings() {
         onOpenChange={(open) => {
           if (!open) setConfirmResetOpen(false);
         }}
-        title="Reset section customizations"
-        description="Reset all section customizations to defaults? This action cannot be undone."
-        confirmLabel="Reset"
+        title={tr("pages.settings.home_screen_settings.reset_section_customizations")}
+        description={tr(
+          "pages.settings.home_screen_settings.reset_all_section_customizations_to_defaults_this_action_cannot_be",
+        )}
+        confirmLabel={tr("common.actions.reset")}
         variant="default"
         onConfirm={() => {
           setConfirmResetOpen(false);
           resetMutation.mutate(
             { scope, libraryId: libraryId ? String(libraryId) : undefined },
-            { onSuccess: () => toast.success("Sections reset to default") },
+            {
+              onSuccess: () =>
+                toast.success("feedback.settings.home_screen_settings.sections_reset_to_default"),
+            },
           );
         }}
       />
@@ -455,26 +467,40 @@ export default function HomeScreenSettings() {
       <ConfirmDialog
         open={confirmDeleteOpen}
         onOpenChange={handleDeleteDialogChange}
-        title={pendingDeleteSection?.is_custom ? "Delete custom section?" : "Remove section?"}
+        title={
+          pendingDeleteSection?.is_custom
+            ? tr("pages.settings.home_screen_settings.delete_custom_section")
+            : tr("pages.settings.home_screen_settings.remove_section")
+        }
         description={
           pendingDeleteSection?.is_custom
-            ? "Delete this custom section?"
-            : "Remove this section from your home screen?"
+            ? tr("pages.settings.home_screen_settings.delete_this_custom_section")
+            : tr("pages.settings.home_screen_settings.remove_this_section_from_your_home_screen")
         }
-        confirmLabel={pendingDeleteSection?.is_custom ? "Delete" : "Remove"}
+        confirmLabel={
+          pendingDeleteSection?.is_custom
+            ? tr("common.actions.delete")
+            : tr("common.actions.remove")
+        }
         variant="destructive"
         onConfirm={handleConfirmDelete}
       />
 
       <SettingsGroup
-        title="Scope"
-        description="Pick the home screen or library-specific view you want to customize."
+        title={tr("pages.settings.home_screen_settings.scope")}
+        description={tr(
+          "pages.settings.home_screen_settings.pick_the_home_screen_or_library_specific_view_you_want",
+        )}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-0.5">
-            <Label className="text-sm font-medium">Editing scope</Label>
+            <Label className="text-sm font-medium">
+              {tr("pages.settings.home_screen_settings.editing_scope")}
+            </Label>
             <p className="text-muted-foreground text-[13px] leading-relaxed">
-              Changes apply only to the selected home screen.
+              {tr(
+                "pages.settings.home_screen_settings.changes_apply_only_to_the_selected_home_screen",
+              )}
             </p>
           </div>
           <Select value={scopeValue} onValueChange={handleScopeChange}>
@@ -482,9 +508,9 @@ export default function HomeScreenSettings() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="home">Home</SelectItem>
+              <SelectItem value="home">{tr("pages.settings.home_screen_settings.home")}</SelectItem>
               {libraries?.map((lib) => (
-                <SelectItem key={lib.id} value={`library:${lib.id}`}>
+                <SelectItem key={lib.id} value={"library:" + lib.id}>
                   {lib.name}
                 </SelectItem>
               ))}
@@ -494,8 +520,10 @@ export default function HomeScreenSettings() {
       </SettingsGroup>
 
       <SettingsGroup
-        title="Sections"
-        description="Add, reorder, or hide sections. Drag to change order."
+        title={tr("pages.settings.home_screen_settings.sections")}
+        description={tr(
+          "pages.settings.home_screen_settings.add_reorder_or_hide_sections_drag_to_change_order",
+        )}
       >
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -504,23 +532,29 @@ export default function HomeScreenSettings() {
             onClick={() => setGalleryOpen(true)}
             disabled={!canEditSections}
           >
-            <Plus className="mr-1 h-4 w-4" /> Add from Gallery
+            <Plus className="mr-1 h-4 w-4" />{" "}
+            {tr("pages.settings.home_screen_settings.add_from_gallery")}
           </Button>
           <Button size="sm" onClick={handleOpenAdd} disabled={!canEditSections}>
-            <Plus className="mr-1 h-4 w-4" /> Add Section
+            <Plus className="mr-1 h-4 w-4" />{" "}
+            {tr("pages.settings.home_screen_settings.add_section")}
           </Button>
           <Button size="sm" variant="outline" onClick={handleReset} disabled={!canEditSections}>
-            Reset to Default
+            {tr("pages.settings.home_screen_settings.reset_to_default")}
           </Button>
           <Badge variant="secondary" className="ml-auto">
-            {orderedSections.length} sections
+            {orderedSections.length} {tr("pages.settings.home_screen_settings.sections_063b1141")}
           </Badge>
         </div>
         {!canEditSections ? (
           <p className="text-muted-foreground text-[13px]">
             {rawOverridesQuery.isError
-              ? "Saved section state failed to load. Editing is disabled."
-              : "Loading saved section state before section changes are enabled."}
+              ? tr(
+                  "pages.settings.home_screen_settings.saved_section_state_failed_to_load_editing_is_disabled",
+                )
+              : tr(
+                  "pages.settings.home_screen_settings.loading_saved_section_state_before_section_changes_are_enabled",
+                )}
           </p>
         ) : null}
 
@@ -549,7 +583,7 @@ export default function HomeScreenSettings() {
               ))}
               {orderedSections.length === 0 && (
                 <div className="surface-panel-subtle text-muted-foreground rounded-[1.2rem] py-8 text-center text-sm">
-                  No sections configured.
+                  {tr("pages.settings.home_screen_settings.no_sections_configured")}
                 </div>
               )}
             </div>

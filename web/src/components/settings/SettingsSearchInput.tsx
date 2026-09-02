@@ -4,6 +4,8 @@ import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SEARCH_SHORTCUT_LABEL } from "@/lib/keyboardShortcut";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SettingsSearchInputProps {
   value: string;
@@ -32,6 +34,7 @@ export function SettingsSearchInput({
   showShortcutHint = false,
   captureShortcut = true,
 }: SettingsSearchInputProps) {
+  useUILanguage();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const hasQuery = value.trim().length > 0;
@@ -88,7 +91,7 @@ export function SettingsSearchInput({
         {hasQuery ? (
           <button
             type="button"
-            aria-label="Clear settings search"
+            aria-label={tr("components.settings.settings_search_input.clear_settings_search")}
             onClick={() => onChange("")}
             className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center rounded-xl transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
           >

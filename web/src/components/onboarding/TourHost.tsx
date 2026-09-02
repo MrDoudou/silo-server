@@ -25,6 +25,8 @@ import { settingValueFromString } from "@/hooks/queries/admin/users";
 import { useSetSettingValue, type SettingIdentity } from "@/hooks/queries/settingValues";
 import type { SettingKey } from "@/lib/settingsContract";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Renders the server-driven first-run tour as a modal overlay. The step
@@ -57,6 +59,7 @@ interface TourHostProps {
 }
 
 export function TourHost({ flow, onDone }: TourHostProps) {
+  useUILanguage();
   const steps = useMemo(() => flow.steps.filter((s) => KNOWN_KINDS.has(s.kind)), [flow.steps]);
   const [index, setIndex] = useState(0);
   const progress = useOnboardingProgress();
@@ -114,7 +117,7 @@ export function TourHost({ flow, onDone }: TourHostProps) {
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-xl"
       role="dialog"
       aria-modal="true"
-      aria-label="Feature tour"
+      aria-label={tr("components.onboarding.tour_host.feature_tour")}
     >
       <div className="bg-card border-border max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl border p-6 shadow-2xl sm:p-7">
         <StepBody step={step} />
@@ -126,7 +129,7 @@ export function TourHost({ flow, onDone }: TourHostProps) {
             onClick={() => finish({ skipped: true })}
             className="text-muted-foreground shrink-0"
           >
-            Skip tour
+            {tr("components.onboarding.tour_host.skip_tour")}
           </Button>
           <div className="flex min-w-0 items-center gap-4">
             {/* Pips are decorative; on phones they'd crowd the buttons out. */}
@@ -144,16 +147,20 @@ export function TourHost({ flow, onDone }: TourHostProps) {
             <div className="flex shrink-0 gap-2">
               {index > 0 && (
                 <Button variant="outline" size="sm" onClick={() => setIndex(index - 1)}>
-                  Back
+                  {tr("common.actions.back")}
                 </Button>
               )}
               {step.kind === "handoff" ? (
                 <Button size="sm" onClick={() => finish({ skipped: false, route: step.route })}>
-                  {step.title ?? "Finish"}
+                  {step.title ?? tr("components.onboarding.tour_host.finish")}
                 </Button>
               ) : (
                 <Button size="sm" onClick={advance}>
-                  {isLast ? "Done" : index === 0 ? "Show me" : "Next"}
+                  {isLast
+                    ? tr("common.actions.done")
+                    : index === 0
+                      ? tr("components.onboarding.tour_host.show_me")
+                      : tr("common.actions.next")}
                 </Button>
               )}
             </div>
@@ -166,6 +173,7 @@ export function TourHost({ flow, onDone }: TourHostProps) {
 }
 
 function StepBody({ step }: { step: OnboardingStep }) {
+  useUILanguage();
   const Icon = ILLUSTRATIONS[step.illustration ?? ""] ?? Sparkles;
 
   return (
@@ -199,6 +207,7 @@ function StepBody({ step }: { step: OnboardingStep }) {
  * links fall back to a plain external-link button.
  */
 function StoreLink({ link }: { link: OnboardingStepLink }) {
+  useUILanguage();
   const brand = link.url.includes("apple.com")
     ? {
         Icon: AppleLogo,
@@ -264,6 +273,7 @@ function GooglePlayLogo({ className }: { className?: string }) {
  * tour the account is genuinely configured.
  */
 function SettingControl({ step }: { step: OnboardingStep }) {
+  useUILanguage();
   const spec = step.setting!;
   const { profile, selectProfile } = useAuth();
   const updateProfile = useUpdateProfile();

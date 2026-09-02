@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Moon } from "lucide-react";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export type SleepSetting =
   | { kind: "off" }
@@ -13,11 +15,36 @@ interface SleepTimerMenuProps {
 }
 
 const PRESETS: { label: string; seconds: number }[] = [
-  { label: "5 min", seconds: 300 },
-  { label: "15 min", seconds: 900 },
-  { label: "30 min", seconds: 1800 },
-  { label: "45 min", seconds: 2700 },
-  { label: "60 min", seconds: 3600 },
+  {
+    get label() {
+      return tr("player.components.sleep_timer_menu.value_5_min");
+    },
+    seconds: 300,
+  },
+  {
+    get label() {
+      return tr("player.components.sleep_timer_menu.value_15_min");
+    },
+    seconds: 900,
+  },
+  {
+    get label() {
+      return tr("player.components.sleep_timer_menu.value_30_min");
+    },
+    seconds: 1800,
+  },
+  {
+    get label() {
+      return tr("player.components.sleep_timer_menu.value_45_min");
+    },
+    seconds: 2700,
+  },
+  {
+    get label() {
+      return tr("player.components.sleep_timer_menu.value_60_min");
+    },
+    seconds: 3600,
+  },
 ];
 
 function formatCountdown(ms: number): string {
@@ -28,6 +55,7 @@ function formatCountdown(ms: number): string {
 }
 
 export function SleepTimerMenu({ setting, remainingMs, onChange }: SleepTimerMenuProps) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([]);
@@ -52,7 +80,7 @@ export function SleepTimerMenu({ setting, remainingMs, onChange }: SleepTimerMen
         type="button"
         className="player-utility-btn flex items-center gap-1.5 px-2 text-xs"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Sleep timer"
+        aria-label={tr("player.components.sleep_timer_menu.sleep_timer")}
         aria-expanded={open}
         aria-haspopup="menu"
       >
@@ -78,7 +106,7 @@ export function SleepTimerMenu({ setting, remainingMs, onChange }: SleepTimerMen
                 setOpen(false);
               }}
             >
-              Turn off
+              {tr("player.components.sleep_timer_menu.turn_off")}
             </button>
           )}
           {PRESETS.map((p, i) => (
@@ -107,7 +135,7 @@ export function SleepTimerMenu({ setting, remainingMs, onChange }: SleepTimerMen
               setOpen(false);
             }}
           >
-            End of chapter
+            {tr("player.components.sleep_timer_menu.end_of_chapter")}
           </button>
         </div>
       )}

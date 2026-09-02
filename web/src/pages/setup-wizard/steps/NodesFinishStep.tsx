@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { Check, ChevronRight, Plus } from "lucide-react";
 import { useWizardContext } from "../WizardContext";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface AddedNode {
   name: string;
@@ -21,6 +23,7 @@ interface AddedNode {
 }
 
 function AddNodeForm({ onAdded }: { onAdded: (node: AddedNode) => void }) {
+  useUILanguage();
   const createNode = useCreateNode();
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
@@ -47,40 +50,44 @@ function AddNodeForm({ onAdded }: { onAdded: (node: AddedNode) => void }) {
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1">
           <Label htmlFor="node-name" className="text-xs">
-            Name
+            {tr("pages.setup_wizard.steps.nodes_finish_step.name")}
           </Label>
           <Input
             id="node-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="proxy-us-east"
+            placeholder={tr("pages.setup_wizard.steps.nodes_finish_step.proxy_us_east")}
             className="h-8 text-sm"
             required
           />
         </div>
         <div className="space-y-1">
           <Label htmlFor="node-type" className="text-xs">
-            Type
+            {tr("pages.setup_wizard.steps.nodes_finish_step.type")}
           </Label>
           <Select value={type} onValueChange={(v) => setType(v as "proxy" | "transcode")}>
             <SelectTrigger id="node-type" className="h-8 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="proxy">Proxy</SelectItem>
-              <SelectItem value="transcode">Transcode</SelectItem>
+              <SelectItem value="proxy">
+                {tr("pages.setup_wizard.steps.nodes_finish_step.proxy")}
+              </SelectItem>
+              <SelectItem value="transcode">
+                {tr("pages.setup_wizard.steps.nodes_finish_step.transcode")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
           <Label htmlFor="node-url" className="text-xs">
-            URL
+            {tr("pages.setup_wizard.steps.nodes_finish_step.url")}
           </Label>
           <Input
             id="node-url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://proxy.example.com"
+            placeholder={tr("pages.setup_wizard.steps.nodes_finish_step.https_proxy_example_com")}
             className="h-8 text-sm"
             required
           />
@@ -93,13 +100,16 @@ function AddNodeForm({ onAdded }: { onAdded: (node: AddedNode) => void }) {
         className="h-7 text-xs"
         disabled={createNode.isPending}
       >
-        {createNode.isPending ? "Adding..." : "Add node"}
+        {createNode.isPending
+          ? tr("pages.setup_wizard.steps.nodes_finish_step.adding")
+          : tr("pages.setup_wizard.steps.nodes_finish_step.add_node")}
       </Button>
     </form>
   );
 }
 
 export function NodesFinishStep() {
+  useUILanguage();
   const navigate = useNavigate();
   const { clearProgress, profile, profiles, selectProfile } = useWizardContext();
   const [finishing, setFinishing] = useState(false);
@@ -155,14 +165,16 @@ export function NodesFinishStep() {
           className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm transition-colors"
         >
           <Plus className="h-3.5 w-3.5" />
-          Add a worker node
+          {tr("pages.setup_wizard.steps.nodes_finish_step.add_a_worker_node")}
         </button>
       )}
 
       {/* Finish CTAs */}
       <div className="border-foreground/[0.06] flex flex-col gap-3 border-t pt-6 sm:flex-row">
         <Button onClick={handleFinish} disabled={finishing} className="sm:flex-1">
-          {finishing ? "Starting..." : "Start using Silo"}
+          {finishing
+            ? tr("pages.setup_wizard.steps.nodes_finish_step.starting")
+            : tr("pages.setup_wizard.steps.nodes_finish_step.start_using_silo")}
           <ChevronRight className="ml-1.5 h-4 w-4" />
         </Button>
         <Button
@@ -172,7 +184,7 @@ export function NodesFinishStep() {
           disabled={finishing}
           className="sm:flex-1"
         >
-          Go to admin
+          {tr("pages.setup_wizard.steps.nodes_finish_step.go_to_admin")}
         </Button>
       </div>
     </div>

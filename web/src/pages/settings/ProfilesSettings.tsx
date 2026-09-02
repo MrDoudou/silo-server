@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Pencil, Plus, Trash2, UserCheck } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import type { Profile } from "@/api/types";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -16,6 +16,8 @@ import { ProfilePinDialog } from "@/components/profiles/ProfilePinDialog";
 import { getProfileToken } from "@/api/client";
 import { buildProfileAccessSummary } from "@/lib/profile-management";
 import { HouseholdStreamsPanel } from "@/components/profiles/HouseholdStreamsPanel";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function getDeleteGuardReason(
   selectedProfile: Profile,
@@ -38,6 +40,7 @@ function getDeleteGuardReason(
 }
 
 export default function ProfilesSettings() {
+  useUILanguage();
   const { data: profiles = [], isLoading: profilesLoading, avatarUploadEnabled } = useProfiles();
   const { data: libraries = [], isLoading: librariesLoading } = useAvailableUserLibraries();
   const { profile: activeProfile, selectProfile, verifyProfilePin } = useAuth();
@@ -79,15 +82,17 @@ export default function ProfilesSettings() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Profiles</h2>
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {tr("pages.settings.profiles_settings.profiles")}
+          </h2>
           <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-            Manage profile names, PINs, and access rules.
+            {tr("pages.settings.profiles_settings.manage_profile_names_pins_and_access_rules")}
           </p>
         </div>
 
         <Button onClick={openCreateDialog}>
           <Plus className="h-4 w-4" />
-          New profile
+          {tr("pages.settings.profiles_settings.new_profile")}
         </Button>
       </div>
 
@@ -114,9 +119,13 @@ export default function ProfilesSettings() {
           </div>
         ) : profiles.length === 0 ? (
           <div className="border-border rounded-md border px-4 py-6">
-            <p className="text-sm font-medium">No profiles yet</p>
+            <p className="text-sm font-medium">
+              {tr("pages.settings.profiles_settings.no_profiles_yet")}
+            </p>
             <p className="text-muted-foreground mt-1 text-sm">
-              Create a profile to manage access and playback identity.
+              {tr(
+                "pages.settings.profiles_settings.create_a_profile_to_manage_access_and_playback_identity",
+              )}
             </p>
           </div>
         ) : (
@@ -144,11 +153,25 @@ export default function ProfilesSettings() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate text-sm font-semibold">{profile.name}</span>
                         {profile.id === activeProfileID ? (
-                          <Badge variant="outline">Current</Badge>
+                          <Badge variant="outline">
+                            {tr("pages.settings.profiles_settings.current")}
+                          </Badge>
                         ) : null}
-                        {profile.is_primary ? <Badge variant="outline">Primary</Badge> : null}
-                        {profile.is_child ? <Badge variant="outline">Kids</Badge> : null}
-                        {profile.has_pin ? <Badge variant="outline">PIN</Badge> : null}
+                        {profile.is_primary ? (
+                          <Badge variant="outline">
+                            {tr("pages.settings.profiles_settings.primary")}
+                          </Badge>
+                        ) : null}
+                        {profile.is_child ? (
+                          <Badge variant="outline">
+                            {tr("pages.settings.profiles_settings.kids")}
+                          </Badge>
+                        ) : null}
+                        {profile.has_pin ? (
+                          <Badge variant="outline">
+                            {tr("pages.settings.profiles_settings.pin")}
+                          </Badge>
+                        ) : null}
                       </div>
 
                       <p className="text-muted-foreground text-sm">{accessSummary.text}</p>
@@ -161,13 +184,13 @@ export default function ProfilesSettings() {
                     {profile.id !== activeProfileID ? (
                       <Button size="sm" variant="outline" onClick={() => handleUseProfile(profile)}>
                         <UserCheck className="h-4 w-4" />
-                        Use
+                        {tr("pages.settings.profiles_settings.use")}
                       </Button>
                     ) : null}
 
                     <Button size="sm" variant="outline" onClick={() => openEditDialog(profile)}>
                       <Pencil className="h-4 w-4" />
-                      Edit
+                      {tr("common.actions.edit")}
                     </Button>
 
                     <Button
@@ -177,7 +200,7 @@ export default function ProfilesSettings() {
                       onClick={() => setConfirmDeleteProfile(profile)}
                     >
                       <Trash2 className="h-4 w-4" />
-                      Delete
+                      {tr("common.actions.delete")}
                     </Button>
                   </div>
 
@@ -216,7 +239,9 @@ export default function ProfilesSettings() {
                 return;
               }
             } catch {
-              toast.error("Profile saved, but PIN verification failed");
+              toast.error(
+                "errors.settings.profiles_settings.profile_saved_but_pin_verification_failed",
+              );
               return;
             }
           }
@@ -242,13 +267,19 @@ export default function ProfilesSettings() {
             setConfirmDeleteProfile(null);
           }
         }}
-        title="Delete profile"
+        title={tr("pages.settings.profiles_settings.delete_profile")}
         description={
           confirmDeleteProfile
-            ? `Delete profile "${profilesByID.get(confirmDeleteProfile.id)?.name ?? confirmDeleteProfile.name}"? This action cannot be undone.`
+            ? tr(
+                "pages.settings.profiles_settings.delete_profile_value_this_action_cannot_be_undone",
+                {
+                  value:
+                    profilesByID.get(confirmDeleteProfile.id)?.name ?? confirmDeleteProfile.name,
+                },
+              )
             : ""
         }
-        confirmLabel="Delete"
+        confirmLabel={tr("common.actions.delete")}
         variant="destructive"
         isPending={deleteMutation.isPending}
         onConfirm={() => {

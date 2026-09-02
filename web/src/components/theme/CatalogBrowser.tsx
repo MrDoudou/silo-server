@@ -6,8 +6,11 @@ import { parseThemeFile } from "@/lib/themeExport";
 import { sanitizeCss } from "@/lib/cssSanitizer";
 import { api } from "@/api/client";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { useIsActingAdmin } from "@/hooks/useIsActingAdmin";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CatalogBrowserProps {
   onInstall: (entry: {
@@ -18,6 +21,7 @@ interface CatalogBrowserProps {
 }
 
 export function CatalogBrowser({ onInstall }: CatalogBrowserProps) {
+  useUILanguage();
   const { data: themes, isLoading, isError, refetch } = useThemeCatalog();
   const refreshCatalog = useRefreshThemeCatalog();
   const isAdmin = useIsActingAdmin();
@@ -25,8 +29,8 @@ export function CatalogBrowser({ onInstall }: CatalogBrowserProps) {
 
   function handleRefresh() {
     refreshCatalog.mutate(undefined, {
-      onSuccess: () => toast.success("Theme catalog refreshed"),
-      onError: () => toast.error("Failed to refresh catalog"),
+      onSuccess: () => toast.success("feedback.theme.catalog_browser.theme_catalog_refreshed"),
+      onError: () => toast.error("errors.theme.catalog_browser.failed_to_refresh_catalog"),
     });
   }
 
@@ -41,11 +45,15 @@ export function CatalogBrowser({ onInstall }: CatalogBrowserProps) {
         vars: themeFile.vars as Record<string, string>,
         customCss: sanitizeCss(themeFile.customCss),
       });
-      toast.success(`Installed "${entry.name}"`);
+      toast.success("feedback.theme.catalog_browser.installed_name", {
+        values: { name: entry.name },
+      });
     } catch (err) {
-      toast.error(
-        `Failed to install theme: ${err instanceof Error ? err.message : "Unknown error"}`,
-      );
+      toast.error("errors.theme.catalog_browser.failed_to_install_theme_message", {
+        values: {
+          message: tr.error("errors.common.request_failed", err),
+        },
+      });
     } finally {
       setInstalling(null);
     }
@@ -66,8 +74,9 @@ export function CatalogBrowser({ onInstall }: CatalogBrowserProps) {
       <div className="flex flex-col items-center gap-3 py-8 text-center">
         <AlertCircle className="text-muted-foreground h-8 w-8" />
         <p className="text-muted-foreground text-sm">
-          Could not load the theme catalog. The catalog may be unavailable or the server is
-          unreachable.
+          {tr(
+            "components.theme.catalog_browser.could_not_load_the_theme_catalog_the_catalog_may_be",
+          )}
         </p>
         <button
           type="button"
@@ -75,7 +84,7 @@ export function CatalogBrowser({ onInstall }: CatalogBrowserProps) {
           className="text-primary hover:text-primary/80 inline-flex items-center gap-1.5 text-sm font-medium"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          Try again
+          {tr("components.theme.catalog_browser.try_again")}
         </button>
       </div>
     );
@@ -84,7 +93,7 @@ export function CatalogBrowser({ onInstall }: CatalogBrowserProps) {
   if (themes.length === 0) {
     return (
       <p className="text-muted-foreground py-8 text-center text-sm">
-        No community themes available yet.
+        {tr("components.theme.catalog_browser.no_community_themes_available_yet")}
       </p>
     );
   }
@@ -100,7 +109,7 @@ export function CatalogBrowser({ onInstall }: CatalogBrowserProps) {
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
           >
             <RefreshCw className={cn("h-3.5 w-3.5", refreshCatalog.isPending && "animate-spin")} />
-            Refresh catalog
+            {tr("components.theme.catalog_browser.refresh_catalog")}
           </button>
         </div>
       )}
@@ -115,7 +124,9 @@ export function CatalogBrowser({ onInstall }: CatalogBrowserProps) {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold tracking-tight">{entry.name}</span>
                 </div>
-                <p className="text-muted-foreground mt-0.5 text-[11px]">by {entry.author}</p>
+                <p className="text-muted-foreground mt-0.5 text-[11px]">
+                  {tr("components.theme.catalog_browser.by")} {entry.author}
+                </p>
                 {entry.description && (
                   <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
                     {entry.description}
@@ -181,7 +192,9 @@ export function CatalogBrowser({ onInstall }: CatalogBrowserProps) {
               )}
             >
               <Download className="h-3.5 w-3.5" />
-              {installing === entry.id ? "Installing..." : "Install"}
+              {installing === entry.id
+                ? tr("components.theme.catalog_browser.installing")
+                : tr("components.theme.catalog_browser.install")}
             </button>
           </div>
         ))}

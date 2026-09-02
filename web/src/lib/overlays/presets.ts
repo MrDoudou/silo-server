@@ -1,5 +1,7 @@
 import type { OverlayPreset, PresetId } from "./types";
 
+import { tr } from "@/i18n/translate";
+
 // Presets are pure data — no runtime branching, no per-render computation.
 // badgeStyle() is called with the resolved accent color and returns the
 // inline style applied to the badge container. CardOverlays overrides the
@@ -9,8 +11,12 @@ import type { OverlayPreset, PresetId } from "./types";
 export const OVERLAY_PRESETS: Record<PresetId, OverlayPreset> = {
   minimal: {
     id: "minimal",
-    label: "Minimal",
-    description: "Near-invisible. Tiny text, no background.",
+    get label() {
+      return tr("lib.overlays.presets.minimal");
+    },
+    get description() {
+      return tr("lib.overlays.presets.near_invisible_tiny_text_no_background");
+    },
     badgeClass:
       "rounded-sm px-1 py-0 text-[9px] font-semibold tracking-widest uppercase leading-none",
     badgeStyle: (accent) => ({
@@ -33,8 +39,12 @@ export const OVERLAY_PRESETS: Record<PresetId, OverlayPreset> = {
   },
   classic: {
     id: "classic",
-    label: "Classic",
-    description: "Semi-transparent dark pill with a white border. The default.",
+    get label() {
+      return tr("lib.overlays.presets.classic");
+    },
+    get description() {
+      return tr("lib.overlays.presets.semi_transparent_dark_pill_with_a_white_border_the_default");
+    },
     badgeClass:
       "rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase leading-none",
     badgeStyle: (accent) => ({
@@ -55,8 +65,12 @@ export const OVERLAY_PRESETS: Record<PresetId, OverlayPreset> = {
   },
   vibrant: {
     id: "vibrant",
-    label: "Vibrant",
-    description: "Opaque, accent-colored badges. High contrast.",
+    get label() {
+      return tr("lib.overlays.presets.vibrant");
+    },
+    get description() {
+      return tr("lib.overlays.presets.opaque_accent_colored_badges_high_contrast");
+    },
     badgeClass:
       "rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase leading-none shadow-sm",
     badgeStyle: (accent) => ({
@@ -78,8 +92,12 @@ export const OVERLAY_PRESETS: Record<PresetId, OverlayPreset> = {
   },
   pill: {
     id: "pill",
-    label: "Pill",
-    description: "Larger pill with more padding. Works well with icons.",
+    get label() {
+      return tr("lib.overlays.presets.pill");
+    },
+    get description() {
+      return tr("lib.overlays.presets.larger_pill_with_more_padding_works_well_with_icons");
+    },
     badgeClass:
       "rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-semibold tracking-wide uppercase leading-none",
     badgeStyle: (accent) => ({
@@ -102,8 +120,12 @@ export const OVERLAY_PRESETS: Record<PresetId, OverlayPreset> = {
   },
   square: {
     id: "square",
-    label: "Square",
-    description: "Blocky, high-density. Plex-inspired.",
+    get label() {
+      return tr("lib.overlays.presets.square");
+    },
+    get description() {
+      return tr("lib.overlays.presets.blocky_high_density_plex_inspired");
+    },
     badgeClass:
       "rounded-sm px-1.5 py-0.5 text-[9px] font-bold tracking-widest uppercase leading-none",
     badgeStyle: (accent) => ({
@@ -144,16 +166,76 @@ export function getPreset(id: PresetId): OverlayPreset {
 // overrides. Values cover most reasonable contrast scenarios over a dark badge
 // background.
 export const ACCENT_PALETTE: { label: string; value: string }[] = [
-  { label: "Gold", value: "#f5c518" }, // IMDb yellow
-  { label: "Tomato", value: "#fa320a" }, // RT critic red
-  { label: "Orange", value: "#f97316" },
-  { label: "Amber", value: "#f59e0b" },
-  { label: "Emerald", value: "#10b981" },
-  { label: "Cyan", value: "#06b6d4" },
-  { label: "Blue", value: "#3b82f6" },
-  { label: "Indigo", value: "#6366f1" },
-  { label: "Violet", value: "#8b5cf6" },
-  { label: "Pink", value: "#ec4899" },
-  { label: "Slate", value: "#64748b" },
-  { label: "White", value: "#ffffff" },
+  {
+    get label() {
+      return tr("lib.overlays.presets.gold");
+    },
+    value: "#f5c518",
+  }, // IMDb yellow
+  {
+    get label() {
+      return tr("lib.overlays.presets.tomato");
+    },
+    value: "#fa320a",
+  }, // RT critic red
+  {
+    get label() {
+      return tr("lib.overlays.presets.orange");
+    },
+    value: "#f97316",
+  },
+  {
+    get label() {
+      return tr("lib.overlays.presets.amber");
+    },
+    value: "#f59e0b",
+  },
+  {
+    get label() {
+      return tr("lib.overlays.presets.emerald");
+    },
+    value: "#10b981",
+  },
+  {
+    get label() {
+      return tr("lib.overlays.presets.cyan");
+    },
+    value: "#06b6d4",
+  },
+  {
+    get label() {
+      return tr("lib.overlays.presets.blue");
+    },
+    value: "#3b82f6",
+  },
+  {
+    get label() {
+      return tr("lib.overlays.presets.indigo");
+    },
+    value: "#6366f1",
+  },
+  {
+    get label() {
+      return tr("lib.overlays.presets.violet");
+    },
+    value: "#8b5cf6",
+  },
+  {
+    get label() {
+      return tr("lib.overlays.presets.pink");
+    },
+    value: "#ec4899",
+  },
+  {
+    get label() {
+      return tr("lib.overlays.presets.slate");
+    },
+    value: "#64748b",
+  },
+  {
+    get label() {
+      return tr("lib.overlays.presets.white");
+    },
+    value: "#ffffff",
+  },
 ];

@@ -10,7 +10,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { ApiClientError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -41,6 +42,8 @@ import {
   connectionSchemasAreValid,
   renderableConnectionSchemas,
 } from "./watchProviderConnectionConfig";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function formatRelativeTime(value?: string) {
   return formatRelativeTimeBase(value, { rounding: "floor", justNowLabel: "Just now" }) ?? "Never";
@@ -66,6 +69,7 @@ const STATUS_PILL_STYLES: Record<StatusVariant, string> = {
 };
 
 function StatusPill({ variant, children }: { variant: StatusVariant; children: React.ReactNode }) {
+  useUILanguage();
   return (
     <span
       className={cn(
@@ -103,6 +107,7 @@ function ToggleRow({
   disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  useUILanguage();
   return (
     <div className="border-border/40 flex items-start justify-between gap-4 border-t py-3 first:border-t-0 first:pt-0 sm:border-t-0 sm:py-1.5 sm:first:pt-1.5">
       <div className="min-w-0 flex-1">
@@ -123,6 +128,7 @@ function ToggleRow({
 }
 
 function StatCell({ label, value }: { label: string; value: React.ReactNode }) {
+  useUILanguage();
   return (
     <div className="min-w-0">
       <div className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
@@ -134,6 +140,7 @@ function StatCell({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function ErrorBanner({ message, hint }: { message: string; hint?: string }) {
+  useUILanguage();
   return (
     <div className="flex items-start gap-2.5 rounded-xl bg-rose-500/10 px-3 py-2.5 ring-1 ring-rose-500/20 ring-inset">
       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
@@ -162,13 +169,19 @@ function AuthCodeBlock({
   onCancel: () => void;
   codeCopied: boolean;
 }) {
+  useUILanguage();
   return (
     <div className="border-primary/30 bg-primary/5 rounded-xl border border-dashed p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-medium">Copy this code first</div>
+          <div className="text-sm font-medium">
+            {tr("pages.settings.watch_providers_settings.copy_this_code_first")}
+          </div>
           <div className="text-muted-foreground mt-0.5 text-xs leading-snug">
-            {displayName} will ask for it after the activation page opens.
+            {displayName}{" "}
+            {tr(
+              "pages.settings.watch_providers_settings.will_ask_for_it_after_the_activation_page_opens",
+            )}
           </div>
         </div>
         <Button
@@ -176,7 +189,7 @@ function AuthCodeBlock({
           variant="ghost"
           size="icon-sm"
           onClick={onCancel}
-          aria-label="Cancel activation"
+          aria-label={tr("pages.settings.watch_providers_settings.cancel_activation")}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -187,14 +200,17 @@ function AuthCodeBlock({
         </div>
         <Button type="button" variant="outline" size="sm" onClick={onCopy}>
           {codeCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          {codeCopied ? "Copied" : "Copy code"}
+          {codeCopied
+            ? tr("pages.settings.watch_providers_settings.copied")
+            : tr("pages.settings.watch_providers_settings.copy_code")}
         </Button>
       </div>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <Button type="button" variant="outline" size="sm" asChild className="sm:flex-1">
           <a href={session.verification_url} target="_blank" rel="noreferrer">
             <ExternalLink className="h-4 w-4" />
-            Open {displayName} activation
+            {tr("pages.settings.watch_providers_settings.open")} {displayName}{" "}
+            {tr("pages.settings.watch_providers_settings.activation")}
           </a>
         </Button>
         <Button
@@ -205,7 +221,7 @@ function AuthCodeBlock({
           className="sm:flex-1"
         >
           {pollPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          I&apos;ve entered it
+          {tr("pages.settings.watch_providers_settings.i_ve_entered_it")}
         </Button>
       </div>
     </div>
@@ -227,6 +243,7 @@ function APIKeyBlock({
   onSubmit: (apiKey: string, connectionConfig: WatchProviderConnectionConfig) => void;
   onCancel: () => void;
 }) {
+  useUILanguage();
   const [value, setValue] = useState("");
   const [connectionConfig, setConnectionConfig] = useState<WatchProviderConnectionConfig>({});
   const [configValidity, setConfigValidity] = useState<Record<string, boolean>>({});
@@ -242,9 +259,15 @@ function APIKeyBlock({
     <div className="border-primary/30 bg-primary/5 rounded-xl border border-dashed p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-medium">Paste your {displayName} API key</div>
+          <div className="text-sm font-medium">
+            {tr("pages.settings.watch_providers_settings.paste_your")} {displayName}{" "}
+            {tr("pages.settings.watch_providers_settings.api_key")}
+          </div>
           <div className="text-muted-foreground mt-0.5 text-xs leading-snug">
-            Find it under your account settings on the {displayName} site.
+            {tr(
+              "pages.settings.watch_providers_settings.find_it_under_your_account_settings_on_the",
+            )}{" "}
+            {displayName} {tr("pages.settings.watch_providers_settings.site")}
           </div>
         </div>
         <Button
@@ -252,7 +275,7 @@ function APIKeyBlock({
           variant="ghost"
           size="icon-sm"
           onClick={onCancel}
-          aria-label="Cancel connection"
+          aria-label={tr("pages.settings.watch_providers_settings.cancel_connection")}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -273,7 +296,7 @@ function APIKeyBlock({
             onChange={(next) =>
               setConnectionConfig((current) => ({ ...current, [schema.key]: next }))
             }
-            idPrefix={`watch-provider-${providerKey}-${schema.key}`}
+            idPrefix={"watch-provider-" + providerKey + "-" + schema.key}
             onValidityChange={(valid) =>
               setConfigValidity((current) => ({ ...current, [schema.key]: valid }))
             }
@@ -285,7 +308,7 @@ function APIKeyBlock({
           type="password"
           autoComplete="off"
           spellCheck={false}
-          placeholder="API key"
+          placeholder={tr("pages.settings.watch_providers_settings.api_key")}
           value={value}
           onChange={(event) => setValue(event.target.value)}
           className="font-mono"
@@ -300,7 +323,7 @@ function APIKeyBlock({
           className="sm:flex-none"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-          Connect
+          {tr("pages.settings.watch_providers_settings.connect")}
         </Button>
       </div>
     </div>
@@ -369,6 +392,7 @@ function formatLastSync(connection: WatchProviderConnection, latestRun?: WatchPr
 }
 
 function WatchProviderCard({ providerKey }: { providerKey: string }) {
+  useUILanguage();
   const { data: connection, isLoading } = useWatchProviderConnection(providerKey);
   const updateConnection = useUpdateWatchProviderConnection(providerKey);
   const startAuth = useStartWatchProviderDeviceAuth(providerKey);
@@ -457,9 +481,13 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
     try {
       await navigator.clipboard.writeText(authSession.user_code);
       setCodeCopied(true);
-      toast.success(`${displayName} code copied`);
+      toast.success("feedback.settings.watch_providers_settings.provider_code_copied", {
+        values: { provider: displayName },
+      });
     } catch {
-      toast.error(`Failed to copy ${displayName} code`);
+      toast.error("errors.settings.watch_providers_settings.failed_to_copy_provider_code", {
+        values: { provider: displayName },
+      });
     }
   };
 
@@ -549,7 +577,9 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
                 className="flex-1 sm:flex-none"
               >
                 <Trash2 className="h-4 w-4" />
-                <span className="sm:inline">Disconnect</span>
+                <span className="sm:inline">
+                  {tr("pages.settings.watch_providers_settings.disconnect")}
+                </span>
               </Button>
             </>
           ) : (
@@ -565,7 +595,7 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              Connect
+              {tr("pages.settings.watch_providers_settings.connect")}
             </Button>
           )}
         </div>
@@ -607,68 +637,105 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
           <div className="bg-background/40 rounded-xl px-3 py-3 ring-1 ring-white/5 ring-inset">
             <div className="grid grid-cols-2 gap-3 sm:hidden">
               <StatCell
-                label="Last imported"
-                value={`${runInfo.imported.watched.toLocaleString()} watched · ${runInfo.imported.progress.toLocaleString()} progress · ${runInfo.imported.favorites.toLocaleString()} favorites · ${runInfo.imported.watchlist.toLocaleString()} watchlist`}
+                label={tr("pages.settings.watch_providers_settings.last_imported")}
+                value={
+                  runInfo.imported.watched.toLocaleString() +
+                  " watched · " +
+                  runInfo.imported.progress.toLocaleString() +
+                  " progress · " +
+                  runInfo.imported.favorites.toLocaleString() +
+                  " favorites · " +
+                  runInfo.imported.watchlist.toLocaleString() +
+                  " watchlist"
+                }
               />
               <StatCell
-                label="Last exported"
-                value={`${(runInfo.exported.watched + runInfo.exported.favorites + runInfo.exported.favoriteRemovals + runInfo.exported.watchlist + runInfo.exported.watchlistRemovals).toLocaleString()} sent`}
+                label={tr("pages.settings.watch_providers_settings.last_exported")}
+                value={
+                  (
+                    runInfo.exported.watched +
+                    runInfo.exported.favorites +
+                    runInfo.exported.favoriteRemovals +
+                    runInfo.exported.watchlist +
+                    runInfo.exported.watchlistRemovals
+                  ).toLocaleString() + " sent"
+                }
               />
             </div>
             <div className="hidden grid-cols-5 gap-3 sm:grid">
               <StatCell
-                label="Watched"
-                value={`${runInfo.imported.watched.toLocaleString()} imported`}
+                label={tr("pages.settings.watch_providers_settings.watched")}
+                value={runInfo.imported.watched.toLocaleString() + " imported"}
               />
               <StatCell
-                label="Progress"
-                value={`${runInfo.imported.progress.toLocaleString()} resumed`}
+                label={tr("pages.settings.watch_providers_settings.progress")}
+                value={runInfo.imported.progress.toLocaleString() + " resumed"}
               />
               <StatCell
-                label="Favorites"
-                value={`${runInfo.imported.favorites.toLocaleString()} imported`}
+                label={tr("pages.settings.watch_providers_settings.favorites")}
+                value={runInfo.imported.favorites.toLocaleString() + " imported"}
               />
               <StatCell
-                label="Watchlist"
-                value={`${runInfo.imported.watchlist.toLocaleString()} imported`}
+                label={tr("pages.settings.watch_providers_settings.watchlist")}
+                value={runInfo.imported.watchlist.toLocaleString() + " imported"}
               />
               <StatCell
-                label="Exported"
-                value={`${(runInfo.exported.watched + runInfo.exported.favorites + runInfo.exported.favoriteRemovals + runInfo.exported.watchlist + runInfo.exported.watchlistRemovals).toLocaleString()} sent`}
+                label={tr("pages.settings.watch_providers_settings.exported")}
+                value={
+                  (
+                    runInfo.exported.watched +
+                    runInfo.exported.favorites +
+                    runInfo.exported.favoriteRemovals +
+                    runInfo.exported.watchlist +
+                    runInfo.exported.watchlistRemovals
+                  ).toLocaleString() + " sent"
+                }
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
             <ToggleRow
-              id={`watch-provider-${providerKey}-import-watched`}
-              label="Import watched history"
-              description={`Bring completed ${displayName} plays into this profile.`}
+              id={"watch-provider-" + providerKey + "-import-watched"}
+              label={tr("pages.settings.watch_providers_settings.import_watched_history")}
+              description={tr(
+                "pages.settings.watch_providers_settings.bring_completed_display_name_plays_into_this_profile",
+                {
+                  displayName: displayName,
+                },
+              )}
               checked={connection.import_watched_enabled}
               disabled={isBusy}
               onChange={(checked) => updateConnection.mutate({ import_watched_enabled: checked })}
             />
             <ToggleRow
-              id={`watch-provider-${providerKey}-import-progress`}
-              label="Import paused progress"
-              description={`Use newer ${displayName} resume points when local progress is older.`}
+              id={"watch-provider-" + providerKey + "-import-progress"}
+              label={tr("pages.settings.watch_providers_settings.import_paused_progress")}
+              description={tr(
+                "pages.settings.watch_providers_settings.use_newer_display_name_resume_points_when_local_progress_is",
+                { displayName: displayName },
+              )}
               checked={connection.import_progress_enabled}
               disabled={isBusy}
               onChange={(checked) => updateConnection.mutate({ import_progress_enabled: checked })}
             />
             <ToggleRow
-              id={`watch-provider-${providerKey}-export-watched`}
-              label="Send watched changes"
-              description="Send local watched marks and completed plays to this provider."
+              id={"watch-provider-" + providerKey + "-export-watched"}
+              label={tr("pages.settings.watch_providers_settings.send_watched_changes")}
+              description={tr(
+                "pages.settings.watch_providers_settings.send_local_watched_marks_and_completed_plays_to_this_provider",
+              )}
               checked={connection.export_watched_enabled}
               disabled={isBusy}
               onChange={(checked) => updateConnection.mutate({ export_watched_enabled: checked })}
             />
             {connection.capabilities.export_unwatched ? (
               <ToggleRow
-                id={`watch-provider-${providerKey}-export-unwatched`}
-                label="Send unwatched changes"
-                description="When you mark something unwatched, remove matching history from this provider."
+                id={"watch-provider-" + providerKey + "-export-unwatched"}
+                label={tr("pages.settings.watch_providers_settings.send_unwatched_changes")}
+                description={tr(
+                  "pages.settings.watch_providers_settings.when_you_mark_something_unwatched_remove_matching_history_from_this",
+                )}
                 checked={connection.export_unwatched_enabled}
                 disabled={isBusy}
                 onChange={(checked) =>
@@ -679,9 +746,12 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
             {connection.capabilities.import_favorites ||
             connection.capabilities.export_favorites ? (
               <ToggleRow
-                id={`watch-provider-${providerKey}-favorites`}
-                label="Sync favorites"
-                description={`Import ${displayName} movie and show favorites, and send local favorite adds.`}
+                id={"watch-provider-" + providerKey + "-favorites"}
+                label={tr("pages.settings.watch_providers_settings.sync_favorites")}
+                description={tr(
+                  "pages.settings.watch_providers_settings.import_display_name_movie_and_show_favorites_and_send_local",
+                  { displayName: displayName },
+                )}
                 checked={favoritesSyncEnabled}
                 disabled={isBusy}
                 onChange={(checked) =>
@@ -697,9 +767,11 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
             ) : null}
             {connection.capabilities.remove_favorites ? (
               <ToggleRow
-                id={`watch-provider-${providerKey}-favorite-removals`}
-                label="Sync favorite removals"
-                description="Remove provider-synced favorites on the other side when they are explicitly unfavorited."
+                id={"watch-provider-" + providerKey + "-favorite-removals"}
+                label={tr("pages.settings.watch_providers_settings.sync_favorite_removals")}
+                description={tr(
+                  "pages.settings.watch_providers_settings.remove_provider_synced_favorites_on_the_other_side_when_they",
+                )}
                 checked={connection.sync_favorite_removals_enabled}
                 disabled={isBusy || !favoritesSyncEnabled}
                 onChange={(checked) =>
@@ -710,9 +782,12 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
             {connection.capabilities.import_watchlist ||
             connection.capabilities.export_watchlist ? (
               <ToggleRow
-                id={`watch-provider-${providerKey}-watchlist`}
-                label="Sync watchlist"
-                description={`Import your ${displayName} watchlist, and send local watchlist adds.`}
+                id={"watch-provider-" + providerKey + "-watchlist"}
+                label={tr("pages.settings.watch_providers_settings.sync_watchlist")}
+                description={tr(
+                  "pages.settings.watch_providers_settings.import_your_display_name_watchlist_and_send_local_watchlist_adds",
+                  { displayName: displayName },
+                )}
                 checked={watchlistSyncEnabled}
                 disabled={isBusy}
                 onChange={(checked) =>
@@ -728,9 +803,11 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
             ) : null}
             {connection.capabilities.remove_watchlist ? (
               <ToggleRow
-                id={`watch-provider-${providerKey}-watchlist-removals`}
-                label="Sync watchlist removals"
-                description="Remove provider-synced watchlist items on the other side when they are removed locally."
+                id={"watch-provider-" + providerKey + "-watchlist-removals"}
+                label={tr("pages.settings.watch_providers_settings.sync_watchlist_removals")}
+                description={tr(
+                  "pages.settings.watch_providers_settings.remove_provider_synced_watchlist_items_on_the_other_side_when",
+                )}
                 checked={connection.sync_watchlist_removals_enabled}
                 disabled={isBusy || !watchlistSyncEnabled}
                 onChange={(checked) =>
@@ -740,9 +817,12 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
             ) : null}
             {connection.capabilities.provides_watchlist_order ? (
               <ToggleRow
-                id={`watch-provider-${providerKey}-watchlist-order`}
-                label="Mirror watchlist order"
-                description={`Order your Silo watchlist to match its ${displayName} sort order. Items not on ${displayName} stay at the bottom.`}
+                id={"watch-provider-" + providerKey + "-watchlist-order"}
+                label={tr("pages.settings.watch_providers_settings.mirror_watchlist_order")}
+                description={tr(
+                  "pages.settings.watch_providers_settings.order_your_silo_watchlist_to_match_its_display_name_sort",
+                  { displayName: displayName, displayName2: displayName },
+                )}
                 checked={connection.sync_watchlist_order_enabled}
                 disabled={isBusy || !connection.import_watchlist_enabled}
                 onChange={(checked) =>
@@ -751,9 +831,11 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
               />
             ) : null}
             <ToggleRow
-              id={`watch-provider-${providerKey}-scrobble`}
-              label="Scrobble playback"
-              description="Report starts, pauses, resumes, and stops live during playback."
+              id={"watch-provider-" + providerKey + "-scrobble"}
+              label={tr("pages.settings.watch_providers_settings.scrobble_playback")}
+              description={tr(
+                "pages.settings.watch_providers_settings.report_starts_pauses_resumes_and_stops_live_during_playback",
+              )}
               checked={connection.scrobble_enabled}
               disabled={isBusy}
               onChange={(checked) => updateConnection.mutate({ scrobble_enabled: checked })}
@@ -766,6 +848,7 @@ function WatchProviderCard({ providerKey }: { providerKey: string }) {
 }
 
 export default function WatchProvidersSettings() {
+  useUILanguage();
   const { data, isLoading } = useWatchProviders();
 
   if (isLoading) {
@@ -784,17 +867,22 @@ export default function WatchProvidersSettings() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Watch Providers</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.settings.watch_providers_settings.watch_providers")}
+        </h2>
         <p className="text-muted-foreground text-[13px] leading-relaxed sm:text-sm">
-          Connect external trackers to import watch history, sync paused progress, and scrobble
-          playback in real time.
+          {tr(
+            "pages.settings.watch_providers_settings.connect_external_trackers_to_import_watch_history_sync_paused_progress",
+          )}
         </p>
       </div>
 
       {providers.length === 0 ? (
         <section className="surface-panel rounded-[1.7rem] border-0 px-4 py-5 shadow-none sm:px-6">
           <div className="text-muted-foreground text-sm">
-            No watch providers are registered on this server.
+            {tr(
+              "pages.settings.watch_providers_settings.no_watch_providers_are_registered_on_this_server",
+            )}
           </div>
         </section>
       ) : (

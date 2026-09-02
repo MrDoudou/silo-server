@@ -1,4 +1,6 @@
 import type { CollectionPreviewResponse } from "@/api/types";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface CollectionPreviewPaneProps {
   preview?: CollectionPreviewResponse;
@@ -11,10 +13,13 @@ export default function CollectionPreviewPane({
   enabled,
   isLoading = false,
 }: CollectionPreviewPaneProps) {
+  useUILanguage();
   if (!enabled) {
     return (
       <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-5 text-sm">
-        Switch this collection to smart mode to preview matching titles live.
+        {tr(
+          "components.collections.collection_preview_pane.switch_this_collection_to_smart_mode_to_preview_matching_titles",
+        )}
       </div>
     );
   }
@@ -22,7 +27,7 @@ export default function CollectionPreviewPane({
   if (isLoading) {
     return (
       <div className="text-muted-foreground rounded-lg border px-4 py-5 text-sm">
-        Loading preview…
+        {tr("components.collections.collection_preview_pane.loading_preview")}
       </div>
     );
   }
@@ -34,16 +39,22 @@ export default function CollectionPreviewPane({
     <div className="space-y-3 rounded-lg border px-4 py-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium">Preview</p>
+          <p className="text-sm font-medium">
+            {tr("components.collections.collection_preview_pane.preview")}
+          </p>
           <p className="text-muted-foreground text-xs">
-            Matching items update as the rules change.
+            {tr(
+              "components.collections.collection_preview_pane.matching_items_update_as_the_rules_change",
+            )}
           </p>
         </div>
         <div className="text-sm font-medium">{total}</div>
       </div>
 
       {items.length === 0 ? (
-        <div className="text-muted-foreground text-sm">No titles match the current query.</div>
+        <div className="text-muted-foreground text-sm">
+          {tr("components.collections.collection_preview_pane.no_titles_match_the_current_query")}
+        </div>
       ) : (
         <div className="space-y-2">
           {items.map((item) => (

@@ -4,11 +4,13 @@ import { Check, Info, Play, Star, X } from "lucide-react";
 import type { SwipeCard as SwipeCardType } from "@/hooks/queries/recommendations";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const sourceLabels: Record<string, string> = {
-  continue_watching: "Continue",
-  next_up: "Next Up",
-  recommendation: "For You",
+  continue_watching: "components.watchtonight.swipe_card.continue",
+  next_up: "components.watchtonight.swipe_card.next_up",
+  recommendation: "components.watchtonight.swipe_card.for_you",
 };
 
 const SWIPE_THRESHOLD = 100;
@@ -22,6 +24,7 @@ interface SwipeCardProps {
 }
 
 export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCardProps) {
+  useUILanguage();
   const [isFlipped, setIsFlipped] = useState(false);
   const didDragRef = useRef(false);
 
@@ -41,7 +44,7 @@ export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCard
       : 0;
 
   const rating = card.rating_imdb ?? card.rating_tmdb;
-  const badgeLabel = sourceLabels[source];
+  const badgeLabel = sourceLabels[source] ? tr(sourceLabels[source]) : undefined;
 
   function handleDragEnd(_: unknown, info: PanInfo) {
     const { offset, velocity } = info;
@@ -106,7 +109,9 @@ export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCard
             />
           ) : (
             <div className="bg-muted flex h-full w-full items-center justify-center rounded-2xl">
-              <span className="text-muted-foreground text-sm">No Image</span>
+              <span className="text-muted-foreground text-sm">
+                {tr("components.watchtonight.swipe_card.no_image")}
+              </span>
             </div>
           )}
 
@@ -153,8 +158,12 @@ export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCard
 
             {hasEpisodeMeta && (
               <p className="mb-1 text-sm text-white/80">
-                S{card.season_number} E{card.episode_number}
-                {card.title && card.series_title ? ` \u2022 ${card.title}` : ""}
+                {tr("components.watchtonight.swipe_card.s")}
+                {card.season_number} {tr("components.watchtonight.swipe_card.e")}
+                {card.episode_number}
+                {card.title && card.series_title
+                  ? tr("components.watchtonight.swipe_card.title", { title: card.title })
+                  : ""}
               </p>
             )}
 
@@ -171,8 +180,11 @@ export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCard
               {card.runtime != null && card.runtime > 0 && (
                 <span className="text-sm text-white/60">
                   {card.runtime >= 60
-                    ? `${Math.floor(card.runtime / 60)}h ${card.runtime % 60}m`
-                    : `${card.runtime}m`}
+                    ? tr("components.watchtonight.swipe_card.value_h_value2_m", {
+                        value: Math.floor(card.runtime / 60),
+                        value2: card.runtime % 60,
+                      })
+                    : tr("components.watchtonight.swipe_card.runtime_m", { runtime: card.runtime })}
                 </span>
               )}
               {card.genres?.slice(0, 3).map((g) => (
@@ -204,7 +216,7 @@ export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCard
           {isTop && (
             <div className="absolute right-3 bottom-3 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-[10px] text-white/60 backdrop-blur-sm">
               <Info className="h-3 w-3" />
-              Tap for details
+              {tr("components.watchtonight.swipe_card.tap_for_details")}
             </div>
           )}
         </div>
@@ -234,8 +246,12 @@ export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCard
 
             {hasEpisodeMeta && (
               <p className="text-muted-foreground text-sm">
-                S{card.season_number} E{card.episode_number}
-                {card.title && card.series_title ? ` \u2022 ${card.title}` : ""}
+                {tr("components.watchtonight.swipe_card.s")}
+                {card.season_number} {tr("components.watchtonight.swipe_card.e")}
+                {card.episode_number}
+                {card.title && card.series_title
+                  ? tr("components.watchtonight.swipe_card.title", { title: card.title })
+                  : ""}
               </p>
             )}
 
@@ -248,14 +264,17 @@ export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCard
             {card.cast?.length > 0 && (
               <div>
                 <h4 className="text-muted-foreground mb-1.5 text-xs font-semibold tracking-wider uppercase">
-                  Cast
+                  {tr("components.watchtonight.swipe_card.cast")}
                 </h4>
                 <div className="space-y-1">
                   {card.cast.map((c) => (
                     <p key={c.name} className="text-sm">
                       <span className="font-medium">{c.name}</span>
                       {c.character && (
-                        <span className="text-muted-foreground"> as {c.character}</span>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          {tr("components.watchtonight.swipe_card.as")} {c.character}
+                        </span>
                       )}
                     </p>
                   ))}
@@ -273,8 +292,11 @@ export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCard
               {card.runtime != null && card.runtime > 0 && (
                 <span className="text-muted-foreground">
                   {card.runtime >= 60
-                    ? `${Math.floor(card.runtime / 60)}h ${card.runtime % 60}m`
-                    : `${card.runtime}m`}
+                    ? tr("components.watchtonight.swipe_card.value_h_value2_m", {
+                        value: Math.floor(card.runtime / 60),
+                        value2: card.runtime % 60,
+                      })
+                    : tr("components.watchtonight.swipe_card.runtime_m", { runtime: card.runtime })}
                 </span>
               )}
               {card.year > 0 && <span className="text-muted-foreground">{card.year}</span>}
@@ -294,7 +316,7 @@ export default function SwipeCard({ card, isTop, onAccept, onReject }: SwipeCard
           {/* Flip back hint */}
           <div className="absolute right-3 bottom-3 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-[10px] text-white/60 backdrop-blur-sm">
             <Info className="h-3 w-3" />
-            Tap to flip back
+            {tr("components.watchtonight.swipe_card.tap_to_flip_back")}
           </div>
         </div>
       </div>
@@ -319,6 +341,7 @@ export function CardActions({
   playLabel = "Play now",
   disabled,
 }: CardActionsProps) {
+  useUILanguage();
   return (
     <div className="flex items-center justify-center gap-4 pt-4">
       <button
@@ -331,7 +354,7 @@ export function CardActions({
           "border-red-500/40 text-red-400 hover:border-red-500 hover:bg-red-500/10 hover:text-red-500",
           "disabled:pointer-events-none disabled:opacity-40",
         )}
-        aria-label="Skip"
+        aria-label={tr("common.actions.skip")}
       >
         <X className="h-6 w-6" />
       </button>
@@ -359,7 +382,7 @@ export function CardActions({
           "border-green-500/40 text-green-400 hover:border-green-500 hover:bg-green-500/10 hover:text-green-500",
           "disabled:pointer-events-none disabled:opacity-40",
         )}
-        aria-label="Like"
+        aria-label={tr("components.watchtonight.swipe_card.like")}
       >
         <Check className="h-6 w-6" />
       </button>

@@ -22,7 +22,10 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useServerBranding } from "@/hooks/useServerBranding";
 import { AuthBackground } from "@/components/auth/AuthBackground";
 import { sanitizeAuthRedirect } from "@/lib/authRedirect";
-import { toast } from "sonner";
+
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 function detectPlatform() {
   const ua = navigator.userAgent;
@@ -65,6 +68,7 @@ function buildDevicePayload() {
 }
 
 export default function Login() {
+  useUILanguage();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [provider, setProvider] = useState("");
@@ -89,7 +93,7 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const { serverName, loginSubtitle } = useServerBranding();
 
-  useDocumentTitle("Sign In");
+  useDocumentTitle(tr("pages.login.sign_in"));
 
   const redirectTarget = sanitizeAuthRedirect(searchParams.get("redirect"));
 
@@ -167,29 +171,31 @@ export default function Login() {
             expires_in: result.expires_in ?? 0,
             user: result.user,
           });
-          setDeviceStatusMessage("Signed in. Loading profiles...");
+          setDeviceStatusMessage(tr("pages.login.signed_in_loading_profiles"));
           void navigateAfterLogin();
           return;
         }
 
         if (result.status === "denied") {
           shouldPollAgain = false;
-          setDeviceStatusMessage("Approval was denied. Start a new code to try again.");
+          setDeviceStatusMessage(
+            tr("pages.login.approval_was_denied_start_a_new_code_to_try_again"),
+          );
           setDeviceSession(null);
           return;
         }
 
         if (result.status === "expired" || result.status === "consumed") {
           shouldPollAgain = false;
-          setDeviceStatusMessage("This code is no longer valid. Start a new one.");
+          setDeviceStatusMessage(tr("pages.login.this_code_is_no_longer_valid_start_a_new_one"));
           setDeviceSession(null);
           return;
         }
 
-        setDeviceStatusMessage("Waiting for approval on your phone...");
+        setDeviceStatusMessage(tr("pages.login.waiting_for_approval_on_your_phone"));
       } catch (error) {
         if (!cancelled) {
-          setDeviceStatusMessage(error instanceof Error ? error.message : "Device sign-in failed");
+          setDeviceStatusMessage(tr.error("errors.auth.device_login_failed", error));
         }
       } finally {
         if (!cancelled) {
@@ -217,7 +223,7 @@ export default function Login() {
         <div
           className="border-primary h-8 w-8 animate-spin rounded-full border-b-2"
           role="status"
-          aria-label="Loading"
+          aria-label={tr("pages.login.loading")}
         />
       </main>
     );
@@ -238,7 +244,7 @@ export default function Login() {
       await login(username, password, selectedProvider || undefined);
       await navigateAfterLogin();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Login failed");
+      toast.error("errors.auth.login_failed", { error: err });
     } finally {
       setSubmitting(false);
     }
@@ -252,10 +258,10 @@ export default function Login() {
         body: JSON.stringify(buildDevicePayload()),
       });
       setDeviceSession(data);
-      setDeviceStatusMessage("Waiting for approval on your phone...");
+      setDeviceStatusMessage(tr("pages.login.waiting_for_approval_on_your_phone"));
       setShowDeviceFallback(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to start device login");
+      toast.error("errors.auth.device_login_start_failed", { error: error });
     } finally {
       setStartingDeviceLogin(false);
     }
@@ -268,7 +274,9 @@ export default function Login() {
   return (
     <main className="auth-shell">
       <AuthBackground />
-      <h1 className="sr-only">Sign in to {serverName}</h1>
+      <h1 className="sr-only">
+        {tr("pages.login.sign_in_to")} {serverName}
+      </h1>
       <Card className="auth-card glass panel-border w-full max-w-md border-0">
         <CardHeader>
           <CardTitle className="text-3xl font-extrabold tracking-[-0.04em]">{serverName}</CardTitle>
@@ -277,7 +285,7 @@ export default function Login() {
         <CardContent className="space-y-6">
           {oauthError && (
             <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border p-3 text-sm">
-              Sign-in failed: {decodeURIComponent(oauthError)}
+              {tr("pages.login.sign_in_failed")} {decodeURIComponent(oauthError)}
             </div>
           )}
           {oauthProviders.length > 0 && (
@@ -286,7 +294,7 @@ export default function Login() {
                 <form
                   key={entry.id}
                   method="post"
-                  action={`/api/v1/auth/oauth/${entry.installation_id}/init${nextParam}`}
+                  action={"/api/v1/auth/oauth/" + entry.installation_id + "/init" + nextParam}
                 >
                   <Button type="submit" variant="outline" className="w-full justify-start gap-3">
                     {entry.icon_url && <img src={entry.icon_url} alt="" className="h-5 w-5" />}
@@ -296,14 +304,14 @@ export default function Login() {
               ))}
               <div className="text-muted-foreground flex items-center gap-2 pt-2 text-xs">
                 <div className="bg-border h-px flex-1" />
-                <span>or</span>
+                <span>{tr("pages.login.or")}</span>
                 <div className="bg-border h-px flex-1" />
               </div>
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">{tr("pages.login.username")}</Label>
               <Input
                 id="username"
                 value={username}
@@ -314,7 +322,7 @@ export default function Login() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{tr("pages.login.password")}</Label>
               <PasswordInput
                 id="password"
                 value={password}
@@ -325,7 +333,7 @@ export default function Login() {
             </div>
             {credentialProviders.length > 1 && (
               <div className="space-y-2">
-                <Label>Sign in with</Label>
+                <Label>{tr("pages.login.sign_in_with")}</Label>
                 <Select value={selectedProvider} onValueChange={setProvider}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -341,7 +349,7 @@ export default function Login() {
               </div>
             )}
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Signing in..." : "Sign in"}
+              {submitting ? tr("pages.login.signing_in") : tr("pages.login.sign_in_ada2e9e9")}
             </Button>
           </form>
 
@@ -349,9 +357,11 @@ export default function Login() {
             <Separator />
             <div className="space-y-3">
               <div>
-                <h2 className="text-sm font-semibold">Use your phone instead</h2>
+                <h2 className="text-sm font-semibold">
+                  {tr("pages.login.use_your_phone_instead")}
+                </h2>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  Scan a code, sign in there, and approve this device.
+                  {tr("pages.login.scan_a_code_sign_in_there_and_approve_this_device")}
                 </p>
               </div>
               {!deviceSession ? (
@@ -362,7 +372,9 @@ export default function Login() {
                   disabled={startingDeviceLogin}
                   onClick={() => void handleStartDeviceLogin()}
                 >
-                  {startingDeviceLogin ? "Generating code..." : "Show QR code"}
+                  {startingDeviceLogin
+                    ? tr("pages.login.generating_code")
+                    : tr("pages.login.show_qr_code")}
                 </Button>
               ) : (
                 <div className="border-border/60 bg-background/50 space-y-4 rounded-md border p-4">
@@ -372,7 +384,7 @@ export default function Login() {
                   <div className="space-y-2 text-center">
                     <div>
                       <div className="text-muted-foreground text-xs tracking-[0.12em] uppercase">
-                        Match code
+                        {tr("pages.login.match_code")}
                       </div>
                       <div className="text-lg font-semibold">{deviceSession.match_code}</div>
                     </div>
@@ -380,7 +392,7 @@ export default function Login() {
                       <div className="space-y-2">
                         <div>
                           <div className="text-muted-foreground text-xs tracking-[0.12em] uppercase">
-                            Enter this code if needed
+                            {tr("pages.login.enter_this_code_if_needed")}
                           </div>
                           <div className="font-mono text-lg font-semibold">
                             {deviceSession.user_code}
@@ -397,7 +409,7 @@ export default function Login() {
                         className="text-muted-foreground hover:text-foreground mx-auto h-auto px-0 py-1 text-xs"
                         onClick={() => setShowDeviceFallback(true)}
                       >
-                        Can&apos;t scan the QR code?
+                        {tr("pages.login.can_t_scan_the_qr_code")}
                       </Button>
                     )}
                   </div>
@@ -412,10 +424,12 @@ export default function Login() {
                         setShowDeviceFallback(false);
                       }}
                     >
-                      Start over
+                      {tr("pages.login.start_over")}
                     </Button>
                     <p className="text-muted-foreground text-center text-sm">
-                      {devicePolling ? "Checking for approval..." : deviceStatusMessage}
+                      {devicePolling
+                        ? tr("pages.login.checking_for_approval")
+                        : deviceStatusMessage}
                     </p>
                   </div>
                 </div>
@@ -424,9 +438,9 @@ export default function Login() {
           </div>
 
           <p className="text-muted-foreground text-center text-sm">
-            Don&apos;t have an account?{" "}
+            {tr("pages.login.don_t_have_an_account")}{" "}
             <Link to={signupHref} className="text-foreground underline hover:no-underline">
-              Sign up
+              {tr("pages.login.sign_up")}
             </Link>
           </p>
         </CardContent>

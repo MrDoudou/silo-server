@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, Info, ShieldCheck, Trash2, Users } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
 
 import type { UserDevice } from "@/api/types";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ import { deviceSettingKeysForRevision } from "@/lib/settingsDisplay";
 import { SETTING_KEYS, type SettingKey } from "@/lib/settingsContract";
 import { parseSubtitleAppearance, type SubtitleAppearance } from "@/lib/subtitleAppearance";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * "Your devices" — see and change how Silo behaves on each device you watch on.
@@ -38,6 +40,7 @@ import { cn } from "@/lib/utils";
  * kid's iPad without borrowing it.
  */
 export default function DeviceSettings() {
+  useUILanguage();
   const actingAdmin = useIsActingAdmin();
   const { profile } = useCurrentProfile();
   const canSeeHousehold = actingAdmin || profile?.is_primary === true;
@@ -92,10 +95,11 @@ export default function DeviceSettings() {
       {/* Hidden below xl while the detail view is open: on a phone that screen
           is about one device, and its own header says which. */}
       <header className={cn("space-y-2", showDetailOnMobile && "hidden xl:block")}>
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your devices</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tr("pages.settings.device_settings.your_devices")}
+        </h2>
         <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-          Every phone, tablet, TV and browser you watch on. Pick one to see what&apos;s set
-          differently there and change it — from here, whichever device you&apos;re holding.
+          {tr("pages.settings.device_settings.every_phone_tablet_tv_and_browser_you_watch_on_pick")}
         </p>
       </header>
 
@@ -161,7 +165,7 @@ export default function DeviceSettings() {
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">
-            No devices yet. They appear here as you sign in on them.
+            {tr("pages.settings.device_settings.no_devices_yet_they_appear_here_as_you_sign_in")}
           </p>
         )}
       </div>
@@ -178,18 +182,20 @@ function HouseholdSwitch({
   onChange: (value: boolean) => void;
   count: number;
 }) {
+  useUILanguage();
   return (
     <div
       className="border-border/60 bg-surface inline-flex gap-1 rounded-xl border p-1"
       role="group"
-      aria-label="Whose devices to show"
+      aria-label={tr("pages.settings.device_settings.whose_devices_to_show")}
     >
       <SwitchButton active={!household} onClick={() => onChange(false)}>
-        Just mine
+        {tr("pages.settings.device_settings.just_mine")}
       </SwitchButton>
       <SwitchButton active={household} onClick={() => onChange(true)}>
         <Users className="h-3.5 w-3.5" />
-        Everyone{household && count > 0 ? ` (${count})` : ""}
+        {tr("pages.settings.device_settings.everyone")}
+        {household && count > 0 ? tr("pages.settings.device_settings.count", { count: count }) : ""}
       </SwitchButton>
     </div>
   );
@@ -204,6 +210,7 @@ function SwitchButton({
   onClick: () => void;
   children: React.ReactNode;
 }) {
+  useUILanguage();
   return (
     <button
       type="button"
@@ -233,6 +240,7 @@ function DeviceDetail({
   /** Returns to the list below xl, where the two are separate screens. */
   onBack: () => void;
 }) {
+  useUILanguage();
   // Acting for someone else changes the copy throughout: the banner, the reset
   // labels, and every mutation's identity.
   const forSomeoneElse = Boolean(device.profile_id) && device.profile_id !== actingProfileId;
@@ -290,7 +298,7 @@ function DeviceDetail({
         className="text-muted-foreground hover:text-foreground -ml-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium xl:hidden"
       >
         <ChevronLeft className="h-4 w-4" />
-        All devices
+        {tr("pages.settings.device_settings.all_devices")}
       </button>
 
       <section className="surface-panel rounded-[1.5rem] border-0 px-4 py-4 shadow-none sm:px-5">
@@ -302,7 +310,7 @@ function DeviceDetail({
             {/* Wraps rather than truncating: on a phone the name is the whole
                 subject of the screen, and "Living Room Apple…" is not it. */}
             <h3 className="text-lg leading-tight font-semibold tracking-tight">
-              {device.device_name || "Unknown device"}
+              {device.device_name || tr("pages.settings.device_settings.unknown_device")}
             </h3>
             <p className="text-muted-foreground mt-0.5 text-[13px] leading-snug">
               {[
@@ -332,14 +340,19 @@ function DeviceDetail({
                 clearDevice.mutate(
                   { deviceId: device.device_id, profileId: targetProfileId },
                   {
-                    onSuccess: () => toast.success("Settings cleared on this device"),
+                    onSuccess: () =>
+                      toast.success(
+                        "feedback.settings.device_settings.settings_cleared_on_this_device",
+                      ),
                     onError: (error) =>
-                      toast.error(error instanceof Error ? error.message : "Couldn't clear"),
+                      toast.error("errors.settings.device_settings.couldn_t_clear", {
+                        error: error,
+                      }),
                   },
                 );
               }}
             >
-              Clear all changes
+              {tr("pages.settings.device_settings.clear_all_changes")}
             </Button>
           ) : null}
           {!device.is_current_device ? (
@@ -358,15 +371,18 @@ function DeviceDetail({
                 forgetDevice.mutate(
                   { deviceId: device.device_id, profileId: targetProfileId },
                   {
-                    onSuccess: () => toast.success("Device forgotten"),
+                    onSuccess: () =>
+                      toast.success("feedback.settings.device_settings.device_forgotten"),
                     onError: (error) =>
-                      toast.error(error instanceof Error ? error.message : "Couldn't forget"),
+                      toast.error("errors.settings.device_settings.couldn_t_forget", {
+                        error: error,
+                      }),
                   },
                 );
               }}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              Forget
+              {tr("pages.settings.device_settings.forget")}
             </Button>
           ) : null}
         </div>
@@ -375,9 +391,11 @@ function DeviceDetail({
       {forSomeoneElse ? (
         <Callout tone="warning" icon={<Users className="h-4 w-4" />}>
           <strong className="text-foreground font-semibold">
-            You&apos;re changing {device.profile_name}&apos;s settings, not your own.
+            {tr("pages.settings.device_settings.you_re_changing")} {device.profile_name}
+            {tr("pages.settings.device_settings.s_settings_not_your_own")}
           </strong>{" "}
-          {device.profile_name} will see these change on this device.
+          {device.profile_name}{" "}
+          {tr("pages.settings.device_settings.will_see_these_change_on_this_device")}
         </Callout>
       ) : null}
 
@@ -386,17 +404,29 @@ function DeviceDetail({
           leads; the elaboration is there for anyone who wants it. */}
       <Callout tone="info" icon={<Info className="h-4 w-4" />}>
         <span className="block">
-          These apply to{" "}
+          {tr("pages.settings.device_settings.these_apply_to")}{" "}
           <strong className="text-foreground font-semibold">
-            this device, for {forSomeoneElse ? `${device.profile_name}'s` : "your"} profile only
+            {tr("pages.settings.device_settings.this_device_for")}{" "}
+            {forSomeoneElse
+              ? tr("pages.settings.device_settings.profile_name_s", {
+                  profile_name: device.profile_name,
+                })
+              : tr("pages.settings.device_settings.your")}{" "}
+            {tr("pages.settings.device_settings.profile_only")}
           </strong>
           .
         </span>
         <span className="text-muted-foreground/90 mt-1 block text-[12.5px]">
-          {forSomeoneElse ? `${device.profile_name}'s` : "Your"} other devices, and anyone else who
-          uses this one, are unaffected.
+          {forSomeoneElse
+            ? tr("pages.settings.device_settings.profile_name_s", {
+                profile_name: device.profile_name,
+              })
+            : tr("pages.settings.device_settings.your_ba596fd3")}{" "}
+          {tr("pages.settings.device_settings.other_devices_and_anyone_else_who_uses_this_one_are")}
           {!device.is_current_device
-            ? " This device picks up your changes the next time it's used."
+            ? tr(
+                "pages.settings.device_settings.this_device_picks_up_your_changes_the_next_time_it",
+              )
             : ""}
         </span>
       </Callout>
@@ -407,10 +437,13 @@ function DeviceDetail({
           className="border-border/70 bg-surface space-y-3 rounded-[1.7rem] border p-5"
         >
           <div>
-            <p className="text-sm font-semibold">Couldn&apos;t check settings compatibility</p>
+            <p className="text-sm font-semibold">
+              {tr("pages.settings.device_settings.couldn_t_check_settings_compatibility")}
+            </p>
             <p className="text-muted-foreground mt-1 text-[13px] leading-relaxed">
-              Device controls stay unavailable until Silo confirms which settings this server
-              supports.
+              {tr(
+                "pages.settings.device_settings.device_controls_stay_unavailable_until_silo_confirms_which_settings_this",
+              )}
             </p>
           </div>
           <Button
@@ -419,7 +452,9 @@ function DeviceDetail({
             disabled={capabilities.isFetching}
             onClick={() => void capabilities.refetch()}
           >
-            {capabilities.isFetching ? "Checking…" : "Retry compatibility check"}
+            {capabilities.isFetching
+              ? tr("pages.settings.device_settings.checking")
+              : tr("pages.settings.device_settings.retry_compatibility_check")}
           </Button>
         </div>
       ) : isLoading ? (
@@ -436,7 +471,7 @@ function DeviceDetail({
               { key, value, identity },
               {
                 onError: (error) =>
-                  toast.error(error instanceof Error ? error.message : "Couldn't save"),
+                  toast.error("errors.settings.device_settings.couldn_t_save", { error: error }),
               },
             )
           }
@@ -445,7 +480,7 @@ function DeviceDetail({
               { key, identity },
               {
                 onError: (error) =>
-                  toast.error(error instanceof Error ? error.message : "Couldn't reset"),
+                  toast.error("errors.settings.device_settings.couldn_t_reset", { error: error }),
               },
             )
           }
@@ -466,7 +501,7 @@ function DeviceDetail({
             { key: SETTING_KEYS.PLAYBACK_SUBTITLE_APPEARANCE, value: next, identity },
             {
               onError: (error) =>
-                toast.error(error instanceof Error ? error.message : "Couldn't save"),
+                toast.error("errors.settings.device_settings.couldn_t_save", { error: error }),
             },
           );
         }}
@@ -477,21 +512,22 @@ function DeviceDetail({
             { key: SETTING_KEYS.PLAYBACK_SUBTITLE_APPEARANCE, identity },
             {
               onError: (error) =>
-                toast.error(error instanceof Error ? error.message : "Couldn't reset"),
+                toast.error("errors.settings.device_settings.couldn_t_reset", { error: error }),
             },
           );
           setAppearanceOpen(false);
         }}
-        resetLabel={`Use ${ownerLabel} style`}
+        resetLabel={"Use " + ownerLabel + " style"}
         eyebrow={device.device_name || "This device"}
         status={setValue.isPending ? "Saving…" : "Changes saved automatically"}
       />
 
       {forSomeoneElse ? (
         <Callout tone="muted" icon={<ShieldCheck className="h-4 w-4" />}>
-          <strong className="text-foreground font-semibold">What you can&apos;t see here.</strong>{" "}
-          This page shows how Silo is set up on each device — not what anyone watched. Viewing
-          history stays private to each profile.
+          <strong className="text-foreground font-semibold">
+            {tr("pages.settings.device_settings.what_you_can_t_see_here")}
+          </strong>{" "}
+          {tr("pages.settings.device_settings.this_page_shows_how_silo_is_set_up_on_each")}
         </Callout>
       ) : null}
     </div>
@@ -507,6 +543,7 @@ function Callout({
   icon: React.ReactNode;
   children: React.ReactNode;
 }) {
+  useUILanguage();
   return (
     <div
       className={cn(

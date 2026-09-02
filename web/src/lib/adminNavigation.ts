@@ -31,6 +31,8 @@ import type { SettingsSearchGroup, SettingsSearchItem } from "@/components/setti
 import { ADMIN_SETTINGS_NAV } from "@/lib/adminSettingsSearch";
 import { pluginRouteHref } from "@/lib/pluginRouteHref";
 
+import { tr } from "@/i18n/translate";
+
 export interface AdminNavItem extends SettingsSearchItem {
   label: string;
   icon: LucideIcon;
@@ -47,33 +49,53 @@ export interface AdminNavVisibility {
 
 export const ADMIN_NAV_SECTIONS: AdminNavGroup[] = [
   {
-    label: "Overview",
+    get label() {
+      return tr("lib.admin_navigation.overview");
+    },
     items: [
       {
-        label: "Dashboard",
-        description: "Live sessions, content health, and server activity.",
+        get label() {
+          return tr("lib.admin_navigation.dashboard");
+        },
+        get description() {
+          return tr("lib.admin_navigation.live_sessions_content_health_and_server_activity");
+        },
         keywords: ["overview", "stats", "health", "scan all"],
         icon: LayoutDashboard,
         href: "/admin",
         exact: true,
       },
       {
-        label: "Activity",
-        description: "Live streams and current playback sessions.",
+        get label() {
+          return tr("lib.admin_navigation.activity");
+        },
+        get description() {
+          return tr("lib.admin_navigation.live_streams_and_current_playback_sessions");
+        },
         keywords: ["streams", "sessions", "now playing", "transcode"],
         icon: Radio,
         href: "/admin/activity",
       },
       {
-        label: "Logs",
-        description: "Server log stream and operational output.",
+        get label() {
+          return tr("lib.admin_navigation.logs");
+        },
+        get description() {
+          return tr("lib.admin_navigation.server_log_stream_and_operational_output");
+        },
         keywords: ["server logs", "debug", "tail", "events"],
         icon: ScrollText,
         href: "/admin/logs",
       },
       {
-        label: "Diagnostics",
-        description: "Uploaded client crash reports, device context, and debug bundles.",
+        get label() {
+          return tr("lib.admin_navigation.diagnostics");
+        },
+        get description() {
+          return tr(
+            "lib.admin_navigation.uploaded_client_crash_reports_device_context_and_debug_bundles",
+          );
+        },
         keywords: ["client diagnostics", "crash reports", "debug bundles", "support"],
         icon: FileWarning,
         href: "/admin/diagnostics",
@@ -81,11 +103,19 @@ export const ADMIN_NAV_SECTIONS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "Content",
+    get label() {
+      return tr("lib.admin_navigation.content");
+    },
     items: [
       {
-        label: "Libraries",
-        description: "Media libraries, paths, scanning, autoscan sources, and catalog import.",
+        get label() {
+          return tr("lib.admin_navigation.libraries");
+        },
+        get description() {
+          return tr(
+            "lib.admin_navigation.media_libraries_paths_scanning_autoscan_sources_and_catalog_import",
+          );
+        },
         keywords: [
           "library",
           "paths",
@@ -101,22 +131,34 @@ export const ADMIN_NAV_SECTIONS: AdminNavGroup[] = [
         href: "/admin/libraries",
       },
       {
-        label: "Collections",
-        description: "Curated and smart collection management.",
+        get label() {
+          return tr("lib.admin_navigation.collections");
+        },
+        get description() {
+          return tr("lib.admin_navigation.curated_and_smart_collection_management");
+        },
         keywords: ["collection groups", "templates", "smart collections"],
         icon: LayoutPanelTop,
         href: "/admin/collections",
       },
       {
-        label: "Sections",
-        description: "Home and catalog section configuration.",
+        get label() {
+          return tr("lib.admin_navigation.sections");
+        },
+        get description() {
+          return tr("lib.admin_navigation.home_and_catalog_section_configuration");
+        },
         keywords: ["home rows", "rails", "featured sections"],
         icon: PanelsTopLeft,
         href: "/admin/sections",
       },
       {
-        label: "Requests",
-        description: "User media requests and request handling.",
+        get label() {
+          return tr("lib.admin_navigation.requests");
+        },
+        get description() {
+          return tr("lib.admin_navigation.user_media_requests_and_request_handling");
+        },
         keywords: ["requested media", "approvals", "overseerr"],
         icon: Send,
         href: "/admin/requests",
@@ -124,32 +166,52 @@ export const ADMIN_NAV_SECTIONS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "Automation",
+    get label() {
+      return tr("lib.admin_navigation.automation");
+    },
     items: [
       {
-        label: "Scheduled Tasks",
-        description: "Background task schedules, runs, and job history.",
+        get label() {
+          return tr("lib.admin_navigation.scheduled_tasks");
+        },
+        get description() {
+          return tr("lib.admin_navigation.background_task_schedules_runs_and_job_history");
+        },
         keywords: ["tasks", "jobs", "scheduler", "sync"],
         icon: CalendarClock,
         href: "/admin/tasks",
       },
       {
-        label: "Subtitle Files",
-        description: "Downloaded subtitle records and subtitle admin tools.",
+        get label() {
+          return tr("lib.admin_navigation.subtitle_files");
+        },
+        get description() {
+          return tr("lib.admin_navigation.downloaded_subtitle_records_and_subtitle_admin_tools");
+        },
         keywords: ["captions", "subtitle downloads", "providers"],
         icon: Captions,
         href: "/admin/subtitles",
       },
       {
-        label: "Markers",
-        description: "Intro, recap, and credits marker history.",
+        get label() {
+          return tr("lib.admin_navigation.markers");
+        },
+        get description() {
+          return tr("lib.admin_navigation.intro_recap_and_credits_marker_history");
+        },
         keywords: ["intro markers", "credits", "recaps", "chapters"],
         icon: SkipForward,
         href: "/admin/marker-history",
       },
       {
-        label: "Recommendations",
-        description: "Recommendation diagnostics, seed data, and ranking controls.",
+        get label() {
+          return tr("lib.admin_navigation.recommendations");
+        },
+        get description() {
+          return tr(
+            "lib.admin_navigation.recommendation_diagnostics_seed_data_and_ranking_controls",
+          );
+        },
         keywords: ["taste", "ranking", "recommendation seeds"],
         icon: Bot,
         href: "/admin/recommendations",
@@ -157,39 +219,63 @@ export const ADMIN_NAV_SECTIONS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "Users",
+    get label() {
+      return tr("lib.admin_navigation.users");
+    },
     items: [
       {
-        label: "Users",
-        description: "Accounts, roles, profile settings, and access.",
+        get label() {
+          return tr("lib.admin_navigation.users");
+        },
+        get description() {
+          return tr("lib.admin_navigation.accounts_roles_profile_settings_and_access");
+        },
         keywords: ["accounts", "profiles", "roles", "permissions"],
         icon: Users,
         href: "/admin/users",
       },
       {
-        label: "Access Groups",
-        description: "Shared access defaults: libraries, downloads, streams, permissions.",
+        get label() {
+          return tr("lib.admin_navigation.access_groups");
+        },
+        get description() {
+          return tr(
+            "lib.admin_navigation.shared_access_defaults_libraries_downloads_streams_permissions",
+          );
+        },
         keywords: ["groups", "roles", "permissions", "library access", "downloads", "limits"],
         icon: UsersRound,
         href: "/admin/access-groups",
       },
       {
-        label: "Devices",
-        description: "Registered devices, overrides, and per-device settings.",
+        get label() {
+          return tr("lib.admin_navigation.devices");
+        },
+        get description() {
+          return tr("lib.admin_navigation.registered_devices_overrides_and_per_device_settings");
+        },
         keywords: ["clients", "device overrides", "sessions"],
         icon: MonitorSmartphone,
         href: "/admin/devices",
       },
       {
-        label: "Playback History",
-        description: "Historical playback events across users and profiles.",
+        get label() {
+          return tr("lib.admin_navigation.playback_history");
+        },
+        get description() {
+          return tr("lib.admin_navigation.historical_playback_events_across_users_and_profiles");
+        },
         keywords: ["history", "watched", "progress", "plays"],
         icon: History,
         href: "/admin/history",
       },
       {
-        label: "History Import",
-        description: "Admin history import mappings and bulk import runs.",
+        get label() {
+          return tr("lib.admin_navigation.history_import");
+        },
+        get description() {
+          return tr("lib.admin_navigation.admin_history_import_mappings_and_bulk_import_runs");
+        },
         keywords: ["emby", "imports", "mappings", "watch history"],
         icon: Download,
         href: "/admin/history-import",
@@ -197,11 +283,19 @@ export const ADMIN_NAV_SECTIONS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "Settings",
+    get label() {
+      return tr("lib.admin_navigation.settings");
+    },
     items: [
       {
-        label: "Settings",
-        description: "Server configuration, integrations, playback, storage, and access.",
+        get label() {
+          return tr("lib.admin_navigation.settings");
+        },
+        get description() {
+          return tr(
+            "lib.admin_navigation.server_configuration_integrations_playback_storage_and_access",
+          );
+        },
         keywords: ["settings", "configuration", "server settings", "preferences"],
         icon: Settings2,
         href: "/admin/settings",
@@ -209,39 +303,65 @@ export const ADMIN_NAV_SECTIONS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "System",
+    get label() {
+      return tr("lib.admin_navigation.system");
+    },
     items: [
       {
-        label: "Plugins",
-        description: "Plugin catalog, repositories, installs, and plugin configuration.",
+        get label() {
+          return tr("lib.admin_navigation.plugins");
+        },
+        get description() {
+          return tr(
+            "lib.admin_navigation.plugin_catalog_repositories_installs_and_plugin_configuration",
+          );
+        },
         keywords: ["extensions", "plugin catalog", "repositories"],
         icon: Blocks,
         href: "/admin/plugins",
       },
       {
-        label: "Policy",
-        description: "OPA policy documents, vendor modules, simulations, and decision logs.",
+        get label() {
+          return tr("lib.admin_navigation.policy");
+        },
+        get description() {
+          return tr(
+            "lib.admin_navigation.opa_policy_documents_vendor_modules_simulations_and_decision_logs",
+          );
+        },
         keywords: ["opa", "rego", "authorization", "decision log", "access policy"],
         icon: ShieldCheck,
         href: "/admin/policy",
       },
       {
-        label: "Nodes",
-        description: "Stream nodes and remote worker status.",
+        get label() {
+          return tr("lib.admin_navigation.nodes");
+        },
+        get description() {
+          return tr("lib.admin_navigation.stream_nodes_and_remote_worker_status");
+        },
         keywords: ["stream nodes", "workers", "transcode nodes"],
         icon: Server,
         href: "/admin/nodes",
       },
       {
-        label: "API Keys",
-        description: "Admin API keys and tier assignment.",
+        get label() {
+          return tr("lib.admin_navigation.api_keys");
+        },
+        get description() {
+          return tr("lib.admin_navigation.admin_api_keys_and_tier_assignment");
+        },
         keywords: ["tokens", "keys", "access", "rate limit tier"],
         icon: KeyRound,
         href: "/admin/api-keys",
       },
       {
-        label: "Maintenance",
-        description: "Operational maintenance tools.",
+        get label() {
+          return tr("lib.admin_navigation.maintenance");
+        },
+        get description() {
+          return tr("lib.admin_navigation.operational_maintenance_tools");
+        },
         keywords: ["repair", "cleanup", "system maintenance"],
         icon: Wrench,
         href: "/admin/maintenance",
@@ -273,7 +393,9 @@ export function buildAdminPluginNavItems(
       const label = route.navigation_label || installation.plugin_id;
       items.push({
         label,
-        description: `${installation.plugin_id} plugin app.`,
+        get description() {
+          return tr("lib.admin_navigation.value1_plugin_app", { value1: installation.plugin_id });
+        },
         keywords: [installation.plugin_id, "plugin", "plugin app"],
         icon: Puzzle,
         href: pluginRouteHref(installation.id, route.path),
@@ -297,7 +419,7 @@ export function appendAdminPluginNavSection(
 
   return [
     ...sections.map((section) => ({ ...section, items: [...section.items] })),
-    { label: "Plugin Apps", items: pluginItems },
+    { label: tr("lib.admin_navigation.plugin_apps"), items: pluginItems },
   ];
 }
 

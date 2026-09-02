@@ -23,10 +23,13 @@ import {
 import { useAllMarkerEditHistory } from "@/hooks/queries/admin/markers";
 import { MARKER_LABELS, formatClock } from "@/lib/markers";
 import { formatTime, preferredDateLocale } from "@/lib/datetime";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const LIMIT_OPTIONS = ["25", "50", "100"] as const;
 
 export default function AdminMarkerHistory() {
+  useUILanguage();
   const [limit, setLimit] = useState("50");
   const history = useAllMarkerEditHistory(Number(limit));
   const rows = history.data ?? [];
@@ -35,20 +38,27 @@ export default function AdminMarkerHistory() {
     <div className="page-shell space-y-6 py-4 sm:py-6">
       <div className="page-header gap-5">
         <div className="space-y-2">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Marker History</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">
+            {tr("pages.admin_marker_history.marker_history")}
+          </h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Recent manual intro, recap, credits, and preview marker edits across the server.
+            {tr(
+              "pages.admin_marker_history.recent_manual_intro_recap_credits_and_preview_marker_edits_across",
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={limit} onValueChange={setLimit}>
-            <SelectTrigger className="w-[8rem]" aria-label="History limit">
+            <SelectTrigger
+              className="w-[8rem]"
+              aria-label={tr("pages.admin_marker_history.history_limit")}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {LIMIT_OPTIONS.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {option} rows
+                  {option} {tr("pages.admin_marker_history.rows")}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -62,8 +72,8 @@ export default function AdminMarkerHistory() {
             }}
             disabled={history.isFetching}
           >
-            <RefreshCw className={`size-4 ${history.isFetching ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw className={"size-4 " + (history.isFetching ? "animate-spin" : "")} />
+            {tr("common.actions.refresh")}
           </Button>
         </div>
       </div>
@@ -73,22 +83,22 @@ export default function AdminMarkerHistory() {
           <MarkerHistorySkeleton />
         ) : history.isError ? (
           <div className="text-destructive px-4 py-8 text-center text-sm">
-            Failed to load marker history.
+            {tr("pages.admin_marker_history.failed_to_load_marker_history")}
           </div>
         ) : rows.length === 0 ? (
           <div className="text-muted-foreground px-4 py-8 text-center text-sm">
-            No marker edits recorded.
+            {tr("pages.admin_marker_history.no_marker_edits_recorded")}
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>When</TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead>Segment</TableHead>
-                <TableHead>Change</TableHead>
-                <TableHead>Actor</TableHead>
-                <TableHead>Request</TableHead>
+                <TableHead>{tr("pages.admin_marker_history.when")}</TableHead>
+                <TableHead>{tr("pages.admin_marker_history.item")}</TableHead>
+                <TableHead>{tr("pages.admin_marker_history.segment")}</TableHead>
+                <TableHead>{tr("pages.admin_marker_history.change")}</TableHead>
+                <TableHead>{tr("pages.admin_marker_history.actor")}</TableHead>
+                <TableHead>{tr("pages.admin_marker_history.request")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -104,6 +114,7 @@ export default function AdminMarkerHistory() {
 }
 
 function MarkerHistoryRow({ row }: { row: MarkerEditAuditEntry }) {
+  useUILanguage();
   const title = row.media_title || fileName(row.file_path) || `File ${row.media_file_id}`;
   const itemLabel = row.item_type ? `${title} (${row.item_type})` : title;
 
@@ -116,7 +127,7 @@ function MarkerHistoryRow({ row }: { row: MarkerEditAuditEntry }) {
         <div className="max-w-[18rem] truncate font-medium">
           {row.item_id ? (
             <Link
-              to={`/item/${encodeURIComponent(row.item_id)}`}
+              to={"/item/" + encodeURIComponent(row.item_id)}
               className="hover:text-primary hover:underline"
               title={itemLabel}
             >
@@ -127,14 +138,19 @@ function MarkerHistoryRow({ row }: { row: MarkerEditAuditEntry }) {
           )}
         </div>
         <div className="text-muted-foreground max-w-[18rem] truncate text-xs">
-          {row.file_path || `Media file ${row.media_file_id}`}
+          {row.file_path ||
+            tr("pages.admin_marker_history.media_file_media_file_id", {
+              media_file_id: row.media_file_id,
+            })}
         </div>
       </TableCell>
       <TableCell>{MARKER_LABELS[row.segment]}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Badge variant={row.action === "clear" ? "outline" : "secondary"}>
-            {row.action === "clear" ? "Cleared" : "Set"}
+            {row.action === "clear"
+              ? tr("pages.admin_marker_history.cleared")
+              : tr("pages.admin_marker_history.set")}
           </Badge>
           <span className="text-muted-foreground font-mono text-xs">
             {formatHistoryRange(row.before)}
@@ -144,14 +160,18 @@ function MarkerHistoryRow({ row }: { row: MarkerEditAuditEntry }) {
         </div>
       </TableCell>
       <TableCell>
-        <div className="font-medium">{row.username ?? "Unknown user"}</div>
+        <div className="font-medium">
+          {row.username ?? tr("pages.admin_marker_history.unknown_user")}
+        </div>
         {row.impersonator_username && (
-          <div className="text-muted-foreground text-xs">via {row.impersonator_username}</div>
+          <div className="text-muted-foreground text-xs">
+            {tr("pages.admin_marker_history.via")} {row.impersonator_username}
+          </div>
         )}
       </TableCell>
       <TableCell>
         <div className="text-muted-foreground max-w-[13rem] truncate text-xs">
-          {row.request_id ?? "No request id"}
+          {row.request_id ?? tr("pages.admin_marker_history.no_request_id")}
         </div>
         <div className="text-muted-foreground max-w-[13rem] truncate text-xs">
           {row.client_ip ?? row.user_agent ?? ""}
@@ -162,6 +182,7 @@ function MarkerHistoryRow({ row }: { row: MarkerEditAuditEntry }) {
 }
 
 function MarkerHistorySkeleton() {
+  useUILanguage();
   return (
     <div className="space-y-3 p-4">
       {Array.from({ length: 6 }).map((_, index) => (

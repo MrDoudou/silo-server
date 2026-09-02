@@ -8,6 +8,8 @@ import {
   type FilterChipModel,
 } from "@/lib/filterEasyMode";
 import type { FilterConfig } from "@/api/types";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface Props {
   initialConfig: FilterConfig;
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export default function FilterEasyMode({ initialConfig, onChange }: Props) {
+  useUILanguage();
   const conv = filterConfigToChips(initialConfig);
   const [chips, setChips] = useState<FilterChipModel[]>(
     conv.kind === "compatible" ? conv.chips : [],
@@ -37,12 +40,12 @@ export default function FilterEasyMode({ initialConfig, onChange }: Props) {
   return (
     <div>
       <div className="mb-2 text-[11px] tracking-wider uppercase opacity-60">
-        Quick-start templates
+        {tr("components.filter_easy_mode.filter_easy_mode.quick_start_templates")}
       </div>
       <QuickStartTemplates onPick={(picked) => setAndEmit(picked, matchMode)} />
 
       <div className="mt-5 mb-2 text-xs opacity-80">
-        Match
+        {tr("components.filter_easy_mode.filter_easy_mode.match")}
         <select
           className="mr-2 ml-2 rounded border border-white/15 bg-white/5 px-2 py-0.5 text-xs"
           value={matchMode}
@@ -51,10 +54,10 @@ export default function FilterEasyMode({ initialConfig, onChange }: Props) {
             setAndEmit(chips, m);
           }}
         >
-          <option value="all">all</option>
-          <option value="any">any</option>
+          <option value="all">{tr("components.filter_easy_mode.filter_easy_mode.all")}</option>
+          <option value="any">{tr("components.filter_easy_mode.filter_easy_mode.any")}</option>
         </select>
-        of these conditions
+        {tr("components.filter_easy_mode.filter_easy_mode.of_these_conditions")}
       </div>
 
       <div className="flex min-h-[60px] flex-wrap items-center gap-2 rounded-lg border border-dashed border-white/10 bg-white/5 p-3">
@@ -73,7 +76,7 @@ export default function FilterEasyMode({ initialConfig, onChange }: Props) {
           onClick={() => setPopoverOpen(true)}
           className="rounded-full border border-dashed border-white/20 bg-white/5 px-3 py-1 text-xs"
         >
-          + Add filter
+          {tr("components.filter_easy_mode.filter_easy_mode.add_filter")}
         </button>
       </div>
 

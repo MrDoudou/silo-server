@@ -14,7 +14,9 @@ import { AuthBackground } from "@/components/auth/AuthBackground";
 import { clearHouseholdSetupDone, setTourSuppressed } from "@/lib/onboarding";
 import { buildInviteDeepLink, detectMobilePlatform } from "@/lib/appDeepLink";
 import { Smartphone } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Public claim screen for an emailed invitation: /invite/:token.
@@ -23,6 +25,7 @@ import { toast } from "sonner";
  * a normal login payload — the user lands signed in, never at /login.
  */
 export default function InviteClaim() {
+  useUILanguage();
   const { token = "" } = useParams();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -63,18 +66,17 @@ export default function InviteClaim() {
         <Card className="auth-card glass panel-border w-full max-w-sm border-0">
           <CardHeader>
             <CardTitle className="text-3xl font-extrabold tracking-[-0.04em]">
-              Invitation expired
+              {tr("pages.invite_claim.invitation_expired")}
             </CardTitle>
             <CardDescription className="mt-2 text-sm leading-6">
-              This invite link is no longer valid — it may have been used already, revoked, or
-              simply expired. Ask whoever invited you to send a fresh one.
+              {tr("pages.invite_claim.this_invite_link_is_no_longer_valid_it_may_have")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground text-center text-sm">
-              Already have an account?{" "}
+              {tr("pages.invite_claim.already_have_an_account")}{" "}
               <Link to="/login" className="text-foreground underline hover:no-underline">
-                Sign in
+                {tr("pages.invite_claim.sign_in")}
               </Link>
             </p>
           </CardContent>
@@ -97,7 +99,7 @@ export default function InviteClaim() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
+      toast.error("errors.auth.passwords_do_not_match");
       return;
     }
     setSubmitting(true);
@@ -118,7 +120,7 @@ export default function InviteClaim() {
       }
       navigate("/household-setup", { replace: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create your account");
+      toast.error("errors.auth.invitation_accept_failed", { error: err });
       setSubmitting(false);
     }
   }
@@ -130,14 +132,14 @@ export default function InviteClaim() {
         <CardHeader>
           {invitation.inviter_name && (
             <p className="text-muted-foreground font-mono text-[11px] font-semibold tracking-[0.1em] uppercase">
-              Invited by {invitation.inviter_name}
+              {tr("pages.invite_claim.invited_by")} {invitation.inviter_name}
             </p>
           )}
           <CardTitle className="text-3xl font-extrabold tracking-[-0.04em]">
-            Welcome to {invitation.server_name}
+            {tr("pages.invite_claim.welcome_to")} {invitation.server_name}
           </CardTitle>
           <CardDescription className="mt-2 text-sm leading-6">
-            Choose a password and you&apos;re in. You&apos;ll sign in with your email address.
+            {tr("pages.invite_claim.choose_a_password_and_you_re_in_you_ll_sign")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -145,16 +147,19 @@ export default function InviteClaim() {
             <div className="mb-6 space-y-3">
               <Button asChild size="lg" className="h-12 w-full text-base font-semibold">
                 <a href={appLink}>
-                  <Smartphone className="mr-2 h-5 w-5" /> Open in the Silo app
+                  <Smartphone className="mr-2 h-5 w-5" />{" "}
+                  {tr("pages.invite_claim.open_in_the_silo_app")}
                 </a>
               </Button>
               <p className="text-muted-foreground text-center text-xs">
-                Nothing happens? The app isn&apos;t installed — just continue below.
+                {tr(
+                  "pages.invite_claim.nothing_happens_the_app_isn_t_installed_just_continue_below",
+                )}
               </p>
               <div className="flex items-center gap-3">
                 <div className="border-border flex-1 border-t" />
                 <span className="text-muted-foreground text-xs uppercase">
-                  or set up in the browser
+                  {tr("pages.invite_claim.or_set_up_in_the_browser")}
                 </span>
                 <div className="border-border flex-1 border-t" />
               </div>
@@ -162,12 +167,14 @@ export default function InviteClaim() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="invite-email">Email</Label>
+              <Label htmlFor="invite-email">{tr("pages.invite_claim.email")}</Label>
               <Input id="invite-email" value={invitation.email} readOnly disabled />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invite-password">Password</Label>
-              <p className="text-muted-foreground text-xs">At least 8 characters</p>
+              <Label htmlFor="invite-password">{tr("pages.invite_claim.password")}</Label>
+              <p className="text-muted-foreground text-xs">
+                {tr("pages.invite_claim.at_least_8_characters")}
+              </p>
               <PasswordInput
                 id="invite-password"
                 value={password}
@@ -180,7 +187,9 @@ export default function InviteClaim() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invite-confirm-password">Confirm password</Label>
+              <Label htmlFor="invite-confirm-password">
+                {tr("pages.invite_claim.confirm_password")}
+              </Label>
               <PasswordInput
                 id="invite-confirm-password"
                 value={confirmPassword}
@@ -189,17 +198,21 @@ export default function InviteClaim() {
                 required
               />
               {confirmPassword && password !== confirmPassword && (
-                <p className="text-destructive text-xs">Passwords do not match</p>
+                <p className="text-destructive text-xs">
+                  {tr("pages.invite_claim.passwords_do_not_match")}
+                </p>
               )}
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Creating account..." : "Create account"}
+              {submitting
+                ? tr("pages.invite_claim.creating_account")
+                : tr("pages.invite_claim.create_account")}
             </Button>
           </form>
           <p className="text-muted-foreground mt-4 text-center text-sm">
-            Already set this up?{" "}
+            {tr("pages.invite_claim.already_set_this_up")}{" "}
             <Link to="/login" className="text-foreground underline hover:no-underline">
-              Sign in
+              {tr("pages.invite_claim.sign_in")}
             </Link>
           </p>
         </CardContent>

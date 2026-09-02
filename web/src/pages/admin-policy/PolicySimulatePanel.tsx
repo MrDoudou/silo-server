@@ -17,9 +17,11 @@ import {
   compileIssuesFromError,
   formatPolicyDomain,
   formatPolicyEvalMicros,
-  messageFromError,
   prettyPolicyJson,
 } from "./policyPageUtils";
+import { useUILanguage } from "@/i18n/uiText";
+
+import { tr } from "@/i18n/translate";
 
 interface PolicySimulatePanelProps {
   domains: readonly string[];
@@ -33,6 +35,7 @@ interface PolicySimulatePanelProps {
  * ceilings. Unknown shapes render nothing — the raw JSON below is the truth.
  */
 function SimulateVerdict({ decision }: { decision: unknown }) {
+  useUILanguage();
   let parsed: unknown = decision;
   if (typeof parsed === "string") {
     try {
@@ -48,12 +51,15 @@ function SimulateVerdict({ decision }: { decision: unknown }) {
     return record.allowed ? (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-300">
         <span aria-hidden className="size-1.5 rounded-full bg-emerald-400" />
-        Allowed
+        {tr("pages.admin_policy.policy_simulate_panel.allowed")}
       </span>
     ) : (
       <span className="bg-destructive/10 text-destructive inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium">
         <span aria-hidden className="bg-destructive size-1.5 rounded-full" />
-        Denied{typeof record.reason === "string" && record.reason ? ` — ${record.reason}` : ""}
+        {tr("pages.admin_policy.policy_simulate_panel.denied")}
+        {typeof record.reason === "string" && record.reason
+          ? tr("pages.admin_policy.policy_simulate_panel.reason", { reason: record.reason })
+          : ""}
       </span>
     );
   }
@@ -78,6 +84,7 @@ function SimulateVerdict({ decision }: { decision: unknown }) {
 }
 
 export function PolicySimulatePanel({ domains, domain, source }: PolicySimulatePanelProps) {
+  useUILanguage();
   const fallbackDomain = domain || domains[0] || "scope";
   const [selectedDomain, setSelectedDomain] = useState(fallbackDomain);
   const [input, setInput] = useState(() => exampleInputForDomain(fallbackDomain));
@@ -103,7 +110,7 @@ export function PolicySimulatePanel({ domains, domain, source }: PolicySimulateP
     try {
       parsedInput = JSON.parse(input);
     } catch {
-      setError("Simulation input must be valid JSON.");
+      setError(tr("pages.admin_policy.policy_simulate_panel.simulation_input_must_be_valid_json"));
       return;
     }
 
@@ -118,8 +125,8 @@ export function PolicySimulatePanel({ domains, domain, source }: PolicySimulateP
       setIssues(nextIssues);
       setError(
         nextIssues.length > 0
-          ? "Policy did not compile for simulation."
-          : messageFromError(err, "Simulation failed."),
+          ? tr("pages.admin_policy.policy_simulate_panel.policy_did_not_compile_for_simulation")
+          : tr.error("errors.admin_policy.policy_simulate_panel.simulation_failed", err),
       );
     }
   }
@@ -128,20 +135,28 @@ export function PolicySimulatePanel({ domains, domain, source }: PolicySimulateP
     <div className="surface-panel-subtle space-y-4 rounded-2xl p-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
-          <h3 className="text-sm font-semibold">Test before going live</h3>
+          <h3 className="text-sm font-semibold">
+            {tr("pages.admin_policy.policy_simulate_panel.test_before_going_live")}
+          </h3>
           <p className="text-muted-foreground mt-1 text-xs">
-            Runs the current draft against a sample request. Nothing is saved or enforced.
+            {tr(
+              "pages.admin_policy.policy_simulate_panel.runs_the_current_draft_against_a_sample_request_nothing_is",
+            )}
           </p>
         </div>
         <Button type="button" size="sm" onClick={runSimulation} disabled={simulate.isPending}>
           <Play className="size-4" />
-          {simulate.isPending ? "Running..." : "Run"}
+          {simulate.isPending
+            ? tr("pages.admin_policy.policy_simulate_panel.running")
+            : tr("pages.admin_policy.policy_simulate_panel.run")}
         </Button>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[180px_1fr]">
         <div className="space-y-2">
-          <Label htmlFor="policy-sim-domain">Domain</Label>
+          <Label htmlFor="policy-sim-domain">
+            {tr("pages.admin_policy.policy_simulate_panel.domain")}
+          </Label>
           <Select
             value={selectedDomain}
             onValueChange={(value) => {
@@ -163,7 +178,9 @@ export function PolicySimulatePanel({ domains, domain, source }: PolicySimulateP
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="policy-sim-input">Input JSON</Label>
+          <Label htmlFor="policy-sim-input">
+            {tr("pages.admin_policy.policy_simulate_panel.input_json")}
+          </Label>
           <textarea
             id="policy-sim-input"
             value={input}
@@ -184,8 +201,13 @@ export function PolicySimulatePanel({ domains, domain, source }: PolicySimulateP
         <ul className="text-destructive space-y-1 text-xs">
           {issues.map((issue, index) => (
             <li key={`${issue.row}-${issue.col}-${index}`}>
-              {issue.row > 0 ? `${issue.row}:${issue.col} ` : ""}
-              {issue.message}
+              {issue.row > 0
+                ? tr("pages.admin_policy.policy_simulate_panel.row_col", {
+                    row: issue.row,
+                    col: issue.col,
+                  })
+                : ""}
+              {tr.remote({ message: issue.message })}
             </li>
           ))}
         </ul>
@@ -196,7 +218,8 @@ export function PolicySimulatePanel({ domains, domain, source }: PolicySimulateP
           <div className="flex flex-wrap items-center gap-3">
             <SimulateVerdict decision={simulate.data.decision} />
             <span className="text-muted-foreground text-xs">
-              Decided in {formatPolicyEvalMicros(simulate.data.eval_time_ns)}
+              {tr("pages.admin_policy.policy_simulate_panel.decided_in")}{" "}
+              {formatPolicyEvalMicros(simulate.data.eval_time_ns)}
             </span>
           </div>
           <pre className="border-border bg-background max-h-[300px] overflow-auto rounded-lg border p-3 font-mono text-xs">

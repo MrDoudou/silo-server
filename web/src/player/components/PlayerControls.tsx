@@ -34,6 +34,8 @@ import type { VersionInfo } from "./QualityMenu";
 import type { PlayerConfig } from "../context/PlayerConfigContext";
 import { useCoarsePointer } from "../hooks/useCoarsePointer";
 import { PlayerMenuSurface } from "./PlayerMenuSurface";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface PlayerControlsProps {
   // Visibility
@@ -159,6 +161,7 @@ export function PlayerControls({
   onFullscreenToggle,
   onSurfaceTap,
 }: PlayerControlsProps) {
+  useUILanguage();
   const isCoarsePointer = useCoarsePointer();
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);
@@ -174,9 +177,10 @@ export function PlayerControls({
 
   return (
     <div
-      className={`player-controls absolute inset-0 z-10 transition-opacity duration-300 ${
-        visible ? "opacity-100" : "pointer-events-none opacity-0"
-      }`}
+      className={
+        "player-controls absolute inset-0 z-10 transition-opacity duration-300 " +
+        (visible ? "opacity-100" : "pointer-events-none opacity-0")
+      }
       onClick={onSurfaceTap ?? onPlayPause}
     >
       {/* Gradient scrim — darkens the bottom of the frame just enough that
@@ -197,7 +201,7 @@ export function PlayerControls({
                 <CircleButton
                   size="md"
                   variant="secondary"
-                  ariaLabel="Previous episode"
+                  ariaLabel={tr("player.components.player_controls.previous_episode")}
                   onClick={onPrevEpisode}
                 >
                   <SkipBack className="h-5 w-5" fill="currentColor" />
@@ -209,7 +213,9 @@ export function PlayerControls({
             <CircleButton
               size="md"
               variant="secondary"
-              ariaLabel={`Back ${SKIP_BACK_SECONDS} seconds`}
+              ariaLabel={tr("player.components.player_controls.back_value1_seconds", {
+                value1: SKIP_BACK_SECONDS,
+              })}
               onClick={handleSkipBack}
             >
               <SkipIcon direction="back" seconds={SKIP_BACK_SECONDS} />
@@ -217,7 +223,7 @@ export function PlayerControls({
             <button
               type="button"
               className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              aria-label={playing ? "Pause" : "Play"}
+              aria-label={playing ? tr("common.actions.pause") : tr("common.actions.play")}
               onClick={onPlayPause}
             >
               {playing ? (
@@ -229,7 +235,9 @@ export function PlayerControls({
             <CircleButton
               size="md"
               variant="secondary"
-              ariaLabel={`Forward ${SKIP_FORWARD_SECONDS} seconds`}
+              ariaLabel={tr("player.components.player_controls.forward_value1_seconds", {
+                value1: SKIP_FORWARD_SECONDS,
+              })}
               onClick={handleSkipForward}
             >
               <SkipIcon direction="forward" seconds={SKIP_FORWARD_SECONDS} />
@@ -239,7 +247,7 @@ export function PlayerControls({
                 <CircleButton
                   size="md"
                   variant="secondary"
-                  ariaLabel="Next episode"
+                  ariaLabel={tr("player.components.player_controls.next_episode")}
                   onClick={onNextEpisode}
                 >
                   <SkipForward className="h-5 w-5" fill="currentColor" />
@@ -318,7 +326,7 @@ export function PlayerControls({
             <button
               type="button"
               className="player-utility-btn"
-              aria-label="More player options"
+              aria-label={tr("player.components.player_controls.more_player_options")}
               aria-expanded={overflowOpen}
               aria-haspopup="menu"
               onClick={() => setOverflowOpen(true)}
@@ -329,7 +337,11 @@ export function PlayerControls({
               type="button"
               className="player-utility-btn"
               onClick={onFullscreenToggle}
-              aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              aria-label={
+                isFullscreen
+                  ? tr("player.components.player_controls.exit_fullscreen")
+                  : tr("player.components.player_controls.fullscreen")
+              }
             >
               {isFullscreen ? (
                 <Minimize className="h-[18px] w-[18px]" />
@@ -383,7 +395,7 @@ export function PlayerControls({
                   <CircleButton
                     size="sm"
                     variant="secondary"
-                    ariaLabel="Previous episode"
+                    ariaLabel={tr("player.components.player_controls.previous_episode")}
                     onClick={onPrevEpisode}
                   >
                     <SkipBack className="h-[18px] w-[18px]" fill="currentColor" />
@@ -396,7 +408,9 @@ export function PlayerControls({
               <CircleButton
                 size="sm"
                 variant="secondary"
-                ariaLabel={`Back ${SKIP_BACK_SECONDS} seconds`}
+                ariaLabel={tr("player.components.player_controls.back_value1_seconds", {
+                  value1: SKIP_BACK_SECONDS,
+                })}
                 onClick={handleSkipBack}
               >
                 <SkipIcon direction="back" seconds={SKIP_BACK_SECONDS} />
@@ -405,7 +419,7 @@ export function PlayerControls({
               <CircleButton
                 size="md"
                 variant="primary"
-                ariaLabel={playing ? "Pause" : "Play"}
+                ariaLabel={tr(playing ? "common.actions.pause" : "common.actions.play")}
                 onClick={onPlayPause}
                 data-paused={!playing}
               >
@@ -419,7 +433,9 @@ export function PlayerControls({
               <CircleButton
                 size="sm"
                 variant="secondary"
-                ariaLabel={`Forward ${SKIP_FORWARD_SECONDS} seconds`}
+                ariaLabel={tr("player.components.player_controls.forward_value1_seconds", {
+                  value1: SKIP_FORWARD_SECONDS,
+                })}
                 onClick={handleSkipForward}
               >
                 <SkipIcon direction="forward" seconds={SKIP_FORWARD_SECONDS} />
@@ -430,7 +446,7 @@ export function PlayerControls({
                   <CircleButton
                     size="sm"
                     variant="secondary"
-                    ariaLabel="Next episode"
+                    ariaLabel={tr("player.components.player_controls.next_episode")}
                     onClick={onNextEpisode}
                   >
                     <SkipForward className="h-[18px] w-[18px]" fill="currentColor" />
@@ -494,9 +510,9 @@ export function PlayerControls({
                   type="button"
                   className="player-utility-btn"
                   onClick={onToggleMarkerEdit}
-                  aria-label="Edit markers"
+                  aria-label={tr("player.components.player_controls.edit_markers")}
                   aria-pressed={markerEditActive}
-                  title="Edit markers"
+                  title={tr("player.components.player_controls.edit_markers")}
                   data-active={markerEditActive ? "true" : "false"}
                 >
                   <Tags className="h-[18px] w-[18px]" />
@@ -507,7 +523,7 @@ export function PlayerControls({
                 type="button"
                 className="player-utility-btn"
                 onClick={onTogglePlaybackInfo}
-                aria-label="Playback info"
+                aria-label={tr("player.components.player_controls.playback_info")}
                 data-active={showPlaybackInfo ? "true" : "false"}
               >
                 <Info className="h-[18px] w-[18px]" />
@@ -518,8 +534,8 @@ export function PlayerControls({
                   type="button"
                   className="player-utility-btn"
                   onClick={onTogglePiP}
-                  aria-label="Picture in Picture (P)"
-                  title="Picture in Picture (P)"
+                  aria-label={tr("player.components.player_controls.picture_in_picture_p")}
+                  title={tr("player.components.player_controls.picture_in_picture_p")}
                 >
                   <PictureInPicture2 className="h-[18px] w-[18px]" />
                 </button>
@@ -529,7 +545,11 @@ export function PlayerControls({
                 type="button"
                 className="player-utility-btn"
                 onClick={onFullscreenToggle}
-                aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                aria-label={
+                  isFullscreen
+                    ? tr("player.components.player_controls.exit_fullscreen")
+                    : tr("player.components.player_controls.fullscreen")
+                }
               >
                 {isFullscreen ? (
                   <Minimize className="h-[18px] w-[18px]" />
@@ -548,7 +568,7 @@ export function PlayerControls({
             {onAudioSelect && audioTracks.length > 0 && (
               <OverflowAction
                 icon={<AudioLines className="h-5 w-5" />}
-                label="Audio tracks"
+                label={tr("player.components.player_controls.audio_tracks")}
                 onClick={() => {
                   setOverflowOpen(false);
                   setAudioOpen(true);
@@ -558,7 +578,7 @@ export function PlayerControls({
             {(chapters?.length ?? 0) > 0 && (
               <OverflowAction
                 icon={<ListVideo className="h-5 w-5" />}
-                label="Chapters"
+                label={tr("player.components.player_controls.chapters")}
                 onClick={() => {
                   setOverflowOpen(false);
                   setChaptersOpen(true);
@@ -567,7 +587,7 @@ export function PlayerControls({
             )}
             <OverflowAction
               icon={<Info className="h-5 w-5" />}
-              label="Playback info"
+              label={tr("player.components.player_controls.playback_info")}
               active={showPlaybackInfo}
               onClick={() => {
                 onTogglePlaybackInfo();
@@ -577,7 +597,7 @@ export function PlayerControls({
             {onTogglePiP && document.pictureInPictureEnabled && (
               <OverflowAction
                 icon={<PictureInPicture2 className="h-5 w-5" />}
-                label="Picture in Picture"
+                label={tr("player.components.player_controls.picture_in_picture")}
                 onClick={() => {
                   onTogglePiP();
                   setOverflowOpen(false);
@@ -587,7 +607,7 @@ export function PlayerControls({
             {markerEditAvailable && onToggleMarkerEdit && (
               <OverflowAction
                 icon={<Tags className="h-5 w-5" />}
-                label="Edit markers"
+                label={tr("player.components.player_controls.edit_markers")}
                 active={markerEditActive}
                 onClick={() => {
                   onToggleMarkerEdit();
@@ -634,11 +654,15 @@ function OverflowAction({
   active?: boolean;
   onClick: () => void;
 }) {
+  useUILanguage();
   return (
     <button
       role="menuitem"
       type="button"
-      className={`flex min-h-12 w-full items-center gap-3 px-5 py-3 text-left text-sm ${active ? "bg-white/10 text-white" : "text-white/80"}`}
+      className={
+        "flex min-h-12 w-full items-center gap-3 px-5 py-3 text-left text-sm " +
+        (active ? "bg-white/10 text-white" : "text-white/80")
+      }
       onClick={onClick}
     >
       {icon}
@@ -661,6 +685,7 @@ function ClusterSlotSpacer({ size }: { size: "sm" | "md" }) {
 
 /** Curved arrow with the skip-seconds number centered in the loop. */
 function SkipIcon({ direction, seconds }: { direction: "back" | "forward"; seconds: number }) {
+  useUILanguage();
   const Arrow = direction === "back" ? RotateCcw : RotateCw;
   return (
     <span className="relative flex h-7 w-7 items-center justify-center">

@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select";
 import { canonicalLanguageTag, getLanguageName } from "@/lib/languageNames";
 import type { SettingOption } from "@/lib/languageOptions";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const OTHER_VALUE = "__other__";
 
@@ -65,6 +67,7 @@ export function LanguageSelect({
   "aria-describedby": ariaDescribedBy,
   children,
 }: LanguageSelectProps) {
+  useUILanguage();
   // null = closed; otherwise the tag being typed.
   const [draft, setDraft] = useState<string | null>(null);
 
@@ -112,7 +115,9 @@ export function LanguageSelect({
           {allowOther && (
             <>
               <SelectSeparator />
-              <SelectItem value={OTHER_VALUE}>Other…</SelectItem>
+              <SelectItem value={OTHER_VALUE}>
+                {tr("components.settings.language_select.other")}
+              </SelectItem>
             </>
           )}
         </SelectContent>
@@ -125,8 +130,8 @@ export function LanguageSelect({
               autoFocus
               value={draft}
               disabled={disabled}
-              placeholder="Language code, e.g. pt-BR"
-              aria-label="Language code"
+              placeholder={tr("components.settings.language_select.language_code_e_g_pt_br")}
+              aria-label={tr("components.settings.language_select.language_code")}
               aria-invalid={draftInvalid || undefined}
               className="h-9 flex-1"
               onChange={(event) => setDraft(event.target.value)}
@@ -148,7 +153,7 @@ export function LanguageSelect({
               disabled={disabled || !draftTag}
               onClick={commitDraft}
             >
-              Use
+              {tr("components.settings.language_select.use")}
             </Button>
             <Button
               type="button"
@@ -158,7 +163,7 @@ export function LanguageSelect({
               disabled={disabled}
               onClick={() => setDraft(null)}
             >
-              Cancel
+              {tr("common.actions.cancel")}
             </Button>
           </div>
           <p
@@ -166,10 +171,14 @@ export function LanguageSelect({
             role={draftInvalid ? "alert" : undefined}
           >
             {draftInvalid
-              ? "Not a valid language tag. Use an ISO code such as is, yue, or pt-BR."
+              ? tr(
+                  "components.settings.language_select.not_a_valid_language_tag_use_an_iso_code_such",
+                )
               : draftTag
                 ? getLanguageName(trimmed)
-                : "Type an ISO language code to use a language not in the list."}
+                : tr(
+                    "components.settings.language_select.type_an_iso_language_code_to_use_a_language_not",
+                  )}
           </p>
         </div>
       )}

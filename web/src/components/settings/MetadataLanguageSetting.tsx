@@ -18,6 +18,8 @@ import {
   withoutMetadataLanguageOverride,
   type MetadataLanguageOverrides,
 } from "@/lib/metadataLanguagePreferences";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface MetadataLanguageSettingProps {
   fallback: string | null;
@@ -49,6 +51,8 @@ export function MetadataLanguageSetting({
   onFallbackChange,
   onOverridesChange,
 }: MetadataLanguageSettingProps) {
+  useUILanguage();
+  useUILanguage();
   const [newSource, setNewSource] = useState("");
   const [optimisticOverrides, setOptimisticOverrides] = useState<{
     base: MetadataLanguageOverrides;
@@ -96,8 +100,10 @@ export function MetadataLanguageSetting({
 
   return (
     <SettingRow
-      label="Metadata language"
-      description="Choose the fallback for titles and descriptions, then add exceptions based on each item's original language. Missing descriptions can be translated automatically when AI translation is enabled."
+      label={tr("components.settings.metadata_language_setting.metadata_language")}
+      description={tr(
+        "components.settings.metadata_language_setting.choose_the_fallback_for_titles_and_descriptions_then_add_exceptions",
+      )}
       control={(id) => (
         <div className="w-full min-w-0 space-y-3 md:w-[430px]">
           <Select
@@ -105,11 +111,17 @@ export function MetadataLanguageSetting({
             onValueChange={(value) => onFallbackChange(value === NO_PREFERENCE ? null : value)}
           >
             <SelectTrigger id={id} className="w-full" disabled={disabled}>
-              <SelectValue placeholder="Library default" />
+              <SelectValue
+                placeholder={tr("components.settings.metadata_language_setting.library_default")}
+              />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_PREFERENCE}>Library default</SelectItem>
-              <SelectItem value={ORIGINAL_METADATA_LANGUAGE}>Original language</SelectItem>
+              <SelectItem value={NO_PREFERENCE}>
+                {tr("components.settings.metadata_language_setting.library_default")}
+              </SelectItem>
+              <SelectItem value={ORIGINAL_METADATA_LANGUAGE}>
+                {tr("components.settings.metadata_language_setting.original_language")}
+              </SelectItem>
               {namedOptions.map((language) => (
                 <SelectItem key={language.value} value={language.value}>
                   {language.label}
@@ -135,14 +147,21 @@ export function MetadataLanguageSetting({
                     }
                   >
                     <SelectTrigger
-                      aria-label={`Metadata language for ${getLanguageName(source)}`}
+                      aria-label={tr(
+                        "components.settings.metadata_language_setting.metadata_language_for_value",
+                        {
+                          value: getLanguageName(source),
+                        },
+                      )}
                       className="col-span-2 col-start-1 row-start-2 h-9 w-full sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:h-8"
                       disabled={disabled}
                     >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={ORIGINAL_METADATA_LANGUAGE}>Original language</SelectItem>
+                      <SelectItem value={ORIGINAL_METADATA_LANGUAGE}>
+                        {tr("components.settings.metadata_language_setting.original_language")}
+                      </SelectItem>
                       {optionsForTarget(target).map((language) => (
                         <SelectItem key={language.value} value={language.value}>
                           {language.label}
@@ -156,7 +175,12 @@ export function MetadataLanguageSetting({
                     size="icon"
                     className="col-start-2 row-start-1 size-9 sm:col-start-3 sm:size-8"
                     disabled={disabled}
-                    aria-label={`Remove ${getLanguageName(source)} exception`}
+                    aria-label={tr(
+                      "components.settings.metadata_language_setting.remove_value_exception",
+                      {
+                        value: getLanguageName(source),
+                      },
+                    )}
                     onClick={() =>
                       void changeOverrides(
                         withoutMetadataLanguageOverride(currentOverrides, source),
@@ -174,11 +198,17 @@ export function MetadataLanguageSetting({
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
               <Select value={newSource} onValueChange={setNewSource}>
                 <SelectTrigger
-                  aria-label="Original language for new exception"
+                  aria-label={tr(
+                    "components.settings.metadata_language_setting.original_language_for_new_exception",
+                  )}
                   className="h-10 w-full min-w-0 flex-1 sm:h-9 sm:w-auto"
                   disabled={disabled}
                 >
-                  <SelectValue placeholder="Choose original language" />
+                  <SelectValue
+                    placeholder={tr(
+                      "components.settings.metadata_language_setting.choose_original_language",
+                    )}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {availableSources.map((language) => (
@@ -197,7 +227,7 @@ export function MetadataLanguageSetting({
                 onClick={addException}
               >
                 <Plus className="mr-1.5 size-3.5" aria-hidden="true" />
-                Add exception
+                {tr("components.settings.metadata_language_setting.add_exception")}
               </Button>
             </div>
           ) : null}

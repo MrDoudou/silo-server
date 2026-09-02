@@ -22,6 +22,8 @@ import type {
 } from "@/api/types";
 import { useItemFiles, useSearchItemMatchCandidates, useSplitItem } from "@/hooks/queries/items";
 import { cn } from "@/lib/utils";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface SplittableItem {
   content_id: string;
@@ -38,9 +40,9 @@ interface SplitItemDialogProps {
 }
 
 const HISTORY_MODE_LABELS: Record<SplitHistoryMode, string> = {
-  evidence: "Follow play evidence (recommended)",
-  keep: "Keep all history on this item",
-  move_all: "Move everything to the new item",
+  evidence: "components.split_item_dialog.follow_play_evidence_recommended",
+  keep: "components.split_item_dialog.keep_all_history_on_this_item",
+  move_all: "components.split_item_dialog.move_everything_to_the_new_item",
 };
 
 /**
@@ -50,6 +52,7 @@ const HISTORY_MODE_LABELS: Record<SplitHistoryMode, string> = {
  * keep the corrected assignment.
  */
 export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemDialogProps) {
+  useUILanguage();
   const { data: filesData, isLoading: filesLoading } = useItemFiles(
     open ? item.content_id : undefined,
   );
@@ -181,7 +184,7 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Split Versions</DialogTitle>
+          <DialogTitle>{tr("components.split_item_dialog.split_versions")}</DialogTitle>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
@@ -195,14 +198,16 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
 
           {/* Step 1: pick the files that belong to a different title */}
           <section className="space-y-2">
-            <Label>Files to move</Label>
+            <Label>{tr("components.split_item_dialog.files_to_move")}</Label>
             {filesLoading ? (
               <div className="text-muted-foreground bg-muted/30 rounded-lg border px-3 py-2 text-sm">
-                Loading files…
+                {tr("components.split_item_dialog.loading_files")}
               </div>
             ) : files.length < 2 ? (
               <div className="text-muted-foreground bg-muted/30 rounded-lg border px-3 py-2 text-sm">
-                This item has only one file; splitting needs at least two.
+                {tr(
+                  "components.split_item_dialog.this_item_has_only_one_file_splitting_needs_at_least",
+                )}
               </div>
             ) : (
               <div className="bg-background/70 divide-border/50 divide-y rounded-lg border">
@@ -215,7 +220,9 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
                           type="checkbox"
                           checked={allSelected}
                           onChange={() => toggleRoot(rootFiles)}
-                          aria-label={`Select all files in ${root}`}
+                          aria-label={tr("components.split_item_dialog.select_all_files_in_root", {
+                            root: root,
+                          })}
                         />
                         <Folder className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                         <span className="min-w-0 flex-1 truncate font-mono text-xs" title={root}>
@@ -232,7 +239,9 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
                               type="checkbox"
                               checked={selectedIds.has(file.id)}
                               onChange={() => toggleFile(file.id)}
-                              aria-label={`Select ${file.file_path}`}
+                              aria-label={tr("components.split_item_dialog.select_file_path", {
+                                file_path: file.file_path,
+                              })}
                             />
                             <span
                               className="text-muted-foreground min-w-0 flex-1 truncate font-mono"
@@ -242,7 +251,10 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
                             </span>
                             {file.season_number && file.episode_number ? (
                               <Badge variant="outline" className="text-[10px]">
-                                S{file.season_number}E{file.episode_number}
+                                {tr("components.split_item_dialog.s")}
+                                {file.season_number}
+                                {tr("components.split_item_dialog.e")}
+                                {file.episode_number}
                               </Badge>
                             ) : null}
                           </label>
@@ -255,48 +267,47 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
             )}
             {selectedIds.size > 0 && selectedIds.size === files.length && (
               <p className="text-destructive text-xs">
-                All files are selected — that is a re-match, not a split. Use “Match Item” instead,
-                or deselect the files that are correct.
+                {tr("components.split_item_dialog.all_files_are_selected_that_is_a_re_match_not")}
               </p>
             )}
           </section>
 
           {/* Step 2: what the moved files actually are */}
           <section className="space-y-3">
-            <Label>Correct identity for the moved files</Label>
+            <Label>{tr("components.split_item_dialog.correct_identity_for_the_moved_files")}</Label>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Title"
-                  aria-label="Search title"
+                  placeholder={tr("components.split_item_dialog.title")}
+                  aria-label={tr("components.split_item_dialog.search_title")}
                 />
               </div>
               <Input
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
-                placeholder="Year"
+                placeholder={tr("components.split_item_dialog.year")}
                 type="number"
-                aria-label="Search year"
+                aria-label={tr("components.split_item_dialog.search_year")}
               />
               <Input
                 value={tmdbId}
                 onChange={(e) => setTmdbId(e.target.value)}
-                placeholder="TMDB ID"
-                aria-label="TMDB ID"
+                placeholder={tr("components.split_item_dialog.tmdb_id")}
+                aria-label={tr("components.split_item_dialog.tmdb_id")}
               />
               <Input
                 value={imdbId}
                 onChange={(e) => setImdbId(e.target.value)}
-                placeholder="IMDb ID (tt…)"
-                aria-label="IMDb ID"
+                placeholder={tr("components.split_item_dialog.imdb_id_tt")}
+                aria-label={tr("components.split_item_dialog.imdb_id")}
               />
               <Input
                 value={tvdbId}
                 onChange={(e) => setTvdbId(e.target.value)}
-                placeholder="TVDB ID"
-                aria-label="TVDB ID"
+                placeholder={tr("components.split_item_dialog.tvdb_id")}
+                aria-label={tr("components.split_item_dialog.tvdb_id")}
               />
             </div>
             <Button
@@ -306,7 +317,7 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
               className="w-full gap-2"
             >
               <Search className={cn("h-4 w-4", searchMutation.isPending && "animate-spin")} />
-              Search
+              {tr("common.actions.search")}
             </Button>
 
             {candidates.length > 0 && (
@@ -350,7 +361,9 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
               </div>
             )}
             {searchMutation.isSuccess && candidates.length === 0 && (
-              <p className="text-muted-foreground text-center text-sm">No candidates found.</p>
+              <p className="text-muted-foreground text-center text-sm">
+                {tr("components.split_item_dialog.no_candidates_found")}
+              </p>
             )}
 
             <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -362,64 +375,85 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
                   if (e.target.checked) setSelectedCandidate(null);
                 }}
               />
-              Detach as unmatched (identify later)
+              {tr("components.split_item_dialog.detach_as_unmatched_identify_later")}
             </label>
           </section>
 
           {/* Step 3: watch-state handling */}
           <section className="space-y-2">
-            <Label>Watch history handling</Label>
+            <Label>{tr("components.split_item_dialog.watch_history_handling")}</Label>
             <Select
               value={historyMode}
               onValueChange={(value) => setHistoryMode(value as SplitHistoryMode)}
             >
-              <SelectTrigger aria-label="Watch history handling">
+              <SelectTrigger aria-label={tr("components.split_item_dialog.watch_history_handling")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {(Object.keys(HISTORY_MODE_LABELS) as SplitHistoryMode[]).map((mode) => (
                   <SelectItem key={mode} value={mode}>
-                    {HISTORY_MODE_LABELS[mode]}
+                    {tr(HISTORY_MODE_LABELS[mode])}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-xs">
-              Resume points and downloads tied to the moved files always follow them. This controls
-              history rows without per-file evidence.
+              {tr(
+                "components.split_item_dialog.resume_points_and_downloads_tied_to_the_moved_files_always",
+              )}
             </p>
           </section>
 
           {planValid && !preview && (
             <section className="bg-muted/30 text-muted-foreground rounded-lg border px-3 py-2 text-sm">
-              Previewing…
+              {tr("components.split_item_dialog.previewing")}
             </section>
           )}
           {preview && (
             <section className="bg-muted/30 space-y-1 rounded-lg border px-3 py-2 text-sm">
               <div className="font-medium">
-                Preview — {preview.files_moved} file{preview.files_moved === 1 ? "" : "s"} →{" "}
+                {tr("components.split_item_dialog.preview")} {preview.files_moved}{" "}
+                {tr("components.split_item_dialog.file")}
+                {preview.files_moved === 1
+                  ? ""
+                  : tr("components.split_item_dialog.s_a0f1490a")} →{" "}
                 <span className="font-mono text-xs">{preview.target_content_id}</span>
                 {preview.target_created ? (
                   <Badge variant="secondary" className="ml-2 text-[10px]">
-                    new item
+                    {tr("components.split_item_dialog.new_item")}
                   </Badge>
                 ) : null}
               </div>
               <ul className="text-muted-foreground list-inside list-disc text-xs">
-                <li>{preview.reattribution.progress_moved} resume points move</li>
                 <li>
-                  {preview.reattribution.history_moved} history entries move,{" "}
-                  {preview.reattribution.history_ambiguous} stay for lack of evidence
+                  {preview.reattribution.progress_moved}{" "}
+                  {tr("components.split_item_dialog.resume_points_move")}
                 </li>
-                <li>{preview.reattribution.downloads} downloads move</li>
-                {preview.episode_pairs > 0 && <li>{preview.episode_pairs} episodes re-anchored</li>}
+                <li>
+                  {preview.reattribution.history_moved}{" "}
+                  {tr("components.split_item_dialog.history_entries_move")}{" "}
+                  {preview.reattribution.history_ambiguous}{" "}
+                  {tr("components.split_item_dialog.stay_for_lack_of_evidence")}
+                </li>
+                <li>
+                  {preview.reattribution.downloads}{" "}
+                  {tr("components.split_item_dialog.downloads_move")}
+                </li>
+                {preview.episode_pairs > 0 && (
+                  <li>
+                    {preview.episode_pairs}{" "}
+                    {tr("components.split_item_dialog.episodes_re_anchored")}
+                  </li>
+                )}
                 {(preview.root_overrides?.length ?? 0) + (preview.file_overrides?.length ?? 0) >
                   0 && (
                   <li>
-                    {preview.root_overrides?.length ?? 0} folder /{" "}
-                    {preview.file_overrides?.length ?? 0} file identity override{"(s)"} pinned for
-                    future scans
+                    {preview.root_overrides?.length ?? 0}{" "}
+                    {tr("components.split_item_dialog.folder")}{" "}
+                    {preview.file_overrides?.length ?? 0}{" "}
+                    {tr("components.split_item_dialog.file_identity_override")}
+                    {tr("components.split_item_dialog.s_aef8e615")}{" "}
+                    {tr("components.split_item_dialog.pinned_for_future_scans")}
                   </li>
                 )}
               </ul>
@@ -435,7 +469,9 @@ export default function SplitItemDialog({ item, open, onOpenChange }: SplitItemD
             data-testid="confirm-split"
           >
             <Scissors className="h-4 w-4" />
-            {splitMutation.isPending && preview ? "Splitting…" : "Split"}
+            {splitMutation.isPending && preview
+              ? tr("components.split_item_dialog.splitting")
+              : tr("components.split_item_dialog.split")}
           </Button>
         </div>
       </DialogContent>

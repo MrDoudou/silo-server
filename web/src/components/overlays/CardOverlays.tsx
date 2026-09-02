@@ -183,7 +183,12 @@ function BadgeStack({
 
   return (
     <div
-      className={`flex min-w-0 flex-col ${align === "start" ? "items-start" : "items-end"} ${preset.gapClass}`}
+      className={
+        "flex min-w-0 flex-col " +
+        (align === "start" ? "items-start" : "items-end") +
+        " " +
+        preset.gapClass
+      }
       style={{ gap: length(preset.stackGap, POSTER_VARS.stackGap) }}
     >
       {badges.map((badge) => {
@@ -225,7 +230,7 @@ function BadgeStack({
           <span
             key={badge.def.id}
             data-overlay-badge
-            className={`inline-flex max-w-full items-center gap-1 ${preset.badgeClass}`}
+            className={"inline-flex max-w-full items-center gap-1 " + preset.badgeClass}
             style={{ ...preset.badgeStyle(badge.accentColor), ...geometry }}
           >
             {badge.iconId && (

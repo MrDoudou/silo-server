@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import "./i18n";
 import App from "./App";
 import { installPreloadErrorReload } from "./lib/reloadOnPreloadError";
 import "./app.css";

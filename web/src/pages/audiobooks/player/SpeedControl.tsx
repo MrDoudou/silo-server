@@ -7,6 +7,8 @@ import {
   AUDIOBOOK_RATE_STEP,
   clampAudiobookRate,
 } from "./useAudiobookPrefs";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 const HOLD_DELAY_MS = 250;
 const HOLD_REPEAT_MS = 80;
@@ -26,6 +28,7 @@ interface SpeedControlProps {
  * playback engine.
  */
 export function SpeedControl({ value, onChange }: SpeedControlProps) {
+  useUILanguage();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const valueRef = useRef(value);
@@ -92,10 +95,10 @@ export function SpeedControl({ value, onChange }: SpeedControlProps) {
         type="button"
         className="player-utility-btn min-w-[3.25rem] px-2 text-xs tabular-nums"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Playback speed"
+        aria-label={tr("pages.audiobooks.player.speed_control.playback_speed")}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="Playback speed (shift+. / shift+,)"
+        title={tr("pages.audiobooks.player.speed_control.playback_speed_shift_shift")}
       >
         {formatRate(value)}
       </button>
@@ -103,7 +106,7 @@ export function SpeedControl({ value, onChange }: SpeedControlProps) {
       {open && (
         <div
           role="dialog"
-          aria-label="Playback speed"
+          aria-label={tr("pages.audiobooks.player.speed_control.playback_speed")}
           className="absolute right-0 bottom-full mb-2 flex w-[230px] flex-col gap-3 rounded-lg bg-black/90 px-4 py-3 shadow-xl backdrop-blur-sm"
           onKeyDown={handlePopoverKeyDown}
         >
@@ -131,9 +134,10 @@ export function SpeedControl({ value, onChange }: SpeedControlProps) {
                 key={preset}
                 type="button"
                 data-active={preset === value ? "true" : undefined}
-                className={`rounded-full px-2.5 py-1 text-xs tabular-nums transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none ${
-                  preset === value ? "bg-white/15 text-white" : "text-white/60"
-                }`}
+                className={
+                  "rounded-full px-2.5 py-1 text-xs tabular-nums transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none " +
+                  (preset === value ? "bg-white/15 text-white" : "text-white/60")
+                }
                 onClick={() => onChange(preset)}
               >
                 {formatRate(preset)}
@@ -141,7 +145,9 @@ export function SpeedControl({ value, onChange }: SpeedControlProps) {
             ))}
           </div>
 
-          <p className="text-center text-[11px] text-white/40">Remembered for this book</p>
+          <p className="text-center text-[11px] text-white/40">
+            {tr("pages.audiobooks.player.speed_control.remembered_for_this_book")}
+          </p>
         </div>
       )}
     </div>
@@ -159,11 +165,16 @@ function StepperButton({
   onHoldStart: (direction: 1 | -1) => void;
   onHoldStop: () => void;
 }) {
+  useUILanguage();
   const Icon = direction === 1 ? Plus : Minus;
   return (
     <button
       type="button"
-      aria-label={direction === 1 ? "Faster" : "Slower"}
+      aria-label={
+        direction === 1
+          ? tr("pages.audiobooks.player.speed_control.faster")
+          : tr("pages.audiobooks.player.speed_control.slower")
+      }
       disabled={disabled}
       className="flex h-8 w-8 items-center justify-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
       onPointerDown={(e) => {

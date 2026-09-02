@@ -23,8 +23,12 @@ import type { AuditLogEntry, OperationalLogEntry } from "@/api/types";
 import { useAdminLogStream } from "@/hooks/admin/useAdminLogStream";
 import { formatDateTime as formatPreferredDateTime } from "@/lib/datetime";
 import { useDateTimeFormat } from "@/hooks/useDateTimeFormat";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function AdminLogs() {
+  useUILanguage();
+  useUILanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const focus = searchParams.get("focus") ?? "";
   const playbackFocused = focus === "playback";
@@ -77,14 +81,16 @@ export default function AdminLogs() {
     <div className="space-y-6">
       <div className="page-header gap-5">
         <div className="space-y-3">
-          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">Logs</h1>
+          <h1 className="page-title text-[clamp(2rem,4vw,3rem)]">{tr("pages.admin_logs.logs")}</h1>
           <p className="page-subtitle text-sm sm:text-base">
-            Search application logs and request audit trails without leaving the admin UI.
+            {tr(
+              "pages.admin_logs.search_application_logs_and_request_audit_trails_without_leaving_the",
+            )}
           </p>
         </div>
         <div className="text-right">
           <div className="text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase">
-            Stream
+            {tr("pages.admin_logs.stream")}
           </div>
           <div className="text-sm">{formatConnectionState(activeStream.connectionState)}</div>
           {activeStream.error && (
@@ -97,7 +103,7 @@ export default function AdminLogs() {
               className="mt-1 h-7 px-2 text-xs"
               onClick={activeStream.reconnect}
             >
-              Reconnect
+              {tr("pages.admin_logs.reconnect")}
             </Button>
           )}
         </div>
@@ -106,14 +112,14 @@ export default function AdminLogs() {
       <div className="surface-panel rounded-2xl border-0 px-3 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <Input
-            placeholder="Playback Session ID"
+            placeholder={tr("pages.admin_logs.playback_session_id")}
             value={playbackSessionID}
             onChange={(e) => updateSearchParam("playback_session_id", e.target.value)}
             className="max-w-md font-mono text-xs"
           />
           {playbackSessionID && (
             <div className="bg-background border-border rounded-md border px-3 py-1.5 text-xs">
-              Playback session {shortID(playbackSessionID)}
+              {tr("pages.admin_logs.playback_session")} {shortID(playbackSessionID)}
             </div>
           )}
         </div>
@@ -136,26 +142,26 @@ export default function AdminLogs() {
         onValueChange={(value) => updateSearchParam("tab", value)}
       >
         <TabsList>
-          <TabsTrigger value="app">Application</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
+          <TabsTrigger value="app">{tr("pages.admin_logs.application")}</TabsTrigger>
+          <TabsTrigger value="audit">{tr("pages.admin_logs.audit")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="app" className="space-y-4">
           <div className="surface-panel-subtle flex flex-wrap gap-2 rounded-xl p-3">
             <Input
-              placeholder="Request ID"
+              placeholder={tr("pages.admin_logs.request_id")}
               value={requestID}
               onChange={(e) => updateSearchParam("request_id", e.target.value)}
               className="max-w-xs font-mono"
             />
             <Input
-              placeholder="Message contains..."
+              placeholder={tr("pages.admin_logs.message_contains")}
               value={messageQuery}
               onChange={(e) => updateSearchParam("q", e.target.value)}
               className="max-w-sm"
             />
             <Input
-              placeholder="Component"
+              placeholder={tr("pages.admin_logs.component")}
               value={component}
               onChange={(e) => updateSearchParam("component", e.target.value)}
               className="max-w-xs"
@@ -163,45 +169,50 @@ export default function AdminLogs() {
             {playbackFocused && playbackSessionID && (
               <button
                 type="button"
-                className={`rounded-md border px-3 py-2 text-xs font-medium ${
-                  component === "ffmpeg"
+                className={
+                  "rounded-md border px-3 py-2 text-xs font-medium " +
+                  (component === "ffmpeg"
                     ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-background text-muted-foreground"
-                }`}
+                    : "border-border bg-background text-muted-foreground")
+                }
                 onClick={() =>
                   updateSearchParam("component", component === "ffmpeg" ? "" : "ffmpeg")
                 }
               >
-                {component === "ffmpeg" ? "Showing ffmpeg only" : "Filter ffmpeg"}
+                {component === "ffmpeg"
+                  ? tr("pages.admin_logs.showing_ffmpeg_only")
+                  : tr("pages.admin_logs.filter_ffmpeg")}
               </button>
             )}
           </div>
           <LogTable
             rows={appLogs.rows}
             isLoading={appLogs.isConnecting && appLogs.rows.length === 0}
-            empty="No application logs matched the current filters."
+            empty={tr("pages.admin_logs.no_application_logs_matched_the_current_filters")}
             renderRow={(entry) => (
               <OperationalLogRow
                 entry={entry}
-                key={`app-${entry.id}`}
+                key={"app-" + entry.id}
                 highlight={playbackFocused && entry.component === "ffmpeg"}
                 onSelectEntry={setSelectedEntry}
               />
             )}
             header={
               <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Level</TableHead>
-                <TableHead>Component</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Message</TableHead>
+                <TableHead>{tr("pages.admin_logs.time")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.level")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.component")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.status")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.duration")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.message")}</TableHead>
               </TableRow>
             }
           />
           {appLogs.nextCursor && (
             <p className="text-muted-foreground text-xs">
-              More rows available. Phase 1 keeps cursor pagination server-side only.
+              {tr(
+                "pages.admin_logs.more_rows_available_phase_1_keeps_cursor_pagination_server_side",
+              )}
             </p>
           )}
         </TabsContent>
@@ -209,19 +220,19 @@ export default function AdminLogs() {
         <TabsContent value="audit" className="space-y-4">
           <div className="surface-panel-subtle flex flex-wrap gap-2 rounded-xl p-3">
             <Input
-              placeholder="Request ID"
+              placeholder={tr("pages.admin_logs.request_id")}
               value={requestID}
               onChange={(e) => updateSearchParam("request_id", e.target.value)}
               className="max-w-xs font-mono"
             />
             <Input
-              placeholder="Method"
+              placeholder={tr("pages.admin_logs.method")}
               value={method}
               onChange={(e) => updateSearchParam("method", e.target.value)}
               className="max-w-[120px]"
             />
             <Input
-              placeholder="Client IP"
+              placeholder={tr("pages.admin_logs.client_ip")}
               value={clientIP}
               onChange={(e) => updateSearchParam("client_ip", e.target.value)}
               className="max-w-xs font-mono"
@@ -230,25 +241,25 @@ export default function AdminLogs() {
           <LogTable
             rows={auditLogs.rows}
             isLoading={auditLogs.isConnecting && auditLogs.rows.length === 0}
-            empty="No audit logs matched the current filters."
-            renderRow={(entry) => <AuditLogRow entry={entry} key={`audit-${entry.id}`} />}
+            empty={tr("pages.admin_logs.no_audit_logs_matched_the_current_filters")}
+            renderRow={(entry) => <AuditLogRow entry={entry} key={"audit-" + entry.id} />}
             header={
               <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead>Path</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Session</TableHead>
-                <TableHead>Playback</TableHead>
-                <TableHead>Request</TableHead>
+                <TableHead>{tr("pages.admin_logs.time")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.method")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.path")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.status")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.client")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.user")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.session")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.playback")}</TableHead>
+                <TableHead>{tr("pages.admin_logs.request")}</TableHead>
               </TableRow>
             }
           />
           {auditLogs.nextCursor && (
             <p className="text-muted-foreground text-xs">
-              More rows available. Add cursor paging in a follow-up UI pass if needed.
+              {tr("pages.admin_logs.more_rows_available_add_cursor_paging_in_a_follow_up")}
             </p>
           )}
         </TabsContent>
@@ -267,27 +278,43 @@ export default function AdminLogs() {
               </SheetHeader>
               <div className="space-y-4 overflow-y-auto px-4 pb-6">
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <DetailField label="Request ID" value={selectedEntry.request_id || "-"} mono />
-                  <DetailField label="Node" value={selectedEntry.node_id || "-"} />
-                  <DetailField label="Method" value={stringAttr(selectedEntry, "method")} />
-                  <DetailField label="Status" value={stringAttr(selectedEntry, "status")} />
-                  <DetailField label="Duration" value={durationAttr(selectedEntry)} />
                   <DetailField
-                    label="Client IP"
+                    label={tr("pages.admin_logs.request_id")}
+                    value={selectedEntry.request_id || "-"}
+                    mono
+                  />
+                  <DetailField
+                    label={tr("pages.admin_logs.node")}
+                    value={selectedEntry.node_id || "-"}
+                  />
+                  <DetailField
+                    label={tr("pages.admin_logs.method")}
+                    value={stringAttr(selectedEntry, "method")}
+                  />
+                  <DetailField
+                    label={tr("pages.admin_logs.status")}
+                    value={stringAttr(selectedEntry, "status")}
+                  />
+                  <DetailField
+                    label={tr("pages.admin_logs.duration")}
+                    value={durationAttr(selectedEntry)}
+                  />
+                  <DetailField
+                    label={tr("pages.admin_logs.client_ip")}
                     value={selectedEntry.client_ip || stringAttr(selectedEntry, "client_ip")}
                     mono
                   />
                   <DetailField
-                    label="User ID"
+                    label={tr("pages.admin_logs.user_id")}
                     value={selectedEntry.user_id ? String(selectedEntry.user_id) : "-"}
                   />
                   <DetailField
-                    label="Session ID"
+                    label={tr("pages.admin_logs.session_id")}
                     value={selectedEntry.session_id || stringAttr(selectedEntry, "session_id")}
                     mono
                   />
                   <DetailField
-                    label="Playback Session"
+                    label={tr("pages.admin_logs.playback_session_2aeb225d")}
                     value={
                       selectedEntry.playback_session_id ||
                       stringAttr(selectedEntry, "playback_session_id")
@@ -308,17 +335,19 @@ export default function AdminLogs() {
                       setSelectedEntry(null);
                     }}
                   >
-                    View related playback session logs
+                    {tr("pages.admin_logs.view_related_playback_session_logs")}
                   </button>
                 )}
                 <div>
-                  <div className="mb-1 text-sm font-medium">Path</div>
+                  <div className="mb-1 text-sm font-medium">{tr("pages.admin_logs.path")}</div>
                   <div className="bg-muted rounded-md px-3 py-2 font-mono text-xs break-all">
                     {stringAttr(selectedEntry, "path")}
                   </div>
                 </div>
                 <div>
-                  <div className="mb-1 text-sm font-medium">Attributes</div>
+                  <div className="mb-1 text-sm font-medium">
+                    {tr("pages.admin_logs.attributes")}
+                  </div>
                   <pre className="bg-muted max-h-[420px] overflow-auto rounded-md p-3 text-xs leading-5 break-all whitespace-pre-wrap">
                     {JSON.stringify(selectedEntry.attrs ?? {}, null, 2)}
                   </pre>
@@ -345,7 +374,14 @@ function LogTable<T>({
   header: ReactNode;
   renderRow: (row: T) => ReactNode;
 }) {
-  if (isLoading) return <div className="text-muted-foreground py-8 text-sm">Loading logs...</div>;
+  useUILanguage();
+  useUILanguage();
+  if (isLoading)
+    return (
+      <div className="text-muted-foreground py-8 text-sm">
+        {tr("pages.admin_logs.loading_logs")}
+      </div>
+    );
   if (rows.length === 0) return <div className="text-muted-foreground py-8 text-sm">{empty}</div>;
 
   return (
@@ -365,10 +401,12 @@ const OperationalLogRow = memo(function OperationalLogRow({
   highlight?: boolean;
   onSelectEntry: (entry: OperationalLogEntry) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   useDateTimeFormat();
   return (
     <TableRow
-      className={`cursor-pointer ${highlight ? "bg-primary/5" : ""}`}
+      className={"cursor-pointer " + (highlight ? "bg-primary/5" : "")}
       onClick={() => onSelectEntry(entry)}
     >
       <TableCell className="whitespace-nowrap">{formatDateTime(entry.timestamp)}</TableCell>
@@ -386,6 +424,8 @@ const OperationalLogRow = memo(function OperationalLogRow({
 });
 
 const AuditLogRow = memo(function AuditLogRow({ entry }: { entry: AuditLogEntry }) {
+  useUILanguage();
+  useUILanguage();
   useDateTimeFormat();
   return (
     <TableRow>
@@ -398,7 +438,9 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: { entry: AuditLogEntry 
       </TableCell>
       <TableCell>{entry.status_code}</TableCell>
       <TableCell className="font-mono text-xs">{formatClientIP(entry.client_ip)}</TableCell>
-      <TableCell>{entry.user_id ? `#${entry.user_id}` : "-"}</TableCell>
+      <TableCell>
+        {entry.user_id ? tr("pages.admin_logs.user_id_83dea131", { user_id: entry.user_id }) : "-"}
+      </TableCell>
       <TableCell className="font-mono text-xs">{entry.session_id || "-"}</TableCell>
       <TableCell className="font-mono text-xs">{entry.playback_session_id || "-"}</TableCell>
       <TableCell className="font-mono text-xs">{entry.request_id || "-"}</TableCell>
@@ -419,6 +461,8 @@ function PlaybackSessionSummary({
   component: string;
   onFilterFFmpeg: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const { appCount, ffmpegCount, auditCount, firstSeen, lastSeen, nodes } = useMemo(() => {
     const matchingAppRows = appRows.filter((row) => matchesPlaybackSession(row, playbackSessionID));
     const matchingAuditRows = auditRows.filter((row) =>
@@ -444,29 +488,44 @@ function PlaybackSessionSummary({
     <div className="bg-card border-border rounded-lg border p-4 text-sm">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap gap-3 md:grid md:flex-1 md:grid-cols-6">
-          <SummaryMetric label="Playback Session" value={shortID(playbackSessionID)} mono />
-          <SummaryMetric label="Application Logs" value={String(appCount)} />
-          <SummaryMetric label="FFmpeg Logs" value={String(ffmpegCount)} />
-          <SummaryMetric label="Audit Logs" value={String(auditCount)} />
-          <SummaryMetric label="First Seen" value={firstSeen ? formatDateTime(firstSeen) : "-"} />
           <SummaryMetric
-            label="Nodes Seen"
+            label={tr("pages.admin_logs.playback_session_2aeb225d")}
+            value={shortID(playbackSessionID)}
+            mono
+          />
+          <SummaryMetric label={tr("pages.admin_logs.application_logs")} value={String(appCount)} />
+          <SummaryMetric label={tr("pages.admin_logs.ffmpeg_logs")} value={String(ffmpegCount)} />
+          <SummaryMetric label={tr("pages.admin_logs.audit_logs")} value={String(auditCount)} />
+          <SummaryMetric
+            label={tr("pages.admin_logs.first_seen")}
+            value={firstSeen ? formatDateTime(firstSeen) : "-"}
+          />
+          <SummaryMetric
+            label={tr("pages.admin_logs.nodes_seen")}
             value={nodes.size > 0 ? Array.from(nodes).join(", ") : "-"}
             mono={nodes.size > 0}
           />
-          {lastSeen && <SummaryMetric label="Last Seen" value={formatDateTime(lastSeen)} />}
+          {lastSeen && (
+            <SummaryMetric
+              label={tr("pages.admin_logs.last_seen")}
+              value={formatDateTime(lastSeen)}
+            />
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onFilterFFmpeg}
-            className={`rounded-md border px-3 py-2 text-xs font-medium ${
-              component === "ffmpeg"
+            className={
+              "rounded-md border px-3 py-2 text-xs font-medium " +
+              (component === "ffmpeg"
                 ? "border-primary bg-primary/10 text-primary"
-                : "border-border bg-background text-muted-foreground"
-            }`}
+                : "border-border bg-background text-muted-foreground")
+            }
           >
-            {component === "ffmpeg" ? "Showing ffmpeg only" : "Open ffmpeg logs"}
+            {component === "ffmpeg"
+              ? tr("pages.admin_logs.showing_ffmpeg_only")
+              : tr("pages.admin_logs.open_ffmpeg_logs")}
           </button>
         </div>
       </div>
@@ -483,6 +542,8 @@ function SummaryMetric({
   value: string;
   mono?: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div>
       <div className="text-muted-foreground mb-1 text-xs">{label}</div>
@@ -549,6 +610,8 @@ function DetailField({
   value: string;
   mono?: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div>
       <div className="text-muted-foreground mb-1 text-xs">{label}</div>

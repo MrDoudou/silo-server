@@ -247,3 +247,28 @@ func TestHandleBrowseGenreRequiresMediaType(t *testing.T) {
 		t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestWriteRequestServiceErrorIncludesQuotaTranslationParams(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeRequestServiceError(rec, mediarequests.QuotaError{Used: 3, Limit: 5, WindowDays: 30})
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusTooManyRequests)
+	}
+	var response struct {
+		Error  string         `json:"error"`
+		Params map[string]any `json:"params"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Error != "quota_exceeded" {
+		t.Fatalf("error = %q, want quota_exceeded", response.Error)
+	}
+	if got := response.Params["limit"]; got != float64(5) {
+		t.Fatalf("limit = %v, want 5", got)
+	}
+	if got := response.Params["window_days"]; got != float64(30) {
+		t.Fatalf("window_days = %v, want 30", got)
+	}
+}

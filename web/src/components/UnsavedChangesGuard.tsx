@@ -12,6 +12,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useHasUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 /**
  * Confirms before an in-app navigation throws away staged edits.
@@ -28,6 +30,7 @@ import { useHasUnsavedChanges } from "@/hooks/useUnsavedChanges";
  * `<MemoryRouter>`.
  */
 export function UnsavedChangesGuard() {
+  useUILanguage();
   const hasUnsavedChanges = useHasUnsavedChanges();
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -56,13 +59,17 @@ export function UnsavedChangesGuard() {
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {tr("components.unsaved_changes_guard.discard_unsaved_changes")}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            This page has edits that were never saved. Leaving now throws them away.
+            {tr(
+              "components.unsaved_changes_guard.this_page_has_edits_that_were_never_saved_leaving_now",
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{tr("common.actions.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             onClick={() => {
@@ -70,7 +77,7 @@ export function UnsavedChangesGuard() {
               blocker.proceed?.();
             }}
           >
-            Discard
+            {tr("components.unsaved_changes_guard.discard")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

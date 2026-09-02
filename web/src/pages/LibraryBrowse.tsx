@@ -27,6 +27,8 @@ import {
   type AudiobookBrowseAxis,
   type LibraryBrowseType,
 } from "./libraryPageSearchParams";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 interface LibraryBrowseProps {
   libraryId: number;
@@ -41,10 +43,10 @@ interface LibraryBrowseProps {
 }
 
 const AXIS_LABELS: Record<AudiobookBrowseAxis, string> = {
-  books: "Books",
-  series: "Series",
-  authors: "Authors",
-  narrators: "Narrators",
+  books: "pages.library_browse.books",
+  series: "pages.library_browse.series",
+  authors: "pages.library_browse.authors",
+  narrators: "pages.library_browse.narrators",
 };
 
 const AXIS_GROUP_BY: Record<Exclude<AudiobookBrowseAxis, "books">, AudiobookGroupBy> = {
@@ -66,10 +68,11 @@ function AudiobookAxisTabs({
   value: AudiobookBrowseAxis;
   onChange: (axis: AudiobookBrowseAxis) => void;
 }) {
+  useUILanguage();
   return (
     <div
       role="radiogroup"
-      aria-label="Browse audiobooks by"
+      aria-label={tr("pages.library_browse.browse_audiobooks_by")}
       className="surface-panel inline-flex items-center gap-1 rounded-full p-1"
     >
       {AUDIOBOOK_BROWSE_AXES.map((axis) => {
@@ -92,7 +95,7 @@ function AudiobookAxisTabs({
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {AXIS_LABELS[axis]}
+            {tr(AXIS_LABELS[axis])}
           </button>
         );
       })}
@@ -108,6 +111,7 @@ export default function LibraryBrowse({
   onBrowseTypeChange,
   onQueryDefinitionChange,
 }: LibraryBrowseProps) {
+  useUILanguage();
   const limit = 60;
   const sortRelevanceScope =
     browseType === "episode"
@@ -217,7 +221,9 @@ export default function LibraryBrowse({
     <div className="space-y-5 py-2 sm:space-y-6">
       {libraryType === "series" ? (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-muted-foreground text-sm font-medium">Type</span>
+          <span className="text-muted-foreground text-sm font-medium">
+            {tr("pages.library_browse.type")}
+          </span>
           <Select
             value={browseType}
             onValueChange={(value) => onBrowseTypeChange(value as LibraryBrowseType)}
@@ -226,8 +232,8 @@ export default function LibraryBrowse({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="series">Series</SelectItem>
-              <SelectItem value="episode">Episodes</SelectItem>
+              <SelectItem value="series">{tr("pages.library_browse.series")}</SelectItem>
+              <SelectItem value="episode">{tr("pages.library_browse.episodes")}</SelectItem>
             </SelectContent>
           </Select>
         </div>

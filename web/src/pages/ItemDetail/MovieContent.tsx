@@ -40,8 +40,11 @@ import {
 } from "@/lib/permissions";
 import { formatRuntimeMinutes } from "@/lib/mediaFormat";
 import { useQualityPreference } from "@/hooks/queries/qualityPreference";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export default function MovieContent({ item }: { item: ItemDetail & { type: "movie" } }) {
+  useUILanguage();
   const { translating: overviewTranslating, onTranslate: onTranslateOverview } =
     useOnViewTranslation(item);
   const navigate = useNavigate();
@@ -319,7 +322,7 @@ export default function MovieContent({ item }: { item: ItemDetail & { type: "mov
       <div className="page-shell detail-supporting-content space-y-12 py-10 sm:space-y-14">
         {canCurateMetadata && (
           <MediaLocations
-            title="Media locations"
+            title={tr("pages.item_detail.movie_content.media_locations")}
             versions={item.versions}
             onShowMediaInfo={openMediaInfo}
           />
@@ -331,7 +334,9 @@ export default function MovieContent({ item }: { item: ItemDetail & { type: "mov
 
         {item.cast && item.cast.length > 0 && (
           <div>
-            <h2 className="mb-5 text-xl font-semibold tracking-tight">Cast</h2>
+            <h2 className="mb-5 text-xl font-semibold tracking-tight">
+              {tr("pages.item_detail.movie_content.cast")}
+            </h2>
             <CastCarousel cast={item.cast} />
           </div>
         )}
@@ -359,7 +364,7 @@ export default function MovieContent({ item }: { item: ItemDetail & { type: "mov
       )}
       {canCurateMetadata && (
         <SplitItemDialog
-          key={`split-${item.content_id}`}
+          key={"split-" + item.content_id}
           item={item}
           open={splitOpen}
           onOpenChange={setSplitOpen}

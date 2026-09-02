@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/i18n/toast";
+
 import { api } from "@/api/client";
 import type {
   MarkerEditAuditResponse,
@@ -9,6 +10,7 @@ import type {
   MarkerProviderValidationResponse,
 } from "@/api/types";
 import { adminKeys } from "@/hooks/queries/keys";
+import { tr } from "@/i18n/translate";
 
 const ADMIN_STALE_TIME = 30_000;
 
@@ -44,7 +46,7 @@ export function useUpdateMarkerProvider() {
         body: JSON.stringify(patch),
       }),
     onSuccess: async (_data, variables) => {
-      toast.success("Marker provider settings saved");
+      toast.success("feedback.queries.admin.markers.marker_provider_settings_saved");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adminKeys.markerProviders() }),
         queryClient.invalidateQueries({
@@ -56,7 +58,9 @@ export function useUpdateMarkerProvider() {
       ]);
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save marker provider settings");
+      toast.error("errors.queries.admin.markers.failed_to_save_marker_provider_settings", {
+        error: err,
+      });
     },
   });
 }
@@ -77,13 +81,21 @@ export function useValidateMarkerProvider() {
       const provider = variables.provider;
       queryClient.setQueryData(adminKeys.markerProviderValidation(provider), data);
       if (data.valid) {
-        toast.success(`${label} validated`);
+        toast.success("feedback.queries.admin.markers.provider_validated", {
+          values: { provider: label },
+        });
       } else {
-        toast.error(data.error || `${label} validation failed`);
+        toast.error("errors.queries.admin.markers.reported_message", {
+          values: {
+            message:
+              data.error ||
+              tr("feedback.queries.admin.markers.provider_validation_failed", { provider: label }),
+          },
+        });
       }
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Marker provider validation failed");
+      toast.error("errors.queries.admin.markers.marker_provider_validation_failed", { error: err });
     },
   });
 }

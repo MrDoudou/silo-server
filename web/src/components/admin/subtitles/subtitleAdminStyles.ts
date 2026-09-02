@@ -1,11 +1,38 @@
 import { cn } from "@/lib/utils";
 
+import { tr } from "@/i18n/translate";
+
 export const SUBTITLE_PROVIDER_OPTIONS = [
-  { value: "all", label: "All" },
-  { value: "upload", label: "Upload" },
-  { value: "opensubtitles", label: "OpenSubtitles" },
-  { value: "subdl", label: "SubDL" },
-  { value: "subsource", label: "SubSource" },
+  {
+    value: "all",
+    get label() {
+      return tr("components.admin.subtitles.subtitle_admin_styles.all");
+    },
+  },
+  {
+    value: "upload",
+    get label() {
+      return tr("common.actions.upload");
+    },
+  },
+  {
+    value: "opensubtitles",
+    get label() {
+      return tr("components.admin.subtitles.subtitle_admin_styles.open_subtitles");
+    },
+  },
+  {
+    value: "subdl",
+    get label() {
+      return tr("components.admin.subtitles.subtitle_admin_styles.sub_dl");
+    },
+  },
+  {
+    value: "subsource",
+    get label() {
+      return tr("components.admin.subtitles.subtitle_admin_styles.sub_source");
+    },
+  },
 ] as const;
 
 export function providerBadgeClass(provider: string): string {

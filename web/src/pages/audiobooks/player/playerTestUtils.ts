@@ -7,6 +7,8 @@ import {
   type AudiobookPrefs,
 } from "./useAudiobookPrefs";
 
+import { tr } from "@/i18n/translate";
+
 export function makePlayback(over: Partial<AudiobookPlayback> = {}): AudiobookPlayback {
   return {
     audioRef: { current: null },
@@ -50,7 +52,9 @@ export function makePrefs(over: Partial<AudiobookPrefs> = {}): AudiobookPrefs {
 export function makeChapters(starts: number[], total: number): PlayerChapter[] {
   return starts.map((start, index) => ({
     index,
-    title: `Chapter ${index + 1}`,
+    get title() {
+      return tr("pages.audiobooks.player.player_test_utils.chapter_value1", { value1: index + 1 });
+    },
     start_seconds: start,
     end_seconds: starts[index + 1] ?? total,
     source: "embedded",

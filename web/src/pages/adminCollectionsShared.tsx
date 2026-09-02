@@ -42,6 +42,8 @@ import {
 } from "@/components/ui/select";
 import { Download, ListPlus, Sparkles, TrendingUp } from "lucide-react";
 import { SyncScheduleField } from "@/components/collections/SyncScheduleField";
+import { useUILanguage } from "@/i18n/uiText";
+import { tr } from "@/i18n/translate";
 
 export type CollectionSourceType = "manual" | "mdblist" | "tmdb" | "trakt";
 export type TMDBPreset =
@@ -358,13 +360,15 @@ export function LibraryPicker({
   value: number | null;
   onChange: (libraryId: number) => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <Select
       value={value ? String(value) : undefined}
       onValueChange={(next) => onChange(Number(next))}
     >
       <SelectTrigger className="w-full sm:w-[220px]">
-        <SelectValue placeholder="Choose library" />
+        <SelectValue placeholder={tr("pages.admin_collections_shared.choose_library")} />
       </SelectTrigger>
       <SelectContent>
         {libraries.map((library) => (
@@ -414,6 +418,8 @@ function AdminCollectionSummary({
   libraries: Library[];
   sourceLabel: string;
 }) {
+  useUILanguage();
+  useUILanguage();
   const selectedLibraries = libraries
     .filter((library) => value.query_definition.library_ids.includes(library.id))
     .map((library) => library.name);
@@ -421,24 +427,32 @@ function AdminCollectionSummary({
   return (
     <Card className="surface-panel gap-0 rounded-[1.5rem] border-0 shadow-none">
       <CardHeader>
-        <CardTitle>Collection Summary</CardTitle>
-        <CardDescription>Keep the important state visible while you build.</CardDescription>
+        <CardTitle>{tr("pages.admin_collections_shared.collection_summary")}</CardTitle>
+        <CardDescription>
+          {tr("pages.admin_collections_shared.keep_the_important_state_visible_while_you_build")}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <SummaryRow label="Mode" value={value.collection_type === "smart" ? "Smart" : "Manual"} />
-        <SummaryRow label="Source" value={sourceLabel} />
         <SummaryRow
-          label="Visibility"
+          label={tr("pages.admin_collections_shared.mode")}
+          value={value.collection_type === "smart" ? "Smart" : "Manual"}
+        />
+        <SummaryRow label={tr("pages.admin_collections_shared.source")} value={sourceLabel} />
+        <SummaryRow
+          label={tr("pages.admin_collections_shared.visibility")}
           value={value.visibility === "visible" ? "Visible" : "Hidden"}
         />
-        <SummaryRow label="Featured" value={value.featured ? "Yes" : "No"} />
         <SummaryRow
-          label="Libraries"
+          label={tr("pages.admin_collections_shared.featured")}
+          value={value.featured ? "Yes" : "No"}
+        />
+        <SummaryRow
+          label={tr("pages.admin_collections_shared.libraries")}
           value={selectedLibraries.length > 0 ? selectedLibraries.join(", ") : "None selected"}
         />
         {collection ? (
           <SummaryRow
-            label="Items"
+            label={tr("pages.admin_collections_shared.items")}
             value={
               collection.collection_type === "smart" ? "\u2014" : String(collection.item_count)
             }
@@ -450,6 +464,8 @@ function AdminCollectionSummary({
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <span className="text-muted-foreground">{label}</span>
@@ -469,6 +485,8 @@ export function CollectionForm({
   initialLibraryId: number | null;
   onClose: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const createMutation = useCreateAdminCollection();
   const updateMutation = useUpdateAdminCollection();
   const [draft, setDraft] = useState(() =>
@@ -523,7 +541,7 @@ export function CollectionForm({
           { onSuccess: onClose },
         );
       }}
-      submitLabel="Save Collection"
+      submitLabel={tr("pages.admin_collections_shared.save_collection")}
       libraries={libraries.map((library) => ({ id: library.id, name: library.name }))}
       isPending={isPending}
       previewLayout="sidebar"
@@ -538,10 +556,13 @@ export function CollectionForm({
     >
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold">Libraries</h2>
+          <h2 className="text-lg font-semibold">
+            {tr("pages.admin_collections_shared.libraries")}
+          </h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Choose which libraries this collection should appear in. Smart rules apply across the
-            selected libraries.
+            {tr(
+              "pages.admin_collections_shared.choose_which_libraries_this_collection_should_appear_in_smart_rules",
+            )}
           </p>
         </div>
         <CollectionLibraryPicker
@@ -553,14 +574,16 @@ export function CollectionForm({
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold">Artwork</h2>
+          <h2 className="text-lg font-semibold">{tr("pages.admin_collections_shared.artwork")}</h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Upload collection art that will be reused across library surfaces.
+            {tr(
+              "pages.admin_collections_shared.upload_collection_art_that_will_be_reused_across_library_surfaces",
+            )}
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <ImageUploadField
-            label="Poster"
+            label={tr("pages.admin_collections_shared.poster")}
             currentUrl={collection?.poster_url}
             file={posterFile}
             onFileChange={setPosterFile}
@@ -578,7 +601,7 @@ export function CollectionForm({
             }
           />
           <ImageUploadField
-            label="Backdrop"
+            label={tr("pages.admin_collections_shared.backdrop")}
             currentUrl={collection?.backdrop_url}
             file={backdropFile}
             onFileChange={setBackdropFile}
@@ -610,6 +633,8 @@ export function SourceTypeSelector({
   onSelect: (type: CollectionSourcePick) => void;
   showTemplates?: boolean;
 }) {
+  useUILanguage();
+  useUILanguage();
   const options: {
     type: CollectionSourcePick;
     icon: typeof ListPlus;
@@ -622,21 +647,50 @@ export function SourceTypeSelector({
     options.push({
       type: "templates",
       icon: Sparkles,
-      label: "Browse Templates",
-      subtitle: "Start from a curated TMDB, Trakt, or MDBList preset",
+      label: tr("pages.admin_collections_shared.browse_templates"),
+      get subtitle() {
+        return tr(
+          "pages.admin_collections_shared.start_from_a_curated_tmdb_trakt_or_mdblist_preset",
+        );
+      },
       highlight: true,
     });
   }
 
   options.push(
-    { type: "manual", icon: ListPlus, label: "Manual", subtitle: "Curate items by hand" },
-    { type: "mdblist", icon: Download, label: "MDBList", subtitle: "Sync from an MDBList URL" },
-    { type: "tmdb", icon: TrendingUp, label: "TMDB", subtitle: "Auto-populate from TMDB presets" },
+    {
+      type: "manual",
+      icon: ListPlus,
+      label: tr("pages.admin_collections_shared.manual"),
+      get subtitle() {
+        return tr("pages.admin_collections_shared.curate_items_by_hand");
+      },
+    },
+    {
+      type: "mdblist",
+      icon: Download,
+      label: tr("pages.admin_collections_shared.mdblist"),
+      get subtitle() {
+        return tr("pages.admin_collections_shared.sync_from_an_mdblist_url");
+      },
+    },
+    {
+      type: "tmdb",
+      icon: TrendingUp,
+      label: tr("pages.admin_collections_shared.tmdb"),
+      get subtitle() {
+        return tr("pages.admin_collections_shared.auto_populate_from_tmdb_presets");
+      },
+    },
     {
       type: "trakt",
       icon: TrendingUp,
-      label: "Trakt",
-      subtitle: "Sync trending, popular, and profile recommendations",
+      label: tr("pages.admin_collections_shared.trakt"),
+      get subtitle() {
+        return tr(
+          "pages.admin_collections_shared.sync_trending_popular_and_profile_recommendations",
+        );
+      },
     },
   );
 
@@ -678,6 +732,8 @@ function ExternalEditorShell({
   summary: ReactNode;
   children: ReactNode;
 }) {
+  useUILanguage();
+  useUILanguage();
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <Card>
@@ -701,6 +757,8 @@ export function TMDBPresetForm({
   initialLibraryId: number | null;
   onClose: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const mutation = useImportTMDBCollection();
   const [libraryIds, setLibraryIds] = useState<number[]>(() =>
     initialLibraryId ? [initialLibraryId] : libraries[0]?.id ? [libraries[0].id] : [],
@@ -757,20 +815,28 @@ export function TMDBPresetForm({
 
   return (
     <ExternalEditorShell
-      title="TMDB Collection"
-      description="Choose a TMDB preset once, then let sync keep the shelf fresh."
+      title={tr("pages.admin_collections_shared.tmdb_collection")}
+      description={tr(
+        "pages.admin_collections_shared.choose_a_tmdb_preset_once_then_let_sync_keep_the",
+      )}
       summary={
         <Card className="gap-0">
           <CardHeader>
-            <CardTitle>Import Summary</CardTitle>
+            <CardTitle>{tr("pages.admin_collections_shared.import_summary")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <SummaryRow label="Preset" value={getTMDBPresetLabel(preset)} />
+            <SummaryRow
+              label={tr("pages.admin_collections_shared.preset")}
+              value={getTMDBPresetLabel(preset)}
+            />
             {tmdbPresetNeedsTimeWindow(preset) ? (
-              <SummaryRow label="Window" value={timeWindow === "day" ? "Daily" : "Weekly"} />
+              <SummaryRow
+                label={tr("pages.admin_collections_shared.window")}
+                value={timeWindow === "day" ? "Daily" : "Weekly"}
+              />
             ) : null}
             <SummaryRow
-              label="Media"
+              label={tr("pages.admin_collections_shared.media")}
               value={
                 normalizedMediaType === "all"
                   ? "All"
@@ -779,7 +845,10 @@ export function TMDBPresetForm({
                     : "Movies"
               }
             />
-            <SummaryRow label="Featured" value={featured ? "Yes" : "No"} />
+            <SummaryRow
+              label={tr("pages.admin_collections_shared.featured")}
+              value={featured ? "Yes" : "No"}
+            />
           </CardContent>
         </Card>
       }
@@ -787,7 +856,7 @@ export function TMDBPresetForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>Libraries</Label>
+            <Label>{tr("pages.admin_collections_shared.libraries")}</Label>
             <CollectionLibraryPicker
               libraries={libraries}
               value={libraryIds}
@@ -796,55 +865,75 @@ export function TMDBPresetForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="tmdb-title">Collection Title</Label>
+            <Label htmlFor="tmdb-title">
+              {tr("pages.admin_collections_shared.collection_title")}
+            </Label>
             <Input
               id="tmdb-title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Trending Movies This Week"
+              placeholder={tr("pages.admin_collections_shared.trending_movies_this_week")}
               required
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="tmdb-description">Description</Label>
+          <Label htmlFor="tmdb-description">
+            {tr("pages.admin_collections_shared.description")}
+          </Label>
           <Input
             id="tmdb-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Optional collection summary"
+            placeholder={tr("pages.admin_collections_shared.optional_collection_summary")}
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>Preset</Label>
+            <Label>{tr("pages.admin_collections_shared.preset")}</Label>
             <Select value={preset} onValueChange={(v) => setPreset(v as TMDBPreset)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="trending">Trending</SelectItem>
-                <SelectItem value="popular">Popular</SelectItem>
-                <SelectItem value="top_rated">Top Rated</SelectItem>
-                <SelectItem value="now_playing">Now Playing</SelectItem>
-                <SelectItem value="upcoming">Upcoming</SelectItem>
-                <SelectItem value="airing_today">Airing Today</SelectItem>
-                <SelectItem value="on_the_air">On The Air</SelectItem>
+                <SelectItem value="trending">
+                  {tr("pages.admin_collections_shared.trending")}
+                </SelectItem>
+                <SelectItem value="popular">
+                  {tr("pages.admin_collections_shared.popular")}
+                </SelectItem>
+                <SelectItem value="top_rated">
+                  {tr("pages.admin_collections_shared.top_rated")}
+                </SelectItem>
+                <SelectItem value="now_playing">
+                  {tr("pages.admin_collections_shared.now_playing")}
+                </SelectItem>
+                <SelectItem value="upcoming">
+                  {tr("pages.admin_collections_shared.upcoming")}
+                </SelectItem>
+                <SelectItem value="airing_today">
+                  {tr("pages.admin_collections_shared.airing_today")}
+                </SelectItem>
+                <SelectItem value="on_the_air">
+                  {tr("pages.admin_collections_shared.on_the_air")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
           {tmdbPresetNeedsTimeWindow(preset) ? (
             <div className="space-y-2">
-              <Label>Time Window</Label>
+              <Label>{tr("pages.admin_collections_shared.time_window")}</Label>
               <Select value={timeWindow} onValueChange={(v) => setTimeWindow(v as TMDBTimeWindow)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="day">Daily</SelectItem>
-                  <SelectItem value="week">Weekly</SelectItem>
+                  <SelectItem value="day">{tr("pages.admin_collections_shared.daily")}</SelectItem>
+                  <SelectItem value="week">
+                    {tr("pages.admin_collections_shared.weekly")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -853,7 +942,7 @@ export function TMDBPresetForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>Media Type</Label>
+            <Label>{tr("pages.admin_collections_shared.media_type")}</Label>
             <Select
               value={normalizedMediaType}
               onValueChange={(v) => setMediaType(v as TMDBMediaType)}
@@ -864,13 +953,17 @@ export function TMDBPresetForm({
               </SelectTrigger>
               <SelectContent>
                 {allowedMediaTypes.includes("all") ? (
-                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="all">{tr("pages.admin_collections_shared.all")}</SelectItem>
                 ) : null}
                 {allowedMediaTypes.includes("movie") ? (
-                  <SelectItem value="movie">Movies</SelectItem>
+                  <SelectItem value="movie">
+                    {tr("pages.admin_collections_shared.movies")}
+                  </SelectItem>
                 ) : null}
                 {allowedMediaTypes.includes("tv") ? (
-                  <SelectItem value="tv">TV Shows</SelectItem>
+                  <SelectItem value="tv">
+                    {tr("pages.admin_collections_shared.tv_shows")}
+                  </SelectItem>
                 ) : null}
               </SelectContent>
             </Select>
@@ -878,7 +971,7 @@ export function TMDBPresetForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="tmdb-limit">Max Items</Label>
+          <Label htmlFor="tmdb-limit">{tr("pages.admin_collections_shared.max_items")}</Label>
           <Input
             id="tmdb-limit"
             type="number"
@@ -888,20 +981,20 @@ export function TMDBPresetForm({
             inputMode="numeric"
             value={limit}
             onChange={(event) => setLimit(event.target.value)}
-            placeholder="Defaults to 20"
+            placeholder={tr("pages.admin_collections_shared.defaults_to_20")}
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <ImageUploadField
-            label="Poster"
+            label={tr("pages.admin_collections_shared.poster")}
             file={posterFile}
             onFileChange={setPosterFile}
             sourceUrl={posterSourceUrl}
             onSourceUrlChange={setPosterSourceUrl}
           />
           <ImageUploadField
-            label="Backdrop"
+            label={tr("pages.admin_collections_shared.backdrop")}
             file={backdropFile}
             onFileChange={setBackdropFile}
             sourceUrl={backdropSourceUrl}
@@ -919,9 +1012,11 @@ export function TMDBPresetForm({
 
         <div className="border-border flex items-center justify-between rounded-lg border px-4 py-3">
           <div>
-            <p className="text-sm font-medium">Feature on library tab</p>
+            <p className="text-sm font-medium">
+              {tr("pages.admin_collections_shared.feature_on_library_tab")}
+            </p>
             <p className="text-muted-foreground text-xs">
-              Surface this collection in the hero shelves.
+              {tr("pages.admin_collections_shared.surface_this_collection_in_the_hero_shelves")}
             </p>
           </div>
           <Switch checked={featured} onCheckedChange={setFeatured} />
@@ -932,7 +1027,9 @@ export function TMDBPresetForm({
           className="w-full"
           disabled={mutation.isPending || libraryIds.length === 0 || hasInvalidLimit}
         >
-          {mutation.isPending ? "Importing..." : "Import TMDB Collection"}
+          {mutation.isPending
+            ? tr("pages.admin_collections_shared.importing")
+            : tr("pages.admin_collections_shared.import_tmdb_collection")}
         </Button>
       </form>
     </ExternalEditorShell>
@@ -948,6 +1045,8 @@ export function TraktPresetForm({
   initialLibraryId: number | null;
   onClose: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const mutation = useImportTraktCollection();
   const { data: profiles = [] } = useProfiles();
   const [libraryIds, setLibraryIds] = useState<number[]>(() =>
@@ -1014,29 +1113,40 @@ export function TraktPresetForm({
 
   return (
     <ExternalEditorShell
-      title="Trakt Collection"
-      description="Sync shelves from Trakt discovery feeds and profile recommendations."
+      title={tr("pages.admin_collections_shared.trakt_collection")}
+      description={tr(
+        "pages.admin_collections_shared.sync_shelves_from_trakt_discovery_feeds_and_profile_recommendations",
+      )}
       summary={
         <Card className="gap-0">
           <CardHeader>
-            <CardTitle>Import Summary</CardTitle>
+            <CardTitle>{tr("pages.admin_collections_shared.import_summary")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {isListMode ? (
-              <SummaryRow label="Source" value="User list" />
+              <SummaryRow label={tr("pages.admin_collections_shared.source")} value="User list" />
             ) : (
               <>
-                <SummaryRow label="Preset" value={getTraktPresetLabel(preset)} />
-                <SummaryRow label="Media" value={mediaType === "tv" ? "TV Shows" : "Movies"} />
+                <SummaryRow
+                  label={tr("pages.admin_collections_shared.preset")}
+                  value={getTraktPresetLabel(preset)}
+                />
+                <SummaryRow
+                  label={tr("pages.admin_collections_shared.media")}
+                  value={mediaType === "tv" ? "TV Shows" : "Movies"}
+                />
               </>
             )}
             {requiresProfile ? (
               <SummaryRow
-                label="Profile"
+                label={tr("pages.admin_collections_shared.profile")}
                 value={profiles.find((profile) => profile.id === profileId)?.name ?? "Required"}
               />
             ) : null}
-            <SummaryRow label="Featured" value={featured ? "Yes" : "No"} />
+            <SummaryRow
+              label={tr("pages.admin_collections_shared.featured")}
+              value={featured ? "Yes" : "No"}
+            />
           </CardContent>
         </Card>
       }
@@ -1044,7 +1154,7 @@ export function TraktPresetForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>Libraries</Label>
+            <Label>{tr("pages.admin_collections_shared.libraries")}</Label>
             <CollectionLibraryPicker
               libraries={libraries}
               value={libraryIds}
@@ -1053,81 +1163,102 @@ export function TraktPresetForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="trakt-title">Collection Title</Label>
+            <Label htmlFor="trakt-title">
+              {tr("pages.admin_collections_shared.collection_title")}
+            </Label>
             <Input
               id="trakt-title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Trakt Trending Movies"
+              placeholder={tr("pages.admin_collections_shared.trakt_trending_movies")}
               required
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="trakt-description">Description</Label>
+          <Label htmlFor="trakt-description">
+            {tr("pages.admin_collections_shared.description")}
+          </Label>
           <Input
             id="trakt-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Optional collection summary"
+            placeholder={tr("pages.admin_collections_shared.optional_collection_summary")}
           />
         </div>
 
         <div className="space-y-2">
-          <Label>Source</Label>
+          <Label>{tr("pages.admin_collections_shared.source")}</Label>
           <Select value={sourceKind} onValueChange={(v) => setSourceKind(v as TraktSourceKind)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="preset">
-                Discovery feed (Trending / Popular / Recommended)
+                {tr("pages.admin_collections_shared.discovery_feed_trending_popular_recommended")}
               </SelectItem>
-              <SelectItem value="list">User list (trakt.tv URL)</SelectItem>
+              <SelectItem value="list">
+                {tr("pages.admin_collections_shared.user_list_trakt_tv_url")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {isListMode ? (
           <div className="space-y-2">
-            <Label htmlFor="trakt-list-url">Trakt list URL</Label>
+            <Label htmlFor="trakt-list-url">
+              {tr("pages.admin_collections_shared.trakt_list_url")}
+            </Label>
             <Input
               id="trakt-list-url"
               value={listUrl}
               onChange={(event) => setListUrl(event.target.value)}
-              placeholder="https://trakt.tv/users/jjjonesjr33/lists/saw-cinematic-universe-in-timeline-order"
+              placeholder={tr(
+                "pages.admin_collections_shared.https_trakt_tv_users_jjjonesjr33_lists_saw_cinematic_universe_in",
+              )}
               required
             />
             <p className="text-muted-foreground text-xs">
-              Paste a public Trakt list URL. Movies and shows in the list are matched against the
-              selected libraries in list order.
+              {tr(
+                "pages.admin_collections_shared.paste_a_public_trakt_list_url_movies_and_shows_in",
+              )}
             </p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>Preset</Label>
+              <Label>{tr("pages.admin_collections_shared.preset")}</Label>
               <Select value={preset} onValueChange={(v) => setPreset(v as TraktPreset)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="trending">Trending</SelectItem>
-                  <SelectItem value="popular">Popular</SelectItem>
-                  <SelectItem value="recommended">Recommended</SelectItem>
+                  <SelectItem value="trending">
+                    {tr("pages.admin_collections_shared.trending")}
+                  </SelectItem>
+                  <SelectItem value="popular">
+                    {tr("pages.admin_collections_shared.popular")}
+                  </SelectItem>
+                  <SelectItem value="recommended">
+                    {tr("pages.admin_collections_shared.recommended")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Media Type</Label>
+              <Label>{tr("pages.admin_collections_shared.media_type")}</Label>
               <Select value={mediaType} onValueChange={(v) => setMediaType(v as TraktMediaType)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="movie">Movies</SelectItem>
-                  <SelectItem value="tv">TV Shows</SelectItem>
+                  <SelectItem value="movie">
+                    {tr("pages.admin_collections_shared.movies")}
+                  </SelectItem>
+                  <SelectItem value="tv">
+                    {tr("pages.admin_collections_shared.tv_shows")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1136,10 +1267,10 @@ export function TraktPresetForm({
 
         {requiresProfile ? (
           <div className="space-y-2">
-            <Label>Profile</Label>
+            <Label>{tr("pages.admin_collections_shared.profile")}</Label>
             <Select value={profileId} onValueChange={setProfileId}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a profile" />
+                <SelectValue placeholder={tr("pages.admin_collections_shared.choose_a_profile")} />
               </SelectTrigger>
               <SelectContent>
                 {profiles.map((profile) => (
@@ -1150,14 +1281,15 @@ export function TraktPresetForm({
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-xs">
-              Recommended collections use this profile's existing Trakt connection from Watch
-              Providers settings.
+              {tr(
+                "pages.admin_collections_shared.recommended_collections_use_this_profile_s_existing_trakt_connection_from",
+              )}
             </p>
           </div>
         ) : null}
 
         <div className="space-y-2">
-          <Label htmlFor="trakt-limit">Max Items</Label>
+          <Label htmlFor="trakt-limit">{tr("pages.admin_collections_shared.max_items")}</Label>
           <Input
             id="trakt-limit"
             type="number"
@@ -1167,20 +1299,20 @@ export function TraktPresetForm({
             inputMode="numeric"
             value={limit}
             onChange={(event) => setLimit(event.target.value)}
-            placeholder="Defaults to 20"
+            placeholder={tr("pages.admin_collections_shared.defaults_to_20")}
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <ImageUploadField
-            label="Poster"
+            label={tr("pages.admin_collections_shared.poster")}
             file={posterFile}
             onFileChange={setPosterFile}
             sourceUrl={posterSourceUrl}
             onSourceUrlChange={setPosterSourceUrl}
           />
           <ImageUploadField
-            label="Backdrop"
+            label={tr("pages.admin_collections_shared.backdrop")}
             file={backdropFile}
             onFileChange={setBackdropFile}
             sourceUrl={backdropSourceUrl}
@@ -1198,9 +1330,11 @@ export function TraktPresetForm({
 
         <div className="border-border flex items-center justify-between rounded-lg border px-4 py-3">
           <div>
-            <p className="text-sm font-medium">Feature on library tab</p>
+            <p className="text-sm font-medium">
+              {tr("pages.admin_collections_shared.feature_on_library_tab")}
+            </p>
             <p className="text-muted-foreground text-xs">
-              Surface this collection in the hero shelves.
+              {tr("pages.admin_collections_shared.surface_this_collection_in_the_hero_shelves")}
             </p>
           </div>
           <Switch checked={featured} onCheckedChange={setFeatured} />
@@ -1217,7 +1351,9 @@ export function TraktPresetForm({
             missingListURL
           }
         >
-          {mutation.isPending ? "Importing..." : "Import Trakt Collection"}
+          {mutation.isPending
+            ? tr("pages.admin_collections_shared.importing")
+            : tr("pages.admin_collections_shared.import_trakt_collection")}
         </Button>
       </form>
     </ExternalEditorShell>
@@ -1233,6 +1369,8 @@ export function MDBListImportForm({
   initialLibraryId: number | null;
   onClose: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const mutation = useImportMDBListCollection();
   const [libraryIds, setLibraryIds] = useState<number[]>(() =>
     initialLibraryId ? [initialLibraryId] : libraries[0]?.id ? [libraries[0].id] : [],
@@ -1276,17 +1414,28 @@ export function MDBListImportForm({
 
   return (
     <ExternalEditorShell
-      title="MDBList Import"
-      description="Connect a remote list and keep a curated shelf synced from it."
+      title={tr("pages.admin_collections_shared.mdblist_import")}
+      description={tr(
+        "pages.admin_collections_shared.connect_a_remote_list_and_keep_a_curated_shelf_synced",
+      )}
       summary={
         <Card className="gap-0">
           <CardHeader>
-            <CardTitle>Import Summary</CardTitle>
+            <CardTitle>{tr("pages.admin_collections_shared.import_summary")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <SummaryRow label="Source" value={url || "MDBList JSON feed"} />
-            <SummaryRow label="Featured" value={featured ? "Yes" : "No"} />
-            <SummaryRow label="Limit" value={limit || "All items"} />
+            <SummaryRow
+              label={tr("pages.admin_collections_shared.source")}
+              value={url || "MDBList JSON feed"}
+            />
+            <SummaryRow
+              label={tr("pages.admin_collections_shared.featured")}
+              value={featured ? "Yes" : "No"}
+            />
+            <SummaryRow
+              label={tr("pages.admin_collections_shared.limit")}
+              value={limit || "All items"}
+            />
           </CardContent>
         </Card>
       }
@@ -1294,7 +1443,7 @@ export function MDBListImportForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>Libraries</Label>
+            <Label>{tr("pages.admin_collections_shared.libraries")}</Label>
             <CollectionLibraryPicker
               libraries={libraries}
               value={libraryIds}
@@ -1302,40 +1451,46 @@ export function MDBListImportForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mdblist-title">Collection Title</Label>
+            <Label htmlFor="mdblist-title">
+              {tr("pages.admin_collections_shared.collection_title")}
+            </Label>
             <Input
               id="mdblist-title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Top Watched Movies"
+              placeholder={tr("pages.admin_collections_shared.top_watched_movies")}
               required
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="mdblist-url">MDBList JSON URL</Label>
+          <Label htmlFor="mdblist-url">
+            {tr("pages.admin_collections_shared.mdblist_json_url")}
+          </Label>
           <Input
             id="mdblist-url"
             value={url}
             onChange={(event) => setURL(event.target.value)}
-            placeholder="https://mdblist.com/lists/.../json"
+            placeholder={tr("pages.admin_collections_shared.https_mdblist_com_lists_json")}
             required
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="mdblist-description">Description</Label>
+          <Label htmlFor="mdblist-description">
+            {tr("pages.admin_collections_shared.description")}
+          </Label>
           <Input
             id="mdblist-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Optional collection summary"
+            placeholder={tr("pages.admin_collections_shared.optional_collection_summary")}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="mdblist-limit">Max Items</Label>
+          <Label htmlFor="mdblist-limit">{tr("pages.admin_collections_shared.max_items")}</Label>
           <Input
             id="mdblist-limit"
             type="number"
@@ -1344,23 +1499,23 @@ export function MDBListImportForm({
             inputMode="numeric"
             value={limit}
             onChange={(event) => setLimit(event.target.value)}
-            placeholder="Leave blank for all items"
+            placeholder={tr("pages.admin_collections_shared.leave_blank_for_all_items")}
           />
           <p className="text-muted-foreground text-xs">
-            Store only the first N items from the remote list.
+            {tr("pages.admin_collections_shared.store_only_the_first_n_items_from_the_remote_list")}
           </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <ImageUploadField
-            label="Poster"
+            label={tr("pages.admin_collections_shared.poster")}
             file={posterFile}
             onFileChange={setPosterFile}
             sourceUrl={posterSourceUrl}
             onSourceUrlChange={setPosterSourceUrl}
           />
           <ImageUploadField
-            label="Backdrop"
+            label={tr("pages.admin_collections_shared.backdrop")}
             file={backdropFile}
             onFileChange={setBackdropFile}
             sourceUrl={backdropSourceUrl}
@@ -1378,9 +1533,13 @@ export function MDBListImportForm({
 
         <div className="border-border flex items-center justify-between rounded-lg border px-4 py-3">
           <div>
-            <p className="text-sm font-medium">Feature on library tab</p>
+            <p className="text-sm font-medium">
+              {tr("pages.admin_collections_shared.feature_on_library_tab")}
+            </p>
             <p className="text-muted-foreground text-xs">
-              New imports can immediately surface in the hero shelves.
+              {tr(
+                "pages.admin_collections_shared.new_imports_can_immediately_surface_in_the_hero_shelves",
+              )}
             </p>
           </div>
           <Switch checked={featured} onCheckedChange={setFeatured} />
@@ -1391,7 +1550,9 @@ export function MDBListImportForm({
           className="w-full"
           disabled={mutation.isPending || libraryIds.length === 0 || hasInvalidLimit}
         >
-          {mutation.isPending ? "Importing..." : "Import MDBList Collection"}
+          {mutation.isPending
+            ? tr("pages.admin_collections_shared.importing")
+            : tr("pages.admin_collections_shared.import_mdblist_collection")}
         </Button>
       </form>
     </ExternalEditorShell>
@@ -1409,6 +1570,8 @@ export function CollectionEditForm({
   initialLibraryId: number | null;
   onClose: () => void;
 }) {
+  useUILanguage();
+  useUILanguage();
   const [libraryIds, setLibraryIds] = useState<number[]>(() => {
     if (collection.library_ids && collection.library_ids.length > 0) return collection.library_ids;
     if (collection.library_id) return [collection.library_id];
@@ -1563,19 +1726,27 @@ export function CollectionEditForm({
 
   return (
     <ExternalEditorShell
-      title={`Edit ${sourceLabel}`}
-      description="Update the source configuration, artwork, and visibility for this collection."
+      title={tr("pages.admin_collections_shared.edit_source_label", { sourceLabel: sourceLabel })}
+      description={tr(
+        "pages.admin_collections_shared.update_the_source_configuration_artwork_and_visibility_for_this_collection",
+      )}
       summary={
         <Card className="gap-0">
           <CardHeader>
-            <CardTitle>Collection Summary</CardTitle>
+            <CardTitle>{tr("pages.admin_collections_shared.collection_summary")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <SummaryRow label="Source" value={sourceLabel} />
-            <SummaryRow label="Visibility" value={visibility} />
-            <SummaryRow label="Featured" value={featured ? "Yes" : "No"} />
+            <SummaryRow label={tr("pages.admin_collections_shared.source")} value={sourceLabel} />
             <SummaryRow
-              label="Items"
+              label={tr("pages.admin_collections_shared.visibility")}
+              value={visibility}
+            />
+            <SummaryRow
+              label={tr("pages.admin_collections_shared.featured")}
+              value={featured ? "Yes" : "No"}
+            />
+            <SummaryRow
+              label={tr("pages.admin_collections_shared.items")}
               value={
                 collection.collection_type === "smart" ? "\u2014" : String(collection.item_count)
               }
@@ -1587,7 +1758,7 @@ export function CollectionEditForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>Libraries</Label>
+            <Label>{tr("pages.admin_collections_shared.libraries")}</Label>
             <CollectionLibraryPicker
               libraries={libraries}
               value={libraryIds}
@@ -1596,7 +1767,7 @@ export function CollectionEditForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="collection-title">Title</Label>
+            <Label htmlFor="collection-title">{tr("pages.admin_collections_shared.title")}</Label>
             <Input
               id="collection-title"
               value={title}
@@ -1607,7 +1778,9 @@ export function CollectionEditForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="collection-description">Description</Label>
+          <Label htmlFor="collection-description">
+            {tr("pages.admin_collections_shared.description")}
+          </Label>
           <textarea
             id="collection-description"
             value={description}
@@ -1619,7 +1792,7 @@ export function CollectionEditForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <ImageUploadField
-            label="Poster"
+            label={tr("pages.admin_collections_shared.poster")}
             currentUrl={collection.poster_url}
             file={posterFile}
             onFileChange={setPosterFile}
@@ -1634,7 +1807,7 @@ export function CollectionEditForm({
             }
           />
           <ImageUploadField
-            label="Backdrop"
+            label={tr("pages.admin_collections_shared.backdrop")}
             currentUrl={collection.backdrop_url}
             file={backdropFile}
             onFileChange={setBackdropFile}
@@ -1653,17 +1826,21 @@ export function CollectionEditForm({
         {isMDBListCollection ? (
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="collection-source-url">MDBList JSON URL</Label>
+              <Label htmlFor="collection-source-url">
+                {tr("pages.admin_collections_shared.mdblist_json_url")}
+              </Label>
               <Input
                 id="collection-source-url"
                 value={sourceUrl}
                 onChange={(event) => setSourceUrl(event.target.value)}
-                placeholder="https://mdblist.com/lists/.../json"
+                placeholder={tr("pages.admin_collections_shared.https_mdblist_com_lists_json")}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="collection-source-limit">Max Items</Label>
+              <Label htmlFor="collection-source-limit">
+                {tr("pages.admin_collections_shared.max_items")}
+              </Label>
               <Input
                 id="collection-source-limit"
                 type="number"
@@ -1672,7 +1849,7 @@ export function CollectionEditForm({
                 inputMode="numeric"
                 value={sourceLimit}
                 onChange={(event) => setSourceLimit(event.target.value)}
-                placeholder="Leave blank for all items"
+                placeholder={tr("pages.admin_collections_shared.leave_blank_for_all_items")}
               />
             </div>
           </div>
@@ -1689,25 +1866,39 @@ export function CollectionEditForm({
         {isTMDBCollection ? (
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>Preset</Label>
+              <Label>{tr("pages.admin_collections_shared.preset")}</Label>
               <Select value={tmdbPreset} onValueChange={(v) => setTmdbPreset(v as TMDBPreset)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="trending">Trending</SelectItem>
-                  <SelectItem value="popular">Popular</SelectItem>
-                  <SelectItem value="top_rated">Top Rated</SelectItem>
-                  <SelectItem value="now_playing">Now Playing</SelectItem>
-                  <SelectItem value="upcoming">Upcoming</SelectItem>
-                  <SelectItem value="airing_today">Airing Today</SelectItem>
-                  <SelectItem value="on_the_air">On The Air</SelectItem>
+                  <SelectItem value="trending">
+                    {tr("pages.admin_collections_shared.trending")}
+                  </SelectItem>
+                  <SelectItem value="popular">
+                    {tr("pages.admin_collections_shared.popular")}
+                  </SelectItem>
+                  <SelectItem value="top_rated">
+                    {tr("pages.admin_collections_shared.top_rated")}
+                  </SelectItem>
+                  <SelectItem value="now_playing">
+                    {tr("pages.admin_collections_shared.now_playing")}
+                  </SelectItem>
+                  <SelectItem value="upcoming">
+                    {tr("pages.admin_collections_shared.upcoming")}
+                  </SelectItem>
+                  <SelectItem value="airing_today">
+                    {tr("pages.admin_collections_shared.airing_today")}
+                  </SelectItem>
+                  <SelectItem value="on_the_air">
+                    {tr("pages.admin_collections_shared.on_the_air")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {tmdbPresetNeedsTimeWindow(tmdbPreset) ? (
               <div className="space-y-2">
-                <Label>Time Window</Label>
+                <Label>{tr("pages.admin_collections_shared.time_window")}</Label>
                 <Select
                   value={tmdbTimeWindow}
                   onValueChange={(v) => setTmdbTimeWindow(v as TMDBTimeWindow)}
@@ -1716,14 +1907,18 @@ export function CollectionEditForm({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="day">Daily</SelectItem>
-                    <SelectItem value="week">Weekly</SelectItem>
+                    <SelectItem value="day">
+                      {tr("pages.admin_collections_shared.daily")}
+                    </SelectItem>
+                    <SelectItem value="week">
+                      {tr("pages.admin_collections_shared.weekly")}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             ) : null}
             <div className="space-y-2">
-              <Label>Media Type</Label>
+              <Label>{tr("pages.admin_collections_shared.media_type")}</Label>
               <Select
                 value={normalizedTMDBMediaType}
                 onValueChange={(v) => setTmdbMediaType(v as TMDBMediaType)}
@@ -1734,19 +1929,25 @@ export function CollectionEditForm({
                 </SelectTrigger>
                 <SelectContent>
                   {allowedTMDBMediaTypes.includes("all") ? (
-                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="all">{tr("pages.admin_collections_shared.all")}</SelectItem>
                   ) : null}
                   {allowedTMDBMediaTypes.includes("movie") ? (
-                    <SelectItem value="movie">Movies</SelectItem>
+                    <SelectItem value="movie">
+                      {tr("pages.admin_collections_shared.movies")}
+                    </SelectItem>
                   ) : null}
                   {allowedTMDBMediaTypes.includes("tv") ? (
-                    <SelectItem value="tv">TV Shows</SelectItem>
+                    <SelectItem value="tv">
+                      {tr("pages.admin_collections_shared.tv_shows")}
+                    </SelectItem>
                   ) : null}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="collection-tmdb-limit">Max Items</Label>
+              <Label htmlFor="collection-tmdb-limit">
+                {tr("pages.admin_collections_shared.max_items")}
+              </Label>
               <Input
                 id="collection-tmdb-limit"
                 type="number"
@@ -1756,7 +1957,7 @@ export function CollectionEditForm({
                 inputMode="numeric"
                 value={tmdbLimit}
                 onChange={(event) => setTmdbLimit(event.target.value)}
-                placeholder="Defaults to 20"
+                placeholder={tr("pages.admin_collections_shared.defaults_to_20")}
               />
             </div>
           </div>
@@ -1765,7 +1966,7 @@ export function CollectionEditForm({
         {isTraktCollection ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Source</Label>
+              <Label>{tr("pages.admin_collections_shared.source")}</Label>
               <Select
                 value={traktSourceKind}
                 onValueChange={(v) => setTraktSourceKind(v as TraktSourceKind)}
@@ -1775,9 +1976,13 @@ export function CollectionEditForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="preset">
-                    Discovery feed (Trending / Popular / Recommended)
+                    {tr(
+                      "pages.admin_collections_shared.discovery_feed_trending_popular_recommended",
+                    )}
                   </SelectItem>
-                  <SelectItem value="list">User list (trakt.tv URL)</SelectItem>
+                  <SelectItem value="list">
+                    {tr("pages.admin_collections_shared.user_list_trakt_tv_url")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1785,21 +1990,28 @@ export function CollectionEditForm({
             {isTraktListMode ? (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="collection-trakt-list-url">Trakt list URL</Label>
+                  <Label htmlFor="collection-trakt-list-url">
+                    {tr("pages.admin_collections_shared.trakt_list_url")}
+                  </Label>
                   <Input
                     id="collection-trakt-list-url"
                     value={traktListUrl}
                     onChange={(event) => setTraktListUrl(event.target.value)}
-                    placeholder="https://trakt.tv/users/jjjonesjr33/lists/saw-cinematic-universe-in-timeline-order"
+                    placeholder={tr(
+                      "pages.admin_collections_shared.https_trakt_tv_users_jjjonesjr33_lists_saw_cinematic_universe_in",
+                    )}
                     required
                   />
                   <p className="text-muted-foreground text-xs">
-                    Paste a public Trakt list URL. Movies and shows in the list are matched against
-                    the selected libraries in list order.
+                    {tr(
+                      "pages.admin_collections_shared.paste_a_public_trakt_list_url_movies_and_shows_in",
+                    )}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="collection-trakt-limit">Max Items</Label>
+                  <Label htmlFor="collection-trakt-limit">
+                    {tr("pages.admin_collections_shared.max_items")}
+                  </Label>
                   <Input
                     id="collection-trakt-limit"
                     type="number"
@@ -1809,14 +2021,14 @@ export function CollectionEditForm({
                     inputMode="numeric"
                     value={traktLimit}
                     onChange={(event) => setTraktLimit(event.target.value)}
-                    placeholder="Defaults to 20"
+                    placeholder={tr("pages.admin_collections_shared.defaults_to_20")}
                   />
                 </div>
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Preset</Label>
+                  <Label>{tr("pages.admin_collections_shared.preset")}</Label>
                   <Select
                     value={traktPreset}
                     onValueChange={(v) => setTraktPreset(v as TraktPreset)}
@@ -1825,14 +2037,20 @@ export function CollectionEditForm({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="trending">Trending</SelectItem>
-                      <SelectItem value="popular">Popular</SelectItem>
-                      <SelectItem value="recommended">Recommended</SelectItem>
+                      <SelectItem value="trending">
+                        {tr("pages.admin_collections_shared.trending")}
+                      </SelectItem>
+                      <SelectItem value="popular">
+                        {tr("pages.admin_collections_shared.popular")}
+                      </SelectItem>
+                      <SelectItem value="recommended">
+                        {tr("pages.admin_collections_shared.recommended")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Media Type</Label>
+                  <Label>{tr("pages.admin_collections_shared.media_type")}</Label>
                   <Select
                     value={traktMediaType}
                     onValueChange={(v) => setTraktMediaType(v as TraktMediaType)}
@@ -1841,17 +2059,23 @@ export function CollectionEditForm({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="movie">Movies</SelectItem>
-                      <SelectItem value="tv">TV Shows</SelectItem>
+                      <SelectItem value="movie">
+                        {tr("pages.admin_collections_shared.movies")}
+                      </SelectItem>
+                      <SelectItem value="tv">
+                        {tr("pages.admin_collections_shared.tv_shows")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 {traktNeedsProfile ? (
                   <div className="space-y-2">
-                    <Label>Profile</Label>
+                    <Label>{tr("pages.admin_collections_shared.profile")}</Label>
                     <Select value={traktProfileId} onValueChange={setTraktProfileId}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose a profile" />
+                        <SelectValue
+                          placeholder={tr("pages.admin_collections_shared.choose_a_profile")}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {profiles.map((profile) => (
@@ -1864,7 +2088,9 @@ export function CollectionEditForm({
                   </div>
                 ) : null}
                 <div className="space-y-2">
-                  <Label htmlFor="collection-trakt-limit">Max Items</Label>
+                  <Label htmlFor="collection-trakt-limit">
+                    {tr("pages.admin_collections_shared.max_items")}
+                  </Label>
                   <Input
                     id="collection-trakt-limit"
                     type="number"
@@ -1874,7 +2100,7 @@ export function CollectionEditForm({
                     inputMode="numeric"
                     value={traktLimit}
                     onChange={(event) => setTraktLimit(event.target.value)}
-                    placeholder="Defaults to 20"
+                    placeholder={tr("pages.admin_collections_shared.defaults_to_20")}
                   />
                 </div>
               </div>
@@ -1884,7 +2110,7 @@ export function CollectionEditForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>Visibility</Label>
+            <Label>{tr("pages.admin_collections_shared.visibility")}</Label>
             <Select
               value={visibility}
               onValueChange={(value) => setVisibility(value as "visible" | "hidden")}
@@ -1893,16 +2119,22 @@ export function CollectionEditForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="visible">Visible</SelectItem>
-                <SelectItem value="hidden">Hidden</SelectItem>
+                <SelectItem value="visible">
+                  {tr("pages.admin_collections_shared.visible")}
+                </SelectItem>
+                <SelectItem value="hidden">
+                  {tr("pages.admin_collections_shared.hidden")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="border-border flex items-center justify-between rounded-lg border px-4 py-3">
             <div>
-              <p className="text-sm font-medium">Featured</p>
+              <p className="text-sm font-medium">{tr("pages.admin_collections_shared.featured")}</p>
               <p className="text-muted-foreground text-xs">
-                Surface this collection near the top of the library tab.
+                {tr(
+                  "pages.admin_collections_shared.surface_this_collection_near_the_top_of_the_library_tab",
+                )}
               </p>
             </div>
             <Switch checked={featured} onCheckedChange={setFeatured} />
@@ -1923,7 +2155,9 @@ export function CollectionEditForm({
             missingTraktProfile
           }
         >
-          {updateMutation.isPending ? "Saving..." : "Save Collection"}
+          {updateMutation.isPending
+            ? tr("pages.admin_collections_shared.saving")
+            : tr("pages.admin_collections_shared.save_collection")}
         </Button>
       </form>
     </ExternalEditorShell>

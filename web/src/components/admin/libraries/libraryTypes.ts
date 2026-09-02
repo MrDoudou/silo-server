@@ -1,13 +1,57 @@
 import { BookHeadphones, BookMarked, BookOpen, Film, Layers, Podcast, Tv } from "lucide-react";
 
+import { tr } from "@/i18n/translate";
+
 export const LIBRARY_TYPES = [
-  { value: "movies", label: "Movies", icon: Film },
-  { value: "series", label: "Series", icon: Tv },
-  { value: "mixed", label: "Mixed", icon: Layers },
-  { value: "audiobooks", label: "Audiobooks", icon: BookHeadphones },
-  { value: "ebooks", label: "Ebooks", icon: BookOpen },
-  { value: "manga", label: "Manga", icon: BookMarked },
-  { value: "podcasts", label: "Podcasts", icon: Podcast },
+  {
+    value: "movies",
+    get label() {
+      return tr("components.admin.libraries.library_types.movies");
+    },
+    icon: Film,
+  },
+  {
+    value: "series",
+    get label() {
+      return tr("components.admin.libraries.library_types.series");
+    },
+    icon: Tv,
+  },
+  {
+    value: "mixed",
+    get label() {
+      return tr("components.admin.libraries.library_types.mixed");
+    },
+    icon: Layers,
+  },
+  {
+    value: "audiobooks",
+    get label() {
+      return tr("components.admin.libraries.library_types.audiobooks");
+    },
+    icon: BookHeadphones,
+  },
+  {
+    value: "ebooks",
+    get label() {
+      return tr("components.admin.libraries.library_types.ebooks");
+    },
+    icon: BookOpen,
+  },
+  {
+    value: "manga",
+    get label() {
+      return tr("components.admin.libraries.library_types.manga");
+    },
+    icon: BookMarked,
+  },
+  {
+    value: "podcasts",
+    get label() {
+      return tr("components.admin.libraries.library_types.podcasts");
+    },
+    icon: Podcast,
+  },
 ] as const;
 
 export function libraryTypeMeta(type: string) {
