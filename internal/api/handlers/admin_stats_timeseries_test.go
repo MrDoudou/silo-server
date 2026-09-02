@@ -27,7 +27,8 @@ func (s *stubTimeseriesSource) Get(_ context.Context, hours int) (*AdminTimeseri
 
 func (s *stubTimeseriesSource) Invalidate() { s.invalidated++ }
 
-func int64Ptr(value int64) *int64 { return &value }
+func int64Ptr(value int64) *int64       { return &value }
+func float64Ptr(value float64) *float64 { return &value }
 
 func TestAssembleTimeseries(t *testing.T) {
 	t.Parallel()
@@ -55,9 +56,24 @@ func TestAssembleTimeseries(t *testing.T) {
 				Transcode:          int64Ptr(2),
 				EgressKbps:         48_211,
 				DownloadEgressKbps: 6_100,
+				CPUPercent:         float64Ptr(64),
+				MemoryPercent:      float64Ptr(37.5),
+				GPUPercent:         float64Ptr(81),
+				NetworkReceiveBPS:  int64Ptr(1_200),
+				NetworkSendBPS:     int64Ptr(3_400),
+				PostgresLatencyMS:  float64Ptr(1.25),
+				RedisLatencyMS:     float64Ptr(0.75),
+				NodeLatencyMS:      float64Ptr(8.5),
 			}},
 			want: []AdminTimeseriesPoint{
-				{T: minuteOne, Streams: 3, Direct: 1, Remux: 0, Transcode: 2, EgressKbps: 48_211, DownloadEgressKbps: 6_100},
+				{
+					T: minuteOne, Streams: 3, Direct: 1, Remux: 0, Transcode: 2,
+					EgressKbps: 48_211, DownloadEgressKbps: 6_100,
+					CPUPercent: float64Ptr(64), MemoryPercent: float64Ptr(37.5), GPUPercent: float64Ptr(81),
+					NetworkReceiveBPS: int64Ptr(1_200), NetworkSendBPS: int64Ptr(3_400),
+					PostgresLatencyMS: float64Ptr(1.25), RedisLatencyMS: float64Ptr(0.75),
+					NodeLatencyMS: float64Ptr(8.5),
+				},
 			},
 		},
 		{
@@ -106,12 +122,28 @@ func TestAssembleTimeseries(t *testing.T) {
 					got[i].Remux != tt.want[i].Remux ||
 					got[i].Transcode != tt.want[i].Transcode ||
 					got[i].EgressKbps != tt.want[i].EgressKbps ||
-					got[i].DownloadEgressKbps != tt.want[i].DownloadEgressKbps {
+					got[i].DownloadEgressKbps != tt.want[i].DownloadEgressKbps ||
+					!equalFloat64Pointers(got[i].CPUPercent, tt.want[i].CPUPercent) ||
+					!equalFloat64Pointers(got[i].MemoryPercent, tt.want[i].MemoryPercent) ||
+					!equalFloat64Pointers(got[i].GPUPercent, tt.want[i].GPUPercent) ||
+					!equalInt64Pointers(got[i].NetworkReceiveBPS, tt.want[i].NetworkReceiveBPS) ||
+					!equalInt64Pointers(got[i].NetworkSendBPS, tt.want[i].NetworkSendBPS) ||
+					!equalFloat64Pointers(got[i].PostgresLatencyMS, tt.want[i].PostgresLatencyMS) ||
+					!equalFloat64Pointers(got[i].RedisLatencyMS, tt.want[i].RedisLatencyMS) ||
+					!equalFloat64Pointers(got[i].NodeLatencyMS, tt.want[i].NodeLatencyMS) {
 					t.Fatalf("point %d = %+v, want %+v", i, got[i], tt.want[i])
 				}
 			}
 		})
 	}
+}
+
+func equalFloat64Pointers(left, right *float64) bool {
+	return left == nil && right == nil || left != nil && right != nil && *left == *right
+}
+
+func equalInt64Pointers(left, right *int64) bool {
+	return left == nil && right == nil || left != nil && right != nil && *left == *right
 }
 
 func TestTimeseriesBucketSeconds(t *testing.T) {

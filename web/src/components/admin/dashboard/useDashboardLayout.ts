@@ -35,13 +35,42 @@ export function dashboardLayoutStorageKey(userId: number): string {
 // are updated synchronously, so the delay is never visible.
 export const DASHBOARD_LAYOUT_SAVE_DEBOUNCE_MS = 800;
 
-// Version 1 is still version 1 with row heights and per-widget windows in it:
-// `rows` and `range` are additive fields that older documents simply omit, and
-// sanitizing fills them from the widget's defaults. A bump would only be needed
-// for a change that makes an existing field mean something new.
+// Version 3 keeps the compact live resource cards while restoring their
+// historical graph to the default dashboard. Versioning prevents a widget an
+// admin removes later from being reintroduced on every load.
+export const DASHBOARD_LAYOUT_VERSION = 3;
+
 interface StoredLayout {
-  version: 1;
+  version: number;
   entries: DashboardLayoutEntry[];
+}
+
+interface SanitizedLayout {
+  entries: DashboardLayoutEntry[];
+  needsMigration: boolean;
+}
+
+const RESOURCE_STAT_WIDGET_IDS = [
+  "stat-cpu",
+  "stat-memory",
+  "stat-gpu",
+  "stat-network",
+] as const satisfies readonly WidgetId[];
+
+const LEGACY_RESOURCE_CHART_IDS = new Set<WidgetId>(["resource-history", "network-history"]);
+
+function defaultEntry(id: WidgetId): DashboardLayoutEntry {
+  const widget = findDashboardWidget(id);
+  if (!widget) {
+    throw new Error(`dashboard widget ${id} is not registered`);
+  }
+
+  const entry: DashboardLayoutEntry = {
+    id,
+    span: widget.defaultSpan,
+    rows: widget.defaultRows,
+  };
+  return widget.ranges ? { ...entry, range: widget.ranges.default } : entry;
 }
 
 function clampSpan(span: unknown, widget: DashboardWidgetDefinition): number {
@@ -84,15 +113,66 @@ function sanitizeRange(range: unknown, widget: DashboardWidgetDefinition): Widge
 /**
  * Validates a layout document from any source — localStorage or the server —
  * and drops what this build cannot render. Returns null when the value is not
- * a v1 layout document at all, which callers read as "there is no layout here"
+ * a supported layout document at all, which callers read as "there is no layout here"
  * rather than "the layout is empty".
  */
-function sanitizeLayoutDocument(value: unknown): DashboardLayoutEntry[] | null {
+function migrateV1Layout(entries: DashboardLayoutEntry[]): DashboardLayoutEntry[] {
+  const retained = entries.filter((entry) => !LEGACY_RESOURCE_CHART_IDS.has(entry.id));
+  const visible = new Set(retained.map((entry) => entry.id));
+  const additions = RESOURCE_STAT_WIDGET_IDS.filter((id) => !visible.has(id)).map(defaultEntry);
+
+  if (additions.length === 0) {
+    return retained;
+  }
+
+  let insertionIndex = retained.findIndex((entry) => entry.id === "health-strip");
+  if (insertionIndex === -1) {
+    insertionIndex = retained.findIndex((entry) => !entry.id.startsWith("stat-"));
+  }
+  if (insertionIndex === -1) {
+    insertionIndex = retained.length;
+  }
+
+  return [...retained.slice(0, insertionIndex), ...additions, ...retained.slice(insertionIndex)];
+}
+
+function migrateV2Layout(entries: DashboardLayoutEntry[]): DashboardLayoutEntry[] {
+  const volumeIndex = entries.findIndex((entry) => entry.id === "server-resources");
+  const retained = entries.filter((entry) => entry.id !== "server-resources");
+  if (retained.some((entry) => entry.id === "resource-history")) {
+    return retained;
+  }
+
+  let insertionIndex = volumeIndex;
+  if (insertionIndex === -1) {
+    insertionIndex = retained.findIndex((entry) => entry.id === "dependency-latency");
+  }
+  if (insertionIndex === -1) {
+    const healthIndex = retained.findIndex((entry) => entry.id === "health-strip");
+    insertionIndex = healthIndex === -1 ? retained.length : healthIndex + 1;
+  }
+
+  return [
+    ...retained.slice(0, insertionIndex),
+    defaultEntry("resource-history"),
+    ...retained.slice(insertionIndex),
+  ];
+}
+
+function migrateLayout(entries: DashboardLayoutEntry[], version: number): DashboardLayoutEntry[] {
+  const withResourceCards = version === 1 ? migrateV1Layout(entries) : entries;
+  return version <= 2 ? migrateV2Layout(withResourceCards) : withResourceCards;
+}
+
+function sanitizeLayoutDocument(value: unknown): SanitizedLayout | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
   const parsed = value as Partial<StoredLayout>;
-  if (parsed.version !== 1 || !Array.isArray(parsed.entries)) {
+  if (
+    (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== DASHBOARD_LAYOUT_VERSION) ||
+    !Array.isArray(parsed.entries)
+  ) {
     return null;
   }
   const seen = new Set<WidgetId>();
@@ -119,10 +199,13 @@ function sanitizeLayoutDocument(value: unknown): DashboardLayoutEntry[] | null {
     }
     entries.push(sanitized);
   }
-  return entries;
+  return {
+    entries: migrateLayout(entries, parsed.version),
+    needsMigration: parsed.version !== DASHBOARD_LAYOUT_VERSION,
+  };
 }
 
-function readStoredLayout(userId: number | null): DashboardLayoutEntry[] | null {
+function readStoredLayout(userId: number | null): SanitizedLayout | null {
   if (userId === null) {
     return null;
   }
@@ -143,11 +226,18 @@ function readStoredLayout(userId: number | null): DashboardLayoutEntry[] | null 
 }
 
 function loadStoredLayout(userId: number | null): DashboardLayoutEntry[] {
-  return readStoredLayout(userId) ?? [...DEFAULT_LAYOUT];
+  const stored = readStoredLayout(userId);
+  if (!stored) {
+    return [...DEFAULT_LAYOUT];
+  }
+  if (stored.needsMigration) {
+    persistLayout(userId, stored.entries);
+  }
+  return stored.entries;
 }
 
 function toLayoutDocument(entries: DashboardLayoutEntry[]): AdminDashboardLayoutDocument {
-  return { version: 1, entries };
+  return { version: DASHBOARD_LAYOUT_VERSION, entries };
 }
 
 function persistLayout(userId: number | null, entries: DashboardLayoutEntry[]) {
@@ -155,7 +245,7 @@ function persistLayout(userId: number | null, entries: DashboardLayoutEntry[]) {
     return;
   }
   try {
-    const stored: StoredLayout = { version: 1, entries };
+    const stored: StoredLayout = { version: DASHBOARD_LAYOUT_VERSION, entries };
     window.localStorage.setItem(dashboardLayoutStorageKey(userId), JSON.stringify(stored));
   } catch {
     // Storage may be unavailable (private mode, quota); the layout still works in-memory.
@@ -314,8 +404,11 @@ export function useDashboardLayout(): DashboardLayout {
     }
     const serverEntries = sanitizeLayoutDocument(remoteData?.layout);
     if (serverEntries) {
-      setEntries(serverEntries);
-      persistLayout(userId, serverEntries);
+      setEntries(serverEntries.entries);
+      persistLayout(userId, serverEntries.entries);
+      if (serverEntries.needsMigration) {
+        saveMutate(toLayoutDocument(serverEntries.entries));
+      }
       return;
     }
     // No server layout yet: hand this browser's arrangement up once so the
@@ -323,7 +416,7 @@ export function useDashboardLayout(): DashboardLayout {
     // Only this account's own cache qualifies.
     const local = readStoredLayout(userId);
     if (local) {
-      saveMutate(toLayoutDocument(local));
+      saveMutate(toLayoutDocument(local.entries));
     }
   }, [remoteSettled, remoteData, saveMutate, userId]);
 

@@ -7,6 +7,7 @@ import type { AdminDashboardLayoutResponse } from "@/api/types";
 import { DASHBOARD_WIDGETS, DEFAULT_LAYOUT } from "./registry";
 import {
   DASHBOARD_LAYOUT_SAVE_DEBOUNCE_MS,
+  DASHBOARD_LAYOUT_VERSION,
   dashboardLayoutStorageKey,
   LEGACY_DASHBOARD_LAYOUT_STORAGE_KEY,
   useDashboardLayout,
@@ -38,9 +39,13 @@ function storageKey(userId: number = mocks.userId): string {
   return dashboardLayoutStorageKey(userId);
 }
 
-function serverLayout(entries: unknown, updatedAt = "2026-08-26T10:00:00Z") {
+function serverLayout(
+  entries: unknown,
+  updatedAt = "2026-08-26T10:00:00Z",
+  version = DASHBOARD_LAYOUT_VERSION,
+) {
   mocks.query = {
-    data: { layout: { version: 1, entries }, updated_at: updatedAt },
+    data: { layout: { version, entries }, updated_at: updatedAt },
     isSuccess: true,
   };
 }
@@ -57,8 +62,8 @@ function readStored(userId?: number): { version: number; entries: DashboardLayou
   return JSON.parse(raw) as { version: number; entries: DashboardLayoutEntry[] };
 }
 
-function writeStored(entries: unknown, userId?: number) {
-  window.localStorage.setItem(storageKey(userId), JSON.stringify({ version: 1, entries }));
+function writeStored(entries: unknown, userId?: number, version = DASHBOARD_LAYOUT_VERSION) {
+  window.localStorage.setItem(storageKey(userId), JSON.stringify({ version, entries }));
 }
 
 // A widget joins the registry before it joins DEFAULT_LAYOUT — new widgets
@@ -99,12 +104,68 @@ describe("useDashboardLayout", () => {
   it("falls back to the default layout on an unexpected shape", () => {
     window.localStorage.setItem(
       storageKey(),
-      JSON.stringify({ version: 2, entries: [{ id: "libraries", span: 7 }] }),
+      JSON.stringify({ version: 99, entries: [{ id: "libraries", span: 7 }] }),
     );
 
     const { result } = renderHook(() => useDashboardLayout());
 
     expect(result.current.entries).toEqual(DEFAULT_LAYOUT);
+  });
+
+  it("migrates v1 resource charts to compact stat cards and the current graph", () => {
+    writeStored(
+      [
+        { id: "stat-movies", span: 2, rows: 1 },
+        { id: "stat-storage", span: 2, rows: 1 },
+        { id: "health-strip", span: 12, rows: 1 },
+        { id: "resource-history", span: 6, rows: 3, range: "day" },
+        { id: "network-history", span: 6, rows: 3, range: "day" },
+        { id: "server-resources", span: 6, rows: 1 },
+      ],
+      undefined,
+      1,
+    );
+
+    const first = renderHook(() => useDashboardLayout());
+
+    expect(first.result.current.entries.map((entry) => entry.id)).toEqual([
+      "stat-movies",
+      "stat-storage",
+      "stat-cpu",
+      "stat-memory",
+      "stat-gpu",
+      "stat-network",
+      "health-strip",
+      "resource-history",
+    ]);
+    expect(readStored().version).toBe(DASHBOARD_LAYOUT_VERSION);
+
+    act(() => first.result.current.removeWidget("stat-cpu"));
+    first.unmount();
+
+    const second = renderHook(() => useDashboardLayout());
+    expect(second.result.current.entries.some((entry) => entry.id === "stat-cpu")).toBe(false);
+  });
+
+  it("replaces v2 storage volumes with the resource history graph", () => {
+    writeStored(
+      [
+        { id: "health-strip", span: 12, rows: 1 },
+        { id: "server-resources", span: 6, rows: 1 },
+        { id: "dependency-latency", span: 6, rows: 3, range: "day" },
+      ],
+      undefined,
+      2,
+    );
+
+    const { result } = renderHook(() => useDashboardLayout());
+
+    expect(result.current.entries).toEqual([
+      { id: "health-strip", span: 12, rows: 1 },
+      { id: "resource-history", span: 6, rows: 3, range: "day" },
+      { id: "dependency-latency", span: 6, rows: 3, range: "day" },
+    ]);
+    expect(readStored().version).toBe(DASHBOARD_LAYOUT_VERSION);
   });
 
   it("drops unknown widget ids on load", () => {
@@ -239,6 +300,7 @@ describe("useDashboardLayout", () => {
   it("replaces a window the widget does not offer and drops one it cannot use", () => {
     writeStored([
       { id: "top-profiles", span: 6, rows: 3, range: "hour" },
+      { id: "resource-history", span: 6, rows: 3, range: "month" },
       { id: "egress-24h", span: 6, rows: 3, range: "fortnight" },
       { id: "concurrent-streams-24h", span: 6, rows: 3, range: 7 },
       { id: "users", span: 5, rows: 4, range: "month" },
@@ -248,11 +310,12 @@ describe("useDashboardLayout", () => {
 
     expect(result.current.entries).toEqual([
       { id: "top-profiles", span: 6, rows: 3, range: "week" },
+      { id: "resource-history", span: 6, rows: 3, range: "day" },
       { id: "egress-24h", span: 6, rows: 3, range: "day" },
       { id: "concurrent-streams-24h", span: 6, rows: 3, range: "day" },
       { id: "users", span: 5, rows: 4 },
     ]);
-    expect(result.current.entries[3]).not.toHaveProperty("range");
+    expect(result.current.entries[4]).not.toHaveProperty("range");
   });
 
   it("setWidgetRange changes the window and persists", () => {
@@ -370,7 +433,7 @@ describe("useDashboardLayout", () => {
       { id: "now-playing", span: 12, rows: 3 },
     ];
     expect(result.current.entries).toEqual(expected);
-    expect(readStored()).toEqual({ version: 1, entries: expected });
+    expect(readStored()).toEqual({ version: DASHBOARD_LAYOUT_VERSION, entries: expected });
   });
 
   it("addWidget with a beforeId inserts in front of that entry and persists", () => {
@@ -390,7 +453,7 @@ describe("useDashboardLayout", () => {
       { id: "users", span: 5, rows: 4 },
     ];
     expect(result.current.entries).toEqual(expected);
-    expect(readStored()).toEqual({ version: 1, entries: expected });
+    expect(readStored()).toEqual({ version: DASHBOARD_LAYOUT_VERSION, entries: expected });
   });
 
   it("addWidget with a beforeId stamps a ranged widget's default window", () => {
@@ -626,8 +689,40 @@ describe("useDashboardLayout server persistence", () => {
       { id: "now-playing", span: 12, rows: 2 },
     ];
     expect(result.current.entries).toEqual(expected);
-    expect(readStored()).toEqual({ version: 1, entries: expected });
+    expect(readStored()).toEqual({ version: DASHBOARD_LAYOUT_VERSION, entries: expected });
     expect(mocks.save).not.toHaveBeenCalled();
+  });
+
+  it("migrates a v1 server layout and saves the current arrangement", () => {
+    serverLayout(
+      [
+        { id: "stat-storage", span: 2, rows: 1 },
+        { id: "health-strip", span: 12, rows: 1 },
+        { id: "resource-history", span: 6, rows: 3, range: "day" },
+        { id: "network-history", span: 6, rows: 3, range: "day" },
+      ],
+      "2026-08-26T10:00:00Z",
+      1,
+    );
+
+    const { result } = renderHook(() => useDashboardLayout());
+    const expected = [
+      { id: "stat-storage", span: 2, rows: 1 },
+      { id: "stat-cpu", span: 3, rows: 1 },
+      { id: "stat-memory", span: 3, rows: 1 },
+      { id: "stat-gpu", span: 3, rows: 1 },
+      { id: "stat-network", span: 3, rows: 1 },
+      { id: "health-strip", span: 12, rows: 1 },
+      { id: "resource-history", span: 6, rows: 3, range: "day" },
+    ];
+
+    expect(result.current.entries).toEqual(expected);
+    expect(readStored()).toEqual({ version: DASHBOARD_LAYOUT_VERSION, entries: expected });
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(mocks.save).toHaveBeenCalledWith({
+      version: DASHBOARD_LAYOUT_VERSION,
+      entries: expected,
+    });
   });
 
   it("sanitizes the adopted server layout", () => {
@@ -655,10 +750,10 @@ describe("useDashboardLayout server persistence", () => {
       { id: "users", span: 5, rows: 4 },
     ];
     expect(result.current.entries).toEqual(expected);
-    expect(readStored()).toEqual({ version: 1, entries: expected });
+    expect(readStored()).toEqual({ version: DASHBOARD_LAYOUT_VERSION, entries: expected });
   });
 
-  it("keeps the local layout when the server document is not a v1 layout", () => {
+  it("keeps the local layout when the server document has an unsupported version", () => {
     writeStored([{ id: "users", span: 5, rows: 4 }]);
     mocks.query = {
       data: { layout: { version: 99, entries: [] }, updated_at: "2026-08-26T10:00:00Z" },
@@ -678,7 +773,7 @@ describe("useDashboardLayout server persistence", () => {
 
     expect(mocks.save).toHaveBeenCalledTimes(1);
     expect(mocks.save).toHaveBeenCalledWith({
-      version: 1,
+      version: DASHBOARD_LAYOUT_VERSION,
       entries: [{ id: "users", span: 5, rows: 6 }],
     });
 
@@ -733,7 +828,7 @@ describe("useDashboardLayout server persistence", () => {
 
     expect(mocks.save).toHaveBeenCalledTimes(1);
     expect(mocks.save).toHaveBeenCalledWith({
-      version: 1,
+      version: DASHBOARD_LAYOUT_VERSION,
       entries: [{ id: "users", span: 6, rows: 3 }],
     });
   });
@@ -752,7 +847,7 @@ describe("useDashboardLayout server persistence", () => {
 
     expect(mocks.save).toHaveBeenCalledTimes(1);
     expect(mocks.save).toHaveBeenCalledWith({
-      version: 1,
+      version: DASHBOARD_LAYOUT_VERSION,
       entries: [{ id: "users", span: 6, rows: 5 }],
     });
   });

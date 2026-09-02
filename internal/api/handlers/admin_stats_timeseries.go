@@ -82,6 +82,14 @@ type AdminTimeseriesPoint struct {
 	Transcode          int64     `json:"transcode"`
 	EgressKbps         int64     `json:"egress_kbps"`
 	DownloadEgressKbps int64     `json:"download_egress_kbps"`
+	CPUPercent         *float64  `json:"cpu_pct,omitempty"`
+	MemoryPercent      *float64  `json:"memory_pct,omitempty"`
+	GPUPercent         *float64  `json:"gpu_pct,omitempty"`
+	NetworkReceiveBPS  *int64    `json:"net_rx_bps,omitempty"`
+	NetworkSendBPS     *int64    `json:"net_tx_bps,omitempty"`
+	PostgresLatencyMS  *float64  `json:"postgres_latency_ms,omitempty"`
+	RedisLatencyMS     *float64  `json:"redis_latency_ms,omitempty"`
+	NodeLatencyMS      *float64  `json:"node_latency_ms,omitempty"`
 }
 
 // AdminTimeseries is the GET /admin/stats/timeseries body.
@@ -234,6 +242,14 @@ type timeseriesRow struct {
 	Transcode          *int64
 	EgressKbps         int64
 	DownloadEgressKbps int64
+	CPUPercent         *float64
+	MemoryPercent      *float64
+	GPUPercent         *float64
+	NetworkReceiveBPS  *int64
+	NetworkSendBPS     *int64
+	PostgresLatencyMS  *float64
+	RedisLatencyMS     *float64
+	NodeLatencyMS      *float64
 }
 
 // assembleTimeseries turns grouped rows into response points, reading a missing
@@ -250,6 +266,14 @@ func assembleTimeseries(rows []timeseriesRow) []AdminTimeseriesPoint {
 			Transcode:          nullableCount(row.Transcode),
 			EgressKbps:         row.EgressKbps,
 			DownloadEgressKbps: row.DownloadEgressKbps,
+			CPUPercent:         row.CPUPercent,
+			MemoryPercent:      row.MemoryPercent,
+			GPUPercent:         row.GPUPercent,
+			NetworkReceiveBPS:  row.NetworkReceiveBPS,
+			NetworkSendBPS:     row.NetworkSendBPS,
+			PostgresLatencyMS:  row.PostgresLatencyMS,
+			RedisLatencyMS:     row.RedisLatencyMS,
+			NodeLatencyMS:      row.NodeLatencyMS,
 		})
 	}
 	return points
@@ -287,7 +311,15 @@ func queryAdminTimeseries(ctx context.Context, pool *pgxpool.Pool, hours int) (*
 			       MAX(streams_remux)     FILTER (WHERE source = 'shared') AS streams_remux,
 			       MAX(streams_transcode) FILTER (WHERE source = 'shared') AS streams_transcode,
 			       COALESCE(SUM(egress_kbps), 0)::bigint AS egress_kbps,
-			       COALESCE(SUM(download_egress_kbps), 0)::bigint AS download_egress_kbps
+			       COALESCE(SUM(download_egress_kbps), 0)::bigint AS download_egress_kbps,
+			       MAX(cpu_pct) AS cpu_pct,
+			       MAX(memory_pct) AS memory_pct,
+			       MAX(gpu_pct) AS gpu_pct,
+			       SUM(net_rx_bps)::bigint AS net_rx_bps,
+			       SUM(net_tx_bps)::bigint AS net_tx_bps,
+			       MAX(postgres_latency_ms) AS postgres_latency_ms,
+			       MAX(redis_latency_ms) AS redis_latency_ms,
+			       MAX(node_latency_ms) AS node_latency_ms
 			FROM dashboard_metric_samples
 			WHERE bucket >= now() - make_interval(hours => $1)
 			GROUP BY bucket
@@ -298,7 +330,15 @@ func queryAdminTimeseries(ctx context.Context, pool *pgxpool.Pool, hours int) (*
 		       MAX(streams_remux),
 		       MAX(streams_transcode),
 		       MAX(egress_kbps)::bigint,
-		       MAX(download_egress_kbps)::bigint
+		       MAX(download_egress_kbps)::bigint,
+		       MAX(cpu_pct),
+		       MAX(memory_pct),
+		       MAX(gpu_pct),
+		       MAX(net_rx_bps)::bigint,
+		       MAX(net_tx_bps)::bigint,
+		       MAX(postgres_latency_ms),
+		       MAX(redis_latency_ms),
+		       MAX(node_latency_ms)
 		FROM minutes
 		GROUP BY display_bucket
 		ORDER BY display_bucket
@@ -319,6 +359,14 @@ func queryAdminTimeseries(ctx context.Context, pool *pgxpool.Pool, hours int) (*
 			&row.Transcode,
 			&row.EgressKbps,
 			&row.DownloadEgressKbps,
+			&row.CPUPercent,
+			&row.MemoryPercent,
+			&row.GPUPercent,
+			&row.NetworkReceiveBPS,
+			&row.NetworkSendBPS,
+			&row.PostgresLatencyMS,
+			&row.RedisLatencyMS,
+			&row.NodeLatencyMS,
 		); err != nil {
 			return nil, fmt.Errorf("scanning dashboard metric sample: %w", err)
 		}

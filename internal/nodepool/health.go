@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"slices"
 	"strings"
@@ -216,6 +217,11 @@ type HealthChecker struct {
 	// a fetch that outlives the sweep that started it is not started again by
 	// the next sweep. Node ids are unique across both pools (one table).
 	capabilityRefreshInFlight sync.Map
+
+	// nodeLatencies holds the latest successful health round trip per node. A
+	// failed check removes its previous value so history does not keep charting
+	// latency for a worker that is currently unreachable.
+	nodeLatencies sync.Map // map[int]float64, milliseconds
 }
 
 // NewHealthChecker creates a health checker for the given pools.
@@ -312,7 +318,9 @@ func (hc *HealthChecker) checkAll(ctx context.Context) {
 	var wg sync.WaitGroup
 	check := func(n *Node, applyHealth applyHealthFunc, applyCapabilities applyCapabilitiesFunc) {
 		wg.Go(func() {
+			startedAt := time.Now()
 			healthy, activeJobs, egressKbps, capabilitiesHash, lastStats := CheckNode(ctx, n)
+			hc.recordNodeLatency(n.ID, healthy, time.Since(startedAt))
 
 			// Publish the result through the pool lock so readers never see
 			// a Node struct mutated in place (the pool swaps in a copy). Fenced
@@ -352,6 +360,43 @@ func (hc *HealthChecker) checkAll(ctx context.Context) {
 		check(n, hc.transcodePool.ApplyHealth, hc.transcodePool.ApplyCapabilities)
 	}
 	wg.Wait()
+}
+
+// MaxHealthyLatencyMS returns the slowest latest successful node health check.
+// nil means no configured node has completed a successful check yet.
+func (hc *HealthChecker) MaxHealthyLatencyMS() *float64 {
+	if hc == nil {
+		return nil
+	}
+	var slowest *float64
+	consider := func(node *Node) {
+		stored, found := hc.nodeLatencies.Load(node.ID)
+		latency, ok := stored.(float64)
+		if found && ok && (slowest == nil || latency > *slowest) {
+			value := latency
+			slowest = &value
+		}
+	}
+	if hc.proxyPool != nil {
+		for _, node := range hc.proxyPool.Nodes() {
+			consider(node)
+		}
+	}
+	if hc.transcodePool != nil {
+		for _, node := range hc.transcodePool.Nodes() {
+			consider(node)
+		}
+	}
+	return slowest
+}
+
+func (hc *HealthChecker) recordNodeLatency(id int, healthy bool, elapsed time.Duration) {
+	if !healthy {
+		hc.nodeLatencies.Delete(id)
+		return
+	}
+	milliseconds := math.Round(float64(elapsed.Microseconds())/10) / 100
+	hc.nodeLatencies.Store(id, milliseconds)
 }
 
 // startCapabilityRefresh runs one node's capability fetch off the sweep's

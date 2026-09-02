@@ -1,11 +1,12 @@
 // Package dashmetrics records the admin dashboard time series that cannot be
-// reconstructed after the fact: how many streams were running (split by play
-// method) and how much egress the deployment served. Live sessions leave no
-// per-minute trace once they end, and node egress is a rolling average that is
-// overwritten on every health check, so both have to be sampled as they happen.
+// reconstructed after the fact: live streams, egress, process resource
+// pressure, and dependency latency. These values either disappear when the
+// moment passes or are overwritten by their next reading, so they have to be
+// sampled as they happen.
 //
-// One row per minute per source lands in dashboard_metric_samples, and rows
-// older than the retention window below are pruned once an hour:
+// One row per minute per source lands in dashboard_metric_samples. System
+// readings are cleared after their short diagnostic window, while rows remain
+// available for the longer playback and egress history:
 //
 //   - "shared" is the cluster-wide snapshot. Every replica writes it with
 //     INSERT ... ON CONFLICT DO NOTHING, so the first writer for a minute wins
@@ -18,7 +19,8 @@
 //     deployment would chart zero egress forever. egress_kbps is the process
 //     total; download_egress_kbps is the file-transfer subset of that total
 //     (see computeEgressDelta), so the dashboard can split playback from
-//     download traffic.
+//     download traffic. The same row carries the local resource snapshot and
+//     successful PostgreSQL/Redis round trips.
 //
 // Sampling is best-effort: every failure is logged and swallowed. A missed
 // minute is a gap in the chart, never a failed request or a dead server.
@@ -26,14 +28,19 @@ package dashmetrics
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
+	"github.com/Silo-Server/silo-server/internal/nodemetrics"
 	"github.com/Silo-Server/silo-server/internal/streamtelemetry"
 )
 
@@ -48,14 +55,43 @@ const (
 	// interval so a wedged pool costs missed minutes, not a stuck sampler.
 	sampleTickTimeout = 30 * time.Second
 
-	// retentionDays is how much history the charts can show — a month, so the
-	// dashboard's widest range has samples to draw. 1440 minutes a day times 31
-	// days is ~45k rows per source, and sources are (1 + replicas), so the table
-	// stays in the low hundreds of thousands of rows at most. Reads bucket the
-	// minutes down before returning them (internal/api/handlers), so a wide
-	// window costs the same on the wire as a narrow one.
-	retentionDays = 31
+	// sampleRetentionDays is how much playback and egress history the charts
+	// can show — a month, so the dashboard's widest range has samples to draw.
+	// 1440 minutes a day times 31 days is ~45k rows per source, and sources are
+	// (1 + replicas), so the table stays in the low hundreds of thousands of
+	// rows at most. Reads bucket the minutes down before returning them
+	// (internal/api/handlers), so a wide window costs the same on the wire as a
+	// narrow one.
+	sampleRetentionDays = 31
+
+	// systemMetricRetentionHours keeps enough detail for current incidents
+	// without storing long-term host and dependency telemetry.
+	systemMetricRetentionHours = 24
 )
+
+type metricStore interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+}
+
+// resourceSnapshotter is the read side of the local resource sampler. Reads
+// are atomic and never perform system work; the five-second collector owns it.
+type resourceSnapshotter interface {
+	Snapshot() nodemetrics.Snapshot
+}
+
+type nodeLatencySource interface {
+	MaxHealthyLatencyMS() *float64
+}
+
+// Options are the process-local inputs to dashboard sampling.
+type Options struct {
+	Pool      *pgxpool.Pool
+	Telemetry *streamtelemetry.Registry
+	Resources resourceSnapshotter
+	Redis     *redis.Client
+	Nodes     nodeLatencySource
+	NodeID    string
+}
 
 // Sampler writes one dashboard_metric_samples row per minute for as long as it
 // runs. Its state is owned by the single goroutine Start launches; nothing else
@@ -63,6 +99,9 @@ const (
 type Sampler struct {
 	pool      *pgxpool.Pool
 	telemetry *streamtelemetry.Registry // nil when stream telemetry is disabled
+	resources resourceSnapshotter       // nil when host sampling is disabled
+	redis     *redis.Client             // nil when Redis is not configured
+	nodes     nodeLatencySource         // nil when node health checks are disabled
 	source    string                    // "proc:<node_id>"
 	interval  time.Duration
 
@@ -80,10 +119,11 @@ type Sampler struct {
 	stop     chan struct{}
 }
 
-// NewSampler builds a sampler for this process. telemetry may be nil, in which
-// case only the shared cluster row is written. nodeID identifies this process
-// among the replicas; it falls back to the hostname when empty.
-func NewSampler(pool *pgxpool.Pool, telemetry *streamtelemetry.Registry, nodeID string) *Sampler {
+// NewSampler builds a sampler for this process. Optional inputs simply leave
+// their metric absent. NodeID identifies this process among replicas and falls
+// back to the hostname when empty.
+func NewSampler(opts Options) *Sampler {
+	nodeID := opts.NodeID
 	if nodeID == "" {
 		nodeID, _ = os.Hostname()
 	}
@@ -91,8 +131,11 @@ func NewSampler(pool *pgxpool.Pool, telemetry *streamtelemetry.Registry, nodeID 
 		nodeID = "unknown"
 	}
 	return &Sampler{
-		pool:      pool,
-		telemetry: telemetry,
+		pool:      opts.Pool,
+		telemetry: opts.Telemetry,
+		resources: opts.Resources,
+		redis:     opts.Redis,
+		nodes:     opts.Nodes,
 		source:    "proc:" + nodeID,
 		interval:  sampleInterval,
 		stop:      make(chan struct{}),
@@ -152,9 +195,10 @@ func (s *Sampler) sampleOnce(ctx context.Context, at time.Time) {
 
 	s.sampleShared(ctx)
 	s.sampleProcessEgress(ctx, at)
+	s.sampleProcessSystem(ctx, at)
 
 	// Retention runs in-band rather than as its own timer: the table is tiny
-	// and one DELETE an hour costs less than another goroutine.
+	// and one cleanup pass an hour costs less than another goroutine.
 	if at.Minute() == 0 {
 		s.pruneExpired(ctx)
 	}
@@ -230,15 +274,52 @@ func (s *Sampler) sampleProcessEgress(ctx context.Context, at time.Time) {
 	}
 }
 
-// pruneExpired drops samples older than the retention window.
+// pruneExpired clears short-lived system readings, then drops rows after the
+// longer playback and egress retention window.
 func (s *Sampler) pruneExpired(ctx context.Context) {
-	_, err := s.pool.Exec(ctx, `
-		DELETE FROM dashboard_metric_samples
-		WHERE bucket < now() - make_interval(days => $1)
-	`, retentionDays)
-	if err != nil {
+	if err := pruneExpiredDashboardMetrics(ctx, s.pool); err != nil {
 		slog.WarnContext(ctx, "failed to prune dashboard metric samples", "component", component, "error", err)
 	}
+}
+
+// pruneExpiredDashboardMetrics applies the two independent retention windows
+// without letting one failed operation prevent the other from running.
+func pruneExpiredDashboardMetrics(ctx context.Context, store metricStore) error {
+	var pruneErrors []error
+
+	_, err := store.Exec(ctx, `
+		UPDATE dashboard_metric_samples
+		SET cpu_pct = NULL,
+		    memory_pct = NULL,
+		    gpu_pct = NULL,
+		    net_rx_bps = NULL,
+		    net_tx_bps = NULL,
+		    postgres_latency_ms = NULL,
+		    redis_latency_ms = NULL,
+		    node_latency_ms = NULL
+		WHERE bucket < now() - make_interval(hours => $1)
+		  AND (cpu_pct IS NOT NULL
+		    OR memory_pct IS NOT NULL
+		    OR gpu_pct IS NOT NULL
+		    OR net_rx_bps IS NOT NULL
+		    OR net_tx_bps IS NOT NULL
+		    OR postgres_latency_ms IS NOT NULL
+		    OR redis_latency_ms IS NOT NULL
+		    OR node_latency_ms IS NOT NULL)
+	`, systemMetricRetentionHours)
+	if err != nil {
+		pruneErrors = append(pruneErrors, fmt.Errorf("clear expired system metrics: %w", err))
+	}
+
+	_, err = store.Exec(ctx, `
+		DELETE FROM dashboard_metric_samples
+		WHERE bucket < now() - make_interval(days => $1)
+	`, sampleRetentionDays)
+	if err != nil {
+		pruneErrors = append(pruneErrors, fmt.Errorf("delete expired samples: %w", err))
+	}
+
+	return errors.Join(pruneErrors...)
 }
 
 // sampleBucket truncates a sample time to the minute it belongs to, in UTC.

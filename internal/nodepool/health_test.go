@@ -578,3 +578,28 @@ func TestCheckNodeReachesATrailingSlashBaseURL(t *testing.T) {
 		t.Fatalf("active jobs = %d, hash = %q; want the node's own answer", activeJobs, hash)
 	}
 }
+
+func TestHealthCheckerReportsSlowestHealthyNodeLatency(t *testing.T) {
+	t.Parallel()
+
+	proxies := NewProxyPool()
+	proxies.SetNodes([]*Node{{ID: 1}, {ID: 2}})
+	checker := NewHealthChecker(proxies, NewTranscodePool(), nil)
+	if latency := checker.MaxHealthyLatencyMS(); latency != nil {
+		t.Fatalf("latency before a successful check = %v, want nil", *latency)
+	}
+
+	checker.recordNodeLatency(1, true, 1250*time.Microsecond)
+	checker.recordNodeLatency(2, true, 9*time.Millisecond)
+	checker.recordNodeLatency(3, true, 20*time.Millisecond)
+	latency := checker.MaxHealthyLatencyMS()
+	if latency == nil || *latency != 9 {
+		t.Fatalf("slowest latency = %v, want 9ms", latency)
+	}
+
+	checker.recordNodeLatency(2, false, 5*time.Second)
+	latency = checker.MaxHealthyLatencyMS()
+	if latency == nil || *latency != 1.25 {
+		t.Fatalf("latency after slow node failed = %v, want 1.25ms", latency)
+	}
+}

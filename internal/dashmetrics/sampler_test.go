@@ -1,11 +1,41 @@
 package dashmetrics
 
 import (
+	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/Silo-Server/silo-server/internal/nodemetrics"
 	"github.com/Silo-Server/silo-server/internal/streamtelemetry"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+type metricStoreCall struct {
+	query string
+	args  []any
+}
+
+type recordingMetricStore struct {
+	calls  []metricStoreCall
+	errors []error
+}
+
+func (s *recordingMetricStore) Exec(_ context.Context, query string, args ...any) (pgconn.CommandTag, error) {
+	callIndex := len(s.calls)
+	s.calls = append(s.calls, metricStoreCall{query: query, args: args})
+	if callIndex < len(s.errors) {
+		return pgconn.CommandTag{}, s.errors[callIndex]
+	}
+	return pgconn.CommandTag{}, nil
+}
+
+type fixedResourceSampler struct {
+	snapshot nodemetrics.Snapshot
+}
+
+func (s fixedResourceSampler) Snapshot() nodemetrics.Snapshot { return s.snapshot }
 
 func viewerSession(id string, bytes int64) streamtelemetry.SessionView {
 	return streamtelemetry.SessionView{
@@ -250,10 +280,10 @@ func TestEgressKbps(t *testing.T) {
 func TestNewSamplerSourceKey(t *testing.T) {
 	t.Parallel()
 
-	if got := NewSampler(nil, nil, "api-2").source; got != "proc:api-2" {
+	if got := NewSampler(Options{NodeID: "api-2"}).source; got != "proc:api-2" {
 		t.Fatalf("source = %q, want %q", got, "proc:api-2")
 	}
-	if got := NewSampler(nil, nil, "").source; got == "proc:" {
+	if got := NewSampler(Options{}).source; got == "proc:" {
 		t.Fatal("an empty node id must fall back to a host identity, not an empty source key")
 	}
 }
@@ -261,7 +291,118 @@ func TestNewSamplerSourceKey(t *testing.T) {
 func TestSamplerStopIsIdempotent(t *testing.T) {
 	t.Parallel()
 
-	sampler := NewSampler(nil, nil, "api-1")
+	sampler := NewSampler(Options{NodeID: "api-1"})
 	sampler.Stop()
 	sampler.Stop()
+}
+
+func TestPruneExpiredDashboardMetricsKeepsLongTermPlaybackHistory(t *testing.T) {
+	t.Parallel()
+
+	store := &recordingMetricStore{}
+	if err := pruneExpiredDashboardMetrics(context.Background(), store); err != nil {
+		t.Fatalf("pruneExpiredDashboardMetrics() error = %v", err)
+	}
+	if len(store.calls) != 2 {
+		t.Fatalf("calls = %d, want 2", len(store.calls))
+	}
+
+	clearSystem := store.calls[0]
+	if !strings.Contains(clearSystem.query, "UPDATE dashboard_metric_samples") {
+		t.Fatalf("system retention query = %s, want UPDATE", clearSystem.query)
+	}
+	for _, column := range []string{
+		"cpu_pct",
+		"memory_pct",
+		"gpu_pct",
+		"net_rx_bps",
+		"net_tx_bps",
+		"postgres_latency_ms",
+		"redis_latency_ms",
+		"node_latency_ms",
+	} {
+		if !strings.Contains(clearSystem.query, column+" = NULL") {
+			t.Errorf("system retention query does not clear %s", column)
+		}
+	}
+	if len(clearSystem.args) != 1 || clearSystem.args[0] != systemMetricRetentionHours {
+		t.Fatalf("system retention args = %v, want [%d]", clearSystem.args, systemMetricRetentionHours)
+	}
+
+	deleteSamples := store.calls[1]
+	if !strings.Contains(deleteSamples.query, "DELETE FROM dashboard_metric_samples") {
+		t.Fatalf("sample retention query = %s, want DELETE", deleteSamples.query)
+	}
+	if len(deleteSamples.args) != 1 || deleteSamples.args[0] != sampleRetentionDays {
+		t.Fatalf("sample retention args = %v, want [%d]", deleteSamples.args, sampleRetentionDays)
+	}
+}
+
+func TestPruneExpiredDashboardMetricsStillDeletesRowsWhenClearingFails(t *testing.T) {
+	t.Parallel()
+
+	clearError := errors.New("clear failed")
+	store := &recordingMetricStore{errors: []error{clearError}}
+	err := pruneExpiredDashboardMetrics(context.Background(), store)
+
+	if !errors.Is(err, clearError) {
+		t.Fatalf("error = %v, want clear failure", err)
+	}
+	if len(store.calls) != 2 {
+		t.Fatalf("calls = %d, want delete attempted after clear failure", len(store.calls))
+	}
+}
+
+func TestSystemMetricsUsesFreshSnapshot(t *testing.T) {
+	t.Parallel()
+
+	at := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+	videoBusy := 72
+	totalBusy := 91
+	metrics := systemMetrics(fixedResourceSampler{snapshot: nodemetrics.Snapshot{
+		Available: true,
+		SampledAt: at.Add(-5 * time.Second),
+		System: &nodemetrics.SystemStats{
+			CPUPct:     43,
+			MemUsedMB:  3_072,
+			MemTotalMB: 8_192,
+			NetRxBps:   12_000,
+			NetTxBps:   34_000,
+		},
+		GPU: []nodemetrics.GPUStats{
+			{VideoBusyPct: &videoBusy},
+			{TotalBusyPct: &totalBusy},
+		},
+	}}, at)
+
+	if metrics.CPUPercent == nil || *metrics.CPUPercent != 43 {
+		t.Fatalf("cpu = %v, want 43", metrics.CPUPercent)
+	}
+	if metrics.MemoryPercent == nil || *metrics.MemoryPercent != 37.5 {
+		t.Fatalf("memory = %v, want 37.5", metrics.MemoryPercent)
+	}
+	if metrics.GPUPercent == nil || *metrics.GPUPercent != 91 {
+		t.Fatalf("gpu = %v, want 91", metrics.GPUPercent)
+	}
+	if metrics.NetworkReceiveBPS == nil || *metrics.NetworkReceiveBPS != 12_000 {
+		t.Fatalf("rx = %v, want 12000", metrics.NetworkReceiveBPS)
+	}
+	if metrics.NetworkSendBPS == nil || *metrics.NetworkSendBPS != 34_000 {
+		t.Fatalf("tx = %v, want 34000", metrics.NetworkSendBPS)
+	}
+}
+
+func TestSystemMetricsRejectsStaleSnapshot(t *testing.T) {
+	t.Parallel()
+
+	at := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+	metrics := systemMetrics(fixedResourceSampler{snapshot: nodemetrics.Snapshot{
+		Available: true,
+		SampledAt: at.Add(-resourceSampleMaxAge - time.Second),
+		System:    &nodemetrics.SystemStats{CPUPct: 80},
+	}}, at)
+
+	if metrics != (processSystemSample{}) {
+		t.Fatalf("stale metrics = %+v, want empty sample", metrics)
+	}
 }

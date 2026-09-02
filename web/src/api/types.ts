@@ -4783,6 +4783,17 @@ export interface AdminTimeseriesPoint {
   // and 0 on samples written before the split — "not measured", not "no
   // downloads".
   download_egress_kbps?: number;
+  /** Highest API-process pressure sampled during this minute. */
+  cpu_pct?: number;
+  memory_pct?: number;
+  gpu_pct?: number;
+  /** Aggregate traffic across the API processes, in bits per second. */
+  net_rx_bps?: number;
+  net_tx_bps?: number;
+  /** Slowest successful dependency round trip sampled during this minute. */
+  postgres_latency_ms?: number;
+  redis_latency_ms?: number;
+  node_latency_ms?: number;
 }
 
 // `oldest_sample_at` is null until the sampler has written anything, which is

@@ -2169,7 +2169,14 @@ func main() {
 		// unset SILO_MODE is the integrated default everywhere else in this
 		// file, so it samples too.
 		if mode == "integrated" || mode == "api" || mode == "" {
-			dashSampler := dashmetrics.NewSampler(deps.DB, deps.StreamTelemetry, nodeIdentity)
+			dashSampler := dashmetrics.NewSampler(dashmetrics.Options{
+				Pool:      deps.DB,
+				Telemetry: deps.StreamTelemetry,
+				Resources: deps.ResourceSampler,
+				Redis:     deps.RedisClient,
+				Nodes:     deps.NodeHealthChecker,
+				NodeID:    nodeIdentity,
+			})
 			dashSampler.Start(appCtx)
 			defer dashSampler.Stop()
 		}

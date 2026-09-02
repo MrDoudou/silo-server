@@ -14,10 +14,19 @@ import {
   TranscodeShareStatWidget,
   UsersStatWidget,
 } from "./widgets/statTiles";
+import {
+  CPUStatWidget,
+  GPUStatWidget,
+  MemoryStatWidget,
+  NetworkStatWidget,
+} from "./widgets/ResourceStatTiles";
 import { ConcurrentStreamsWidget } from "./widgets/ConcurrentStreamsWidget";
 import { EgressWidget } from "./widgets/EgressWidget";
 import { HealthStripWidget } from "./widgets/HealthStripWidget";
-import { ServerResourcesWidget } from "./widgets/ServerResourcesWidget";
+import { StorageVolumesWidget } from "./widgets/StorageVolumesWidget";
+import { ResourceHistoryWidget } from "./widgets/ResourceHistoryWidget";
+import { NetworkHistoryWidget } from "./widgets/NetworkHistoryWidget";
+import { DependencyLatencyWidget } from "./widgets/DependencyLatencyWidget";
 import { PlaybackActivityWidget } from "./widgets/PlaybackActivityWidget";
 import { PlaybackReliabilityWidget } from "./widgets/PlaybackReliabilityWidget";
 import { TopProfilesWidget } from "./widgets/TopProfilesWidget";
@@ -39,6 +48,12 @@ import { RecentActivityWidget } from "./widgets/RecentActivityWidget";
  */
 const SAMPLED_RANGES: WidgetRangeOptions = {
   allowed: ["hour", "day", "week", "month"],
+  default: "day",
+};
+
+/** Host and dependency telemetry is intentionally retained for one day. */
+const SYSTEM_RANGES: WidgetRangeOptions = {
+  allowed: ["hour", "day"],
   default: "day",
 };
 
@@ -75,6 +90,54 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
     maxRows: 2,
     defaultRows: 1,
     Component: EgressNowStatWidget,
+  },
+  {
+    id: "stat-cpu",
+    title: "CPU",
+    description: "Current API host CPU usage",
+    minSpan: 2,
+    maxSpan: 4,
+    defaultSpan: 3,
+    minRows: 1,
+    maxRows: 2,
+    defaultRows: 1,
+    Component: CPUStatWidget,
+  },
+  {
+    id: "stat-memory",
+    title: "RAM",
+    description: "Current API host memory usage",
+    minSpan: 2,
+    maxSpan: 4,
+    defaultSpan: 3,
+    minRows: 1,
+    maxRows: 2,
+    defaultRows: 1,
+    Component: MemoryStatWidget,
+  },
+  {
+    id: "stat-gpu",
+    title: "GPU",
+    description: "Current API host video-engine usage",
+    minSpan: 2,
+    maxSpan: 4,
+    defaultSpan: 3,
+    minRows: 1,
+    maxRows: 2,
+    defaultRows: 1,
+    Component: GPUStatWidget,
+  },
+  {
+    id: "stat-network",
+    title: "Network",
+    description: "Current API host receive and send throughput",
+    minSpan: 2,
+    maxSpan: 4,
+    defaultSpan: 3,
+    minRows: 1,
+    maxRows: 2,
+    defaultRows: 1,
+    Component: NetworkStatWidget,
   },
   {
     id: "stat-transcode-share",
@@ -162,15 +225,54 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
   },
   {
     id: "server-resources",
-    title: "Server resources",
-    description: "CPU, memory, disk, network, and GPU usage on the API host",
+    title: "Storage volumes",
+    description: "Capacity and usage of each sampled Silo filesystem",
     minSpan: 6,
     maxSpan: 12,
     defaultSpan: 6,
-    minRows: 2,
+    minRows: 1,
     maxRows: 4,
+    defaultRows: 1,
+    Component: StorageVolumesWidget,
+  },
+  {
+    id: "resource-history",
+    title: "Resource usage",
+    description: "Sampled CPU, memory, and GPU pressure",
+    minSpan: 4,
+    maxSpan: 12,
+    defaultSpan: 6,
+    minRows: 2,
+    maxRows: 5,
     defaultRows: 3,
-    Component: ServerResourcesWidget,
+    ranges: SYSTEM_RANGES,
+    Component: ResourceHistoryWidget,
+  },
+  {
+    id: "dependency-latency",
+    title: "Service latency",
+    description: "Sampled PostgreSQL, Redis, and stream-node round-trip time",
+    minSpan: 4,
+    maxSpan: 12,
+    defaultSpan: 6,
+    minRows: 2,
+    maxRows: 5,
+    defaultRows: 3,
+    ranges: SYSTEM_RANGES,
+    Component: DependencyLatencyWidget,
+  },
+  {
+    id: "network-history",
+    title: "Network traffic",
+    description: "Sampled API receive and send throughput",
+    minSpan: 4,
+    maxSpan: 12,
+    defaultSpan: 6,
+    minRows: 2,
+    maxRows: 5,
+    defaultRows: 3,
+    ranges: SYSTEM_RANGES,
+    Component: NetworkHistoryWidget,
   },
   {
     id: "playback-24h",
@@ -426,7 +528,13 @@ const DEFAULT_LAYOUT_ORDER: WidgetId[] = [
   "stat-movies",
   "stat-shows",
   "stat-storage",
+  "stat-cpu",
+  "stat-memory",
+  "stat-gpu",
+  "stat-network",
   "health-strip",
+  "resource-history",
+  "dependency-latency",
   // What is playing right now — the reason most admins open this page.
   "now-playing",
   // The trends that explain the numbers, then who watched what.

@@ -1,22 +1,27 @@
 import type { ReactNode } from "react";
 import { Activity, Film, Gauge, HardDrive, Tv, UserCheck, Users, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAdminSessions, useAdminStats } from "@/hooks/queries/admin/stats";
+import { useSystemResources } from "@/hooks/queries/admin/system";
+import { usePageActivity } from "@/hooks/usePageActivity";
 import {
   useAdminPlaybackActivity,
   useAdminTimeseries,
 } from "@/hooks/queries/admin/dashboardInsights";
 import { classifyActivityMethod } from "@/pages/adminActivityPresentation";
 import { formatFileCount, formatMbps } from "../format";
+import { describeLibraryStorage } from "./storageMetrics";
 import { latestFreshPoint } from "./timeseriesSeries";
 
-function StatTile({
+export function StatTile({
   label,
   value,
   sub,
   icon,
   isLoading,
   error,
+  tooltip,
 }: {
   label: string;
   value: string;
@@ -24,16 +29,20 @@ function StatTile({
   icon: ReactNode;
   isLoading: boolean;
   error: unknown;
+  tooltip?: string;
 }) {
   if (isLoading) {
     return <Skeleton className="h-full min-h-24 rounded-2xl" />;
   }
 
-  return (
+  const tile = (
     // A stat tile is one grid row tall, so its content is centered in whatever
     // height the row gives it and the padding is trimmed to the ~96px the
     // loading skeleton has always reserved.
-    <div className="surface-panel flex h-full flex-col justify-center overflow-hidden rounded-2xl border-0 p-4 transition-colors duration-150">
+    <div
+      className="surface-panel flex h-full flex-col justify-center overflow-hidden rounded-2xl border-0 p-4 transition-colors duration-150"
+      tabIndex={tooltip ? 0 : undefined}
+    >
       <div className="mb-1.5 flex items-center justify-between">
         <div className="text-muted-foreground text-[11px] leading-none font-medium">{label}</div>
         <div className="text-muted-foreground">{icon}</div>
@@ -49,6 +58,18 @@ function StatTile({
         </>
       )}
     </div>
+  );
+
+  if (!tooltip) {
+    return tile;
+  }
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>{tile}</TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -178,21 +199,29 @@ export function UsersStatWidget() {
 
 export function StorageStatWidget() {
   const statsQuery = useAdminStats();
+  const pageActivity = usePageActivity();
+  const resourcesQuery = useSystemResources(pageActivity.canPollDashboard);
   const stats = statsQuery.data;
-  let storageDisplay = "—";
-  if (stats) {
-    const storageGB = stats.total_storage_bytes / (1024 * 1024 * 1024);
-    const storageTB = storageGB / 1024;
-    storageDisplay = storageTB >= 1 ? `${storageTB.toFixed(1)} TB` : `${storageGB.toFixed(0)} GB`;
-  }
+  const storage = describeLibraryStorage(
+    stats?.total_storage_bytes,
+    resourcesQuery.data?.system?.disks ?? [],
+  );
+  const fileCount = formatFileCount(stats?.total_files);
+
   return (
     <StatTile
       label="Storage"
-      value={storageDisplay}
-      sub={formatFileCount(stats?.total_files)}
+      value={storage.percent}
+      sub={storage.detail}
       icon={<HardDrive className="h-4 w-4" />}
-      isLoading={statsQuery.isLoading || (!stats && !statsQuery.error)}
+      isLoading={
+        statsQuery.isLoading ||
+        resourcesQuery.isLoading ||
+        (!stats && !statsQuery.error) ||
+        (!resourcesQuery.data && !resourcesQuery.error)
+      }
       error={statsQuery.error}
+      tooltip={fileCount}
     />
   );
 }

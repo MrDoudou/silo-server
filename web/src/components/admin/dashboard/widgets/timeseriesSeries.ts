@@ -20,7 +20,7 @@ const DEFAULT_RESOLUTION_SECONDS = 60;
  */
 export function buildTimeseriesPoints(
   series: AdminTimeseries | undefined,
-  select: (point: AdminTimeseriesPoint) => number,
+  select: (point: AdminTimeseriesPoint) => number | null | undefined,
 ): LineChartPoint[] {
   if (!series) {
     return [];
@@ -34,7 +34,7 @@ export function buildTimeseriesPoints(
       return [];
     }
     const value = select(point);
-    return [{ t, value: Number.isFinite(value) ? value : null }];
+    return [{ t, value: typeof value === "number" && Number.isFinite(value) ? value : null }];
   });
 
   const from = Date.parse(series.from);

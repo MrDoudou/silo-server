@@ -58,7 +58,9 @@ export function TimeseriesChartBody({
     return <SectionError message={errorMessage} />;
   }
 
-  const hasSample = points.some((point) => point.value !== null);
+  const hasSample =
+    points.some((point) => point.value !== null) ||
+    overlays?.some((overlay) => overlay.points.some((point) => point.value !== null));
   if (!hasSample) {
     return (
       <ChartEmptyState
