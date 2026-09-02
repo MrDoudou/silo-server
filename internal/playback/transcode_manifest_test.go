@@ -1005,6 +1005,15 @@ func TestTranscodeThrottlerUsesProducedHeadForGap(t *testing.T) {
 
 	writeManifestRange(t, tempDir, 225, 254, ".ts")
 	throttler.CheckOnce()
+	if !throttler.paused {
+		t.Fatal("throttler resumed before the hysteresis boundary")
+	}
+	if writer.writes != "p" {
+		t.Fatalf("writes = %q, want p", writer.writes)
+	}
+
+	writeManifestRange(t, tempDir, 225, 240, ".ts")
+	throttler.CheckOnce()
 	if throttler.paused {
 		t.Fatal("expected throttler to resume")
 	}
